@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import axios from 'axios'; // Kept for when you implement the actual API calls
 import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
@@ -10,24 +10,66 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
   const sendOtp = async () => {
-    if (phone.length !== 10) {
-    setError('Enter a valid 10 digit phone number');
-    return;
-  }
-  setStep('otp');
-};
-const verifyOtp = async () => {
-  if (otp.length !== 6) {
-    setError('Enter the 6 digit OTP');
-    return;
-  }
-  if (role === 'owner') {
-    navigate('/owner/dashboard');
-  } else {
-    navigate('/driver/dashboard');
-  }
-};
+    setError(''); // Clear previous errors
+    
+    // Basic validation to ensure only digits are entered
+    if (!/^\d{10}$/.test(phone)) {
+      setError('Enter a valid 10 digit phone number');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // TODO: Replace with actual axios call
+      // await axios.post('/api/send-otp', { phone, role });
+      
+      // Simulating network request
+      await new Promise(resolve => setTimeout(resolve, 500)); 
+      setStep('otp');
+    } catch (err) {
+      setError('Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    setError(''); // Clear previous errors
+
+    if (!/^\d{6}$/.test(otp)) {
+      setError('Enter a valid 6 digit OTP');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // TODO: Replace with actual axios call
+      // await axios.post('/api/verify-otp', { phone, otp, role });
+      
+      // Simulating network request
+      await new Promise(resolve => setTimeout(resolve, 500)); 
+      
+      if (role === 'owner') {
+        navigate('/owner/dashboard');
+      } else {
+        navigate('/driver/dashboard');
+      }
+    } catch (err) {
+      setError('Invalid OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper to handle input changes and restrict to numbers
+  const handleNumericInput = (e, setter, max) => {
+    const value = e.target.value.replace(/\D/g, ''); // Strip non-digits
+    if (value.length <= max) {
+      setter(value);
+    }
+  };
 
   return (
     <div style={styles.container}>
@@ -38,13 +80,19 @@ const verifyOtp = async () => {
         <div style={styles.toggle}>
           <button
             style={{ ...styles.toggleBtn, ...(role === 'driver' ? styles.toggleActive : {}) }}
-            onClick={() => setRole('driver')}
+            onClick={() => {
+              setRole('driver');
+              setError('');
+            }}
           >
             Driver
           </button>
           <button
             style={{ ...styles.toggleBtn, ...(role === 'owner' ? styles.toggleActive : {}) }}
-            onClick={() => setRole('owner')}
+            onClick={() => {
+              setRole('owner');
+              setError('');
+            }}
           >
             Owner
           </button>
@@ -57,15 +105,19 @@ const verifyOtp = async () => {
               <span style={styles.prefix}>+91</span>
               <input
                 style={styles.input}
-                type="number"
+                type="tel"
                 placeholder="9999999999"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                maxLength={10}
+                onChange={(e) => handleNumericInput(e, setPhone, 10)}
+                onKeyDown={(e) => e.key === 'Enter' && sendOtp()}
               />
             </div>
             {error && <p style={styles.error}>{error}</p>}
-            <button style={styles.btn} onKeyDown={(e) => e.key === 'Enter' && verifyOtp()} disabled={loading}>
+            <button 
+              style={styles.btn} 
+              onClick={sendOtp} 
+              disabled={loading}
+            >
               {loading ? 'Sending...' : 'Send OTP'}
             </button>
           </>
@@ -74,17 +126,28 @@ const verifyOtp = async () => {
             <p style={styles.label}>Enter the OTP sent to +91 {phone}</p>
             <input
               style={styles.otpInput}
-              type="number"
+              type="tel"
               placeholder="123456"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              maxLength={6}
+              onChange={(e) => handleNumericInput(e, setOtp, 6)}
+              onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
             />
             {error && <p style={styles.error}>{error}</p>}
-            <button style={styles.btn} onClick={verifyOtp} disabled={loading}>
+            <button 
+              style={styles.btn} 
+              onClick={verifyOtp} 
+              disabled={loading}
+            >
               {loading ? 'Verifying...' : 'Verify OTP'}
             </button>
-            <p style={styles.resend} onClick={() => setStep('phone')}>
+            <p 
+              style={styles.resend} 
+              onClick={() => {
+                setStep('phone');
+                setOtp('');
+                setError('');
+              }}
+            >
               Change number
             </p>
           </>
@@ -94,6 +157,7 @@ const verifyOtp = async () => {
   );
 }
 
+// ... keep your styles object exactly as is
 const styles = {
   container: {
     minHeight: '100vh',
@@ -136,6 +200,9 @@ const styles = {
     fontWeight: '500',
     backgroundColor: 'transparent',
     color: 'var(--text-secondary)',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
   },
   toggleActive: {
     backgroundColor: 'var(--bronze)',
@@ -165,9 +232,12 @@ const styles = {
     fontSize: '16px',
     backgroundColor: 'transparent',
     color: 'var(--text-primary)',
+    border: 'none',
+    outline: 'none',
   },
   otpInput: {
     width: '100%',
+    boxSizing: 'border-box',
     border: '1px solid var(--border)',
     borderRadius: '8px',
     padding: '12px 16px',
@@ -177,6 +247,7 @@ const styles = {
     backgroundColor: 'var(--bg)',
     color: 'var(--text-primary)',
     marginBottom: '16px',
+    outline: 'none',
   },
   btn: {
     width: '100%',
@@ -186,6 +257,8 @@ const styles = {
     borderRadius: '8px',
     fontSize: '15px',
     fontWeight: '600',
+    border: 'none',
+    cursor: 'pointer',
   },
   error: {
     color: 'var(--danger)',
