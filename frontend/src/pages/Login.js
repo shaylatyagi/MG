@@ -11,10 +11,10 @@ export default function Login() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   
-  // OTP input ke liye reference create kar rahe hain
+  // OTP input ke liye reference
   const otpInputRef = useRef(null);
 
-  // Jaise hi step 'otp' hoga, apne aap OTP wale dabbe par focus chala jayega
+  // OTP wale step par aate hi auto-focus karna
   useEffect(() => {
     if (step === 'otp' && otpInputRef.current) {
       otpInputRef.current.focus();
@@ -30,7 +30,7 @@ export default function Login() {
 
     setLoading(true);
     try {
-      // API call yahan aayegi jab backend ready ho
+      // API call yahan aayegi (abhi testing ke liye timeout hai)
       // await axios.post('/api/send-otp', { phone, role });
       await new Promise(resolve => setTimeout(resolve, 500)); 
       setStep('otp');
@@ -50,7 +50,7 @@ export default function Login() {
 
     setLoading(true);
     try {
-      // API call yahan aayegi jab backend ready ho
+      // API call yahan aayegi 
       // await axios.post('/api/verify-otp', { phone, otp, role });
       await new Promise(resolve => setTimeout(resolve, 500)); 
       
@@ -66,6 +66,7 @@ export default function Login() {
     }
   };
 
+  // Sirf numbers allow karne aur length check karne wala function
   const handleNumericInput = (e, setter, max) => {
     const value = e.target.value.replace(/\D/g, '');
     if (value.length <= max) {
@@ -96,7 +97,7 @@ export default function Login() {
 
         {step === 'phone' ? (
           <>
-            <p style={styles.label}>Enter your phone number</p>
+            <p style={styles.label}>Enter your 10 digit phone number</p>
             <div style={styles.inputWrapper}>
               <span style={styles.prefix}>+91</span>
               <input
@@ -106,6 +107,7 @@ export default function Login() {
                 value={phone}
                 onChange={(e) => handleNumericInput(e, setPhone, 10)}
                 onKeyDown={(e) => e.key === 'Enter' && sendOtp()}
+                maxLength={10}
                 autoFocus
               />
             </div>
@@ -116,7 +118,7 @@ export default function Login() {
           </>
         ) : (
           <>
-            <p style={styles.label}>Enter the OTP sent to +91 {phone}</p>
+            <p style={styles.label}>Enter the 6-digit OTP sent to +91 {phone}</p>
             <input
               ref={otpInputRef}
               style={styles.otpInput}
@@ -125,6 +127,7 @@ export default function Login() {
               value={otp}
               onChange={(e) => handleNumericInput(e, setOtp, 6)}
               onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
+              maxLength={6}
             />
             {error && <p style={styles.error}>{error}</p>}
             <button style={styles.btn} onClick={verifyOtp} disabled={loading}>
@@ -140,6 +143,7 @@ export default function Login() {
   );
 }
 
+// Mobile Responsive Styles
 const styles = {
   container: {
     minHeight: '100vh',
