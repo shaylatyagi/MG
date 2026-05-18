@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
-import axios from 'axios';
+import api from '../api';
 
 function DriverDashboard() {
   const [loading, setLoading] = useState(false);
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const handlePayment = async (amount) => {
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:5000/api/payment/create-order', {
-        amount,
-        customerName: 'Test Driver',
-        customerPhone: '9999999999',
-        customerEmail: 'driver@mobilitygrid.in',
+      const res = await api.post('/api/payment/create-order', {
+        amount: amount,
+        customerName: user.name || 'Driver',
+        customerPhone: user.phone_number || '',
+        customerEmail: user.email || 'driver@mobilitygrid.in',
       });
       const checkoutUrl = res.data.data.data.checkoutUrl;
       if (checkoutUrl) {
@@ -31,7 +32,6 @@ function DriverDashboard() {
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Driver Console</h1>
@@ -42,7 +42,7 @@ function DriverDashboard() {
               Download Report
             </button>
             <button
-              onClick={() => handlePayment(450)}
+              onClick={() => handlePayment(2)}
               disabled={loading}
               style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white', opacity: loading ? 0.7 : 1 }}
             >
@@ -63,18 +63,18 @@ function DriverDashboard() {
           <div style={{ flex: 2, backgroundColor: 'white', borderRadius: '16px', padding: '28px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Today's Progress</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <p style={{ fontSize: '28px', fontWeight: '700' }}>₹350 / ₹450</p>
+              <p style={{ fontSize: '28px', fontWeight: '700' }}>₹0 / ₹1</p>
               <span style={{ color: '#D97706', fontSize: '13px', fontWeight: '600' }}>₹100 Due</span>
             </div>
             <div style={{ backgroundColor: '#F3EDE5', borderRadius: '4px', height: '8px', marginBottom: '16px' }}>
               <div style={{ backgroundColor: '#8B5E3C', borderRadius: '4px', height: '8px', width: '78%' }} />
             </div>
             <button
-              onClick={() => handlePayment(100)}
+              onClick={() => handlePayment(10)}
               disabled={loading}
               style={{ width: '100%', padding: '14px', backgroundColor: '#C49A6C', color: 'white', borderRadius: '8px', fontSize: '15px', fontWeight: '600', opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? 'Processing...' : 'Pay Balance via UPI'}
+              {loading ? 'Processing...' : 'Pay Balance'}
             </button>
           </div>
 
@@ -118,11 +118,10 @@ function DriverDashboard() {
                   <p style={{ fontSize: '12px', color: '#9CA3AF' }}>May 17, 10:15 AM</p>
                 </div>
               </div>
-              <p style={{ fontSize: '14px', fontWeight: '600', color: '#16A34A' }}>₹350.00</p>
+              <p style={{ fontSize: '14px', fontWeight: '600', color: '#16A34A' }}>₹0.00</p>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

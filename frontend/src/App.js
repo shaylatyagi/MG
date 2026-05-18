@@ -13,6 +13,7 @@ import HelpSOS from './pages/HelpSOS';
 import VehicleStatus from './pages/VehicleStatus';
 import FleetSettings from './pages/FleetSettings';
 import ComingSoon from './pages/ComingSoon';
+import PaymentResult from './pages/PaymentResult';
 function App() {
   return (
     <Router>
@@ -28,6 +29,7 @@ function App() {
         <Route path="/driver/wallet" element={<MyWallet />} />
         <Route path="/driver/vehicle" element={<VehicleStatus />} />
         <Route path="/driver/rewards" element={<TrustRewards />} />
+        <Route path="/payment-result" element={<PaymentResult />} />
         <Route path="/driver/help" element={<HelpSOS />} />
       </Routes>
     </Router>

@@ -12,7 +12,7 @@ router.post('/send-otp', async (req, res) => {
   }
 
   try {
-    const otp = '123456';
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expires_at = new Date(Date.now() + 10 * 60 * 1000);
 
     await pool.query(
@@ -52,7 +52,8 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(200).json({ message: 'OTP verified', is_new_user: true });
     }
 
-    res.json({ message: 'OTP verified', is_new_user: false, user: user.rows[0] });
+    const token = generateToken(user.rows[0]);
+    res.json({ message: 'OTP verified', is_new_user: false, token, user: user.rows[0] });
 
   } catch (err) {
     console.error(err);

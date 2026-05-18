@@ -5,16 +5,25 @@ import { useNavigate } from 'react-router-dom';
 export default function Login() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [name, setName] = useState('');
   const [step, setStep] = useState('phone');
   const [role, setRole] = useState('driver');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   
-  // OTP input ke liye reference
   const otpInputRef = useRef(null);
-
-  // OTP wale step par aate hi auto-focus karna
+  useEffect(() => {
+  const token = localStorage.getItem('token');
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  if (token && user.role) {
+    if (user.role === 'owner') {
+      navigate('/owner/dashboard');
+    } else {
+      navigate('/driver/dashboard');
+    }
+  }
+}, []);
   useEffect(() => {
     if (step === 'otp' && otpInputRef.current) {
       otpInputRef.current.focus();
@@ -27,12 +36,9 @@ export default function Login() {
       setError('Enter a valid 10 digit phone number');
       return;
     }
-
     setLoading(true);
     try {
-      // API call yahan aayegi (abhi testing ke liye timeout hai)
-      // await axios.post('/api/send-otp', { phone, role });
-      await new Promise(resolve => setTimeout(resolve, 500)); 
+      await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/auth/send-otp`, { phone_number: phone });
       setStep('otp');
     } catch (err) {
       setError('Failed to send OTP. Please try again.');
@@ -47,17 +53,22 @@ export default function Login() {
       setError('Enter a valid 6 digit OTP');
       return;
     }
-
     setLoading(true);
     try {
-      // API call yahan aayegi 
-      // await axios.post('/api/verify-otp', { phone, otp, role });
-      await new Promise(resolve => setTimeout(resolve, 500)); 
+      const res = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/auth/verify-otp`, { phone_number: phone, otp });
       
-      if (role === 'owner') {
-        navigate('/owner/dashboard');
+      if (res.data.is_new_user) {
+        setStep('name');
+        setLoading(false);
+        return;
       } else {
-        navigate('/driver/dashboard');
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        if (role === 'owner') {
+          navigate('/owner/dashboard');
+        } else {
+          navigate('/driver/dashboard');
+        }
       }
     } catch (err) {
       setError('Invalid OTP. Please try again.');
@@ -66,7 +77,32 @@ export default function Login() {
     }
   };
 
-  // Sirf numbers allow karne aur length check karne wala function
+  const registerUser = async () => {
+    if (!name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+    setLoading(true);
+    try {
+      const regRes = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/auth/register`, {
+        phone_number: phone,
+        name: name,
+        role: role,
+      });
+      localStorage.setItem('token', regRes.data.token);
+      localStorage.setItem('user', JSON.stringify(regRes.data.user));
+      if (role === 'owner') {
+        navigate('/owner/dashboard');
+      } else {
+        navigate('/driver/dashboard');
+      }
+    } catch (err) {
+      setError('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNumericInput = (e, setter, max) => {
     const value = e.target.value.replace(/\D/g, '');
     if (value.length <= max) {
@@ -116,7 +152,7 @@ export default function Login() {
               {loading ? 'Sending...' : 'Send OTP'}
             </button>
           </>
-        ) : (
+        ) : step === 'otp' ? (
           <>
             <p style={styles.label}>Enter the 6-digit OTP sent to +91 {phone}</p>
             <input
@@ -137,13 +173,29 @@ export default function Login() {
               Change number
             </p>
           </>
+        ) : (
+          <>
+            <p style={styles.label}>Enter your full name</p>
+            <input
+              style={styles.otpInput}
+              type="text"
+              placeholder="Your full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && registerUser()}
+              autoFocus
+            />
+            {error && <p style={styles.error}>{error}</p>}
+            <button style={styles.btn} onClick={registerUser} disabled={loading}>
+              {loading ? 'Registering...' : 'Continue'}
+            </button>
+          </>
         )}
       </div>
     </div>
   );
 }
 
-// Mobile Responsive Styles
 const styles = {
   container: {
     minHeight: '100vh',
@@ -151,16 +203,16 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px', 
+    padding: '20px',
     boxSizing: 'border-box',
   },
   card: {
     backgroundColor: 'var(--white)',
     borderRadius: '16px',
-    padding: '32px 24px', 
-    width: '100%', 
-    maxWidth: '400px', 
-    boxSizing: 'border-box', 
+    padding: '32px 24px',
+    width: '100%',
+    maxWidth: '400px',
+    boxSizing: 'border-box',
     boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
   },
   logo: {
@@ -211,7 +263,7 @@ const styles = {
     padding: '12px 16px',
     marginBottom: '16px',
     backgroundColor: 'var(--bg)',
-    boxSizing: 'border-box', 
+    boxSizing: 'border-box',
   },
   prefix: {
     fontSize: '14px',
@@ -220,7 +272,7 @@ const styles = {
   },
   input: {
     flex: 1,
-    fontSize: '16px', 
+    fontSize: '16px',
     backgroundColor: 'transparent',
     color: 'var(--text-primary)',
     border: 'none',
@@ -233,8 +285,8 @@ const styles = {
     border: '1px solid var(--border)',
     borderRadius: '8px',
     padding: '12px 16px',
-    fontSize: '22px', 
-    letterSpacing: '6px', 
+    fontSize: '22px',
+    letterSpacing: '6px',
     textAlign: 'center',
     backgroundColor: 'var(--bg)',
     color: 'var(--text-primary)',
