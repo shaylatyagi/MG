@@ -12,20 +12,26 @@ export default function MyWallet() {
     daily_rent: 0,
     amount_paid_today: 0,
   });
+  const [refreshing, setRefreshing] = useState(false);
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const fetchData = async () => {
+    try {
+      const [txnRes, detailsRes] = await Promise.all([
+        api.get('/api/payment/my-transactions', { params: { phone: user.phone_number } }),
+        api.get('/api/payment/driver-details'),
+      ]);
+      const sortedTransactions = txnRes.data
+        .slice()
+        .sort((a, b) => new Date(b.order_initiation_date) - new Date(a.order_initiation_date));
+      setTransactions(sortedTransactions);
+      setDriverDetails(detailsRes.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [txnRes, detailsRes] = await Promise.all([
-          api.get('/api/payment/my-transactions'),
-          api.get('/api/payment/driver-details'),
-        ]);
-        setTransactions(txnRes.data);
-        setDriverDetails(detailsRes.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
     fetchData();
   }, []);
 
@@ -34,6 +40,7 @@ export default function MyWallet() {
     .reduce((sum, t) => sum + parseFloat(t.order_amount), 0);
 
   const pendingDues = Number(driverDetails.daily_rent) - Number(driverDetails.amount_paid_today);
+  const pendingCount = transactions.filter(t => t.transaction_status !== 'SUCCESS').length;
 
   const handleWithdraw = () => {
     if (!withdrawAmount) { alert('Enter an amount'); return; }
@@ -41,6 +48,32 @@ export default function MyWallet() {
     setShowWithdraw(false);
     setWithdrawAmount('');
     setTimeout(() => setWithdrawn(false), 4000);
+  };
+
+  const handleRefreshAllPending = async () => {
+    setRefreshing(true);
+    try {
+      await api.post('/api/payment/check-pending');
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to refresh pending inquiries', err);
+      alert('Unable to refresh pending inquiries. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefreshSingle = async (orderId) => {
+    setRefreshing(true);
+    try {
+      await api.get(`/api/payment/status/${orderId}`);
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to refresh order status', err);
+      alert('Unable to refresh this inquiry. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
@@ -87,29 +120,55 @@ export default function MyWallet() {
         </div>
 
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
-          <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>Transaction History</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
+            <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 }}>Transaction History</p>
+            <button
+              onClick={handleRefreshAllPending}
+              disabled={refreshing || pendingCount === 0}
+              style={{ padding: '10px 16px', borderRadius: '10px', backgroundColor: pendingCount > 0 ? '#8B5E3C' : '#E5E7EB', color: pendingCount > 0 ? 'white' : '#6B7280', border: 'none', cursor: pendingCount > 0 ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: '600' }}
+            >
+              {refreshing ? 'Refreshing…' : `Refresh ${pendingCount} Pending`}
+            </button>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {transactions.length === 0 ? (
               <p style={{ fontSize: '13px', color: '#9CA3AF' }}>No transactions yet</p>
             ) : transactions.map((t, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F3EDE5' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: t.transaction_status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
-                    {t.transaction_status === 'SUCCESS' ? '✓' : '↻'}
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', padding: '14px 0', borderBottom: '1px solid #F3EDE5' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: t.transaction_status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+                      {t.transaction_status === 'SUCCESS' ? '✓' : '↻'}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A1A' }}>{t.order_number}</p>
+                      <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
+                        {new Date(t.order_initiation_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A1A' }}>{t.order_number}</p>
-                    <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
-                      {new Date(t.order_initiation_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: t.transaction_status === 'SUCCESS' ? '#16A34A' : '#D97706' }}>
+                      ₹{t.order_amount}
                     </p>
+                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{t.transaction_status}</p>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '14px', fontWeight: '600', color: t.transaction_status === 'SUCCESS' ? '#16A34A' : '#D97706' }}>
-                    ₹{t.order_amount}
-                  </p>
-                  <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{t.transaction_status}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                  <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0 }}>Order UUID: {t.order_id || 'N/A'}</p>
+                  <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0 }}>PG Txn ID: {t.pg_transaction_id || 'N/A'}</p>
+                  <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0 }}>Bank Ref: {t.bank_reference_no || 'N/A'}</p>
+                  <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0 }}>UTR: {t.bank_utr_no || 'N/A'}</p>
                 </div>
+                {t.transaction_status !== 'SUCCESS' && (
+                  <button
+                    onClick={() => handleRefreshSingle(t.order_id)}
+                    disabled={refreshing}
+                    style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '10px', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: '1px solid #D6BFA8', cursor: 'pointer', alignSelf: 'flex-start', fontSize: '13px', fontWeight: '600' }}
+                  >
+                    {refreshing ? 'Refreshing…' : 'Refresh this pending inquiry'}
+                  </button>
+                )}
               </div>
             ))}
           </div>

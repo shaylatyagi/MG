@@ -36,7 +36,7 @@ export default function OwnerDashboard() {
   const [driverPayouts, setDriverPayouts] = useState([]);
   const [newVehicle, setNewVehicle] = useState({
     vehicle_number: '', vehicle_age: '', condition: 'Good', area: '', daily_rent: '', fine_per_day: '',
-    rental_from: '', rental_to: '', payment_deadline: '', charging_station: '', driver_phone: '', driver_name: ''
+    rental_from: '', rental_to: '', payment_deadline: '', charging_station: ''
   });
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -107,7 +107,7 @@ export default function OwnerDashboard() {
       fetchStats();
       setShowModal(false);
       setUploadedDocs({});
-      setNewVehicle({ vehicle_number: '', vehicle_age: '', condition: 'Good', area: '', daily_rent: '', fine_per_day: '', rental_from: '', rental_to: '', payment_deadline: '', charging_station: '', driver_phone: '', driver_name: '' });
+      setNewVehicle({ vehicle_number: '', vehicle_age: '', condition: 'Good', area: '', daily_rent: '', fine_per_day: '', rental_from: '', rental_to: '', payment_deadline: '', charging_station: '' });
     } catch (err) {
       console.error(err);
       alert('Failed to add vehicle');
@@ -131,12 +131,6 @@ export default function OwnerDashboard() {
             <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Real time status of your EV assets.</p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
-              style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: 'white', color: '#DC2626', border: '1px solid #DC2626', cursor: 'pointer' }}
-            >
-              Logout
-            </button>
             <button style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: 'white', color: '#1A1A1A', border: '1px solid #E8E0D5' }}>Download Report</button>
             <button onClick={() => setShowModal(true)} style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white' }}>+ Add Vehicle</button>
           </div>
@@ -272,14 +266,6 @@ export default function OwnerDashboard() {
               <div>
                 <p style={labelStyle}>Charging Station Location</p>
                 <input style={inputStyle} placeholder="Sector 10, Dwarka" value={newVehicle.charging_station} onChange={(e) => setNewVehicle({ ...newVehicle, charging_station: e.target.value })} />
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <p style={labelStyle}>Assign Driver Phone Number</p>
-                <input style={inputStyle} placeholder="9999999999" type="number" value={newVehicle.driver_phone} onChange={(e) => setNewVehicle({ ...newVehicle, driver_phone: e.target.value })} />
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <p style={labelStyle}>Driver Name</p>
-                <input style={inputStyle} placeholder="Amit Sharma" value={newVehicle.driver_name} onChange={(e) => setNewVehicle({ ...newVehicle, driver_name: e.target.value })} />
               </div>
             </div>
             <div style={{ marginTop: '20px' }}>

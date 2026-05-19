@@ -4,31 +4,67 @@ import api from '../api';
 
 
 function DriverDashboard() {
-  const [loading, setLoading] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [activePayment, setActivePayment] = useState('');
   const [transactions, setTransactions] = useState([]);
   const [driverDetails, setDriverDetails] = useState({
-  wallet_balance: 0,
-  daily_rent: 0,
-  amount_paid_today: 0,
-  battery_level: 0,
-  kms_driven: 0,
-  vehicle_number: 'Not Assigned'
-});
+    wallet_balance: 0,
+    daily_rent: 0,
+    amount_paid_today: 0,
+    battery_level: 0,
+    kms_driven: 0,
+    vehicle_number: 'Not Assigned'
+  });
+  const [refreshing, setRefreshing] = useState(false);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  useEffect(() => {
+
   const fetchTransactions = async () => {
     try {
-      const res = await api.get('/api/payment/my-transactions');
-      setTransactions(res.data);
+      const res = await api.get('/api/payment/my-transactions', {
+        params: { phone: user.phone_number }
+      });
+      const sorted = res.data.slice().sort((a, b) => new Date(b.order_initiation_date) - new Date(a.order_initiation_date));
+      setTransactions(sorted);
     } catch (err) {
       console.error(err);
     }
   };
-  fetchTransactions();
-}, []);
 
-  const handlePayment = async (amount) => {
-    setLoading(true);
+  useEffect(() => {
+    fetchTransactions();
+  }, [user.phone_number]);
+
+  const handleRefreshAllPending = async () => {
+    setRefreshing(true);
+    try {
+      await api.post('/api/payment/check-pending');
+      await fetchTransactions();
+    } catch (err) {
+      console.error('Failed to refresh pending inquiries', err);
+      alert('Unable to refresh pending inquiries. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefreshSingle = async (orderId) => {
+    setRefreshing(true);
+    try {
+      await api.get(`/api/payment/status/${orderId}`);
+      await fetchTransactions();
+    } catch (err) {
+      console.error('Failed to refresh order status', err);
+      alert('Unable to refresh this inquiry. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const pendingCount = transactions.filter(txn => txn.transaction_status !== 'SUCCESS').length;
+
+  const handlePayment = async (amount, type) => {
+    setPaymentLoading(true);
+    setActivePayment(type);
     try {
       const res = await api.post('/api/payment/create-order', {
         amount: amount,
@@ -46,7 +82,8 @@ function DriverDashboard() {
       console.error(err);
       alert('Something went wrong. Please try again.');
     }
-    setLoading(false);
+    setPaymentLoading(false);
+    setActivePayment('');
   };
 
   return (
@@ -63,20 +100,11 @@ function DriverDashboard() {
               Download Report
             </button>
             <button
-  onClick={() => {
-    localStorage.clear();
-    window.location.href = '/login';
-  }}
-  style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: 'white', color: '#DC2626', border: '1px solid #DC2626', cursor: 'pointer' }}
->
-  Logout
-</button>
-            <button
-              onClick={() => handlePayment(2)}
-              disabled={loading}
-              style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white', opacity: loading ? 0.7 : 1 }}
+              onClick={() => handlePayment(2, 'quick')}
+              disabled={paymentLoading}
+              style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white', opacity: paymentLoading ? 0.7 : 1 }}
             >
-              {loading ? 'Processing...' : 'Quick Pay Rent'}
+              {paymentLoading && activePayment === 'quick' ? 'Processing...' : 'Quick Pay Rent'}
             </button>
           </div>
         </div>
@@ -100,11 +128,11 @@ function DriverDashboard() {
               <div style={{ backgroundColor: '#8B5E3C', borderRadius: '4px', height: '8px', width: '78%' }} />
             </div>
             <button
-              onClick={() => handlePayment(10)}
-              disabled={loading}
-              style={{ width: '100%', padding: '14px', backgroundColor: '#C49A6C', color: 'white', borderRadius: '8px', fontSize: '15px', fontWeight: '600', opacity: loading ? 0.7 : 1 }}
+              onClick={() => handlePayment(10, 'balance')}
+              disabled={paymentLoading}
+              style={{ width: '100%', padding: '14px', backgroundColor: '#C49A6C', color: 'white', borderRadius: '8px', fontSize: '15px', fontWeight: '600', opacity: paymentLoading ? 0.7 : 1 }}
             >
-              {loading ? 'Processing...' : 'Pay Balance'}
+              {paymentLoading && activePayment === 'balance' ? 'Processing...' : 'Pay Balance'}
             </button>
           </div>
 
@@ -139,30 +167,54 @@ function DriverDashboard() {
           </div>
 
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
-            <p style={{ fontSize: '15px', fontWeight: '600', marginBottom: '20px' }}>Recent Transactions</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
+              <p style={{ fontSize: '15px', fontWeight: '600', margin: 0 }}>Recent Transactions</p>
+              <button
+                onClick={handleRefreshAllPending}
+                disabled={refreshing || pendingCount === 0}
+                style={{ padding: '10px 16px', borderRadius: '10px', backgroundColor: pendingCount > 0 ? '#8B5E3C' : '#E5E7EB', color: pendingCount > 0 ? 'white' : '#6B7280', border: 'none', cursor: pendingCount > 0 ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: '600' }}
+              >
+                {refreshing ? 'Refreshing…' : `Refresh ${pendingCount} Pending`}
+              </button>
+            </div>
             {transactions.length === 0 ? (
-  <p style={{ fontSize: '13px', color: '#9CA3AF' }}>No transactions yet</p>
-) : (
-  transactions.slice(0, 5).map((txn) => (
-    <div key={txn.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F3EDE5' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ backgroundColor: txn.transaction_status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
-          {txn.transaction_status === 'SUCCESS' ? '✓' : '↻'}
-        </span>
-        <div>
-          <p style={{ fontSize: '14px', fontWeight: '500' }}>{txn.order_number}</p>
-          <p style={{ fontSize: '12px', color: '#9CA3AF' }}>
-            {new Date(txn.order_initiation_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-          </p>
-        </div>
-      </div>
-      <div style={{ textAlign: 'right' }}>
-        <p style={{ fontSize: '14px', fontWeight: '600', color: txn.transaction_status === 'SUCCESS' ? '#16A34A' : '#D97706' }}>₹{txn.order_amount}</p>
-        <p style={{ fontSize: '11px', color: '#9CA3AF' }}>{txn.transaction_status}</p>
-      </div>
-    </div>
-  ))
-)}
+              <p style={{ fontSize: '13px', color: '#9CA3AF' }}>No transactions yet</p>
+            ) : (
+              transactions.slice(0, 5).map((txn) => (
+                <div key={txn.order_id || txn.order_number} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 0', borderBottom: '1px solid #F3EDE5' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ backgroundColor: txn.transaction_status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+                        {txn.transaction_status === 'SUCCESS' ? '✓' : '↻'}
+                      </span>
+                      <div>
+                        <p style={{ fontSize: '14px', fontWeight: '500' }}>{txn.order_number}</p>
+                        <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
+                          {new Date(txn.order_initiation_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: '14px', fontWeight: '600', color: txn.transaction_status === 'SUCCESS' ? '#16A34A' : '#D97706' }}>₹{txn.order_amount}</p>
+                      <p style={{ fontSize: '11px', color: '#9CA3AF' }}>{txn.transaction_status}</p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
+                    <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0 }}>Order UUID: {txn.order_id || 'N/A'}</p>
+                    <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0 }}>PG Txn ID: {txn.pg_transaction_id || 'N/A'}</p>
+                  </div>
+                  {txn.transaction_status !== 'SUCCESS' && (
+                    <button
+                      onClick={() => handleRefreshSingle(txn.order_id)}
+                      disabled={refreshing}
+                      style={{ alignSelf: 'flex-start', padding: '8px 14px', borderRadius: '10px', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: '1px solid #D6BFA8', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+                    >
+                      {refreshing ? 'Refreshing…' : 'Refresh pending inquiry'}
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

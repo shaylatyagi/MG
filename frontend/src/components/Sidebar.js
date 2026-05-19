@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import LanguageSelector from './LanguageSelect';
 
 const ownerLinks = [
   { label: 'Fleet Overview', path: '/owner/dashboard', icon: '🏠' },
@@ -15,7 +16,8 @@ const driverLinks = [
   { label: 'Vehicle Status', path: '/driver/vehicle', icon: '🚗' },
   { label: 'Trust Rewards', path: '/driver/rewards', icon: '🏆' },
   { label: 'Help & SOS', path: '/driver/help', icon: '🆘' },
-  {label: 'My Profile',path:'/profile',icon:'👤'},
+  { label: 'My Profile', path: '/profile', icon: '👤' },
+  { label: 'Charging Stations', path: '/driver/charging', icon: '⚡' },
 ];
 
 export default function Sidebar() {
@@ -24,6 +26,12 @@ export default function Sidebar() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isOwner = location.pathname.startsWith('/owner');
   const links = isOwner ? ownerLinks : driverLinks;
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div style={styles.sidebar}>
@@ -59,6 +67,10 @@ export default function Sidebar() {
           </div>
         ))}
       </nav>
+      
+      <div style={{ marginBottom: '12px' }}>
+        <LanguageSelector />
+      </div>
 
       <div style={styles.profile}>
         <div style={styles.avatar}>
@@ -69,6 +81,10 @@ export default function Sidebar() {
           <p style={styles.profileRole}>{isOwner ? 'Verified Owner' : 'Premium Driver'}</p>
         </div>
       </div>
+
+      <button style={styles.logoutBtn} onClick={handleLogout}>
+        Log Out
+      </button>
     </div>
   );
 }
@@ -82,6 +98,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     padding: '24px 16px',
+    paddingBottom: '100px',
     position: 'fixed',
     top: 0,
     left: 0,
@@ -110,6 +127,8 @@ const styles = {
     backgroundColor: 'transparent',
     color: 'var(--text-secondary)',
     letterSpacing: '0.5px',
+    border: 'none',
+    cursor: 'pointer'
   },
   toggleActive: {
     backgroundColor: 'var(--white)',
@@ -170,4 +189,19 @@ const styles = {
     fontSize: '11px',
     color: 'var(--text-secondary)',
   },
+  logoutBtn: {
+    marginTop: 'auto',
+    padding: '10px',
+    backgroundColor: '#FEF2F2',
+    color: '#DC2626',
+    border: '1px solid #FECACA',
+    borderRadius: '8px',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    width: '100%',
+    textAlign: 'center',
+    transition: '0.2s',
+    position: 'relative',
+  }
 };

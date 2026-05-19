@@ -101,7 +101,7 @@ app.get('/', (req, res) => {
 });
 
 // ====================== SCHEDULER ======================
-const BASE_URL = process.env.RAILWAY_PUBLIC_DOMAIN 
+const BASE_URL = 'https://mg-backend-production.up.railway.app';
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : 'http://localhost:5000';
 
