@@ -12,8 +12,10 @@ import ComplianceVault from './pages/ComplianceVault';
 import HelpSOS from './pages/HelpSOS';
 import VehicleStatus from './pages/VehicleStatus';
 import FleetSettings from './pages/FleetSettings';
-import ComingSoon from './pages/ComingSoon';
 import PaymentResult from './pages/PaymentResult';
+import Profile from './pages/Profile';
+import ComingSoon from './pages/ComingSoon';
+
 function App() {
   return (
     <Router>
@@ -21,16 +23,17 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/owner/dashboard" element={<OwnerDashboard />} />
-        <Route path="/driver/dashboard" element={<DriverDashboard />} />
         <Route path="/owner/vehicles" element={<MyVehicles />} />
         <Route path="/owner/earnings" element={<EarningsPayouts />} />
         <Route path="/owner/compliance" element={<ComplianceVault />} />
         <Route path="/owner/settings" element={<FleetSettings />} />
+        <Route path="/driver/dashboard" element={<DriverDashboard />} />
         <Route path="/driver/wallet" element={<MyWallet />} />
         <Route path="/driver/vehicle" element={<VehicleStatus />} />
         <Route path="/driver/rewards" element={<TrustRewards />} />
-        <Route path="/payment-result" element={<PaymentResult />} />
         <Route path="/driver/help" element={<HelpSOS />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/payment-result" element={<PaymentResult />} />
       </Routes>
     </Router>
   );

@@ -1,20 +1,34 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-});
+console.log('🔄 DB Connection Starting...');
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
 
-pool.connect((err) => {
-  if (err) {
-    console.error('Database connection failed:', err);
-  } else {
-    console.log('Database connected successfully');
-  }
-});
+let pool;
+
+if (process.env.DATABASE_URL) {
+  console.log('✅ Using DATABASE_URL');
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+} else {
+  console.log('⚠️  Using individual PG variables');
+  pool = new Pool({
+    host: process.env.PGHOST || process.env.DB_HOST,
+    port: process.env.PGPORT || process.env.DB_PORT || 5432,
+    user: process.env.PGUSER || process.env.DB_USER,
+    password: process.env.PGPASSWORD || process.env.DB_PASSWORD,
+    database: process.env.PGDATABASE || process.env.DB_NAME,
+    ssl: { rejectUnauthorized: false }
+  });
+}
+
+pool.connect()
+  .then(() => console.log('✅ Database connected successfully'))
+  .catch(err => {
+    console.error('❌ Database connection FAILED:', err.message);
+    console.error('Check DATABASE_URL variable in Railway');
+  });
 
 module.exports = pool;

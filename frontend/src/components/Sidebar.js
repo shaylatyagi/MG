@@ -15,13 +15,14 @@ const driverLinks = [
   { label: 'Vehicle Status', path: '/driver/vehicle', icon: '🚗' },
   { label: 'Trust Rewards', path: '/driver/rewards', icon: '🏆' },
   { label: 'Help & SOS', path: '/driver/help', icon: '🆘' },
+  {label: 'My Profile',path:'/profile',icon:'👤'},
 ];
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const isOwner = location.pathname.startsWith('/owner');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isOwner = location.pathname.startsWith('/owner');
   const links = isOwner ? ownerLinks : driverLinks;
 
   return (

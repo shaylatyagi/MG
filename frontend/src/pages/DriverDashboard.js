@@ -33,7 +33,7 @@ function DriverDashboard() {
       const res = await api.post('/api/payment/create-order', {
         amount: amount,
         customerName: user.name || 'Driver',
-        customerPhone: user.phone_number || '',
+        customerPhone: user.phone_number || '9876543210',
         customerEmail: user.email || 'driver@mobilitygrid.in',
       });
       const checkoutUrl = res.data.data.data.checkoutUrl;

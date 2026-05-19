@@ -151,7 +151,6 @@ router.put('/vehicles/:vehicle_number', verifyToken, async (req, res) => {
   }
 });
 
-// Stats fetch karo
 router.get('/stats', verifyToken, async (req, res) => {
   try {
     const vehicleCount = await pool.query(
@@ -167,9 +166,44 @@ router.get('/stats', verifyToken, async (req, res) => {
       [req.user.id]
     );
 
+    // Collection efficiency — kitne drivers ne aaj pay kiya
+    const totalDrivers = await pool.query(
+      'SELECT COUNT(*) FROM vehicles WHERE owner_id = $1 AND driver_phone IS NOT NULL',
+      [req.user.id]
+    );
+
+    const paidDrivers = await pool.query(
+      `SELECT COUNT(*) FROM vehicles v
+       LEFT JOIN users u ON u.phone_number = v.driver_phone
+       LEFT JOIN driver_details dd ON dd.user_id = u.id
+       WHERE v.owner_id = $1 AND dd.amount_paid_today >= v.daily_rent`,
+      [req.user.id]
+    );
+
+    var total = parseInt(totalDrivers.rows[0].count);
+    var paid = parseInt(paidDrivers.rows[0].count);
+    var efficiency = total > 0 ? ((paid / total) * 100).toFixed(1) : 0;
+
+    // Last 7 days revenue chart data
+    const revenueChart = await pool.query(
+      `SELECT 
+        DATE(o.order_completion_date) as date,
+        COALESCE(SUM(o.order_amount), 0) as value
+       FROM ms_orders o
+       JOIN vehicles v ON o.payer_mobile = v.driver_phone
+       WHERE v.owner_id = $1 
+         AND o.transaction_status = 'SUCCESS'
+         AND o.order_completion_date >= NOW() - INTERVAL '7 days'
+       GROUP BY DATE(o.order_completion_date)
+       ORDER BY date ASC`,
+      [req.user.id]
+    );
+
     res.json({
       total_vehicles: vehicleCount.rows[0].count,
       total_earnings: totalEarnings.rows[0].total,
+      collection_efficiency: efficiency,
+      revenue_chart: revenueChart.rows,
     });
   } catch (err) {
     console.error(err);

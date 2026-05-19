@@ -35,17 +35,28 @@ router.post('/verify-otp', async (req, res) => {
   }
 
   try {
+    // Temporary bypass — remove when SMS API is ready
+    if (String(otp).length === 6) {
+      const user = await pool.query('SELECT * FROM users WHERE phone_number = $1', [phone_number]);
+      if (user.rows.length === 0) {
+        return res.status(200).json({ message: 'OTP verified', is_new_user: true });
+      }
+      const token = generateToken(user.rows[0]);
+      return res.json({ message: 'OTP verified', is_new_user: false, token, user: user.rows[0] });
+    }
+
     const result = await pool.query(
-  'SELECT * FROM otps WHERE phone_number = $1 AND otp = $2 AND is_used = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
-  [phone_number, otp]
-);
+      'SELECT * FROM otps WHERE phone_number = $1 AND otp = $2 AND is_used = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [phone_number, otp]
+    );
 
-// Temporary bypass — remove when SMS API is ready
-if (result.rows.length === 0 && otp !== '123456') {
-  return res.status(400).json({ message: 'Invalid or expired OTP' });
-}
+    if (result.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
 
-    await pool.query('UPDATE otps SET is_used = true WHERE id = $1', [result.rows[0].id]);
+    if (result.rows.length > 0) {
+      await pool.query('UPDATE otps SET is_used = true WHERE id = $1', [result.rows[0].id]);
+    }
 
     const user = await pool.query('SELECT * FROM users WHERE phone_number = $1', [phone_number]);
 
@@ -61,6 +72,31 @@ if (result.rows.length === 0 && otp !== '123456') {
     res.status(500).json({ message: 'Something went wrong' });
   }
 });
+
+router.put('/update-profile', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ message: 'No token' });
+  
+  const token = authHeader.split(' ')[1];
+  const { verifyToken: verify, generateToken } = require('../middleware/auth');
+  const jwt = require('jsonwebtoken');
+  const decoded = jwt.verify(token, process.env.JWT_SECRET || 'voltops_super_secret_key_2025');
+
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ message: 'Name required' });
+
+  try {
+    const result = await pool.query(
+      'UPDATE users SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [name, decoded.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to update profile' });
+  }
+});
+
 router.post('/register', async (req, res) => {
   const { phone_number, name, role } = req.body;
 
@@ -85,11 +121,12 @@ router.post('/register', async (req, res) => {
     );
 
     const token = generateToken(result.rows[0]);
-res.status(201).json({ message: 'User registered successfully', token, user: result.rows[0] });
+    res.status(201).json({ message: 'User registered successfully', token, user: result.rows[0] });
 
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Something went wrong' });
   }
 });
+
 module.exports = router;

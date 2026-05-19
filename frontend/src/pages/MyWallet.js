@@ -1,18 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
-
-const transactions = [
-  { type: 'debit', label: 'Daily Rent Paid', date: 'May 17, 2026, 10:15 AM', amount: '₹450', status: 'Success' },
-  { type: 'credit', label: 'Refund Received', date: 'May 16, 2026, 3:00 PM', amount: '₹100', status: 'Success' },
-  { type: 'debit', label: 'Daily Rent Paid', date: 'May 16, 2026, 9:45 AM', amount: '₹450', status: 'Success' },
-  { type: 'debit', label: 'Daily Rent Paid', date: 'May 15, 2026, 10:00 AM', amount: '₹450', status: 'Success' },
-  { type: 'debit', label: 'Late Fine', date: 'May 14, 2026, 11:00 AM', amount: '₹50', status: 'Success' },
-];
+import api from '../api';
 
 export default function MyWallet() {
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawn, setWithdrawn] = useState(false);
+  const [transactions, setTransactions] = useState([]);
+  const [driverDetails, setDriverDetails] = useState({
+    wallet_balance: 0,
+    daily_rent: 0,
+    amount_paid_today: 0,
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [txnRes, detailsRes] = await Promise.all([
+          api.get('/api/payment/my-transactions'),
+          api.get('/api/payment/driver-details'),
+        ]);
+        setTransactions(txnRes.data);
+        setDriverDetails(detailsRes.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const totalPaid = transactions
+    .filter(t => t.transaction_status === 'SUCCESS')
+    .reduce((sum, t) => sum + parseFloat(t.order_amount), 0);
+
+  const pendingDues = Number(driverDetails.daily_rent) - Number(driverDetails.amount_paid_today);
 
   const handleWithdraw = () => {
     if (!withdrawAmount) { alert('Enter an amount'); return; }
@@ -41,7 +62,7 @@ export default function MyWallet() {
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: 1, backgroundColor: '#7D5235', borderRadius: '16px', padding: '28px', color: 'white' }}>
             <p style={{ fontSize: '13px', opacity: 0.8, marginBottom: '8px' }}>Wallet Balance</p>
-            <p style={{ fontSize: '40px', fontWeight: '700', marginBottom: '24px' }}>₹1,240</p>
+            <p style={{ fontSize: '40px', fontWeight: '700', marginBottom: '24px' }}>₹{driverDetails.wallet_balance}</p>
             <button
               onClick={() => setShowWithdraw(true)}
               style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}
@@ -52,9 +73,9 @@ export default function MyWallet() {
 
           <div style={{ flex: 2, display: 'flex', gap: '16px' }}>
             {[
-              { label: 'Total Earned', value: '₹18,500', sub: 'All time' },
-              { label: 'Total Paid', value: '₹17,260', sub: 'Rent + fines' },
-              { label: 'Pending Dues', value: '₹100', sub: 'Due today', color: '#D97706' },
+              { label: 'Total Paid', value: `₹${totalPaid.toFixed(2)}`, sub: 'All time rent payments' },
+              { label: 'Paid Today', value: `₹${driverDetails.amount_paid_today}`, sub: `Daily rent: ₹${driverDetails.daily_rent}` },
+              { label: 'Pending Dues', value: `₹${pendingDues > 0 ? pendingDues : 0}`, sub: 'Due today', color: pendingDues > 0 ? '#D97706' : '#16A34A' },
             ].map((card, i) => (
               <div key={i} style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #E8E0D5' }}>
                 <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{card.label}</p>
@@ -68,22 +89,26 @@ export default function MyWallet() {
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
           <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>Transaction History</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {transactions.map((t, i) => (
+            {transactions.length === 0 ? (
+              <p style={{ fontSize: '13px', color: '#9CA3AF' }}>No transactions yet</p>
+            ) : transactions.map((t, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F3EDE5' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: t.type === 'credit' ? '#DCFCE7' : '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
-                    {t.type === 'credit' ? '↑' : '↓'}
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: t.transaction_status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+                    {t.transaction_status === 'SUCCESS' ? '✓' : '↻'}
                   </div>
                   <div>
-                    <p style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A1A' }}>{t.label}</p>
-                    <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>{t.date}</p>
+                    <p style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A1A' }}>{t.order_number}</p>
+                    <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
+                      {new Date(t.order_initiation_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '14px', fontWeight: '600', color: t.type === 'credit' ? '#16A34A' : '#DC2626' }}>
-                    {t.type === 'credit' ? '+' : '-'}{t.amount}
+                  <p style={{ fontSize: '14px', fontWeight: '600', color: t.transaction_status === 'SUCCESS' ? '#16A34A' : '#D97706' }}>
+                    ₹{t.order_amount}
                   </p>
-                  <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{t.status}</p>
+                  <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{t.transaction_status}</p>
                 </div>
               </div>
             ))}
@@ -101,7 +126,7 @@ export default function MyWallet() {
             </div>
             <div style={{ backgroundColor: '#F3EDE5', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px' }}>
               <p style={{ fontSize: '12px', color: '#6B6B6B' }}>Available Balance</p>
-              <p style={{ fontSize: '24px', fontWeight: '700', color: '#8B5E3C' }}>₹1,240</p>
+              <p style={{ fontSize: '24px', fontWeight: '700', color: '#8B5E3C' }}>₹{driverDetails.wallet_balance}</p>
             </div>
             <div style={{ marginBottom: '16px' }}>
               <p style={{ fontSize: '12px', color: '#6B6B6B', marginBottom: '6px', fontWeight: '500' }}>Withdraw Amount (₹)</p>

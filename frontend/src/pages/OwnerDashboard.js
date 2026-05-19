@@ -27,12 +27,13 @@ export default function OwnerDashboard() {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [vehicles, setVehicles] = useState([]);
-  const [stats, setStats] = useState({ total_vehicles: 0, total_earnings: 0 });
+  const [stats, setStats] = useState({ total_vehicles: 0, total_earnings: 0, collection_efficiency: 0, revenue_chart: [] });
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [editDriverName, setEditDriverName] = useState('');
   const [editDriverPhone, setEditDriverPhone] = useState('');
   const [uploadedDocs, setUploadedDocs] = useState({});
   const [search, setSearch] = useState('');
+  const [driverPayouts, setDriverPayouts] = useState([]);
   const [newVehicle, setNewVehicle] = useState({
     vehicle_number: '', vehicle_age: '', condition: 'Good', area: '', daily_rent: '', fine_per_day: '',
     rental_from: '', rental_to: '', payment_deadline: '', charging_station: '', driver_phone: '', driver_name: ''
@@ -42,7 +43,16 @@ export default function OwnerDashboard() {
   useEffect(() => {
     fetchVehicles();
     fetchStats();
+    fetchDriverPayouts();
   }, []);
+  const fetchDriverPayouts = async () => {
+  try {
+    const res = await api.get('/api/owner/driver-payouts');
+    setDriverPayouts(res.data);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   const fetchVehicles = async () => {
     try {
@@ -134,14 +144,14 @@ export default function OwnerDashboard() {
 
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <StatCard label="Total Earnings" value={`₹${stats.total_earnings}`} sub="From successful payments" subColor="#16A34A" />
-          <StatCard label="Collection Efficiency" value="94.2%" sub="Target: 98%" />
+          <StatCard label="Collection Efficiency" value={`${stats.collection_efficiency}%`} sub="Target: 98%" />
           <StatCard label="Active Fleet" value={`${stats.total_vehicles} vehicles`} sub="All vehicles active" subColor="#16A34A" />
           <StatCard label="Compliance Score" value="Healthy" sub="All RCs/Insurance valid" subColor="#16A34A" />
         </div>
 
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: 2 }}>
-            <Chart data={revenueData} title="Collection Revenue Trend" />
+            <Chart data={stats.revenue_chart.length > 0 ? stats.revenue_chart.map(r => ({ name: new Date(r.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }), value: parseFloat(r.value) })) : [{ name: 'No data', value: 0 }]} title="Collection Revenue Trend" />
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A' }}>Operational Alerts</p>
@@ -170,7 +180,7 @@ export default function OwnerDashboard() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #E8E0D5' }}>
-                {['Vehicle ID', 'Current Driver', 'Status', 'Daily Rent', 'Area', 'Action'].map((h) => (
+                {['Vehicle ID', 'Current Driver', 'Status', 'Daily Rent', "Today's Payout", 'Action'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '10px 16px', fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>{h}</th>
                 ))}
               </tr>
@@ -188,7 +198,17 @@ export default function OwnerDashboard() {
                     <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', backgroundColor: v.status === 'On Route' ? '#DCFCE7' : '#F3F4F6', color: v.status === 'On Route' ? '#16A34A' : '#6B7280' }}>{v.status}</span>
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>₹{v.daily_rent}</td>
-                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>{v.area}</td>
+                  <td style={{ padding: '14px 16px' }}>
+  {(() => {
+    var payout = driverPayouts.find(p => p.vehicle_number === v.vehicle_number);
+    var status = payout ? payout.payout_status : 'Pending';
+    return (
+      <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: status === 'Paid' ? '#DCFCE7' : '#FEF3C7', color: status === 'Paid' ? '#16A34A' : '#D97706' }}>
+        {status}
+      </span>
+    );
+  })()}
+</td>
                   <td style={{ padding: '14px 16px' }}>
                     <button onClick={() => handleEdit(v)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer' }}>
                       Edit Driver

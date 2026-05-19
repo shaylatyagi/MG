@@ -1,320 +1,40 @@
-import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
 export default function Login() {
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [name, setName] = useState('');
-  const [step, setStep] = useState('phone');
-  const [role, setRole] = useState('driver');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const navigate = useNavigate();
-  
-  const otpInputRef = useRef(null);
-  useEffect(() => {
-  const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  if (token && user.role) {
-    if (user.role === 'owner') {
-      navigate('/owner/dashboard');
-    } else {
-      navigate('/driver/dashboard');
-    }
-  }
-}, []);
-  useEffect(() => {
-    if (step === 'otp' && otpInputRef.current) {
-      otpInputRef.current.focus();
-    }
-  }, [step]);
+  const [role, setRole] = useState('driver');
 
-  const sendOtp = async () => {
-    setError('');
-    if (!/^\d{10}$/.test(phone)) {
-      setError('Enter a valid 10 digit phone number');
-      return;
-    }
-    setLoading(true);
-    try {
-      await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/auth/send-otp`, { phone_number: phone });
-      setStep('otp');
-    } catch (err) {
-      setError('Failed to send OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyOtp = async () => {
-    setError('');
-    if (!/^\d{6}$/.test(otp)) {
-      setError('Enter a valid 6 digit OTP');
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/auth/verify-otp`, { phone_number: phone, otp });
-      
-      if (res.data.is_new_user) {
-        setStep('name');
-        setLoading(false);
-        return;
-      } else {
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        if (role === 'owner') {
-          navigate('/owner/dashboard');
-        } else {
-          navigate('/driver/dashboard');
-        }
-      }
-    } catch (err) {
-      setError('Invalid OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const registerUser = async () => {
-    if (!name.trim()) {
-      setError('Please enter your name');
-      return;
-    }
-    setLoading(true);
-    try {
-      const regRes = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/auth/register`, {
-        phone_number: phone,
-        name: name,
-        role: role,
-      });
-      localStorage.setItem('token', regRes.data.token);
-      localStorage.setItem('user', JSON.stringify(regRes.data.user));
-      if (role === 'owner') {
-        navigate('/owner/dashboard');
-      } else {
-        navigate('/driver/dashboard');
-      }
-    } catch (err) {
-      setError('Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNumericInput = (e, setter, max) => {
-    const value = e.target.value.replace(/\D/g, '');
-    if (value.length <= max) {
-      setter(value);
-    }
+  const handleEnter = () => {
+    localStorage.setItem('token', 'demo-token');
+    localStorage.setItem('user', JSON.stringify({ name: 'Demo User', role: role }));
+    navigate(role === 'owner' ? '/owner/dashboard' : '/driver/dashboard');
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <div style={styles.logo}>Mobility Grid</div>
-        <p style={styles.tagline}>Smart EV Fleet Management</p>
+    <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '40px', width: '380px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+        <div style={{ fontSize: '28px', fontWeight: '800', color: '#8B5E3C', letterSpacing: '2px', marginBottom: '4px' }}>Mobility Grid</div>
+        <p style={{ fontSize: '13px', color: '#6B6B6B', marginBottom: '28px' }}>Smart EV Fleet Management</p>
 
-        <div style={styles.toggle}>
+        <div style={{ display: 'flex', backgroundColor: '#F3EDE5', borderRadius: '8px', padding: '4px', marginBottom: '24px' }}>
           <button
-            style={{ ...styles.toggleBtn, ...(role === 'driver' ? styles.toggleActive : {}) }}
-            onClick={() => { setRole('driver'); setError(''); }}
-          >
-            Driver
-          </button>
+            style={{ flex: 1, padding: '8px', borderRadius: '6px', fontSize: '14px', fontWeight: '500', border: 'none', cursor: 'pointer', backgroundColor: role === 'driver' ? '#8B5E3C' : 'transparent', color: role === 'driver' ? 'white' : '#6B6B6B' }}
+            onClick={() => setRole('driver')}
+          >Driver</button>
           <button
-            style={{ ...styles.toggleBtn, ...(role === 'owner' ? styles.toggleActive : {}) }}
-            onClick={() => { setRole('owner'); setError(''); }}
-          >
-            Owner
-          </button>
+            style={{ flex: 1, padding: '8px', borderRadius: '6px', fontSize: '14px', fontWeight: '500', border: 'none', cursor: 'pointer', backgroundColor: role === 'owner' ? '#8B5E3C' : 'transparent', color: role === 'owner' ? 'white' : '#6B6B6B' }}
+            onClick={() => setRole('owner')}
+          >Owner</button>
         </div>
 
-        {step === 'phone' ? (
-          <>
-            <p style={styles.label}>Enter your 10 digit phone number</p>
-            <div style={styles.inputWrapper}>
-              <span style={styles.prefix}>+91</span>
-              <input
-                style={styles.input}
-                type="tel"
-                placeholder="9999999999"
-                value={phone}
-                onChange={(e) => handleNumericInput(e, setPhone, 10)}
-                onKeyDown={(e) => e.key === 'Enter' && sendOtp()}
-                maxLength={10}
-                autoFocus
-              />
-            </div>
-            {error && <p style={styles.error}>{error}</p>}
-            <button style={styles.btn} onClick={sendOtp} disabled={loading}>
-              {loading ? 'Sending...' : 'Send OTP'}
-            </button>
-          </>
-        ) : step === 'otp' ? (
-          <>
-            <p style={styles.label}>Enter the 6-digit OTP sent to +91 {phone}</p>
-            <input
-              ref={otpInputRef}
-              style={styles.otpInput}
-              type="tel"
-              placeholder="123456"
-              value={otp}
-              onChange={(e) => handleNumericInput(e, setOtp, 6)}
-              onKeyDown={(e) => e.key === 'Enter' && verifyOtp()}
-              maxLength={6}
-            />
-            {error && <p style={styles.error}>{error}</p>}
-            <button style={styles.btn} onClick={verifyOtp} disabled={loading}>
-              {loading ? 'Verifying...' : 'Verify OTP'}
-            </button>
-            <p style={styles.resend} onClick={() => { setStep('phone'); setOtp(''); setError(''); }}>
-              Change number
-            </p>
-          </>
-        ) : (
-          <>
-            <p style={styles.label}>Enter your full name</p>
-            <input
-              style={styles.otpInput}
-              type="text"
-              placeholder="Your full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && registerUser()}
-              autoFocus
-            />
-            {error && <p style={styles.error}>{error}</p>}
-            <button style={styles.btn} onClick={registerUser} disabled={loading}>
-              {loading ? 'Registering...' : 'Continue'}
-            </button>
-          </>
-        )}
+        <button
+          onClick={handleEnter}
+          style={{ width: '100%', padding: '14px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '8px', fontSize: '15px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
+        >
+          Enter as {role === 'owner' ? 'Owner' : 'Driver'}
+        </button>
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: 'var(--bg)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '20px',
-    boxSizing: 'border-box',
-  },
-  card: {
-    backgroundColor: 'var(--white)',
-    borderRadius: '16px',
-    padding: '32px 24px',
-    width: '100%',
-    maxWidth: '400px',
-    boxSizing: 'border-box',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
-  },
-  logo: {
-    fontSize: '28px',
-    fontWeight: '800',
-    color: 'var(--bronze)',
-    letterSpacing: '2px',
-    marginBottom: '4px',
-  },
-  tagline: {
-    fontSize: '13px',
-    color: 'var(--text-secondary)',
-    marginBottom: '28px',
-  },
-  toggle: {
-    display: 'flex',
-    backgroundColor: '#F3EDE5',
-    borderRadius: '8px',
-    padding: '4px',
-    marginBottom: '24px',
-  },
-  toggleBtn: {
-    flex: 1,
-    padding: '8px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    backgroundColor: 'transparent',
-    color: 'var(--text-secondary)',
-    border: 'none',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  toggleActive: {
-    backgroundColor: 'var(--bronze)',
-    color: 'var(--white)',
-  },
-  label: {
-    fontSize: '14px',
-    color: 'var(--text-secondary)',
-    marginBottom: '10px',
-  },
-  inputWrapper: {
-    display: 'flex',
-    alignItems: 'center',
-    border: '1px solid var(--border)',
-    borderRadius: '8px',
-    padding: '12px 16px',
-    marginBottom: '16px',
-    backgroundColor: 'var(--bg)',
-    boxSizing: 'border-box',
-  },
-  prefix: {
-    fontSize: '14px',
-    color: 'var(--text-secondary)',
-    marginRight: '8px',
-  },
-  input: {
-    flex: 1,
-    fontSize: '16px',
-    backgroundColor: 'transparent',
-    color: 'var(--text-primary)',
-    border: 'none',
-    outline: 'none',
-    width: '100%',
-  },
-  otpInput: {
-    width: '100%',
-    boxSizing: 'border-box',
-    border: '1px solid var(--border)',
-    borderRadius: '8px',
-    padding: '12px 16px',
-    fontSize: '22px',
-    letterSpacing: '6px',
-    textAlign: 'center',
-    backgroundColor: 'var(--bg)',
-    color: 'var(--text-primary)',
-    marginBottom: '16px',
-    outline: 'none',
-  },
-  btn: {
-    width: '100%',
-    padding: '14px',
-    backgroundColor: 'var(--bronze)',
-    color: 'var(--white)',
-    borderRadius: '8px',
-    fontSize: '15px',
-    fontWeight: '600',
-    border: 'none',
-    cursor: 'pointer',
-    boxSizing: 'border-box',
-  },
-  error: {
-    color: 'var(--danger)',
-    fontSize: '13px',
-    marginBottom: '12px',
-  },
-  resend: {
-    textAlign: 'center',
-    marginTop: '16px',
-    fontSize: '13px',
-    color: 'var(--bronze)',
-    cursor: 'pointer',
-  },
-};

@@ -1,11 +1,9 @@
 import Sidebar from '../components/Sidebar';
-
 export default function VehicleStatus() {
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Vehicle Status</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Real time status of your assigned vehicle.</p>
