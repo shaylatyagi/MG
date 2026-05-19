@@ -36,13 +36,14 @@ router.post('/verify-otp', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT * FROM otps WHERE phone_number = $1 AND otp = $2 AND is_used = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
-      [phone_number, otp]
-    );
+  'SELECT * FROM otps WHERE phone_number = $1 AND otp = $2 AND is_used = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+  [phone_number, otp]
+);
 
-    if (result.rows.length === 0) {
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
-    }
+// Temporary bypass — remove when SMS API is ready
+if (result.rows.length === 0 && otp !== '123456') {
+  return res.status(400).json({ message: 'Invalid or expired OTP' });
+}
 
     await pool.query('UPDATE otps SET is_used = true WHERE id = $1', [result.rows[0].id]);
 

@@ -21,6 +21,29 @@ const getToken = async () => {
   const data = await res.json();
   return data.data.token;
 };
+router.get('/driver-details', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM driver_details WHERE user_id = $1`,
+      [req.user.id]
+    );
+    
+    if (result.rows.length === 0) {
+      // Naya driver hai — default values create karo
+      const newDriver = await pool.query(
+        `INSERT INTO driver_details (user_id, wallet_balance, daily_rent, amount_paid_today, battery_level, kms_driven, vehicle_number)
+         VALUES ($1, 0, 100, 0, 0, 0, 'Not Assigned') RETURNING *`,
+        [req.user.id]
+      );
+      return res.json(newDriver.rows[0]);
+    }
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to fetch driver details' });
+  }
+});
 
 router.post('/create-order', verifyToken, async (req, res) => {
   const { amount, customerName, customerPhone, customerEmail } = req.body;
@@ -109,6 +132,19 @@ router.post('/webhook', async (req, res) => {
       return res.status(400).json({ message: 'Amount mismatch detected' });
     }
 
+    // Payment successful hone pe driver details update karo
+    if (status === 'SUCCESS') {
+      await pool.query(
+        `UPDATE driver_details SET 
+          amount_paid_today = amount_paid_today + $1,
+          updated_at = NOW()
+         WHERE user_id = (
+           SELECT id FROM users WHERE phone_number = $2
+         )`,
+        [localOrder.rows[0].order_amount, localOrder.rows[0].payer_mobile]
+      );
+    }
+
     await pool.query(
       `UPDATE ms_orders SET
         transaction_status = $1,
@@ -132,6 +168,18 @@ router.post('/webhook', async (req, res) => {
   } catch (err) {
     console.error('Webhook error:', err);
     res.status(500).json({ message: 'Webhook processing failed' });
+  }
+});
+router.get('/my-transactions', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM ms_orders WHERE payer_mobile = $1 ORDER BY order_initiation_date DESC LIMIT 10`,
+      [req.user.phone_number]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to fetch transactions' });
   }
 });
 

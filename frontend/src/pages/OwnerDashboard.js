@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import Chart from '../components/Chart';
+import api from '../api';
 
 const labelStyle = { fontSize: '12px', color: '#6B6B6B', marginBottom: '6px', fontWeight: '500' };
 const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '14px', backgroundColor: '#FAF7F2', color: '#1A1A1A' };
@@ -22,46 +23,64 @@ const alerts = [
   { icon: '📋', title: 'Renewal Due', sub: 'Insurance for UP-14-EA-1905', color: '#EFF6FF', border: '#3B82F6' },
 ];
 
-const initialVehicles = [
-  { id: 'UP-14-EA-2201', driver: 'Amit Sharma', driverPhone: '9999999999', status: 'On Route', rent: '₹450', payout: 'Paid', area: 'Dwarka', condition: 'Good' },
-  { id: 'UP-14-EA-2005', driver: 'Suresh Yadav', driverPhone: '8888888888', status: 'Idle', rent: '₹450', payout: 'Pending', area: 'Dwarka', condition: 'Fair' },
-];
-
 export default function OwnerDashboard() {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [vehicles, setVehicles] = useState(() => {
-    const saved = localStorage.getItem('vehicles');
-    return saved ? JSON.parse(saved) : initialVehicles;
-  });
+  const [vehicles, setVehicles] = useState([]);
+  const [stats, setStats] = useState({ total_vehicles: 0, total_earnings: 0 });
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [editDriverName, setEditDriverName] = useState('');
   const [editDriverPhone, setEditDriverPhone] = useState('');
   const [uploadedDocs, setUploadedDocs] = useState({});
   const [search, setSearch] = useState('');
   const [newVehicle, setNewVehicle] = useState({
-    id: '', age: '', condition: 'Good', area: '', rent: '', fine: '',
-    from: '', to: '', deadline: '', charging: '', driverPhone: '', driverName: ''
+    vehicle_number: '', vehicle_age: '', condition: 'Good', area: '', daily_rent: '', fine_per_day: '',
+    rental_from: '', rental_to: '', payment_deadline: '', charging_station: '', driver_phone: '', driver_name: ''
   });
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const saveVehicles = (updated) => {
-    setVehicles(updated);
-    localStorage.setItem('vehicles', JSON.stringify(updated));
+  useEffect(() => {
+    fetchVehicles();
+    fetchStats();
+  }, []);
+
+  const fetchVehicles = async () => {
+    try {
+      const res = await api.get('/api/owner/vehicles');
+      setVehicles(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const res = await api.get('/api/owner/stats');
+      setStats(res.data);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleEdit = (vehicle) => {
     setSelectedVehicle(vehicle);
-    setEditDriverName(vehicle.driver);
-    setEditDriverPhone(vehicle.driverPhone || '');
+    setEditDriverName(vehicle.driver_name);
+    setEditDriverPhone(vehicle.driver_phone || '');
     setShowEditModal(true);
   };
 
-  const handleUpdateDriver = () => {
-    const updated = vehicles.map(v =>
-      v.id === selectedVehicle.id ? { ...v, driver: editDriverName, driverPhone: editDriverPhone } : v
-    );
-    saveVehicles(updated);
-    setShowEditModal(false);
+  const handleUpdateDriver = async () => {
+    try {
+      await api.put(`/api/owner/vehicles/${selectedVehicle.vehicle_number}`, {
+        driver_name: editDriverName,
+        driver_phone: editDriverPhone,
+      });
+      fetchVehicles();
+      setShowEditModal(false);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update driver');
+    }
   };
 
   const handleFileUpload = (docName, file) => {
@@ -70,28 +89,25 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleAddVehicle = () => {
-    if (!newVehicle.id) { alert('Please enter a vehicle number'); return; }
-    const vehicle = {
-      id: newVehicle.id,
-      driver: newVehicle.driverName || 'Unassigned',
-      driverPhone: newVehicle.driverPhone || '',
-      status: 'Idle',
-      rent: newVehicle.rent ? `₹${newVehicle.rent}` : '₹0',
-      payout: 'Pending',
-      area: newVehicle.area || '',
-      condition: newVehicle.condition || 'Good',
-    };
-    saveVehicles([...vehicles, vehicle]);
-    setShowModal(false);
-    setUploadedDocs({});
-    setNewVehicle({ id: '', age: '', condition: 'Good', area: '', rent: '', fine: '', from: '', to: '', deadline: '', charging: '', driverPhone: '', driverName: '' });
+  const handleAddVehicle = async () => {
+    if (!newVehicle.vehicle_number) { alert('Please enter a vehicle number'); return; }
+    try {
+      await api.post('/api/owner/vehicles', newVehicle);
+      fetchVehicles();
+      fetchStats();
+      setShowModal(false);
+      setUploadedDocs({});
+      setNewVehicle({ vehicle_number: '', vehicle_age: '', condition: 'Good', area: '', daily_rent: '', fine_per_day: '', rental_from: '', rental_to: '', payment_deadline: '', charging_station: '', driver_phone: '', driver_name: '' });
+    } catch (err) {
+      console.error(err);
+      alert('Failed to add vehicle');
+    }
   };
 
   const filteredVehicles = vehicles.filter(v =>
-    v.id.toLowerCase().includes(search.toLowerCase()) ||
-    v.driver.toLowerCase().includes(search.toLowerCase()) ||
-    v.area?.toLowerCase().includes(search.toLowerCase())
+    v.vehicle_number.toLowerCase().includes(search.toLowerCase()) ||
+    v.driver_name.toLowerCase().includes(search.toLowerCase()) ||
+    (v.area || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -101,19 +117,25 @@ export default function OwnerDashboard() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
-            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Fleet Overview</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Hello, {user.name || 'Owner'} 👋</h1>
             <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Real time status of your EV assets.</p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
+              style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: 'white', color: '#DC2626', border: '1px solid #DC2626', cursor: 'pointer' }}
+            >
+              Logout
+            </button>
             <button style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: 'white', color: '#1A1A1A', border: '1px solid #E8E0D5' }}>Download Report</button>
             <button onClick={() => setShowModal(true)} style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white' }}>+ Add Vehicle</button>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          <StatCard label="Total Earnings" value="₹42,500" sub="▲ 12% vs last month" subColor="#16A34A" />
+          <StatCard label="Total Earnings" value={`₹${stats.total_earnings}`} sub="From successful payments" subColor="#16A34A" />
           <StatCard label="Collection Efficiency" value="94.2%" sub="Target: 98%" />
-          <StatCard label="Active Fleet" value={`${vehicles.length} / ${vehicles.length}`} sub="All vehicles active" subColor="#16A34A" />
+          <StatCard label="Active Fleet" value={`${stats.total_vehicles} vehicles`} sub="All vehicles active" subColor="#16A34A" />
           <StatCard label="Compliance Score" value="Healthy" sub="All RCs/Insurance valid" subColor="#16A34A" />
         </div>
 
@@ -148,7 +170,7 @@ export default function OwnerDashboard() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #E8E0D5' }}>
-                {['Vehicle ID', 'Current Driver', 'Status', 'Daily Rent', "Today's Payout", 'Action'].map((h) => (
+                {['Vehicle ID', 'Current Driver', 'Status', 'Daily Rent', 'Area', 'Action'].map((h) => (
                   <th key={h} style={{ textAlign: 'left', padding: '10px 16px', fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>{h}</th>
                 ))}
               </tr>
@@ -160,13 +182,13 @@ export default function OwnerDashboard() {
                 </tr>
               ) : filteredVehicles.map((v, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #E8E0D5' }}>
-                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>{v.id}</td>
-                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>{v.driver}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>{v.vehicle_number}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>{v.driver_name}</td>
                   <td style={{ padding: '14px 16px' }}>
                     <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', backgroundColor: v.status === 'On Route' ? '#DCFCE7' : '#F3F4F6', color: v.status === 'On Route' ? '#16A34A' : '#6B7280' }}>{v.status}</span>
                   </td>
-                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>{v.rent}</td>
-                  <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '600', color: v.payout === 'Paid' ? '#16A34A' : '#D97706' }}>{v.payout}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>₹{v.daily_rent}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>{v.area}</td>
                   <td style={{ padding: '14px 16px' }}>
                     <button onClick={() => handleEdit(v)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer' }}>
                       Edit Driver
@@ -177,10 +199,8 @@ export default function OwnerDashboard() {
             </tbody>
           </table>
         </div>
-
       </div>
 
-      {/* Add Vehicle Modal */}
       {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
@@ -188,15 +208,14 @@ export default function OwnerDashboard() {
               <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1A1A1A' }}>Add New Vehicle</h2>
               <button onClick={() => setShowModal(false)} style={{ fontSize: '20px', color: '#6B6B6B', backgroundColor: 'transparent' }}>✕</button>
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
                 <p style={labelStyle}>Vehicle Number</p>
-                <input style={inputStyle} placeholder="UP-14-EA-2201" value={newVehicle.id} onChange={(e) => setNewVehicle({ ...newVehicle, id: e.target.value })} />
+                <input style={inputStyle} placeholder="UP-14-EA-2201" value={newVehicle.vehicle_number} onChange={(e) => setNewVehicle({ ...newVehicle, vehicle_number: e.target.value })} />
               </div>
               <div>
                 <p style={labelStyle}>Vehicle Age (years)</p>
-                <input style={inputStyle} type="number" placeholder="2" value={newVehicle.age} onChange={(e) => setNewVehicle({ ...newVehicle, age: e.target.value })} />
+                <input style={inputStyle} type="number" placeholder="2" value={newVehicle.vehicle_age} onChange={(e) => setNewVehicle({ ...newVehicle, vehicle_age: e.target.value })} />
               </div>
               <div>
                 <p style={labelStyle}>Condition</p>
@@ -212,38 +231,37 @@ export default function OwnerDashboard() {
               </div>
               <div>
                 <p style={labelStyle}>Daily Rent (₹)</p>
-                <input style={inputStyle} type="number" placeholder="450" value={newVehicle.rent} onChange={(e) => setNewVehicle({ ...newVehicle, rent: e.target.value })} />
+                <input style={inputStyle} type="number" placeholder="450" value={newVehicle.daily_rent} onChange={(e) => setNewVehicle({ ...newVehicle, daily_rent: e.target.value })} />
               </div>
               <div>
                 <p style={labelStyle}>Fine Per Day After Deadline (₹)</p>
-                <input style={inputStyle} type="number" placeholder="50" value={newVehicle.fine} onChange={(e) => setNewVehicle({ ...newVehicle, fine: e.target.value })} />
+                <input style={inputStyle} type="number" placeholder="50" value={newVehicle.fine_per_day} onChange={(e) => setNewVehicle({ ...newVehicle, fine_per_day: e.target.value })} />
               </div>
               <div>
                 <p style={labelStyle}>Rental From</p>
-                <input style={inputStyle} type="date" value={newVehicle.from} onChange={(e) => setNewVehicle({ ...newVehicle, from: e.target.value })} />
+                <input style={inputStyle} type="date" value={newVehicle.rental_from} onChange={(e) => setNewVehicle({ ...newVehicle, rental_from: e.target.value })} />
               </div>
               <div>
                 <p style={labelStyle}>Rental To</p>
-                <input style={inputStyle} type="date" value={newVehicle.to} onChange={(e) => setNewVehicle({ ...newVehicle, to: e.target.value })} />
+                <input style={inputStyle} type="date" value={newVehicle.rental_to} onChange={(e) => setNewVehicle({ ...newVehicle, rental_to: e.target.value })} />
               </div>
               <div>
                 <p style={labelStyle}>Payment Deadline (days)</p>
-                <input style={inputStyle} type="number" placeholder="3" value={newVehicle.deadline} onChange={(e) => setNewVehicle({ ...newVehicle, deadline: e.target.value })} />
+                <input style={inputStyle} type="number" placeholder="3" value={newVehicle.payment_deadline} onChange={(e) => setNewVehicle({ ...newVehicle, payment_deadline: e.target.value })} />
               </div>
               <div>
                 <p style={labelStyle}>Charging Station Location</p>
-                <input style={inputStyle} placeholder="Sector 10, Dwarka" value={newVehicle.charging} onChange={(e) => setNewVehicle({ ...newVehicle, charging: e.target.value })} />
+                <input style={inputStyle} placeholder="Sector 10, Dwarka" value={newVehicle.charging_station} onChange={(e) => setNewVehicle({ ...newVehicle, charging_station: e.target.value })} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <p style={labelStyle}>Assign Driver Phone Number</p>
-                <input style={inputStyle} placeholder="9999999999" type="number" value={newVehicle.driverPhone} onChange={(e) => setNewVehicle({ ...newVehicle, driverPhone: e.target.value })} />
+                <input style={inputStyle} placeholder="9999999999" type="number" value={newVehicle.driver_phone} onChange={(e) => setNewVehicle({ ...newVehicle, driver_phone: e.target.value })} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <p style={labelStyle}>Driver Name</p>
-                <input style={inputStyle} placeholder="Amit Sharma" value={newVehicle.driverName} onChange={(e) => setNewVehicle({ ...newVehicle, driverName: e.target.value })} />
+                <input style={inputStyle} placeholder="Amit Sharma" value={newVehicle.driver_name} onChange={(e) => setNewVehicle({ ...newVehicle, driver_name: e.target.value })} />
               </div>
             </div>
-
             <div style={{ marginTop: '20px' }}>
               <p style={labelStyle}>Upload Vehicle Documents</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
@@ -261,7 +279,6 @@ export default function OwnerDashboard() {
                 ))}
               </div>
             </div>
-
             <div style={{ marginTop: '16px' }}>
               <p style={labelStyle}>Documents Required from Driver</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '8px' }}>
@@ -273,7 +290,6 @@ export default function OwnerDashboard() {
                 ))}
               </div>
             </div>
-
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C' }}>Cancel</button>
               <button onClick={handleAddVehicle} style={{ flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white' }}>Add Vehicle</button>
@@ -282,7 +298,6 @@ export default function OwnerDashboard() {
         </div>
       )}
 
-      {/* Edit Driver Modal */}
       {showEditModal && selectedVehicle && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
@@ -290,7 +305,7 @@ export default function OwnerDashboard() {
               <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1A1A1A' }}>Edit Driver</h2>
               <button onClick={() => setShowEditModal(false)} style={{ fontSize: '20px', color: '#6B6B6B', backgroundColor: 'transparent' }}>✕</button>
             </div>
-            <p style={{ fontSize: '13px', color: '#6B6B6B', marginBottom: '16px' }}>Vehicle: {selectedVehicle.id}</p>
+            <p style={{ fontSize: '13px', color: '#6B6B6B', marginBottom: '16px' }}>Vehicle: {selectedVehicle.vehicle_number}</p>
             <div style={{ marginBottom: '16px' }}>
               <p style={labelStyle}>Driver Name</p>
               <input style={inputStyle} value={editDriverName} onChange={(e) => setEditDriverName(e.target.value)} />
@@ -306,7 +321,6 @@ export default function OwnerDashboard() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

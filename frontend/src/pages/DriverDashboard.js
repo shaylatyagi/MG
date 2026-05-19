@@ -1,10 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
 
+
 function DriverDashboard() {
   const [loading, setLoading] = useState(false);
+  const [transactions, setTransactions] = useState([]);
+  const [driverDetails, setDriverDetails] = useState({
+  wallet_balance: 0,
+  daily_rent: 0,
+  amount_paid_today: 0,
+  battery_level: 0,
+  kms_driven: 0,
+  vehicle_number: 'Not Assigned'
+});
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  useEffect(() => {
+  const fetchTransactions = async () => {
+    try {
+      const res = await api.get('/api/payment/my-transactions');
+      setTransactions(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  fetchTransactions();
+}, []);
 
   const handlePayment = async (amount) => {
     setLoading(true);
@@ -34,13 +55,22 @@ function DriverDashboard() {
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
-            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Driver Console</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Hello, {user.name || 'Driver'} 👋</h1>
             <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Track your daily earnings and asset health.</p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: 'white', color: '#1A1A1A', border: '1px solid #E8E0D5' }}>
               Download Report
             </button>
+            <button
+  onClick={() => {
+    localStorage.clear();
+    window.location.href = '/login';
+  }}
+  style={{ padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', backgroundColor: 'white', color: '#DC2626', border: '1px solid #DC2626', cursor: 'pointer' }}
+>
+  Logout
+</button>
             <button
               onClick={() => handlePayment(2)}
               disabled={loading}
@@ -54,7 +84,7 @@ function DriverDashboard() {
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: 1, backgroundColor: '#7D5235', borderRadius: '16px', padding: '28px', color: 'white' }}>
             <p style={{ fontSize: '13px', opacity: 0.8, marginBottom: '8px' }}>Wallet Balance</p>
-            <p style={{ fontSize: '36px', fontWeight: '700', marginBottom: '20px' }}>₹1,240</p>
+            <p style={{ fontSize: '36px', fontWeight: '700', marginBottom: '20px' }}>₹{driverDetails.wallet_balance}</p>
             <button style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}>
               Withdraw to Bank
             </button>
@@ -63,8 +93,8 @@ function DriverDashboard() {
           <div style={{ flex: 2, backgroundColor: 'white', borderRadius: '16px', padding: '28px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Today's Progress</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <p style={{ fontSize: '28px', fontWeight: '700' }}>₹0 / ₹1</p>
-              <span style={{ color: '#D97706', fontSize: '13px', fontWeight: '600' }}>₹100 Due</span>
+              <p style={{ fontSize: '28px', fontWeight: '700' }}>₹{driverDetails.amount_paid_today} / ₹{driverDetails.daily_rent}</p>
+              <span style={{ color: '#D97706', fontSize: '13px', fontWeight: '600' }}>₹{Number(driverDetails.daily_rent) - Number(driverDetails.amount_paid_today)} Due</span>
             </div>
             <div style={{ backgroundColor: '#F3EDE5', borderRadius: '4px', height: '8px', marginBottom: '16px' }}>
               <div style={{ backgroundColor: '#8B5E3C', borderRadius: '4px', height: '8px', width: '78%' }} />
@@ -94,32 +124,45 @@ function DriverDashboard() {
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <p style={{ fontSize: '15px', fontWeight: '600' }}>Active Vehicle Details</p>
-              <span style={{ backgroundColor: '#DCFCE7', color: '#16A34A', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500' }}>UP-14-EA-2201</span>
+              <span style={{ backgroundColor: '#DCFCE7', color: '#16A34A', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500' }}>{driverDetails.vehicle_number}</span>
             </div>
             <div style={{ display: 'flex', gap: '32px' }}>
               <div>
                 <p style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '4px' }}>Battery Level</p>
-                <p style={{ fontSize: '24px', fontWeight: '700' }}>68%</p>
+                <p style={{ fontSize: '24px', fontWeight: '700' }}>{driverDetails.battery_level}%</p>
               </div>
               <div>
                 <p style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '4px' }}>KMs Driven</p>
-                <p style={{ fontSize: '24px', fontWeight: '700' }}>42.5 km</p>
+                <p style={{ fontSize: '24px', fontWeight: '700' }}>{driverDetails.kms_driven} km</p>
               </div>
             </div>
           </div>
 
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', marginBottom: '20px' }}>Recent Transactions</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F3EDE5' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ backgroundColor: '#DCFCE7', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>↓</span>
-                <div>
-                  <p style={{ fontSize: '14px', fontWeight: '500' }}>Daily Rent Paid</p>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF' }}>May 17, 10:15 AM</p>
-                </div>
-              </div>
-              <p style={{ fontSize: '14px', fontWeight: '600', color: '#16A34A' }}>₹0.00</p>
-            </div>
+            {transactions.length === 0 ? (
+  <p style={{ fontSize: '13px', color: '#9CA3AF' }}>No transactions yet</p>
+) : (
+  transactions.slice(0, 5).map((txn) => (
+    <div key={txn.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #F3EDE5' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span style={{ backgroundColor: txn.transaction_status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+          {txn.transaction_status === 'SUCCESS' ? '✓' : '↻'}
+        </span>
+        <div>
+          <p style={{ fontSize: '14px', fontWeight: '500' }}>{txn.order_number}</p>
+          <p style={{ fontSize: '12px', color: '#9CA3AF' }}>
+            {new Date(txn.order_initiation_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <p style={{ fontSize: '14px', fontWeight: '600', color: txn.transaction_status === 'SUCCESS' ? '#16A34A' : '#D97706' }}>₹{txn.order_amount}</p>
+        <p style={{ fontSize: '11px', color: '#9CA3AF' }}>{txn.transaction_status}</p>
+      </div>
+    </div>
+  ))
+)}
           </div>
         </div>
       </div>
