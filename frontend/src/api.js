@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // frontend/src/api.js (Ya jahan axios instance hai)
 const api = axios.create({
-  baseURL: 'http://localhost:5000',
+  baseURL: 'https://mg-qw5s.onrender.com',
 });
 
 api.interceptors.request.use((config) => {

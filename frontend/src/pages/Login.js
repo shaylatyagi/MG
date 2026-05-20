@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+const BACKEND = process.env.REACT_APP_BACKEND_URL || 'https://mg-qw5s.onrender.com';
 
 export default function Login() {
   const navigate = useNavigate();

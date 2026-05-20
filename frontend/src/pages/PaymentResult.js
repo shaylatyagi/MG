@@ -238,7 +238,7 @@ export default function PaymentResult() {
               </div>
 
               <div style={{ marginTop: '24px', backgroundColor: '#F3F4F6', borderRadius: '16px', padding: '20px' }}>
-                <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1F2937' }}>Developer / Localhost Details</h2>
+                <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1F2937' }}>Developer Details</h2>
                 <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '12px', color: '#111827', background: '#FFFFFF', borderRadius: '12px', padding: '16px', overflowX: 'auto', maxHeight: '320px' }}>
 {rawJSON}
                 </pre>

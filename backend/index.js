@@ -39,7 +39,7 @@ app.get('/', (req, res) => {
 });
 
 // ====================== SCHEDULER ======================
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = 'https://mg-qw5s.onrender.com';
 
 const checkPendingOrders = async () => {
   try {
