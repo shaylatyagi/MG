@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print'; // Naya import
 import api from '../api';
@@ -7,7 +7,7 @@ export default function PaymentResult() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [countdown, setCountdown] = useState(10); // Print click hone par isko rok denge
+  const [countdown, setCountdown] = useState(60); // Print click hone par isko rok denge
   const [stopTimer, setStopTimer] = useState(false); // Timer rokne ke liye state
   const [orderData, setOrderData] = useState(null);
   const [error, setError] = useState(null);
@@ -15,17 +15,18 @@ export default function PaymentResult() {
   // Print ke liye reference
   const componentRef = useRef();
 
-  const orderId = searchParams.get('orderId') || searchParams.get('referenceId') || searchParams.get('orderNumber') || searchParams.get('reference_id');
+  const orderId = searchParams.get('ref') || searchParams.get('orderId');
   const statusParam = searchParams.get('status');
+  const queryDetails = Object.fromEntries(searchParams.entries());
 
-  const goToDashboard = () => {
+  const goToDashboard = useCallback(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.role === 'owner') {
       navigate('/owner/dashboard');
     } else {
       navigate('/driver/dashboard');
     }
-  };
+  }, [navigate]);
 
   // Print Handle Function
   const handlePrint = useReactToPrint({
@@ -33,7 +34,7 @@ export default function PaymentResult() {
     documentTitle: `Receipt_${orderId || 'Payment'}`,
     onBeforeGetContent: () => {
       // Jaise hi Print dabega, countdown ruk jayega taaki page redirect na ho!
-      setStopTimer(true); 
+      setStopTimer(true);
     }
   });
 
@@ -47,9 +48,11 @@ export default function PaymentResult() {
 
       try {
         const res = await api.get(`/api/payment/order/${orderId}`);
+        console.log("BACKEND SE AAYA DATA:", res.data);
         setOrderData(res.data);
       } catch (err) {
         console.error('Payment result fetch failed:', err.response?.data || err.message || err);
+        setError(err.response?.data?.message || err.message || 'Failed to fetch payment result');
       } finally {
         setLoading(false);
       }
@@ -77,23 +80,54 @@ export default function PaymentResult() {
         clearInterval(interval);
       };
     }
-  }, [loading, stopTimer, countdown]); // stopTimer add kiya dependency mein
+  }, [loading, stopTimer, countdown, goToDashboard]);
 
+  // --- ROBUST VARIABLE MAPPING ---
+  // Safely extract from your backend response structure
   const local = orderData?.local || {};
-  const external = orderData?.external || {};
+  const external = orderData?.pyData || orderData?.external || orderData?.data || {}; 
   const raw = orderData?.raw || {};
-  const status = external?.transactionStatus || external?.status || local.transaction_status || statusParam || 'PENDING';
+
+  // Status Check
+  const status = local.transaction_status || external.status || external.transactionStatus || statusParam || 'PENDING';
   const isSuccess = String(status).toUpperCase() === 'SUCCESS';
-  const amount = local.order_amount || external?.amount || raw?.amount || 'N/A';
-  const currency = local.currency || external?.currency || raw?.currency || 'INR';
-  const referenceNumber = local.bank_reference_no || external?.bankReferenceNo || external?.rrn || raw?.bankReferenceNo || raw?.rrn || 'N/A';
-  const utrNumber = local.bank_utr_no || external?.bankUTRNo || raw?.bankUTRNo || 'N/A';
-  const pspTxnId = local.pg_transaction_id || external?.transactionId || raw?.transactionId || 'N/A';
-  const payyantraOrderId = external?.orderId || external?.pspOrderId || raw?.orderId || raw?.pspOrderId || 'N/A';
-  const payyantraReferenceId = external?.referenceId || raw?.referenceId || 'N/A';
+
+  // Amount & Currency
+  const amount = local.order_amount || external.amount || 'N/A';
+  const currency = local.currency || external.currency || 'INR';
+
+  // IDs & References
   const localOrderUuid = local.order_id || 'N/A';
-  const statusCode = local.transaction_status_code || external?.statusCode || raw?.statusCode || 'N/A';
   const merchantRef = local.order_number || 'N/A';
+  const payyantraOrderId = external.orderId || external.pspOrderId || 'N/A';
+  const payyantraReferenceId = external.referenceId || 'N/A';
+  
+  // Transaction IDs (Crucial Fix)
+  const pspTxnId = local.pg_transaction_id || external.transactionId || external.transactionPublicId || raw.txnId || 'N/A';
+  const gatewayMerchantOrderId = external.merchantOrderId || 'N/A';
+  const statusCode = local.transaction_status_code || external.statusCode || 'N/A';
+
+  // Bank details (UAT environment usually returns null/NA for these)
+  const referenceNumber = local.bank_reference_no || external.rrn || external.bankReferenceNo || raw.rrn || 'N/A';
+  const utrNumber = local.bank_utr_no || external.bankUTRNo || raw.utr || 'N/A';
+
+  // Customer Details
+  const payerName = local.payer_name || external.customerDetails?.name || 'N/A';
+  const payerEmail = local.payer_email || external.customerDetails?.email || 'N/A';
+  const payerPhone = local.payer_mobile || external.customerDetails?.phone || 'N/A';
+
+  // Timestamps
+  const createdAt = local.order_initiation_date || local.created_at || 'N/A';
+  const completedAt = local.order_completion_date || local.updated_at || 'N/A';
+
+  // URLs & Methods
+  const paymentUrl = external.checkoutUrl || local.payment_url || 'N/A';
+  const notifyUrl = external.notifyUrl || 'N/A';
+  const returnUrl = external.returnUrl || 'N/A';
+  const paymentMethod = external.paymentMode || raw.payment_method || 'N/A';
+  
+  const rawJSON = JSON.stringify(orderData, null, 2);
+  // ---------------------------------
 
   const fieldRow = (label, value) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -114,7 +148,14 @@ export default function PaymentResult() {
               <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
                 {fieldRow('Order Reference', orderId)}
                 {fieldRow('Status', statusParam || 'UNKNOWN')}
+                {fieldRow('Query Params', JSON.stringify(queryDetails) || 'N/A')}
+                {fieldRow('Note', 'This usually means the local backend DB did not find this order.')}
               </div>
+              {!stopTimer ? (
+                <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '16px' }}>Redirecting to dashboard in {countdown} seconds...</p>
+              ) : (
+                <p style={{ fontSize: '13px', color: '#8B5E3C', marginBottom: '16px' }}>Auto-redirect paused. You can safely print or inspect this error.</p>
+              )}
               <button
                 onClick={goToDashboard}
                 style={{ width: '100%', padding: '14px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '10px', fontSize: '15px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
@@ -141,18 +182,42 @@ export default function PaymentResult() {
                   )}
                 </div>
 
-                <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
-                  {fieldRow('Order Reference', merchantRef)}
-                  {fieldRow('Order UUID', localOrderUuid)}
-                  {fieldRow('PayYantra Ref ID', payyantraReferenceId)}
-                  {fieldRow('Payment Order ID', payyantraOrderId)}
-                  {fieldRow('PG Txn ID', pspTxnId)}
-                  {fieldRow('PayYantra Status Code', statusCode)}
-                  {fieldRow('Amount', `${currency} ${amount}`)}
-                  {fieldRow('Payer Mobile', local.payer_mobile || external?.customerPhone || 'N/A')}
-                  {fieldRow('Bank Reference / RRN', referenceNumber)}
-                  {fieldRow('Bank UTR', utrNumber)}
-                  {fieldRow('Status', status)}
+                <div style={{ display: 'grid', gap: '20px', marginBottom: '24px' }}>
+                  <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px' }}>
+                    <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1A1A1A' }}>Local DB values</h2>
+                    {fieldRow('Order UUID', localOrderUuid)}
+                    {fieldRow('Order Number', merchantRef)}
+                    {fieldRow('Transaction Status', local.transaction_status || 'N/A')}
+                    {fieldRow('Status Code', local.transaction_status_code || 'N/A')}
+                    {fieldRow('PG Txn ID', local.pg_transaction_id || 'N/A')}
+                    {fieldRow('Amount', `${local.currency || 'INR'} ${local.order_amount || 'N/A'}`)}
+                    {fieldRow('Payer Name', local.payer_name || 'N/A')}
+                    {fieldRow('Payer Email', local.payer_email || 'N/A')}
+                    {fieldRow('Payer Mobile', local.payer_mobile || 'N/A')}
+                    {fieldRow('Bank Reference / RRN', local.bank_reference_no || 'N/A')}
+                    {fieldRow('Bank UTR', local.bank_utr_no || 'N/A')}
+                    {fieldRow('Created At', local.order_initiation_date || local.created_at || 'N/A')}
+                    {fieldRow('Completed At', local.order_completion_date || local.updated_at || 'N/A')}
+                  </div>
+
+                  <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px' }}>
+                    <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1A1A1A' }}>PayYantra / Gateway values</h2>
+                    {fieldRow('PayYantra Ref ID', payyantraReferenceId)}
+                    {fieldRow('Payment Order ID', payyantraOrderId)}
+                    {fieldRow('PG Txn ID', pspTxnId)}
+                    {fieldRow('Status', status)}
+                    {fieldRow('Amount', `${currency} ${amount}`)}
+                    {fieldRow('Customer Name', payerName)}
+                    {fieldRow('Customer Email', payerEmail)}
+                    {fieldRow('Customer Phone', payerPhone)}
+                    {fieldRow('Payment Mode', paymentMethod)}
+                    {fieldRow('Gateway Order ID', gatewayMerchantOrderId)}
+                    {fieldRow('Payment URL', paymentUrl)}
+                    {fieldRow('Notify URL', notifyUrl)}
+                    {fieldRow('Return URL', returnUrl)}
+                    {fieldRow('Bank Reference / RRN', referenceNumber)}
+                    {fieldRow('Bank UTR', utrNumber)}
+                  </div>
                 </div>
               </div>
 
@@ -170,6 +235,13 @@ export default function PaymentResult() {
                 >
                   Back to Dashboard
                 </button>
+              </div>
+
+              <div style={{ marginTop: '24px', backgroundColor: '#F3F4F6', borderRadius: '16px', padding: '20px' }}>
+                <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1F2937' }}>Developer / Localhost Details</h2>
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '12px', color: '#111827', background: '#FFFFFF', borderRadius: '12px', padding: '16px', overflowX: 'auto', maxHeight: '320px' }}>
+{rawJSON}
+                </pre>
               </div>
             </>
           )}

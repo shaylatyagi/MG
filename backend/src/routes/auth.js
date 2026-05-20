@@ -20,7 +20,8 @@ router.post('/send-otp', async (req, res) => {
       [phone_number, otp, expires_at]
     );
 
-    res.json({ message: 'OTP sent successfully', otp });
+    const existingUser = await pool.query('SELECT id FROM users WHERE phone_number = $1', [phone_number]);
+res.json({ message: 'OTP sent successfully', otp, is_new_user: existingUser.rows.length === 0 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Something went wrong' });
@@ -128,5 +129,27 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ message: 'Something went wrong' });
   }
 });
-
+router.post('/demo-login', async (req, res) => {
+  const { phone_number, name, role } = req.body;
+  
+  try {
+    let user = await pool.query('SELECT * FROM users WHERE phone_number = $1', [phone_number]);
+    
+    if (user.rows.length === 0) {
+      const newUser = await pool.query(
+        'INSERT INTO users (phone_number, name, role) VALUES ($1, $2, $3) RETURNING *',
+        [phone_number, name || 'Demo User', role || 'driver']
+      );
+      user = newUser;
+    } else {
+      user = { rows: user.rows };
+    }
+    
+    const token = generateToken(user.rows[0]);
+    res.json({ token, user: user.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Demo login failed' });
+  }
+});
 module.exports = router;

@@ -10,7 +10,7 @@ if (process.env.DATABASE_URL) {
   console.log('✅ Using DATABASE_URL');
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: false,
   });
 } else {
   console.log('⚠️  Using individual PG variables');
@@ -20,7 +20,7 @@ if (process.env.DATABASE_URL) {
     user: process.env.PGUSER || process.env.DB_USER,
     password: process.env.PGPASSWORD || process.env.DB_PASSWORD,
     database: process.env.PGDATABASE || process.env.DB_NAME,
-    ssl: { rejectUnauthorized: false }
+    ssl: false,
   });
 }
 

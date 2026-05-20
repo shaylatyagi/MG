@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
 
-
 function DriverDashboard() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [activePayment, setActivePayment] = useState('');
   const [transactions, setTransactions] = useState([]);
+  const [expandedTxn, setExpandedTxn] = useState(null); // To track which row is clicked
   const [driverDetails, setDriverDetails] = useState({
     wallet_balance: 0,
     daily_rent: 0,
@@ -21,7 +21,7 @@ function DriverDashboard() {
   const fetchTransactions = async () => {
     try {
       const res = await api.get('/api/payment/my-transactions', {
-        params: { phone: user.phone_number }
+        params: { phone: user.phone_number || user.phone }
       });
       const sorted = res.data.slice().sort((a, b) => new Date(b.order_initiation_date) - new Date(a.order_initiation_date));
       setTransactions(sorted);
@@ -33,6 +33,33 @@ function DriverDashboard() {
   useEffect(() => {
     fetchTransactions();
   }, [user.phone_number]);
+
+  const handleOrderInquiry = async (orderId, e) => {
+    e.stopPropagation(); // Prevents row expansion when clicking the button
+    setRefreshing(true); 
+    try {
+      const response = await api.get(`/api/payment/status/${orderId}`);
+      console.log("Inquiry API ka fresh response:", response.data);
+
+      if (response.data && response.data.success) {
+        const freshStatus = response.data.status;
+        setTransactions(prevTransactions => 
+          prevTransactions.map(txn => 
+            txn.order_id === orderId
+              ? { ...txn, transaction_status: freshStatus }
+              : txn
+          )
+        );
+        alert(`Status updated to: ${freshStatus}`);
+      }
+    } catch (err) {
+      console.error('Frontend Inquiry Failed:', err);
+      alert('Status check karne mein dikkat aayi. Please try again.');
+    } finally {
+      setRefreshing(false);
+      fetchTransactions(); 
+    }
+  };
 
   const handleRefreshAllPending = async () => {
     setRefreshing(true);
@@ -47,19 +74,6 @@ function DriverDashboard() {
     }
   };
 
-  const handleRefreshSingle = async (orderId) => {
-    setRefreshing(true);
-    try {
-      await api.get(`/api/payment/status/${orderId}`);
-      await fetchTransactions();
-    } catch (err) {
-      console.error('Failed to refresh order status', err);
-      alert('Unable to refresh this inquiry. Please try again.');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   const pendingCount = transactions.filter(txn => txn.transaction_status !== 'SUCCESS').length;
 
   const handlePayment = async (amount, type) => {
@@ -69,27 +83,35 @@ function DriverDashboard() {
       const res = await api.post('/api/payment/create-order', {
         amount: amount,
         customerName: user.name || 'Driver',
-        customerPhone: user.phone_number || '9876543210',
+        customerPhone: user.phone_number || user.phone || "9876542345",
         customerEmail: user.email || 'driver@mobilitygrid.in',
       });
-      const checkoutUrl = res.data.data.data.checkoutUrl;
+
+      const checkoutUrl = res.data?.data?.data?.checkoutUrl || res.data?.data?.checkoutUrl || res.data?.paymentUrl;
+      
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
       } else {
-        alert('Payment initiation failed. Please try again.');
+        alert('Payment initiation failed. No checkout URL received.');
       }
     } catch (err) {
-      console.error(err);
+      console.error('Payment Error:', err);
       alert('Something went wrong. Please try again.');
     }
     setPaymentLoading(false);
     setActivePayment('');
   };
 
+  // Toggle row expansion
+  const toggleExpand = (orderId) => {
+    setExpandedTxn(prev => prev === orderId ? null : orderId);
+  };
+
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
+        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Hello, {user.name || 'Driver'} 👋</h1>
@@ -109,7 +131,7 @@ function DriverDashboard() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
           <div style={{ flex: 1, backgroundColor: '#7D5235', borderRadius: '16px', padding: '28px', color: 'white' }}>
             <p style={{ fontSize: '13px', opacity: 0.8, marginBottom: '8px' }}>Wallet Balance</p>
             <p style={{ fontSize: '36px', fontWeight: '700', marginBottom: '20px' }}>₹{driverDetails.wallet_balance}</p>
@@ -167,54 +189,65 @@ function DriverDashboard() {
           </div>
 
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
-              <p style={{ fontSize: '15px', fontWeight: '600', margin: 0 }}>Recent Transactions</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <p style={{ fontSize: '15px', fontWeight: '600' }}>Recent Transactions</p>
               <button
-                onClick={handleRefreshAllPending}
-                disabled={refreshing || pendingCount === 0}
-                style={{ padding: '10px 16px', borderRadius: '10px', backgroundColor: pendingCount > 0 ? '#8B5E3C' : '#E5E7EB', color: pendingCount > 0 ? 'white' : '#6B7280', border: 'none', cursor: pendingCount > 0 ? 'pointer' : 'not-allowed', fontSize: '13px', fontWeight: '600' }}
+                onClick={() => window.location.href = '/driver/wallet'}
+                style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer' }}
               >
-                {refreshing ? 'Refreshing…' : `Refresh ${pendingCount} Pending`}
+                View All →
               </button>
             </div>
-            {transactions.length === 0 ? (
-              <p style={{ fontSize: '13px', color: '#9CA3AF' }}>No transactions yet</p>
-            ) : (
-              transactions.slice(0, 5).map((txn) => (
-                <div key={txn.order_id || txn.order_number} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px 0', borderBottom: '1px solid #F3EDE5' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ backgroundColor: txn.transaction_status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
-                        {txn.transaction_status === 'SUCCESS' ? '✓' : '↻'}
-                      </span>
-                      <div>
-                        <p style={{ fontSize: '14px', fontWeight: '500' }}>{txn.order_number}</p>
-                        <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
-                          {new Date(txn.order_initiation_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
+            
+            {transactions.slice(0, 3).map((txn) => (
+              <div key={txn.order_id} style={{ padding: '10px 0', borderBottom: '1px solid #F3EDE5' }}>
+                <div 
+                  onClick={() => toggleExpand(txn.order_id)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ backgroundColor: txn.transaction_status === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
+                      {txn.transaction_status === 'SUCCESS' ? '✓' : '↻'}
+                    </span>
+                    <div>
+                      <p style={{ fontSize: '13px', fontWeight: '500' }}>{txn.order_number}</p>
+                      <p style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                        {new Date(txn.order_initiation_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: '14px', fontWeight: '600', color: txn.transaction_status === 'SUCCESS' ? '#16A34A' : '#D97706' }}>₹{txn.order_amount}</p>
+                  </div>
+                  <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    <p style={{ fontSize: '13px', fontWeight: '600', color: txn.transaction_status === 'SUCCESS' ? '#16A34A' : '#D97706' }}>₹{txn.order_amount}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <p style={{ fontSize: '11px', color: '#9CA3AF' }}>{txn.transaction_status}</p>
+                      {txn.transaction_status !== 'SUCCESS' && (
+                        <button 
+                          onClick={(e) => handleOrderInquiry(txn.order_id, e)} 
+                          disabled={refreshing}
+                          style={{ padding: '4px 8px', fontSize: '10px', backgroundColor: '#E5E7EB', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          {refreshing ? '...' : 'Check Status'}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
-                    <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0 }}>Order UUID: {txn.order_id || 'N/A'}</p>
-                    <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0 }}>PG Txn ID: {txn.pg_transaction_id || 'N/A'}</p>
-                  </div>
-                  {txn.transaction_status !== 'SUCCESS' && (
-                    <button
-                      onClick={() => handleRefreshSingle(txn.order_id)}
-                      disabled={refreshing}
-                      style={{ alignSelf: 'flex-start', padding: '8px 14px', borderRadius: '10px', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: '1px solid #D6BFA8', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
-                    >
-                      {refreshing ? 'Refreshing…' : 'Refresh pending inquiry'}
-                    </button>
-                  )}
                 </div>
-              ))
-            )}
+
+                {/* The Expanded Details Section */}
+                {expandedTxn === txn.order_id && (
+                  <div style={{ marginTop: '12px', padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px dashed #D1D5DB' }}>
+                    <h4 style={{ fontSize: '12px', fontWeight: '700', marginBottom: '12px', color: '#374151' }}>Transaction Details</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '11px', color: '#4B5563' }}>
+                      <div><span style={{ display: 'block', color: '#9CA3AF', fontSize: '10px', marginBottom: '2px' }}>Order UUID</span><span style={{ fontWeight: '600' }}>{txn.order_id}</span></div>
+                      <div><span style={{ display: 'block', color: '#9CA3AF', fontSize: '10px', marginBottom: '2px' }}>PG Txn ID</span><span style={{ fontWeight: '600' }}>{txn.pg_transaction_id || 'N/A'}</span></div>
+                      <div><span style={{ display: 'block', color: '#9CA3AF', fontSize: '10px', marginBottom: '2px' }}>Bank Reference</span><span style={{ fontWeight: '600' }}>{txn.bank_reference_no || 'N/A'}</span></div>
+                      <div><span style={{ display: 'block', color: '#9CA3AF', fontSize: '10px', marginBottom: '2px' }}>Bank UTR</span><span style={{ fontWeight: '600' }}>{txn.bank_utr_no || 'N/A'}</span></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {transactions.length === 0 && <p style={{ fontSize: '13px', color: '#9CA3AF' }}>No transactions yet</p>}
           </div>
         </div>
       </div>

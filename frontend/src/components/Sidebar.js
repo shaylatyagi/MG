@@ -68,7 +68,7 @@ export default function Sidebar() {
         ))}
       </nav>
       
-      <div style={{ marginBottom: '12px' }}>
+      <div style={{ marginBottom: '8px' }}>
         <LanguageSelector />
       </div>
 
@@ -98,10 +98,11 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     padding: '24px 16px',
-    paddingBottom: '100px',
+    paddingBottom: '120px',
     position: 'fixed',
     top: 0,
     left: 0,
+    overflowY: 'auto',
   },
   logo: {
     fontSize: '20px',
@@ -163,9 +164,10 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '12px 8px',
+    padding: '8px 8px',
     borderTop: '1px solid var(--border)',
-    marginTop: '16px',
+    marginTop: '0px',
+    marginBottom: '12px',
   },
   avatar: {
     width: '36px',
@@ -202,6 +204,7 @@ const styles = {
     width: '100%',
     textAlign: 'center',
     transition: '0.2s',
-    position: 'relative',
+    position: 'sticky',
+    bottom: '20px',
   }
 };

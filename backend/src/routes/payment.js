@@ -1,4 +1,4 @@
-require('dotenv').config();   // ← Sabse top pe
+require('dotenv').config();
 
 const express = require('express');
 const router = express.Router();
@@ -28,12 +28,9 @@ const getToken = async () => {
     });
 
     const data = await res.json();
-    console.log('Token Response:', JSON.stringify(data, null, 2));
-
     if (!data?.data?.token) {
       throw new Error('Failed to get token from PayYantra');
     }
-
     return data.data.token;
   } catch (err) {
     console.error('Get Token Error:', err.message);
@@ -41,33 +38,38 @@ const getToken = async () => {
   }
 };
 
-// ====================== CREATE ORDER (Main Endpoint) ======================
+// ====================== CREATE ORDER ======================
 router.post('/create-order', async (req, res) => {
-  const { amount, customerName, customerPhone, customerEmail, userId } = req.body;
+  const { amount, customerName, customerPhone, customerEmail } = req.body;
 
-  console.log('Create Order Request:', { amount, customerPhone, customerName });
+  console.log('Create Order Received:', { amount, customerName, customerPhone, customerEmail });
 
-  if (!amount || amount <= 0 || !customerPhone) {
-    return res.status(400).json({ success: false, message: 'Amount and phone number are required' });
+  if (!amount || Number(amount) <= 0 || !customerPhone) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Invalid amount or phone number',
+      received: { amount, phone: customerPhone }
+    });
   }
 
+  const parsedAmount = Number(amount);
   const orderId = uuidv4();
-  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
 
   try {
-    // Save order in DB first
+    // Insert order into database
     await pool.query(
       `INSERT INTO ms_orders 
-       (order_id, order_number, order_amount, currency, payer_name, payer_mobile, payer_email, transaction_status, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', $8)`,
-      [orderId, orderNumber, amount, 'INR', customerName, customerPhone, customerEmail, userId]
+       (order_id, order_number, order_amount, currency, payer_name, payer_mobile, payer_email, transaction_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')`,
+      [orderId, orderNumber, parsedAmount, 'INR', customerName, customerPhone, customerEmail]
     );
 
     const token = await getToken();
 
     const orderPayload = {
       referenceId: orderId,
-      amount: Number(amount) * 100,           // ← Most Important: Paise mein convert
+      amount: parsedAmount, 
       currency: 'INR',
       customerName: customerName || 'Driver',
       customerEmail: customerEmail || process.env.DEFAULT_EMAIL,
@@ -89,13 +91,13 @@ router.post('/create-order', async (req, res) => {
     });
 
     const orderData = await orderRes.json();
-    console.log('PayYantra Order Response:', JSON.stringify(orderData, null, 2));
+
+    console.log('PayYantra Response:', { status: orderRes.status, data: orderData });
 
     if (!orderRes.ok) {
-      throw new Error(orderData.message || 'Payment gateway error');
+      throw new Error(orderData.message || `PayYantra Error: ${orderRes.status}`);
     }
 
-    // Update transaction ID
     if (orderData?.data?.transactionId) {
       await pool.query(
         `UPDATE ms_orders SET pg_transaction_id = $1 WHERE order_id = $2`,
@@ -103,44 +105,54 @@ router.post('/create-order', async (req, res) => {
       );
     }
 
+    const checkoutUrl = orderData?.data?.data?.checkoutUrl || orderData?.data?.checkoutUrl || orderData?.data?.url;
+
+    if (!checkoutUrl) {
+      throw new Error('No checkout URL received from PayYantra');
+    }
+
     res.json({
       success: true,
       data: orderData,
       orderId,
       orderNumber,
-      paymentUrl: orderData?.data?.paymentUrl || orderData?.data?.url
+      paymentUrl: checkoutUrl
     });
 
   } catch (err) {
-    console.error('=== PAYMENT INITIATION FAILED ===');
-    console.error(err.message);
-    if (err.response) console.error(err.response.data);
-
+    console.error('=== PAYMENT CREATION FAILED ===', err.message);
     res.status(500).json({
       success: false,
       message: 'Payment Initiation Failed',
-      error: err.message
+      error: err.message,
+      details: 'Check server logs for more info'
     });
   }
 });
 
 router.get('/driver-details', async (req, res) => {
   try {
-    // Safety check add kiya hai
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: 'Unauthorized: User not logged in' });
+    const phone = req.query.phone;
+
+    if (!phone) {
+      return res.status(400).json({ message: 'Phone number is required' });
     }
 
     const result = await pool.query(
-      `SELECT * FROM driver_details WHERE user_id = $1`,
-      [req.user.id]
+      `SELECT * FROM driver_details 
+       WHERE user_id = (SELECT id FROM users WHERE phone_number = $1 LIMIT 1)`,
+      [phone]
     );
 
     if (result.rows.length === 0) {
       const newDriver = await pool.query(
-        `INSERT INTO driver_details (user_id, wallet_balance, daily_rent, amount_paid_today, battery_level, kms_driven, vehicle_number)
-         VALUES ($1, 0, 100, 0, 0, 0, 'Not Assigned') RETURNING *`,
-        [req.user.id]
+        `INSERT INTO driver_details 
+         (user_id, wallet_balance, daily_rent, amount_paid_today, battery_level, kms_driven, vehicle_number)
+         VALUES (
+           (SELECT id FROM users WHERE phone_number = $1 LIMIT 1), 
+           0, 100, 0, 0, 0, 'Not Assigned'
+         ) RETURNING *`,
+        [phone]
       );
       return res.json(newDriver.rows[0]);
     }
@@ -152,39 +164,45 @@ router.get('/driver-details', async (req, res) => {
   }
 });
 
+// ====================== WEBHOOK ======================
 router.post('/webhook', async (req, res) => {
   const body = req.body;
   console.log('Webhook received:', body);
 
   try {
-    const orderId = body.referenceId || body.orderId;
-    const status = body.transactionStatus || body.status;
-    if (!orderId) {
-      return res.status(400).json({ message: 'orderId missing in webhook' });
-    }
+    const payload = body.data || body; 
+    
+    const orderId = payload.referenceId || payload.orderId;
+    let rawStatus = payload.transactionStatus || payload.status;
+    
+    // STATUS MAPPER
+    let status = rawStatus ? String(rawStatus).toUpperCase() : 'PENDING';
+    if (status === 'INITIATED') status = 'PENDING';
+    if (status === 'SUCCESSFUL') status = 'SUCCESS';
+
+    if (!orderId) return res.status(400).json({ message: 'orderId missing' });
 
     const localOrder = await pool.query('SELECT * FROM ms_orders WHERE order_id = $1', [orderId]);
     if (localOrder.rows.length === 0) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    const localAmount = parseFloat(localOrder.rows[0].order_amount);
-    const pgAmount = parseFloat(body.amount);
-    if (pgAmount && localAmount !== pgAmount) {
-      await pool.query('UPDATE ms_orders SET transaction_status = $1 WHERE order_id = $2', ['TAMPERED', orderId]);
-      return res.status(400).json({ message: 'Amount mismatch detected' });
-    }
+    if (status === 'SUCCESS' && localOrder.rows[0].transaction_status !== 'SUCCESS') {
+      const amount = parseFloat(localOrder.rows[0].order_amount || 0);
 
-    if (status === 'SUCCESS') {
       await pool.query(
-        `UPDATE driver_details SET 
-          amount_paid_today = amount_paid_today + $1,
-          updated_at = NOW()
+        `UPDATE driver_details 
+         SET 
+           wallet_balance = COALESCE(wallet_balance, 0) + $1,
+           amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
+           updated_at = NOW()
          WHERE user_id = (
-           SELECT id FROM users WHERE phone_number = $2
+           SELECT id FROM users WHERE phone_number = $2 LIMIT 1
          )`,
-        [localOrder.rows[0].order_amount, localOrder.rows[0].payer_mobile]
+        [amount, localOrder.rows[0].payer_mobile]
       );
+
+      console.log(`💰 Wallet Updated: +₹${amount} for ${localOrder.rows[0].payer_mobile}`);
     }
 
     await pool.query(
@@ -198,11 +216,11 @@ router.post('/webhook', async (req, res) => {
        WHERE order_id = $6`,
       [
         status,
-        body.statusCode || null,
-        body.transactionId || null,
-        body.bankReferenceNo || null,
-        body.bankUTRNo || null,
-        orderId,
+        payload.statusCode || null,
+        payload.transactionId || payload.transactionPublicId || null,
+        payload.bankReferenceNo || payload.rrn || null, 
+        payload.bankUTRNo || null,
+        orderId
       ]
     );
 
@@ -213,17 +231,14 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
+// ====================== MY TRANSACTIONS ======================
 router.get('/my-transactions', async (req, res) => {
   try {
-    // Safely variable extract karna
-    const phone = req.query.phone || req.body.phone || req.user?.phone_number;
-    
-    if (!phone) {
-      return res.status(400).json({ message: 'Phone number is required' });
-    }
+    const phone = req.query.phone;
+    if (!phone) return res.status(400).json({ message: 'Phone number is required' });
 
     const result = await pool.query(
-      `SELECT * FROM ms_orders WHERE payer_mobile = $1 ORDER BY order_initiation_date DESC LIMIT 10`,
+      `SELECT * FROM ms_orders WHERE payer_mobile = $1 ORDER BY order_initiation_date DESC`,
       [phone]
     );
     res.json(result.rows);
@@ -233,9 +248,11 @@ router.get('/my-transactions', async (req, res) => {
   }
 });
 
+// ====================== CHECK PENDING (Inquiry API) ======================
 router.post('/check-pending', async (req, res) => {
   try {
     const pending = await pool.query("SELECT * FROM ms_orders WHERE transaction_status = 'PENDING'");
+
     if (pending.rows.length === 0) {
       return res.json({ message: 'No pending orders' });
     }
@@ -246,11 +263,31 @@ router.post('/check-pending', async (req, res) => {
     for (const order of pending.rows) {
       try {
         const statusRes = await fetch(`${BASE_URL}/api/pay/status/by-reference/${order.order_id}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await statusRes.json();
-        const newStatus = data.transactionStatus || null;
+        
+        let rawStatus = data.transactionStatus || data.status;
+        
+        // STATUS MAPPER
+        let newStatus = rawStatus ? String(rawStatus).toUpperCase() : null;
+        if (newStatus === 'INITIATED') newStatus = 'PENDING';
+        if (newStatus === 'SUCCESSFUL') newStatus = 'SUCCESS';
+
         if (newStatus && newStatus !== 'PENDING') {
+          const amount = parseFloat(order.order_amount);
+
+          if (newStatus === 'SUCCESS') {
+            await pool.query(
+              `UPDATE driver_details 
+               SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
+                   amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
+                   updated_at = NOW()
+               WHERE user_id = (SELECT id FROM users WHERE phone_number = $2 LIMIT 1)`,
+              [amount, order.payer_mobile]
+            );
+          }
+
           await pool.query(
             `UPDATE ms_orders SET 
               transaction_status = $1,
@@ -259,80 +296,187 @@ router.post('/check-pending', async (req, res) => {
               bank_utr_no = $4,
               order_completion_date = NOW()
              WHERE order_id = $5`,
-            [
-              newStatus,
-              data.transactionId || null,
-              data.bankReferenceNo || null,
-              data.bankUTRNo || null,
-              order.order_id,
-            ]
+            [newStatus, data.transactionId, data.bankReferenceNo, data.bankUTRNo, order.order_id]
           );
+
           updated.push(order.order_number);
         }
       } catch (err) {
-        console.error('Inquiry failed for order:', order.order_id, err.message);
+        console.error(`Inquiry failed for ${order.order_id}:`, err.message);
       }
     }
 
-    res.json({ message: 'Inquiry complete', updated });
+    res.json({ message: 'Inquiry complete', updated: updated.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Inquiry failed' });
   }
 });
 
+// ====================== SINGLE ORDER STATUS (Frontend ke liye) ======================
 router.get('/status/:orderId', async (req, res) => {
   const { orderId } = req.params;
+  console.log('Status check requested for:', orderId);
+
   try {
+    const localResult = await pool.query(
+      'SELECT * FROM ms_orders WHERE order_id = $1 OR order_number = $1',
+      [orderId]
+    );
+
+    if (localResult.rows.length === 0) {
+      return res.status(404).json({ 
+        message: 'Order not found in local DB',
+        orderId 
+      });
+    }
+
     const token = await getToken();
     const statusRes = await fetch(`${BASE_URL}/api/pay/status/by-reference/${orderId}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 'Authorization': `Bearer ${token}` },
     });
-    const data = await statusRes.json();
-    if (data && data.transactionStatus) {
+
+    const rawData = await statusRes.json();
+    const pyData = rawData.data || {}; 
+    
+    // STATUS MAPPER
+    let rawStatus = pyData.status || pyData.transactionStatus || localResult.rows[0].transaction_status;
+    let newStatus = rawStatus ? String(rawStatus).toUpperCase() : 'PENDING';
+    
+    if (newStatus === 'INITIATED') newStatus = 'PENDING';
+    if (newStatus === 'SUCCESSFUL') newStatus = 'SUCCESS';
+
+    const amount = parseFloat(localResult.rows[0].order_amount);
+
+    // Update local DB if status changed
+    if (newStatus && newStatus !== localResult.rows[0].transaction_status) {
+      
+      if (newStatus === 'SUCCESS') {
+        await pool.query(
+          `UPDATE driver_details 
+           SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
+               amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
+               updated_at = NOW()
+           WHERE user_id = (SELECT id FROM users WHERE phone_number = $2 LIMIT 1)`,
+          [amount, localResult.rows[0].payer_mobile]
+        );
+      }
+
       await pool.query(
-        `UPDATE ms_orders SET transaction_status = $1, order_completion_date = NOW() WHERE order_id = $2`,
-        [data.transactionStatus, orderId]
+        `UPDATE ms_orders SET 
+          transaction_status = $1,
+          pg_transaction_id = $2,
+          bank_reference_no = $3,
+          bank_utr_no = $4,
+          order_completion_date = NOW()
+         WHERE order_id = $5`,
+        [
+          newStatus,
+          pyData.transactionPublicId || pyData.transactionId,
+          pyData.rrn || pyData.bankReferenceNo,
+          pyData.bankUTRNo,
+          orderId
+        ]
       );
     }
-    res.json(data);
+
+    res.json({
+      success: true,
+      status: newStatus,
+      amount: amount, 
+      orderId: orderId,
+      pyData: pyData
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Status check failed' });
+    console.error('Status check error:', err.message);
+    res.status(500).json({ message: 'Status check failed', error: err.message });
   }
 });
 
-router.get('/order/:orderId', async (req, res) => {
-  const { orderId } = req.params;
+// ====================== INQUIRY BY PAYYANTRA ORDER ID ======================
+router.get('/inquiry-by-order/:payyantraOrderId', async (req, res) => {
+  const { payyantraOrderId } = req.params;
+  console.log('🔍 Inquiry requested for PayYantra Order ID:', payyantraOrderId);
+
   try {
-    let localResult = await pool.query('SELECT * FROM ms_orders WHERE order_id = $1', [orderId]);
-    if (localResult.rows.length === 0) {
-      localResult = await pool.query('SELECT * FROM ms_orders WHERE order_number = $1', [orderId]);
-    }
-    if (localResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
+    const token = await getToken();
 
-    const local = localResult.rows[0];
-    let external = null;
-    let raw = null;
-    const referenceId = local.order_id;
+    const pyRes = await fetch(`${BASE_URL}/api/pay/status/${payyantraOrderId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
 
-    try {
-      const token = await getToken();
-      const statusRes = await fetch(`${BASE_URL}/api/pay/status/by-reference/${referenceId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+    const rawData = await pyRes.json();
+    const pyData = rawData.data || {}; 
+
+    // STATUS MAPPER
+    let rawStatus = pyData.status ? String(pyData.status).toUpperCase() : 'PENDING';
+    let pyStatus = rawStatus;
+    if (rawStatus === 'INITIATED') pyStatus = 'PENDING';
+    if (rawStatus === 'SUCCESSFUL') pyStatus = 'SUCCESS';
+
+    const localOrderId = pyData.referenceId;
+    const amount = parseFloat(pyData.amount || 0);
+
+    if (!localOrderId) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'PayYantra order found, but referenceId is missing in their response.' 
       });
-      raw = await statusRes.json();
-      external = raw?.data || raw;
-    } catch (fetchErr) {
-      console.error('External order fetch failed:', fetchErr.message);
     }
 
-    res.json({ local, external, raw });
+    const localOrderResult = await pool.query(
+      'SELECT * FROM ms_orders WHERE order_id = $1', 
+      [localOrderId]
+    );
+
+    if (localOrderResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found in local DB' });
+    }
+
+    const currentLocalStatus = localOrderResult.rows[0].transaction_status;
+
+    if (pyStatus === 'SUCCESS' && currentLocalStatus !== 'SUCCESS') {
+      await pool.query(
+        `UPDATE driver_details 
+         SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
+             amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
+             updated_at = NOW()
+         WHERE user_id = (SELECT id FROM users WHERE phone_number = $2 LIMIT 1)`,
+        [amount, localOrderResult.rows[0].payer_mobile]
+      );
+      console.log(`💰 Wallet Automatically Updated via Inquiry API for ${localOrderResult.rows[0].payer_mobile}`);
+    }
+
+    await pool.query(
+      `UPDATE ms_orders SET 
+        transaction_status = $1,
+        pg_transaction_id = $2,
+        bank_reference_no = $3,
+        bank_utr_no = $4,
+        order_completion_date = NOW()
+       WHERE order_id = $5`,
+      [
+        pyStatus,
+        pyData.transactionPublicId || pyData.transactionId,
+        pyData.rrn || pyData.bankReferenceNo,
+        pyData.bankUTRNo,
+        localOrderId
+      ]
+    );
+
+    res.json({
+      success: true,
+      status: pyStatus,
+      amount: amount,
+      orderId: localOrderId,
+      payyantraOrderId: payyantraOrderId,
+      pyData: pyData
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Failed to fetch order details' });
+    console.error('❌ Inquiry API Error:', err.message);
+    res.status(500).json({ success: false, message: 'Inquiry processing failed', error: err.message });
   }
 });
 
