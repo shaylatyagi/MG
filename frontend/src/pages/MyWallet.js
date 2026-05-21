@@ -253,7 +253,7 @@ export default function MyWallet() {
                             margin: 0,
                             fontFamily: 'monospace'
                           }}>
-                            {inquiryLogs[t.order_id] || "// API Trace empty. Click 'Sync' to fetch live JSON response."}
+                            {inquiryLogs[t.order_id] || " "}
                           </pre>
                         </td>
                       </tr>
