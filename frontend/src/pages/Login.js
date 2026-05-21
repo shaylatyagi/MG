@@ -41,7 +41,7 @@ export default function Login() {
       <div style={{ background: '#ffffff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: '100%', maxWidth: '360px', border: '1px solid #E6DFD5', boxSizing: 'border-box' }}>        
         {/* LOGO & TITLE */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontWeight: '700', color: '#111827', margin: '0 0 6px 0', fontSize: '24px' }}>
+          <h2 style={{ fontWeight: '700', color: '#8B5E3C', margin: '0 0 6px 0', fontSize: '24px' }}>
             ⚡ Mobility Grid
           </h2>
           <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
@@ -54,14 +54,14 @@ export default function Login() {
             <button 
               type="button"
               onClick={() => setRole('driver')}
-              style={{ flex: 1, padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', backgroundColor: role === 'driver' ? '#111827' : 'transparent', color: role === 'driver' ? '#ffffff' : '#4B5563', transition: 'all 0.15s' }}
+              style={{ flex: 1, padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', backgroundColor: role === 'driver' ? '#8B5E3C' : 'transparent', color: role === 'driver' ? '#ffffff' : '#4B5563', transition: 'all 0.15s' }}
             >
               Driver Mode
             </button>
             <button 
               type="button"
               onClick={() => setRole('owner')}
-              style={{ flex: 1, padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', backgroundColor: role === 'owner' ? '#111827' : 'transparent', color: role === 'owner' ? '#ffffff' : '#4B5563', transition: 'all 0.15s' }}
+              style={{ flex: 1, padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', backgroundColor: role === 'owner' ? '#8B5E3C' : 'transparent', color: role === 'owner' ? '#ffffff' : '#4B5563', transition: 'all 0.15s' }}
             >
               Owner Mode
             </button>
@@ -71,7 +71,7 @@ export default function Login() {
         {step === 1 ? (
           <form onSubmit={handleSendOTP}>
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Phone Number</label>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>Phone Number</label>
               <input 
                 type="tel" 
                 value={phone}
@@ -83,7 +83,7 @@ export default function Login() {
             <button 
               type="submit" 
               disabled={loading}
-              style={{ width: '100%', padding: '12px', backgroundColor: '#111827', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}
+              style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}
             >
               {loading ? 'Sending OTP...' : 'Request OTP'}
             </button>
@@ -92,7 +92,7 @@ export default function Login() {
           /* STEP 2: OTP */
           <form onSubmit={handleVerifyOTP}>
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>One-Time Password (OTP)</label>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>One-Time Password (OTP)</label>
               <input 
                 type="text" 
                 maxLength="6"
