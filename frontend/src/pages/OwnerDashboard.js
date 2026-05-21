@@ -122,7 +122,7 @@ export default function OwnerDashboard() {
     createElement(Sidebar, { key: 'sidebar' }),
     createElement('div', { key: 'main-content', style: { marginLeft: '220px', flex: 1, padding: '32px' } }, [
       
-      // Top Greeting
+      // Top Header Greeting
       createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' } }, [
         createElement('div', null, [
           createElement('h1', { style: { fontSize: '24px', fontWeight: '700', color: '#1A1A1A', margin: 0 } }, `Hello, ${user.name || 'Owner'} 👋`),
@@ -130,7 +130,7 @@ export default function OwnerDashboard() {
         ])
       ]),
 
-      // 1. EARNINGS SECTION CARDS (STRICTLY TOP POSITION)
+      // Earnings Metrics Section
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
         createElement(StatCard, { label: 'Earnings', value: `₹${stats.total_earnings}`, sub: 'From successful payments', subColor: '#16A34A' }),
         createElement(StatCard, { label: 'Collection Efficiency', value: `${stats.collection_efficiency}%`, sub: 'Target: 98%' }),
@@ -138,7 +138,7 @@ export default function OwnerDashboard() {
         createElement(StatCard, { label: 'Compliance Score', value: 'Healthy', sub: 'All RCs/Insurance valid', subColor: '#16A34A' })
       ]),
 
-      // 2. FLEET TABLE CONVERTED INSIDE EARNINGS ENGINE
+      // Earnings & Active Payouts Table
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5', marginBottom: '24px' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } }, [
           createElement('p', { style: { fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Earnings & Active Payouts Grid'),
@@ -187,7 +187,7 @@ export default function OwnerDashboard() {
         ])
       ]),
 
-      // 3. CHART TIMELINE RENDERING
+      // Revenue Trend Chart
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
         createElement('div', { style: { flex: 1 } }, 
           createElement(Chart, { 
@@ -197,7 +197,7 @@ export default function OwnerDashboard() {
         )
       ]),
 
-      // 4. LIVE COLLECTION HISTORY (DRIVER WISE TRANSACTIONS MATRIX)
+      // Live Rental Collection History
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' } }, [
         createElement('div', { style: { marginBottom: '16px' } }, [
           createElement('p', { style: { fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Live Rental Collection History')
@@ -222,12 +222,9 @@ export default function OwnerDashboard() {
                     createElement('td', { style: { ...tdStyle, fontFamily: 'monospace', fontSize: '12px' } }, txn.order_id),
                     createElement('td', { style: tdStyle }, new Date(txn.order_initiation_date).toLocaleString('en-IN')),
                     createElement('td', { style: { ...tdStyle, fontWeight: '600' } }, `INR ${txn.order_amount}`),
-                    
-                    // FIXED: Checks specific gateway parameter to fetch accurate mode value directly from response array
                     createElement('td', { style: tdStyle }, 
                       createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode ? txn.payment_mode : (txn.payment_method ? txn.payment_method : 'UPI / QR Code'))
                     ),
-                    
                     createElement('td', { style: tdStyle }, 
                       createElement('span', {
                         style: {
@@ -245,30 +242,32 @@ export default function OwnerDashboard() {
 
     ]),
 
-    // Modals Hidden Engine Block ( RC & Driver docs schema safely tracked )
+    // Add Vehicle Modal Structure
     showModal && createElement('div', { style: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, 
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '85vh', overflowY: 'auto' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } }, [
           createElement('h2', { style: { fontSize: '20px', fontWeight: '700', color: '#1A1A1A', margin: 0 } }, 'Add New Vehicle'),
-          createElement('button', { onClick: () => setShowModal(false), style: { fontSize: '20px', color: '#6B6B6B', backgroundColor: 'transparent', border: 'none' } }, '✕')
+          createElement('button', { onClick: () => setShowModal(false), style: { fontSize: '20px', color: '#6B6B6B', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' } }, '✕')
         ]),
         createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' } }, [
           createElement('div', null, [createElement('p', { style: labelStyle }, 'Vehicle Number'), createElement('input', { style: inputStyle, placeholder: 'UP-14-EA-2201', value: newVehicle.vehicle_number, onChange: (e) => setNewVehicle({ ...newVehicle, vehicle_number: e.target.value }) })]),
           createElement('div', null, [createElement('p', { style: labelStyle }, 'Daily Rent (₹)'), createElement('input', { style: inputStyle, type: 'number', placeholder: '450', value: newVehicle.daily_rent, onChange: (e) => setNewVehicle({ ...newVehicle, daily_rent: e.target.value }) })])
         ]),
         createElement('div', { style: { display: 'flex', gap: '12px', marginTop: '24px' } }, [
-          createElement('button', { onClick: () => setShowModal(false), style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none' } }, 'Cancel'),
-          createElement('button', { onClick: handleAddVehicle, style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white', border: 'none' } }, 'Add Vehicle')
+          createElement('button', { onClick: () => setShowModal(false), style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer' } }, 'Cancel'),
+          createElement('button', { onClick: handleAddVehicle, style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white', border: 'none', cursor: 'pointer' } }, 'Add Vehicle')
         ])
       ])
-    ]),
+    ),
 
+    // FIXED: Corrected parenthesis alignment mapping for Edit Driver Modal layout context
     showEditModal && selectedVehicle && createElement('div', { style: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, 
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '400px' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } }, [
           createElement('h2', { style: { fontSize: '20px', fontWeight: '700', color: '#1A1A1A', margin: 0 } }, 'Edit Driver'),
-          createElement('button', { onClick: () => setShowEditModal(false), style: { fontSize: '20px', color: '#6B6B6B', backgroundColor: 'transparent', border: 'none' } }, '✕')
+          createElement('button', { onClick: () => setShowEditModal(false), style: { fontSize: '20px', color: '#6B6B6B', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' } }, '✕')
         ]),
+        createElement('p', { style: { fontSize: '13px', color: '#6B6B6B', marginBottom: '16px', margin: 0 } }, `Vehicle: ${selectedVehicle.vehicle_number}`),
         createElement('div', { style: { marginBottom: '16px' } }, [
           createElement('p', { style: labelStyle }, 'Driver Name'),
           createElement('input', { style: inputStyle, value: editDriverName, onChange: (e) => setEditDriverName(e.target.value) })
@@ -278,8 +277,8 @@ export default function OwnerDashboard() {
           createElement('input', { style: inputStyle, type: 'number', value: editDriverPhone, onChange: (e) => setEditDriverPhone(e.target.value) })
         ]),
         createElement('div', { style: { display: 'flex', gap: '12px' } }, [
-          createElement('button', { onClick: () => setShowEditModal(false), style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none' } }, 'Cancel'),
-          createElement('button', { onClick: handleUpdateDriver, style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white', border: 'none' } }, 'Update Driver')
+          createElement('button', { onClick: () => setShowEditModal(false), style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer' } }, 'Cancel'),
+          createElement('button', { onClick: handleUpdateDriver, style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white', border: 'none', cursor: 'pointer' } }, 'Update Driver')
         ])
       ])
     )
