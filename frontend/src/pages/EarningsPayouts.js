@@ -96,7 +96,7 @@ export default function EarningsPayouts() {
                   <td style={{ ...tdStyle, fontWeight: '600' }}>INR {txn.order_amount}</td>
                   <td style={tdStyle}>
                     <span style={{ fontWeight: '500', color: '#4B5563', fontSize: '13px' }}>
-                      {txn.payment_mode || txn.payment_method || 'UPI / QR Code'}
+                      {txn.payment_mode || txn.payment_method}
                     </span>
                   </td>
                   <td style={tdStyle}>

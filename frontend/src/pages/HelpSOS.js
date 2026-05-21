@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 const faqs = [
-  { q: 'How do I pay my daily rent?', a: 'Go to your Driver Dashboard and click "Quick Pay Rent" or go to My Wallet and click "Pay Balance via UPI". You can pay using UPI, debit card, or net banking.' },
+  { q: 'How do I pay my daily rent?', a: 'Go to your Driver Dashboard and click "Quick Pay Rent" or go to My Wallet and click "Pay Balance ". You can pay using UPI, debit card, or net banking.' },
   { q: 'What happens if I miss my payment deadline?', a: 'A daily fine will be added to your dues automatically after the deadline set by your owner. You can see your accumulated dues in real time on your dashboard.' },
   { q: 'How do I contact my vehicle owner?', a: 'Go to Vehicle Status page and you will find your owner contact details with options to call or WhatsApp them directly.' },
   { q: 'How is my trust score calculated?', a: 'Your trust score goes up with every on-time payment and consistent usage. Late payments and fines reduce your score. Check Trust Rewards for a detailed breakdown.' },
