@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
-
 export default function FleetSettings() {
   const [settings, setSettings] = useState({
     ownerName: 'John Doe',
@@ -15,29 +14,22 @@ export default function FleetSettings() {
     notifyPaymentReceived: true,
     notifyDocumentExpiry: true,
   });
-
   const [saved, setSaved] = useState(false);
-
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
-
   const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '14px', backgroundColor: '#FAF7F2', color: '#1A1A1A' };
   const labelStyle = { fontSize: '12px', color: '#6B6B6B', marginBottom: '6px', fontWeight: '500' };
-
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Fleet Settings</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Manage your account and fleet preferences.</p>
         </div>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
           {/* Profile */}
           <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '20px' }}>Profile Information</p>
@@ -56,7 +48,6 @@ export default function FleetSettings() {
               </div>
             </div>
           </div>
-
           {/* Bank */}
           <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '20px' }}>Bank Account Details</p>
@@ -75,7 +66,6 @@ export default function FleetSettings() {
               </div>
             </div>
           </div>
-
           {/* Fleet Defaults */}
           <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '20px' }}>Fleet Defaults</p>
@@ -90,7 +80,6 @@ export default function FleetSettings() {
               </div>
             </div>
           </div>
-
           {/* Notifications */}
           <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '20px' }}>Notification Preferences</p>
@@ -115,12 +104,10 @@ export default function FleetSettings() {
               ))}
             </div>
           </div>
-
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
             {saved && <p style={{ fontSize: '14px', color: '#16A34A', fontWeight: '500', alignSelf: 'center' }}>✓ Settings saved successfully</p>}
             <button onClick={handleSave} style={{ padding: '12px 32px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white' }}>Save Changes</button>
           </div>
-
         </div>
       </div>
     </div>

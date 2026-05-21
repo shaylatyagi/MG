@@ -1,11 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-
 function LandingPage() {
   const navigate = useNavigate();
-
   return (
     <div style={{ backgroundColor: '#FAF7F2', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
-      
       {/* Navbar */}
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 60px', backgroundColor: 'white', borderBottom: '1px solid #E8E0D5', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ fontSize: '18px', fontWeight: '800', color: '#8B5E3C', letterSpacing: '1px' }}>MOBILITY GRID</div>
@@ -16,7 +13,6 @@ function LandingPage() {
           <button onClick={() => navigate('/login')} style={{ backgroundColor: '#8B5E3C', color: 'white', padding: '10px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '600' }}>Launch Platform</button>
         </div>
       </nav>
-
       {/* Hero */}
       <div id="vision" style={{ textAlign: 'center', padding: '0 60px', minHeight: 'calc(100vh - 65px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundImage: 'radial-gradient(circle, #E8E0D5 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
         <div style={{ display: 'inline-block', backgroundColor: '#F3EDE5', color: '#8B5E3C', fontSize: '12px', fontWeight: '600', padding: '6px 16px', borderRadius: '20px', marginBottom: '24px', letterSpacing: '0.5px' }}>
@@ -34,7 +30,6 @@ function LandingPage() {
           <button onClick={() => alert('Whitepaper coming soon')} style={{ backgroundColor: 'white', color: '#1A1A1A', padding: '14px 28px', borderRadius: '8px', fontSize: '15px', fontWeight: '600', border: '1px solid #E8E0D5' }}>Read Whitepaper</button>
         </div>
       </div>
-
       {/* Dual Sided Ecosystem */}
       <div id="solutions" style={{ padding: '80px 60px', backgroundColor: 'white' }}>
         <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>A Dual-Sided Ecosystem</p>
@@ -80,7 +75,6 @@ function LandingPage() {
           </div>
         </div>
       </div>
-
       {/* Grid Intelligence */}
       <div id="the-grid" style={{ padding: '80px 60px', backgroundColor: '#FAF7F2' }}>
         <div style={{ backgroundColor: '#7D5235', borderRadius: '24px', padding: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -113,15 +107,12 @@ function LandingPage() {
           </div>
         </div>
       </div>
-
       {/* Footer */}
       <div style={{ backgroundColor: 'white', borderTop: '1px solid #E8E0D5', padding: '24px 60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <p style={{ fontSize: '14px', fontWeight: '700', color: '#8B5E3C' }}>MOBILITY GRID</p>
         <p style={{ fontSize: '12px', color: '#9CA3AF' }}>© 2025 Mobility Grid. All rights reserved.</p>
       </div>
-
     </div>
   );
 }
-
 export default LandingPage;

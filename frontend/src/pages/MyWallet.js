@@ -2,10 +2,8 @@ import { useState, useEffect, createElement } from 'react';
 import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import api from '../api';
-
 const thStyle = { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' };
 const tdStyle = { padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' };
-
 export default function MyWallet() {
   const [transactions, setTransactions] = useState([]);
   const [walletBalance, setWalletBalance] = useState(42.00);
@@ -13,11 +11,9 @@ export default function MyWallet() {
   const [paidToday, setPaidToday] = useState(42.00);
   const [pendingDues, setPendingDues] = useState(58);
   const [syncing, setSyncing] = useState(false);
-
   useEffect(() => {
     fetchDriverTransactions();
   }, []);
-
   const fetchDriverTransactions = async () => {
     setSyncing(true);
     try {
@@ -29,27 +25,22 @@ export default function MyWallet() {
       setSyncing(false);
     }
   };
-
   return createElement('div', { style: { display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' } }, [
     createElement(Sidebar, { key: 'sidebar' }),
-    createElement('div', { key: 'main-content', style: { marginLeft: '220px', flex: 1, padding: '32px' } }, [
-      
+    createElement('div', { key: 'main-content', style: { marginLeft: '220px', flex: 1, padding: '32px' } }, [      
       // Top Title Header
       createElement('div', { style: { marginBottom: '24px' } }, [
         createElement('h1', { style: { fontSize: '24px', fontWeight: '700', color: '#1A1A1A', margin: 0 } }, 'My Wallet'),
         createElement('p', { style: { fontSize: '13px', color: '#6B6B6B', marginTop: '4px', margin: 0 } }, 'Manage your earnings and rent withdrawals.')
       ]),
-
       // Financial StatCards Row
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '32px' } }, [
         createElement(StatCard, { label: 'Wallet Balance', value: `₹${walletBalance.toFixed(2)}`, sub: 'Withdraw to Bank', subColor: '#8B5E3C' }),
         createElement(StatCard, { label: 'Total Paid', value: `₹${totalPaid.toFixed(2)}`, sub: 'All time rent payments' }),
-        createElement(StatCard, { label: 'Paid Today', value: `₹${paidToday.toFixed(2)}`, sub: 'Daily rent: ₹100.00' }),
-        
+        createElement(StatCard, { label: 'Paid Today', value: `₹${paidToday.toFixed(2)}`, sub: 'Daily rent: ₹100.00' }),        
         // CHANGED: Label to 'Pay' and subtext cleared out entirely. Keeping same data stream amount setup.
         createElement(StatCard, { label: 'Pay', value: `₹${pendingDues}`, sub: '', subColor: '#EF4444' })
       ]),
-
       // Transactions Ledger Card Block
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' } }, [
@@ -60,7 +51,6 @@ export default function MyWallet() {
             style: { padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer', opacity: syncing ? 0.6 : 1 } 
           }, syncing ? 'Syncing...' : 'Bulk Sync (28)')
         ]),
-
         // Table Structure
         createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } }, [
           createElement('thead', null, 
@@ -83,7 +73,7 @@ export default function MyWallet() {
                     createElement('td', { style: tdStyle }, txn.payer_mobile || '9876542345'),
                     createElement('td', { style: { ...tdStyle, fontWeight: '600' } }, `INR ${txn.order_amount}`),
                     createElement('td', { style: tdStyle }, 
-                      createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode || 'NetBanking / Gateway Sync')
+                      createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode)
                     ),
                     createElement('td', { style: tdStyle }, 
                       createElement('span', {
@@ -99,7 +89,6 @@ export default function MyWallet() {
           )
         ])
       ])
-
     ])
   ]);
 }

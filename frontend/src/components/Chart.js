@@ -1,5 +1,4 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-
 function Chart({ data, title }) {
   return (
     <div style={{
@@ -21,5 +20,4 @@ function Chart({ data, title }) {
     </div>
   );
 }
-
 export default Chart;

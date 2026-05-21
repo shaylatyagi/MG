@@ -8,7 +8,6 @@ export default function VehicleStatus() {
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Vehicle Status</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Real time status of your assigned vehicle.</p>
         </div>
-
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: 2, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
@@ -35,7 +34,6 @@ export default function VehicleStatus() {
               ))}
             </div>
           </div>
-
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
               <p style={{ fontSize: '14px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>Battery Health</p>
@@ -44,7 +42,6 @@ export default function VehicleStatus() {
               </div>
               <p style={{ fontSize: '13px', color: '#6B6B6B' }}>68% — Good condition</p>
             </div>
-
             <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
               <p style={{ fontSize: '14px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>Charging Stations Nearby</p>
               {[
@@ -61,7 +58,6 @@ export default function VehicleStatus() {
                 </div>
               ))}
             </div>
-
             <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
               <p style={{ fontSize: '14px', fontWeight: '600', color: '#1A1A1A', marginBottom: '12px' }}>Owner Contact</p>
               <p style={{ fontSize: '13px', color: '#1A1A1A', fontWeight: '500' }}>John Doe</p>
@@ -73,7 +69,6 @@ export default function VehicleStatus() {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LanguageSelector from './LanguageSelect';
-
 const ownerLinks = [
   { label: 'Earnings', path: '/owner/earnings', icon: '💰' },
   { label: 'My Vehicles', path: '/owner/vehicles', icon: '🚗' },
@@ -9,7 +8,6 @@ const ownerLinks = [
   { label: 'Compliance Vault', path: '/owner/compliance', icon: '📋' },
   { label: 'Fleet Settings', path: '/owner/settings', icon: '⚙️' },
 ];
-
 const driverLinks = [
   { label: 'Dashboard', path: '/driver/dashboard', icon: '⚡' },
   { label: 'My Wallet', path: '/driver/wallet', icon: '💳' },
@@ -19,24 +17,20 @@ const driverLinks = [
   { label: 'My Profile', path: '/profile', icon: '👤' },
   { label: 'Charging Stations', path: '/driver/charging', icon: '⚡' },
 ];
-
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isOwner = location.pathname.startsWith('/owner');
   const links = isOwner ? ownerLinks : driverLinks;
-
   const handleLogout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     navigate('/login', { replace: true });
   };
-
   return (
     <div style={styles.sidebar}>
       <div style={styles.logo}>Mobility Grid</div>
-
       <div style={styles.toggle}>
         <button
           style={{ ...styles.toggleBtn, ...(isOwner ? styles.toggleActive : {}) }}
@@ -51,7 +45,6 @@ export default function Sidebar() {
           DRIVER
         </button>
       </div>
-
       <nav style={styles.nav}>
         {links.map((link) => (
           <div
@@ -66,12 +59,10 @@ export default function Sidebar() {
             <span>{link.label}</span>
           </div>
         ))}
-      </nav>
-      
+      </nav>     
       <div style={{ marginBottom: '8px' }}>
         <LanguageSelector />
       </div>
-
       <div style={styles.profile}>
         <div style={styles.avatar}>
           {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
@@ -81,14 +72,12 @@ export default function Sidebar() {
           <p style={styles.profileRole}>{isOwner ? 'Verified Owner' : 'Premium Driver'}</p>
         </div>
       </div>
-
       <button style={styles.logoutBtn} onClick={handleLogout}>
         Log Out
       </button>
     </div>
   );
 }
-
 const styles = {
   sidebar: {
     width: '220px',

@@ -1,24 +1,19 @@
 import { useState } from 'react';
-
 const languages = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'hi', label: 'हिंदी', flag: '🇮🇳' },
   { code: 'pa', label: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
 ];
-
 export default function LanguageSelector() {
   const [current, setCurrent] = useState(localStorage.getItem('lang') || 'en');
   const [open, setOpen] = useState(false);
-
   const handleChange = (code) => {
     localStorage.setItem('lang', code);
     setCurrent(code);
     setOpen(false);
     window.location.reload();
   };
-
   const currentLang = languages.find(l => l.code === current);
-
   return (
     <div style={{ position: 'relative' }}>
       <button

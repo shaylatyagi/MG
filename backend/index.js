@@ -1,13 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-
 //To connect DB
 require('./src/config/db');
 const pool = require('./src/config/db');
-
 const app = express();
-
 // CORS fixed
 app.use(cors({
   origin: true,
@@ -15,21 +12,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 // ROUTES
 const authRoutes = require('./src/routes/auth');
 const driverRoutes = require('./src/routes/driver');
 const paymentRoutes = require('./src/routes/payment');
 const ownerRoutes = require('./src/routes/owner');
-
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/owner', ownerRoutes);
-
 // Check Health
 app.get('/', (req, res) => {
   res.json({ 
@@ -37,17 +30,14 @@ app.get('/', (req, res) => {
     env: process.env.NODE_ENV || 'development'
   });
 });
-
 // SCHEDULER
 const BASE_URL = 'https://mg-qw5s.onrender.com';
-
 const checkPendingOrders = async () => {
   try {
     const res = await fetch(`${BASE_URL}/api/payment/check-pending`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
-
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     console.log('✅ Pending orders checked:', data);
@@ -55,17 +45,13 @@ const checkPendingOrders = async () => {
     console.error('❌ Scheduler error:', err.message);
   }
 };
-
 setInterval(checkPendingOrders, 5 * 60 * 1000);
-
 // Reset Daily
 const scheduleDailyReset = () => {
   const now = new Date();
   const midnight = new Date(now);
   midnight.setHours(24, 0, 0, 0);
-
   const msUntilMidnight = midnight - now;
-
   setTimeout(async () => {
     try {
       await pool.query('UPDATE driver_details SET amount_paid_today = 0, updated_at = NOW()');
@@ -75,17 +61,13 @@ const scheduleDailyReset = () => {
     }
   }, msUntilMidnight);
 };
-
 scheduleDailyReset();
-
 // Handle Erorr 404
 app.use((req, res) => {
   res.status(404).json({ message: ' ' });
 });
-
 // SERVER START
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Base URL: http://localhost:${PORT}`);

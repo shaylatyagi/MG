@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
-
 function DriverDashboard() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [activePayment, setActivePayment] = useState('');
@@ -17,7 +16,6 @@ function DriverDashboard() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-
   const fetchTransactions = async () => {
     try {
       const res = await api.get('/api/payment/my-transactions', {
@@ -29,18 +27,15 @@ function DriverDashboard() {
       console.error(err);
     }
   };
-
   useEffect(() => {
     fetchTransactions();
   }, [user.phone_number]);
-
   const handleOrderInquiry = async (orderId, e) => {
     e.stopPropagation(); // Prevents row expansion when clicking the button
     setRefreshing(true); 
     try {
       const response = await api.get(`/api/payment/status/${orderId}`);
       console.log("Inquiry API ka fresh response:", response.data);
-
       if (response.data && response.data.success) {
         const freshStatus = response.data.status;
         setTransactions(prevTransactions => 
@@ -60,7 +55,6 @@ function DriverDashboard() {
       fetchTransactions(); 
     }
   };
-
   const handleRefreshAllPending = async () => {
     setRefreshing(true);
     try {
@@ -73,9 +67,7 @@ function DriverDashboard() {
       setRefreshing(false);
     }
   };
-
   const pendingCount = transactions.filter(txn => txn.transaction_status !== 'SUCCESS').length;
-
   const handlePayment = async (amount, type) => {
     setPaymentLoading(true);
     setActivePayment(type);
@@ -86,9 +78,7 @@ function DriverDashboard() {
         customerPhone: user.phone_number || user.phone || "9876542345",
         customerEmail: user.email || 'driver@mobilitygrid.in',
       });
-
       const checkoutUrl = res.data?.data?.data?.checkoutUrl || res.data?.data?.checkoutUrl || res.data?.paymentUrl;
-      
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
       } else {
@@ -101,17 +91,14 @@ function DriverDashboard() {
     setPaymentLoading(false);
     setActivePayment('');
   };
-
   // Toggle row expansion
   const toggleExpand = (orderId) => {
     setExpandedTxn(prev => prev === orderId ? null : orderId);
   };
-
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
-      <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-        
+      <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Hello, {user.name || 'Driver'} 👋</h1>
@@ -130,7 +117,6 @@ function DriverDashboard() {
             </button>
           </div>
         </div>
-
         <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
           <div style={{ flex: 1, backgroundColor: '#7D5235', borderRadius: '16px', padding: '28px', color: 'white' }}>
             <p style={{ fontSize: '13px', opacity: 0.8, marginBottom: '8px' }}>Wallet Balance</p>
@@ -139,7 +125,6 @@ function DriverDashboard() {
               Withdraw to Bank
             </button>
           </div>
-
           <div style={{ flex: 2, backgroundColor: 'white', borderRadius: '16px', padding: '28px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Today's Progress</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -157,7 +142,6 @@ function DriverDashboard() {
               {paymentLoading && activePayment === 'balance' ? 'Processing...' : 'Pay Balance'}
             </button>
           </div>
-
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '16px', padding: '28px', border: '1px solid #E8E0D5', textAlign: 'center' }}>
             <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>Your Trust Score</p>
             <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -169,7 +153,6 @@ function DriverDashboard() {
             <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '8px' }}>Excellent! Build 20 points more for interest-free financing.</p>
           </div>
         </div>
-
         <div style={{ display: 'flex', gap: '16px' }}>
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -187,7 +170,6 @@ function DriverDashboard() {
               </div>
             </div>
           </div>
-
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <p style={{ fontSize: '15px', fontWeight: '600' }}>Recent Transactions</p>
@@ -197,8 +179,7 @@ function DriverDashboard() {
               >
                 View All →
               </button>
-            </div>
-            
+            </div>            
             {transactions.slice(0, 3).map((txn) => (
               <div key={txn.order_id} style={{ padding: '10px 0', borderBottom: '1px solid #F3EDE5' }}>
                 <div 
@@ -232,7 +213,6 @@ function DriverDashboard() {
                     </div>
                   </div>
                 </div>
-
                 {/* The Expanded Details Section */}
                 {expandedTxn === txn.order_id && (
                   <div style={{ marginTop: '12px', padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px dashed #D1D5DB' }}>
@@ -254,5 +234,4 @@ function DriverDashboard() {
     </div>
   );
 }
-
 export default DriverDashboard;

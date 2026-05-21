@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useReactToPrint } from 'react-to-print'; // Naya import
+import { useReactToPrint } from 'react-to-print';
 import api from '../api';
-
 export default function PaymentResult() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -11,14 +10,11 @@ export default function PaymentResult() {
   const [stopTimer, setStopTimer] = useState(false); // Timer rokne ke liye state
   const [orderData, setOrderData] = useState(null);
   const [error, setError] = useState(null);
-
   // Print ke liye reference
   const componentRef = useRef();
-
   const orderId = searchParams.get('ref') || searchParams.get('orderId');
   const statusParam = searchParams.get('status');
   const queryDetails = Object.fromEntries(searchParams.entries());
-
   const goToDashboard = useCallback(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.role === 'owner') {
@@ -27,7 +23,6 @@ export default function PaymentResult() {
       navigate('/driver/dashboard');
     }
   }, [navigate]);
-
   // Print Handle Function
   const handlePrint = useReactToPrint({
     content: () => componentRef.current,
@@ -37,7 +32,6 @@ export default function PaymentResult() {
       setStopTimer(true);
     }
   });
-
   useEffect(() => {
     const fetchOrder = async () => {
       if (!orderId) {
@@ -45,7 +39,6 @@ export default function PaymentResult() {
         setLoading(false);
         return;
       }
-
       try {
         const res = await api.get(`/api/payment/order/${orderId}`);
         console.log("BACKEND SE AAYA DATA:", res.data);
@@ -57,11 +50,9 @@ export default function PaymentResult() {
         setLoading(false);
       }
     };
-
     fetchOrder();
   }, [orderId]);
-
-  // Updated Timer Logic
+  //Timer Logic
   useEffect(() => {
     if (!loading && !stopTimer) {
       const timer = setTimeout(goToDashboard, countdown * 1000);
@@ -74,68 +65,54 @@ export default function PaymentResult() {
           return prev - 1;
         });
       }, 1000);
-
       return () => {
         clearTimeout(timer);
         clearInterval(interval);
       };
     }
   }, [loading, stopTimer, countdown, goToDashboard]);
-
-  // --- ROBUST VARIABLE MAPPING ---
-  // Safely extract from your backend response structure
+  // ROBUST VARIABLE MAPPING
+  // extract from backend response structure
   const local = orderData?.local || {};
   const external = orderData?.pyData || orderData?.external || orderData?.data || {}; 
   const raw = orderData?.raw || {};
-
   // Status Check
   const status = local.transaction_status || external.status || external.transactionStatus || statusParam || 'PENDING';
   const isSuccess = String(status).toUpperCase() === 'SUCCESS';
-
   // Amount & Currency
   const amount = local.order_amount || external.amount || 'N/A';
   const currency = local.currency || external.currency || 'INR';
-
   // IDs & References
   const localOrderUuid = local.order_id || 'N/A';
   const merchantRef = local.order_number || 'N/A';
   const payyantraOrderId = external.orderId || external.pspOrderId || 'N/A';
-  const payyantraReferenceId = external.referenceId || 'N/A';
-  
+  const payyantraReferenceId = external.referenceId || 'N/A';  
   // Transaction IDs (Crucial Fix)
   const pspTxnId = local.pg_transaction_id || external.transactionId || external.transactionPublicId || raw.txnId || 'N/A';
   const gatewayMerchantOrderId = external.merchantOrderId || 'N/A';
   const statusCode = local.transaction_status_code || external.statusCode || 'N/A';
-
   // Bank details (UAT environment usually returns null/NA for these)
   const referenceNumber = local.bank_reference_no || external.rrn || external.bankReferenceNo || raw.rrn || 'N/A';
   const utrNumber = local.bank_utr_no || external.bankUTRNo || raw.utr || 'N/A';
-
   // Customer Details
   const payerName = local.payer_name || external.customerDetails?.name || 'N/A';
   const payerEmail = local.payer_email || external.customerDetails?.email || 'N/A';
   const payerPhone = local.payer_mobile || external.customerDetails?.phone || 'N/A';
-
   // Timestamps
   const createdAt = local.order_initiation_date || local.created_at || 'N/A';
   const completedAt = local.order_completion_date || local.updated_at || 'N/A';
-
   // URLs & Methods
   const paymentUrl = external.checkoutUrl || local.payment_url || 'N/A';
   const notifyUrl = external.notifyUrl || 'N/A';
   const returnUrl = external.returnUrl || 'N/A';
-  const paymentMethod = external.paymentMode || raw.payment_method || 'N/A';
-  
+  const paymentMethod = external.paymentMode || raw.payment_method || 'N/A';  
   const rawJSON = JSON.stringify(orderData, null, 2);
-  // ---------------------------------
-
   const fieldRow = (label, value) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
       <span style={{ color: '#6B6B6B', fontSize: '13px' }}>{label}</span>
       <span style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: '600', textAlign: 'right', maxWidth: '220px' }}>{value || 'N/A'}</span>
     </div>
   );
-
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', padding: '32px' }}>
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
@@ -181,7 +158,6 @@ export default function PaymentResult() {
                     <p style={{ fontSize: '13px', color: '#8B5E3C' }}>Auto-redirect paused. You can safely print the receipt.</p>
                   )}
                 </div>
-
                 <div style={{ display: 'grid', gap: '20px', marginBottom: '24px' }}>
                   <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px' }}>
                     <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1A1A1A' }}>Local DB values</h2>
@@ -199,7 +175,6 @@ export default function PaymentResult() {
                     {fieldRow('Created At', local.order_initiation_date || local.created_at || 'N/A')}
                     {fieldRow('Completed At', local.order_completion_date || local.updated_at || 'N/A')}
                   </div>
-
                   <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px' }}>
                     <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1A1A1A' }}>PayYantra / Gateway values</h2>
                     {fieldRow('PayYantra Ref ID', payyantraReferenceId)}
@@ -220,7 +195,6 @@ export default function PaymentResult() {
                   </div>
                 </div>
               </div>
-
               {/* Action Buttons Container */}
               <div style={{ display: 'flex', gap: '16px' }}>
                 <button
@@ -236,7 +210,6 @@ export default function PaymentResult() {
                   Back to Dashboard
                 </button>
               </div>
-
               <div style={{ marginTop: '24px', backgroundColor: '#F3F4F6', borderRadius: '16px', padding: '20px' }}>
                 <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1F2937' }}>Developer Details</h2>
                 <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '12px', color: '#111827', background: '#FFFFFF', borderRadius: '12px', padding: '16px', overflowX: 'auto', maxHeight: '320px' }}>

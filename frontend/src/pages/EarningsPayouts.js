@@ -2,20 +2,16 @@ import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import Chart from '../components/Chart';
 import api from '../api';
-
 const thStyle = { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' };
 const tdStyle = { padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' };
-
 export default function EarningsPayouts() {
   const [stats, setStats] = useState({ total_vehicles: 0, total_earnings: 0, collection_efficiency: 0, revenue_chart: [] });
   const [transactions, setTransactions] = useState([]);
   const [search, setSearch] = useState('');
-
   useEffect(() => {
     fetchStats();
     fetchTransactions();
   }, []);
-
   const fetchTransactions = async () => {
     try {
       const res = await api.get('/api/payment/my-transactions?phone=9876542345');
@@ -24,7 +20,6 @@ export default function EarningsPayouts() {
       console.error('Error fetching transactions:', err);
     }
   };
-
   const fetchStats = async () => {
     try {
       const res = await api.get('/api/owner/stats');
@@ -33,13 +28,10 @@ export default function EarningsPayouts() {
       console.error(err);
     }
   };
-
   const totalEarnings = transactions
     .filter(t => t.transaction_status === 'SUCCESS')
     .reduce((sum, t) => sum + parseFloat(t.order_amount || 0), 0);
-
   const pendingCount = transactions.filter(t => t.transaction_status === 'PENDING').length;
-
   const filteredTxns = transactions.filter(txn => {
     const term = search.toLowerCase();
     return (
@@ -47,21 +39,18 @@ export default function EarningsPayouts() {
       (txn.order_id || '').toLowerCase().includes(term) ||
       (txn.transaction_status || '').toLowerCase().includes(term) ||
       `INR ${txn.order_amount || ''}`.toLowerCase().includes(term) ||
-      (txn.payment_mode || 'UPI / QR Code').toLowerCase().includes(term) ||
+      (txn.payment_mode).toLowerCase().includes(term) ||
       (txn.order_initiation_date ? new Date(txn.order_initiation_date).toLocaleString('en-IN').toLowerCase().includes(term) : false)
     );
   });
-
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Earnings</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Track all your rental income and transaction history.</p>
         </div>
-
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           {[
             { label: 'Total Earnings', value: `₹${totalEarnings.toFixed(2)}`, sub: 'From successful payments', color: '#16A34A' },
@@ -76,7 +65,6 @@ export default function EarningsPayouts() {
             </div>
           ))}
         </div>
-
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5', marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 }}>Live Rental Collection History</p>
@@ -125,7 +113,6 @@ export default function EarningsPayouts() {
             </tbody>
           </table>
         </div>
-
         <div style={{ marginBottom: '24px' }}>
           <Chart
             data={stats.revenue_chart.length > 0 ? stats.revenue_chart.map(r => ({
@@ -135,7 +122,6 @@ export default function EarningsPayouts() {
             title="Collection Revenue Trend"
           />
         </div>
-
       </div>
     </div>
   );

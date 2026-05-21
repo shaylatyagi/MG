@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-
 export default function Login() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -8,7 +7,6 @@ export default function Login() {
   const [otp, setOtp] = useState('123456');
   const [role, setRole] = useState('driver');
   const [loading, setLoading] = useState(false);
-
   const handleSendOTP = (e) => {
     e.preventDefault();
     setLoading(true);
@@ -17,24 +15,19 @@ export default function Login() {
       setStep(2);
     }, 600);
   };
-
   const handleVerifyOTP = (e) => {
     e.preventDefault();
     setLoading(true);
-
     setTimeout(() => {
-      setLoading(false);
-      
-      // USER NAME CHANGED TO DEMO USER HERE
+      setLoading(false);      
+      // USER NAME CHANGED TO DEMO USER
       const mockUser = {
         phone_number: phone,
         name: "demo user", 
         role: role
-      };
-      
+      };      
       localStorage.setItem('token', 'mock-uat-token-9876542345');
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      
+      localStorage.setItem('user', JSON.stringify(mockUser));      
       if (role === 'owner') {
         navigate('/owner/dashboard');
       } else {
@@ -42,13 +35,10 @@ export default function Login() {
       }
     }, 600);
   };
-
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '20px' }}>
-      
+    <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '20px' }}>      
       {/* FIXED: Chhota sa centered container card */}
-      <div style={{ background: '#ffffff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: '100%', maxWidth: '360px', border: '1px solid #E6DFD5', boxSizing: 'border-box' }}>
-        
+      <div style={{ background: '#ffffff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: '100%', maxWidth: '360px', border: '1px solid #E6DFD5', boxSizing: 'border-box' }}>        
         {/* LOGO & TITLE */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontWeight: '700', color: '#111827', margin: '0 0 6px 0', fontSize: '24px' }}>
@@ -58,7 +48,6 @@ export default function Login() {
             {step === 1 ? 'Welcome back! Please enter your details.' : 'Enter the 6-digit code sent to your mobile.'}
           </p>
         </div>
-
         {/* ROLE TOGGLE */}
         {step === 1 && (
           <div style={{ display: 'flex', backgroundColor: '#F3F4F6', padding: '3px', borderRadius: '6px', marginBottom: '20px' }}>
@@ -78,7 +67,6 @@ export default function Login() {
             </button>
           </div>
         )}
-
         {/* STEP 1: PHONE */}
         {step === 1 ? (
           <form onSubmit={handleSendOTP}>

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
-
 const initialDocs = [
   { name: 'Vehicle RC', vehicle: 'UP-14-EA-2201', status: 'Valid', expiry: 'Dec 2026', file: null },
   { name: 'Insurance Certificate', vehicle: 'UP-14-EA-2201', status: 'Valid', expiry: 'Aug 2026', file: null },
@@ -9,16 +8,13 @@ const initialDocs = [
   { name: 'Insurance Certificate', vehicle: 'UP-14-EA-2005', status: 'Expired', expiry: 'Apr 2026', file: null },
   { name: 'Pollution Certificate', vehicle: 'UP-14-EA-2005', status: 'Valid', expiry: 'Nov 2026', file: null },
 ];
-
 const statusColor = (status) => {
   if (status === 'Valid') return { bg: '#DCFCE7', color: '#16A34A' };
   if (status === 'Expiring Soon') return { bg: '#FEF3C7', color: '#D97706' };
   return { bg: '#FEE2E2', color: '#DC2626' };
 };
-
 export default function ComplianceVault() {
   const [docs, setDocs] = useState(initialDocs);
-
   const handleUpload = (index, file) => {
     if (file) {
       const updated = [...docs];
@@ -26,17 +22,14 @@ export default function ComplianceVault() {
       setDocs(updated);
     }
   };
-
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Compliance Vault</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Manage all vehicle documents and compliance status.</p>
         </div>
-
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           {[
             { label: 'Total Documents', value: '6', sub: 'Across all vehicles' },
@@ -51,7 +44,6 @@ export default function ComplianceVault() {
             </div>
           ))}
         </div>
-
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
           <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>Document Status</p>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -89,7 +81,6 @@ export default function ComplianceVault() {
             </tbody>
           </table>
         </div>
-
       </div>
     </div>
   );

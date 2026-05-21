@@ -15,7 +15,6 @@ import FleetSettings from './pages/FleetSettings';
 import ComingSoon from './pages/ComingSoon';
 import PaymentResult from './pages/PaymentResult';
 import Profile from './pages/Profile';
-
 function App() {
   return (
     <Router>
@@ -38,5 +37,4 @@ function App() {
     </Router>
   );
 }
-
 export default App;

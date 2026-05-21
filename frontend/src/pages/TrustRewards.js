@@ -1,5 +1,4 @@
 import Sidebar from '../components/Sidebar';
-
 const milestones = [
   { score: 100, label: 'Bronze Partner', reward: 'Priority listing', achieved: true },
   { score: 300, label: 'Silver Partner', reward: 'Reduced fine rates', achieved: true },
@@ -7,7 +6,6 @@ const milestones = [
   { score: 900, label: 'Platinum Partner', reward: 'Interest-free financing eligibility', achieved: false },
   { score: 1200, label: 'Elite Partner', reward: 'Vehicle ownership pathway', achieved: false },
 ];
-
 const history = [
   { label: 'On-time payment', points: '+12', date: 'May 17, 2026' },
   { label: 'On-time payment', points: '+12', date: 'May 16, 2026' },
@@ -15,22 +13,18 @@ const history = [
   { label: 'On-time payment', points: '+12', date: 'May 13, 2026' },
   { label: '7-day streak bonus', points: '+20', date: 'May 12, 2026' },
 ];
-
 export default function TrustRewards() {
   const currentScore = 842;
   const nextMilestone = milestones.find(m => !m.achieved);
   const progress = nextMilestone ? (currentScore / nextMilestone.score) * 100 : 100;
-
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Trust Rewards</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Build your trust score to unlock better benefits.</p>
         </div>
-
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
           <div style={{ flex: 1, backgroundColor: '#7D5235', borderRadius: '16px', padding: '28px', color: 'white' }}>
             <p style={{ fontSize: '13px', opacity: 0.8, marginBottom: '8px' }}>Your Trust Score</p>
@@ -48,7 +42,6 @@ export default function TrustRewards() {
               </div>
             )}
           </div>
-
           <div style={{ flex: 2, display: 'flex', gap: '16px' }}>
             {[
               { label: 'Points This Month', value: '+51', sub: 'Keep it up!', color: '#16A34A' },
@@ -63,7 +56,6 @@ export default function TrustRewards() {
             ))}
           </div>
         </div>
-
         <div style={{ display: 'flex', gap: '16px' }}>
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>Milestone Rewards</p>
@@ -82,7 +74,6 @@ export default function TrustRewards() {
               ))}
             </div>
           </div>
-
           <div style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>Points History</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -98,7 +89,6 @@ export default function TrustRewards() {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

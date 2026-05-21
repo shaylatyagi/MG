@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
-
 export default function MyVehicles() {
   const [vehicles] = useState(() => {
     const saved = localStorage.getItem('vehicles');
@@ -9,19 +8,15 @@ export default function MyVehicles() {
       { id: 'UP-14-EA-2005', driver: 'Suresh Yadav', driverPhone: '8888888888', status: 'Idle', rent: '₹450', payout: 'Pending', area: 'Dwarka', condition: 'Fair' },
     ];
   });
-
   const [selected, setSelected] = useState(null);
-
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>My Vehicles</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>All vehicles registered under your fleet.</p>
         </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
           {vehicles.map((v, i) => (
             <div
@@ -58,7 +53,6 @@ export default function MyVehicles() {
             </div>
           ))}
         </div>
-
         {selected && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
@@ -86,7 +80,6 @@ export default function MyVehicles() {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

@@ -1,11 +1,8 @@
 const { Pool } = require('pg');
 require('dotenv').config();
-
 console.log('🔄 DB Connection Starting...');
 console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-
 let pool;
-
 if (process.env.DATABASE_URL) {
   console.log('✅ Using DATABASE_URL');
   pool = new Pool({
@@ -23,12 +20,10 @@ if (process.env.DATABASE_URL) {
     ssl: false,
   });
 }
-
 pool.connect()
   .then(() => console.log('✅ Database connected successfully'))
   .catch(err => {
     console.error('❌ Database connection FAILED:', err.message);
     console.error('Check DATABASE_URL variable in Railway');
   });
-
 module.exports = pool;

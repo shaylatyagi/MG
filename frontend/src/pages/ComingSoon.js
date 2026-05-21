@@ -14,5 +14,4 @@ function ComingSoon({ page }) {
     </div>
   );
 }
-
 export default ComingSoon;

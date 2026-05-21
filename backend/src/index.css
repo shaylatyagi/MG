@@ -3,7 +3,6 @@
   padding: 0;
   box-sizing: border-box;
 }
-
 :root {
   --bg: #FAF7F2;
   --sidebar-bg: #FFFFFF;
@@ -20,19 +19,16 @@
   --danger: #DC2626;
   --white: #FFFFFF;
 }
-
 body {
   background-color: var(--bg);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text-primary);
 }
-
 button {
   cursor: pointer;
   border: none;
   outline: none;
 }
-
 input {
   outline: none;
   border: none;

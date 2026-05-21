@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
-
 const translations = {
   en: {
     title: 'Charging Stations',
@@ -40,27 +39,21 @@ const translations = {
     call: 'ਸਟੇਸ਼ਨ ਨੂੰ ਕਾਲ ਕਰੋ',
   },
 };
-
 const nearbyStations = [
   { name: 'Sector 10 Charging Hub', distance: 1.2, status: 'Available', address: 'Sector 10, Dwarka, Delhi' },
   { name: 'Dwarka Mod Station', distance: 2.8, status: 'Busy', address: 'Dwarka Mor Metro, Delhi' },
   { name: 'Sector 23 Point', distance: 3.5, status: 'Available', address: 'Sector 23, Dwarka, Delhi' },
   { name: 'Palam Charging Hub', distance: 5.1, status: 'Available', address: 'Palam, Delhi' },
 ];
-
 export default function ChargingStations() {
   const [driverDetails, setDriverDetails] = useState({ vehicle_number: '', charging_station: '' });
   const [vehicle, setVehicle] = useState(null);
-  
-  // Naya: Language as State so it updates instantly without refreshing
   const [lang, setLang] = useState(localStorage.getItem('lang') || 'en');
   const t = translations[lang] || translations.en;
-
   useEffect(() => {
     // Listen for language changes from Sidebar
     const handleLangChange = () => setLang(localStorage.getItem('lang') || 'en');
     window.addEventListener('languageChanged', handleLangChange);
-
     const fetchData = async () => {
       try {
         const detailsRes = await api.get('/api/payment/driver-details');
@@ -72,23 +65,18 @@ export default function ChargingStations() {
       } catch (err) {
         console.error(err);
       }
-    };
-    
-    fetchData();
-    
+    };    
+    fetchData();    
     return () => window.removeEventListener('languageChanged', handleLangChange);
   }, []);
-
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
       <Sidebar />
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
-
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>{t.title}</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>{t.subtitle}</p>
         </div>
-
         {/* Assigned Station */}
         <div style={{ backgroundColor: '#7D5235', borderRadius: '16px', padding: '28px', color: 'white', marginBottom: '24px' }}>
           <p style={{ fontSize: '11px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{t.assigned}</p>
@@ -108,7 +96,6 @@ export default function ChargingStations() {
             <p style={{ fontSize: '16px', opacity: 0.8 }}>{t.noStation}</p>
           )}
         </div>
-
         {/* Nearby Stations */}
         <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>{t.nearby}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
