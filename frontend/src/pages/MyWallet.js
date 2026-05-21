@@ -240,10 +240,9 @@ export default function MyWallet() {
                       <tr style={{ backgroundColor: '#F9FAFB' }}>
                         <td colSpan="7" style={{ padding: '8px 20px 16px 20px', borderBottom: '1px solid #E5E7EB' }}>
                           <p style={{ color: '#6B7280', fontSize: '9px', textTransform: 'uppercase', fontWeight: '600', marginBottom: '6px', marginTop: '4px' }}>
-                            Payload Response Trace:
                           </p>
                           <pre style={{ 
-                            backgroundColor: '#1E1E1E', 
+                            backgroundColor: '#998b8b', 
                             color: '#A3E635', 
                             padding: '10px', 
                             borderRadius: '4px', 
