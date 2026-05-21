@@ -70,7 +70,7 @@ export default function OwnerDashboard() {
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
         createElement(StatCard, { label: 'Earnings', value: `₹${stats.total_earnings}`, sub: 'From successful payments', subColor: '#16A34A' }),
         createElement(StatCard, { label: 'Collection Efficiency', value: `${stats.collection_efficiency}%`, sub: 'Target: 98%' }),
-        createElement(StatCard, { label: 'Active Fleet Overview', value: `${stats.total_vehicles} vehicles`, sub: 'All vehicles active', subColor: '#16A34A' }),
+        createElement(StatCard, { label: 'Total Collections', value: `${transactions.length}`, sub: 'All rental payments', subColor: '#16A34A' }),
         createElement(StatCard, { label: 'Compliance Score', value: 'Healthy', sub: 'All RCs/Insurance valid', subColor: '#16A34A' })
       ]),
 

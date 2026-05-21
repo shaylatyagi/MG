@@ -3,9 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import LanguageSelector from './LanguageSelect';
 
 const ownerLinks = [
-  { label: 'Earnings', path: '/owner/dashboard', icon: '💰' },
+  { label: 'Earnings', path: '/owner/earnings', icon: '💰' },
   { label: 'My Vehicles', path: '/owner/vehicles', icon: '🚗' },
-  { label: 'Fleet Overview', path: '/owner/earnings', icon: '🏠' },
+  { label: 'Fleet Overview', path: '/owner/dashboard', icon: '🏠' },
   { label: 'Compliance Vault', path: '/owner/compliance', icon: '📋' },
   { label: 'Fleet Settings', path: '/owner/settings', icon: '⚙️' },
 ];

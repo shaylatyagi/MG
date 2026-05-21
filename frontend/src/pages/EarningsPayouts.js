@@ -31,7 +31,7 @@ export default function EarningsPayouts() {
       <div style={{ marginLeft: '220px', flex: 1, padding: '32px' }}>
 
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Earnings & Payouts</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A' }}>Earnings</h1>
           <p style={{ fontSize: '13px', color: '#6B6B6B', marginTop: '4px' }}>Track all your rental income and transaction history.</p>
         </div>
 
@@ -40,7 +40,7 @@ export default function EarningsPayouts() {
             { label: 'Total Earnings', value: `₹${stats.total_earnings}`, sub: 'All time', color: '#1A1A1A' },
             { label: 'Collection Efficiency', value: `${stats.collection_efficiency}%`, sub: 'Target: 98%', color: stats.collection_efficiency >= 98 ? '#16A34A' : '#D97706' },
             { label: 'Pending Dues', value: `${pendingCount} drivers`, sub: 'Payment pending today', color: pendingCount > 0 ? '#D97706' : '#16A34A' },
-            { label: 'Active Fleet', value: `${stats.total_vehicles} vehicles`, sub: 'Total vehicles', color: '#1A1A1A' },
+            { label: 'Total Transactions', value: `${transactions.length}`, sub: 'All time', color: '#1A1A1A' },
           ].map((card, i) => (
             <div key={i} style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '20px 24px', border: '1px solid #E8E0D5' }}>
               <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{card.label}</p>
