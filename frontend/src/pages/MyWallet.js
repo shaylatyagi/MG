@@ -242,8 +242,8 @@ export default function MyWallet() {
                           <p style={{ color: '#6B7280', fontSize: '9px', textTransform: 'uppercase', fontWeight: '600', marginBottom: '6px', marginTop: '4px' }}>
                           </p>
                           <pre style={{ 
-                            backgroundColor: '#998b8b', 
-                            color: '#A3E635', 
+                            backgroundColor: '#ffffff', 
+                            color: '#000000', 
                             padding: '10px', 
                             borderRadius: '4px', 
                             fontSize: '10.5px', 
