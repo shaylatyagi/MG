@@ -182,7 +182,7 @@ export default function MyWallet() {
                   <th style={{ padding: '10px 12px' }}>PY Txn ID</th>
                   <th style={{ padding: '10px 12px' }}>Your Order ID</th>
                   <th style={{ padding: '10px 12px' }}>Date & Time</th>
-                  <th style={{ padding: '10px 12px' }}>Mobile</th>
+                  <th style={{ padding: '10px 12px' }}>Driver</th>
                   <th style={{ padding: '10px 12px' }}>Amount</th>
                   <th style={{ padding: '10px 12px' }}>Status</th>
                   <th style={{ padding: '10px 12px', textAlign: 'right' }}>Action</th>
