@@ -105,7 +105,7 @@ export default function Login() {
             <button 
               type="submit" 
               disabled={loading}
-              style={{ width: '100%', padding: '12px', backgroundColor: '#111827', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}
+              style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}
             >
               {loading ? 'Verifying...' : 'Verify & Log In'}
             </button>
