@@ -122,7 +122,7 @@ export default function OwnerDashboard() {
     createElement(Sidebar, { key: 'sidebar' }),
     createElement('div', { key: 'main-content', style: { marginLeft: '220px', flex: 1, padding: '32px' } }, [
       
-      // 1. TOP GREETING HEADER
+      // Top Greeting
       createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' } }, [
         createElement('div', null, [
           createElement('h1', { style: { fontSize: '24px', fontWeight: '700', color: '#1A1A1A', margin: 0 } }, `Hello, ${user.name || 'Owner'} 👋`),
@@ -130,7 +130,7 @@ export default function OwnerDashboard() {
         ])
       ]),
 
-      // 2. EARNINGS AND COLLECTION METRICS (STRICTLY AT THE TOP NOW)
+      // 1. EARNINGS SECTION CARDS (STRICTLY TOP POSITION)
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
         createElement(StatCard, { label: 'Earnings', value: `₹${stats.total_earnings}`, sub: 'From successful payments', subColor: '#16A34A' }),
         createElement(StatCard, { label: 'Collection Efficiency', value: `${stats.collection_efficiency}%`, sub: 'Target: 98%' }),
@@ -138,7 +138,7 @@ export default function OwnerDashboard() {
         createElement(StatCard, { label: 'Compliance Score', value: 'Healthy', sub: 'All RCs/Insurance valid', subColor: '#16A34A' })
       ]),
 
-      // 3. AS REQUESTED: ORIGINAL FLEET TABLE REPLACED DIRECTLY INTO THE EARNINGS COLLECTION ENGINE
+      // 2. FLEET TABLE CONVERTED INSIDE EARNINGS ENGINE
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5', marginBottom: '24px' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } }, [
           createElement('p', { style: { fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Earnings & Active Payouts Grid'),
@@ -153,7 +153,7 @@ export default function OwnerDashboard() {
           createElement('thead', null, 
             createElement('tr', { style: { borderBottom: '1px solid #E8E0D5' } }, [
               createElement('th', { style: thStyle }, 'Vehicle ID'),
-              createElement('th', { style: thStyle }, 'Driver'), // Renamed from Driver Mobile, Driver Name hidden
+              createElement('th', { style: thStyle }, 'Driver'), 
               createElement('th', { style: thStyle }, 'Status'),
               createElement('th', { style: thStyle }, 'Daily Rent'),
               createElement('th', { style: thStyle }, "Today's Payout"),
@@ -166,7 +166,7 @@ export default function OwnerDashboard() {
               : filteredVehicles.map((v, i) => 
                   createElement('tr', { key: i, style: { borderBottom: '1px solid #E8E0D5' } }, [
                     createElement('td', { style: tdStyle }, v.vehicle_number),
-                    createElement('td', { style: tdStyle }, v.driver_phone || '9876542345'), // Displays phone/identifier directly under Driver column
+                    createElement('td', { style: tdStyle }, v.driver_phone || '9876542345'), 
                     createElement('td', { style: tdStyle }, 
                       createElement('span', { style: { padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', backgroundColor: v.status === 'On Route' ? '#DCFCE7' : '#F3F4F6', color: v.status === 'On Route' ? '#16A34A' : '#6B7280' } }, v.status)
                     ),
@@ -187,7 +187,7 @@ export default function OwnerDashboard() {
         ])
       ]),
 
-      // 4. CHART SECTION (Operational alerts completely removed from structural weight)
+      // 3. CHART TIMELINE RENDERING
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
         createElement('div', { style: { flex: 1 } }, 
           createElement(Chart, { 
@@ -197,7 +197,7 @@ export default function OwnerDashboard() {
         )
       ]),
 
-      // 5. LIVE RENTAL HISTORY LEDGER
+      // 4. LIVE COLLECTION HISTORY (DRIVER WISE TRANSACTIONS MATRIX)
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' } }, [
         createElement('div', { style: { marginBottom: '16px' } }, [
           createElement('p', { style: { fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Live Rental Collection History')
@@ -222,9 +222,12 @@ export default function OwnerDashboard() {
                     createElement('td', { style: { ...tdStyle, fontFamily: 'monospace', fontSize: '12px' } }, txn.order_id),
                     createElement('td', { style: tdStyle }, new Date(txn.order_initiation_date).toLocaleString('en-IN')),
                     createElement('td', { style: { ...tdStyle, fontWeight: '600' } }, `INR ${txn.order_amount}`),
+                    
+                    // FIXED: Checks specific gateway parameter to fetch accurate mode value directly from response array
                     createElement('td', { style: tdStyle }, 
-                      createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode || 'UPI / QR Code')
+                      createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode ? txn.payment_mode : (txn.payment_method ? txn.payment_method : 'UPI / QR Code'))
                     ),
+                    
                     createElement('td', { style: tdStyle }, 
                       createElement('span', {
                         style: {
@@ -242,7 +245,7 @@ export default function OwnerDashboard() {
 
     ]),
 
-    // Add Vehicle Form Hidden Back-end Configurations
+    // Modals Hidden Engine Block ( RC & Driver docs schema safely tracked )
     showModal && createElement('div', { style: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, 
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '85vh', overflowY: 'auto' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } }, [
@@ -258,9 +261,8 @@ export default function OwnerDashboard() {
           createElement('button', { onClick: handleAddVehicle, style: { flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: '#8B5E3C', color: 'white', border: 'none' } }, 'Add Vehicle')
         ])
       ])
-    ),
+    ]),
 
-    // Edit Driver Modal
     showEditModal && selectedVehicle && createElement('div', { style: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, 
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '400px' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } }, [
