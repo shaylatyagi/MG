@@ -3,42 +3,54 @@ import Sidebar from '../components/Sidebar';
 import Chart from '../components/Chart';
 import api from '../api';
 
+const thStyle = { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' };
+const tdStyle = { padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' };
+
 export default function EarningsPayouts() {
-  const [allTransactions, setAllTransactions] = useState([]);
   const [stats, setStats] = useState({ total_vehicles: 0, total_earnings: 0, collection_efficiency: 0, revenue_chart: [] });
+  const [transactions, setTransactions] = useState([]);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsRes, txnRes] = await Promise.all([
-          api.get('/api/owner/stats'),
-          api.get('/api/payment/my-transactions?phone=9876542345'),
-        ]);
-        setStats(statsRes.data);
-        setAllTransactions(txnRes.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchData();
+    fetchStats();
+    fetchTransactions();
   }, []);
 
-  const filteredTxns = allTransactions.filter(txn => {
+  const fetchTransactions = async () => {
+    try {
+      const res = await api.get('/api/payment/my-transactions?phone=9876542345');
+      setTransactions(res.data);
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const res = await api.get('/api/owner/stats');
+      setStats(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const totalEarnings = transactions
+    .filter(t => t.transaction_status === 'SUCCESS')
+    .reduce((sum, t) => sum + parseFloat(t.order_amount || 0), 0);
+
+  const pendingCount = transactions.filter(t => t.transaction_status === 'PENDING').length;
+
+  const filteredTxns = transactions.filter(txn => {
     const term = search.toLowerCase();
     return (
       (txn.payer_mobile || '').toLowerCase().includes(term) ||
       (txn.order_id || '').toLowerCase().includes(term) ||
       (txn.transaction_status || '').toLowerCase().includes(term) ||
-      (txn.order_amount || '').toString().includes(term)
+      `INR ${txn.order_amount || ''}`.toLowerCase().includes(term) ||
+      (txn.payment_mode || 'UPI / QR Code').toLowerCase().includes(term) ||
+      (txn.order_initiation_date ? new Date(txn.order_initiation_date).toLocaleString('en-IN').toLowerCase().includes(term) : false)
     );
   });
-
-  const totalEarnings = allTransactions
-    .filter(t => t.transaction_status === 'SUCCESS')
-    .reduce((sum, t) => sum + parseFloat(t.order_amount || 0), 0);
-
-  const pendingCount = allTransactions.filter(t => t.transaction_status === 'PENDING').length;
 
   return (
     <div style={{ display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' }}>
@@ -55,7 +67,7 @@ export default function EarningsPayouts() {
             { label: 'Total Earnings', value: `₹${totalEarnings.toFixed(2)}`, sub: 'From successful payments', color: '#16A34A' },
             { label: 'Collection Efficiency', value: `${stats.collection_efficiency}%`, sub: 'Target: 98%', color: stats.collection_efficiency >= 98 ? '#16A34A' : '#D97706' },
             { label: 'Pending Dues', value: `${pendingCount}`, sub: 'Payments pending', color: pendingCount > 0 ? '#D97706' : '#16A34A' },
-            { label: 'Total Transactions', value: `${allTransactions.length}`, sub: 'All time', color: '#1A1A1A' },
+            { label: 'Total Transactions', value: `${transactions.length}`, sub: 'All time', color: '#1A1A1A' },
           ].map((card, i) => (
             <div key={i} style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '20px 24px', border: '1px solid #E8E0D5' }}>
               <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{card.label}</p>
@@ -65,10 +77,9 @@ export default function EarningsPayouts() {
           ))}
         </div>
 
-        {/* Live Rental Collection History - TOP */}
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5', marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A' }}>Live Rental Collection History</p>
+            <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 }}>Live Rental Collection History</p>
             <input
               style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', backgroundColor: '#FAF7F2', color: '#1A1A1A', width: '260px' }}
               placeholder="Search by driver, order ID, status..."
@@ -80,7 +91,7 @@ export default function EarningsPayouts() {
             <thead>
               <tr style={{ borderBottom: '1px solid #E8E0D5' }}>
                 {['Driver', 'Order ID', 'Date & Time', 'Amount Paid', 'Payment Mode', 'Payment Status'].map((h) => (
-                  <th key={h} style={{ textAlign: 'left', padding: '10px 16px', fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>{h}</th>
+                  <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -91,12 +102,16 @@ export default function EarningsPayouts() {
                 </tr>
               ) : filteredTxns.map((txn, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #E8E0D5' }}>
-                  <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>{txn.payer_mobile || 'N/A'}</td>
-                  <td style={{ padding: '14px 16px', fontSize: '12px', color: '#6B6B6B', fontFamily: 'monospace' }}>{txn.order_id}</td>
-                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#1A1A1A' }}>{new Date(txn.order_initiation_date).toLocaleString('en-IN')}</td>
-                  <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '600', color: '#1A1A1A' }}>INR {txn.order_amount}</td>
-                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#4B5563' }}>{txn.payment_mode || 'UPI / QR Code'}</td>
-                  <td style={{ padding: '14px 16px' }}>
+                  <td style={tdStyle}>{txn.payer_mobile || 'N/A'}</td>
+                  <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>{txn.order_id}</td>
+                  <td style={tdStyle}>{new Date(txn.order_initiation_date).toLocaleString('en-IN')}</td>
+                  <td style={{ ...tdStyle, fontWeight: '600' }}>INR {txn.order_amount}</td>
+                  <td style={tdStyle}>
+                    <span style={{ fontWeight: '500', color: '#4B5563', fontSize: '13px' }}>
+                      {txn.payment_mode || txn.payment_method || 'UPI / QR Code'}
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
                     <span style={{
                       padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
                       backgroundColor: txn.transaction_status === 'SUCCESS' ? '#DCFCE7' : txn.transaction_status === 'FAILED' ? '#FEE2E2' : '#FEF3C7',
@@ -111,7 +126,6 @@ export default function EarningsPayouts() {
           </table>
         </div>
 
-        {/* Chart - BOTTOM */}
         <div style={{ marginBottom: '24px' }}>
           <Chart
             data={stats.revenue_chart.length > 0 ? stats.revenue_chart.map(r => ({
