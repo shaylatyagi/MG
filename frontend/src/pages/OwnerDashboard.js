@@ -122,7 +122,7 @@ export default function OwnerDashboard() {
     createElement(Sidebar, { key: 'sidebar' }),
     createElement('div', { key: 'main-content', style: { marginLeft: '220px', flex: 1, padding: '32px' } }, [
       
-      // Top Header Greeting
+      // 1. TOP GREETING HEADER
       createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' } }, [
         createElement('div', null, [
           createElement('h1', { style: { fontSize: '24px', fontWeight: '700', color: '#1A1A1A', margin: 0 } }, `Hello, ${user.name || 'Owner'} 👋`),
@@ -130,7 +130,7 @@ export default function OwnerDashboard() {
         ])
       ]),
 
-      // Earnings Metrics Section
+      // 2. SWAPPED STATE: EARNINGS METRICS BLOCK AT THE ABSOLUTE TOP
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
         createElement(StatCard, { label: 'Earnings', value: `₹${stats.total_earnings}`, sub: 'From successful payments', subColor: '#16A34A' }),
         createElement(StatCard, { label: 'Collection Efficiency', value: `${stats.collection_efficiency}%`, sub: 'Target: 98%' }),
@@ -138,7 +138,60 @@ export default function OwnerDashboard() {
         createElement(StatCard, { label: 'Compliance Score', value: 'Healthy', sub: 'All RCs/Insurance valid', subColor: '#16A34A' })
       ]),
 
-      // Earnings & Active Payouts Table
+      // 3. TRANSACTION TABLE MOVED TO THE TOP GRID SECTION
+      createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5', marginBottom: '24px' } }, [
+        createElement('div', { style: { marginBottom: '16px' } }, [
+          createElement('p', { style: { fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Live Rental Collection History')
+        ]),
+        createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } }, [
+          createElement('thead', null, 
+            createElement('tr', { style: { borderBottom: '1px solid #E8E0D5' } }, [
+              createElement('th', { style: thStyle }, 'Driver'), 
+              createElement('th', { style: thStyle }, 'Order ID'),
+              createElement('th', { style: thStyle }, 'Date & Time'),
+              createElement('th', { style: thStyle }, 'Amount Paid'),
+              createElement('th', { style: thStyle }, 'Payment Mode'), 
+              createElement('th', { style: thStyle }, 'Payment Status')
+            ])
+          ),
+          createElement('tbody', null, 
+            transactions.length === 0 
+              ? createElement('tr', null, createElement('td', { colSpan: 6, style: { padding: '24px', textAlign: 'center', fontSize: '14px', color: '#9CA3AF' } }, 'No rental transactions recorded yet.'))
+              : transactions.map((txn, index) => 
+                  createElement('tr', { key: index, style: { borderBottom: '1px solid #E8E0D5' } }, [
+                    createElement('td', { style: tdStyle }, txn.payer_mobile || '9876542345'),
+                    createElement('td', { style: { ...tdStyle, fontFamily: 'monospace', fontSize: '12px' } }, txn.order_id),
+                    createElement('td', { style: tdStyle }, new Date(txn.order_initiation_date).toLocaleString('en-IN')),
+                    createElement('td', { style: { ...tdStyle, fontWeight: '600' } }, `INR ${txn.order_amount}`),
+                    createElement('td', { style: tdStyle }, 
+                      createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode ? txn.payment_mode : (txn.payment_method ? txn.payment_method : 'UPI / QR Code'))
+                    ),
+                    createElement('td', { style: tdStyle }, 
+                      createElement('span', {
+                        style: {
+                          padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
+                          backgroundColor: txn.transaction_status === 'SUCCESS' ? '#DCFCE7' : txn.transaction_status === 'FAILED' ? '#FEE2E2' : '#FEF3C7',
+                          color: txn.transaction_status === 'SUCCESS' ? '#16A34A' : txn.transaction_status === 'FAILED' ? '#EF4444' : '#D97706'
+                        }
+                      }, txn.transaction_status)
+                    )
+                  ])
+                )
+          )
+        ])
+      ]),
+
+      // 4. CHART TIMELINE GRAPH MOVED DOWN BELOW THE LIVE TRANSACTION TABLE
+      createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
+        createElement('div', { style: { flex: 1 } }, 
+          createElement(Chart, { 
+            data: stats.revenue_chart.length > 0 ? stats.revenue_chart.map(r => ({ name: new Date(r.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }), value: parseFloat(r.value) })) : [{ name: 'No data', value: 0 }], 
+            title: 'Collection Revenue Trend' 
+          })
+        )
+      ]),
+
+      // 5. EARNINGS & ACTIVE PAYOUTS GRID (FLEET TABLE DATA BACKED STRUCTURAL MAPPING)
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5', marginBottom: '24px' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } }, [
           createElement('p', { style: { fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Earnings & Active Payouts Grid'),
@@ -185,64 +238,11 @@ export default function OwnerDashboard() {
                 )
           )
         ])
-      ]),
-
-      // Revenue Trend Chart
-      createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
-        createElement('div', { style: { flex: 1 } }, 
-          createElement(Chart, { 
-            data: stats.revenue_chart.length > 0 ? stats.revenue_chart.map(r => ({ name: new Date(r.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }), value: parseFloat(r.value) })) : [{ name: 'No data', value: 0 }], 
-            title: 'Collection Revenue Trend' 
-          })
-        )
-      ]),
-
-      // Live Rental Collection History
-      createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' } }, [
-        createElement('div', { style: { marginBottom: '16px' } }, [
-          createElement('p', { style: { fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Live Rental Collection History')
-        ]),
-        createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } }, [
-          createElement('thead', null, 
-            createElement('tr', { style: { borderBottom: '1px solid #E8E0D5' } }, [
-              createElement('th', { style: thStyle }, 'Driver'), 
-              createElement('th', { style: thStyle }, 'Order ID'),
-              createElement('th', { style: thStyle }, 'Date & Time'),
-              createElement('th', { style: thStyle }, 'Amount Paid'),
-              createElement('th', { style: thStyle }, 'Payment Mode'), 
-              createElement('th', { style: thStyle }, 'Payment Status')
-            ])
-          ),
-          createElement('tbody', null, 
-            transactions.length === 0 
-              ? createElement('tr', null, createElement('td', { colSpan: 6, style: { padding: '24px', textAlign: 'center', fontSize: '14px', color: '#9CA3AF' } }, 'No rental transactions recorded yet.'))
-              : transactions.map((txn, index) => 
-                  createElement('tr', { key: index, style: { borderBottom: '1px solid #E8E0D5' } }, [
-                    createElement('td', { style: tdStyle }, txn.payer_mobile || '9876542345'),
-                    createElement('td', { style: { ...tdStyle, fontFamily: 'monospace', fontSize: '12px' } }, txn.order_id),
-                    createElement('td', { style: tdStyle }, new Date(txn.order_initiation_date).toLocaleString('en-IN')),
-                    createElement('td', { style: { ...tdStyle, fontWeight: '600' } }, `INR ${txn.order_amount}`),
-                    createElement('td', { style: tdStyle }, 
-                      createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode ? txn.payment_mode : (txn.payment_method ? txn.payment_method : 'UPI / QR Code'))
-                    ),
-                    createElement('td', { style: tdStyle }, 
-                      createElement('span', {
-                        style: {
-                          padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-                          backgroundColor: txn.transaction_status === 'SUCCESS' ? '#DCFCE7' : txn.transaction_status === 'FAILED' ? '#FEE2E2' : '#FEF3C7',
-                          color: txn.transaction_status === 'SUCCESS' ? '#16A34A' : txn.transaction_status === 'FAILED' ? '#EF4444' : '#D97706'
-                        }
-                      }, txn.transaction_status)
-                    )
-                  ])
-                )
-          )
-        ])
       ])
 
     ]),
 
-    // Add Vehicle Modal Structure
+    // Add Vehicle Modal Configurations
     showModal && createElement('div', { style: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, 
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '85vh', overflowY: 'auto' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } }, [
@@ -260,7 +260,7 @@ export default function OwnerDashboard() {
       ])
     ),
 
-    // FIXED: Corrected parenthesis alignment mapping for Edit Driver Modal layout context
+    // Edit Driver Modal Layout Context
     showEditModal && selectedVehicle && createElement('div', { style: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, 
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '16px', padding: '32px', width: '400px' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } }, [
