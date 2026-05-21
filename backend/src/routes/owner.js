@@ -4,7 +4,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { verifyToken } = require('../middleware/auth');
 
-// Saari vehicles fetch karo
+// fetch vehicles
 router.get('/vehicles', verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
@@ -32,7 +32,7 @@ router.post('/vehicles', verifyToken, async (req, res) => {
       [vehicle_number, vehicle_age, condition, area, daily_rent, fine_per_day, rental_from, rental_to, payment_deadline, charging_station, driver_name || 'Unassigned', driver_phone, req.user.id]
     );
 
-    // Agar driver phone number diya hai toh driver_details update karo
+    // when driver phone number given, update details
     if (driver_phone) {
       const driver = await pool.query(
         'SELECT * FROM users WHERE phone_number = $1',
@@ -42,7 +42,7 @@ router.post('/vehicles', verifyToken, async (req, res) => {
       if (driver.rows.length > 0) {
         const driverId = driver.rows[0].id;
 
-        // Driver details exist karti hain ya nahi check karo
+        // to check if driver details exist or not
         const existing = await pool.query(
           'SELECT * FROM driver_details WHERE user_id = $1',
           [driverId]

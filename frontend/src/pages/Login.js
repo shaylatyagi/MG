@@ -32,7 +32,7 @@ export default function Login() {
       // LocalStorage mein token sync taaki session barkarar rahe
       const mockUser = {
         phone_number: phone,
-        name: "Shayla Tyagi",
+        name: "Demo User",
         role: role // 'driver' ya 'owner' jo select kiya ho
       };
       

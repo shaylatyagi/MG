@@ -2,13 +2,13 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-// DB Connection
+//To connect DB
 require('./src/config/db');
 const pool = require('./src/config/db');
 
 const app = express();
 
-// ✅ Fixed CORS
+// CORS fixed
 app.use(cors({
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -19,7 +19,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ====================== ROUTES ======================
+// ROUTES
 const authRoutes = require('./src/routes/auth');
 const driverRoutes = require('./src/routes/driver');
 const paymentRoutes = require('./src/routes/payment');
@@ -30,7 +30,7 @@ app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/owner', ownerRoutes);
 
-// Health Check
+// Check Health
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Mobility Grid API is running ✅',
@@ -38,7 +38,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// ====================== SCHEDULER ======================
+// SCHEDULER
 const BASE_URL = 'https://mg-qw5s.onrender.com';
 
 const checkPendingOrders = async () => {
@@ -58,7 +58,7 @@ const checkPendingOrders = async () => {
 
 setInterval(checkPendingOrders, 5 * 60 * 1000);
 
-// Daily Reset
+// Reset Daily
 const scheduleDailyReset = () => {
   const now = new Date();
   const midnight = new Date(now);
@@ -78,12 +78,12 @@ const scheduleDailyReset = () => {
 
 scheduleDailyReset();
 
-// ====================== 404 Handler ======================
+// Handle Erorr 404
 app.use((req, res) => {
   res.status(404).json({ message: ' ' });
 });
 
-// ====================== START SERVER ======================
+// SERVER START
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
