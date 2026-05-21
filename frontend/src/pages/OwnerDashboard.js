@@ -44,7 +44,7 @@ export default function OwnerDashboard() {
   };
 
   return createElement('div', { style: { display: 'flex', backgroundColor: '#FAF7F2', minHeight: '100vh' } }, [
-    // SIDEBAR WITH EXACT SPECIFIED NAVIGATION LINKS
+    // SIDEBAR CONFIGURATION
     createElement(Sidebar, { 
       key: 'sidebar',
       links: [
@@ -58,7 +58,7 @@ export default function OwnerDashboard() {
     
     createElement('div', { key: 'main-content', style: { marginLeft: '220px', flex: 1, padding: '32px' } }, [
       
-      // 1. TOP GREETING HEADER
+      // Top Greeting Header
       createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' } }, [
         createElement('div', null, [
           createElement('h1', { style: { fontSize: '24px', fontWeight: '700', color: '#1A1A1A', margin: 0 } }, `Hello, ${user.name || 'Owner'} 👋`),
@@ -66,7 +66,7 @@ export default function OwnerDashboard() {
         ])
       ]),
 
-      // 2. SUMMARY METRICS (STRICTLY AT THE TOP)
+      // Summary Metrics Cards Section
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
         createElement(StatCard, { label: 'Earnings', value: `₹${stats.total_earnings}`, sub: 'From successful payments', subColor: '#16A34A' }),
         createElement(StatCard, { label: 'Collection Efficiency', value: `${stats.collection_efficiency}%`, sub: 'Target: 98%' }),
@@ -74,13 +74,13 @@ export default function OwnerDashboard() {
         createElement(StatCard, { label: 'Compliance Score', value: 'Healthy', sub: 'All RCs/Insurance valid', subColor: '#16A34A' })
       ]),
 
-      // 3. MAIN SINGLE LIVE TRANSACTIONS TABLE (DUPLICATE REMOVED)
+      // MAIN LIVE TRANSACTIONS TABLE (WITH MULTI-COLUMN SEARCH)
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5', marginBottom: '24px' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } }, [
           createElement('p', { style: { fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Live Rental Collection History'),
           createElement('input', {
-            style: { padding: '8px 14px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', backgroundColor: '#FAF7F2', color: '#1A1A1A' },
-            placeholder: 'Search driver...',
+            style: { padding: '8px 14px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', backgroundColor: '#FAF7F2', color: '#1A1A1A', width: '260px' },
+            placeholder: 'Search by Driver, Order ID, Mode, Status...',
             value: search,
             onChange: (e) => setSearch(e.target.value)
           })
@@ -100,7 +100,18 @@ export default function OwnerDashboard() {
             transactions.length === 0 
               ? createElement('tr', null, createElement('td', { colSpan: 6, style: { padding: '24px', textAlign: 'center', fontSize: '14px', color: '#9CA3AF' } }, 'No rental transactions recorded yet.'))
               : transactions
-                  .filter(txn => (txn.payer_mobile || '').includes(search))
+                  .filter(txn => {
+                    const term = search.toLowerCase();
+                    const driverMatch = (txn.payer_mobile || '').toLowerCase().includes(term);
+                    const orderMatch = (txn.order_id || '').toLowerCase().includes(term);
+                    const amountMatch = `INR ${txn.order_amount || ''}`.toLowerCase().includes(term);
+                    const modeMatch = (txn.payment_mode || txn.payment_method || 'UPI / QR Code').toLowerCase().includes(term);
+                    const statusMatch = (txn.transaction_status || '').toLowerCase().includes(term);
+                    const dateMatch = txn.order_initiation_date ? new Date(txn.order_initiation_date).toLocaleString('en-IN').toLowerCase().includes(term) : false;
+                    
+                    // ANY FIELD MATCH RETURNS ROW TRUTHY
+                    return driverMatch || orderMatch || amountMatch || modeMatch || statusMatch || dateMatch;
+                  })
                   .map((txn, index) => 
                     createElement('tr', { key: index, style: { borderBottom: '1px solid #E8E0D5' } }, [
                       createElement('td', { style: tdStyle }, txn.payer_mobile || '9876542345'),
@@ -125,7 +136,7 @@ export default function OwnerDashboard() {
         ])
       ]),
 
-      // 4. CHART GRAPH PLACED AT THE BOTTOM
+      // Chart Revenue Trend Placed Beautifully at the Bottom
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } }, [
         createElement('div', { style: { flex: 1 } }, 
           createElement(Chart, { 
