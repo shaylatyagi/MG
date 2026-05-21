@@ -12,17 +12,21 @@ export default function MyWallet() {
   const [totalPaid, setTotalPaid] = useState(54.00);
   const [paidToday, setPaidToday] = useState(42.00);
   const [pendingDues, setPendingDues] = useState(58);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     fetchDriverTransactions();
   }, []);
 
   const fetchDriverTransactions = async () => {
+    setSyncing(true);
     try {
       const res = await api.get('/api/payment/my-transactions?phone=9876542345');
       setTransactions(res.data);
     } catch (err) {
       console.error("Error fetching driver wallet transactions:", err);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -36,19 +40,25 @@ export default function MyWallet() {
         createElement('p', { style: { fontSize: '13px', color: '#6B6B6B', marginTop: '4px', margin: 0 } }, 'Manage your earnings and rent withdrawals.')
       ]),
 
-      // Financial StatCards Row - All Original States Intact
+      // Financial StatCards Row
       createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '32px' } }, [
         createElement(StatCard, { label: 'Wallet Balance', value: `₹${walletBalance.toFixed(2)}`, sub: 'Withdraw to Bank', subColor: '#8B5E3C' }),
         createElement(StatCard, { label: 'Total Paid', value: `₹${totalPaid.toFixed(2)}`, sub: 'All time rent payments' }),
         createElement(StatCard, { label: 'Paid Today', value: `₹${paidToday.toFixed(2)}`, sub: 'Daily rent: ₹100.00' }),
-        createElement(StatCard, { label: 'Pending Dues', value: `₹${pendingDues}`, sub: 'Due today', subColor: '#EF4444' })
+        
+        // CHANGED: Label to 'Pay' and subtext cleared out entirely. Keeping same data stream amount setup.
+        createElement(StatCard, { label: 'Pay', value: `₹${pendingDues}`, sub: '', subColor: '#EF4444' })
       ]),
 
       // Transactions Ledger Card Block
       createElement('div', { style: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' } }, [
         createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' } }, [
           createElement('p', { style: { fontSize: '16px', fontWeight: '600', color: '#1A1A1A', margin: 0 } }, 'Recent Transactions'),
-          createElement('button', { style: { padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer' } }, 'Bulk Sync (28)')
+          createElement('button', { 
+            onClick: fetchDriverTransactions,
+            disabled: syncing,
+            style: { padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer', opacity: syncing ? 0.6 : 1 } 
+          }, syncing ? 'Syncing...' : 'Bulk Sync (28)')
         ]),
 
         // Table Structure
@@ -72,11 +82,9 @@ export default function MyWallet() {
                     createElement('td', { style: tdStyle }, new Date(txn.order_initiation_date).toLocaleString('en-IN')),
                     createElement('td', { style: tdStyle }, txn.payer_mobile || '9876542345'),
                     createElement('td', { style: { ...tdStyle, fontWeight: '600' } }, `INR ${txn.order_amount}`),
-                    
                     createElement('td', { style: tdStyle }, 
-                      createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode || 'UPI / QR Code')
+                      createElement('span', { style: { fontWeight: '500', color: '#4B5563', fontSize: '13px' } }, txn.payment_mode || 'NetBanking / Gateway Sync')
                     ),
-
                     createElement('td', { style: tdStyle }, 
                       createElement('span', {
                         style: {
