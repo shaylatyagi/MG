@@ -45,14 +45,15 @@ export default function OwnerDashboard() {
     fetchStats();
     fetchDriverPayouts();
   }, []);
+
   const fetchDriverPayouts = async () => {
-  try {
-    const res = await api.get('/api/owner/driver-payouts');
-    setDriverPayouts(res.data);
-  } catch (err) {
-    console.error(err);
-  }
-};
+    try {
+      const res = await api.get('/api/owner/driver-payouts');
+      setDriverPayouts(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchVehicles = async () => {
     try {
@@ -193,16 +194,16 @@ export default function OwnerDashboard() {
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' }}>₹{v.daily_rent}</td>
                   <td style={{ padding: '14px 16px' }}>
-  {(() => {
-    var payout = driverPayouts.find(p => p.vehicle_number === v.vehicle_number);
-    var status = payout ? payout.payout_status : 'Pending';
-    return (
-      <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: status === 'Paid' ? '#DCFCE7' : '#FEF3C7', color: status === 'Paid' ? '#16A34A' : '#D97706' }}>
-        {status}
-      </span>
-    );
-  })()}
-</td>
+                    {(() => {
+                      var payout = driverPayouts.find(p => p.vehicle_number === v.vehicle_number);
+                      var status = payout ? payout.payout_status : 'Pending';
+                      return (
+                        <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: status === 'Paid' ? '#DCFCE7' : '#FEF3C7', color: status === 'Paid' ? '#16A34A' : '#D97706' }}>
+                          {status}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td style={{ padding: '14px 16px' }}>
                     <button onClick={() => handleEdit(v)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F3EDE5', color: '#8B5E3C', border: 'none', cursor: 'pointer' }}>
                       Edit Driver
@@ -270,7 +271,7 @@ export default function OwnerDashboard() {
             </div>
             <div style={{ marginTop: '20px' }}>
               <p style={labelStyle}>Upload Vehicle Documents</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', flexType: 'column', gap: '10px', marginTop: '8px' }}>
                 {['Vehicle RC', 'Insurance Certificate', 'Pollution Certificate'].map((doc) => (
                   <div key={doc} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', border: '1px solid #E8E0D5', backgroundColor: '#FAF7F2' }}>
                     <div>
@@ -317,7 +318,8 @@ export default function OwnerDashboard() {
               <input style={inputStyle} value={editDriverName} onChange={(e) => setEditDriverName(e.target.value)} />
             </div>
             <div style={{ marginBottom: '24px' }}>
-              <p style={labelStyle}>Driver Phone Number</p>
+              {/* CHANGED LABEL FROM "Driver Phone Number" to "Driver" to avoid word clutter and perfectly balance structural layout */}
+              <p style={labelStyle}>Driver</p>
               <input style={inputStyle} placeholder="9999999999" type="number" value={editDriverPhone} onChange={(e) => setEditDriverPhone(e.target.value)} />
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>

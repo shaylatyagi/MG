@@ -28,7 +28,7 @@ export default function Login() {
       // USER NAME CHANGED TO DEMO USER HERE
       const mockUser = {
         phone_number: phone,
-        name: "DEMO USER", 
+        name: "demo user", 
         role: role
       };
       
