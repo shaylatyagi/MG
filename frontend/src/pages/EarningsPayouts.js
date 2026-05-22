@@ -45,7 +45,6 @@ export default function EarningsPayouts() {
     return (
       (txn.payer_mobile || '').toLowerCase().includes(term) ||
       (txn.order_id || '').toLowerCase().includes(term) ||
-      (txn.pg_transaction_id || '').toLowerCase().includes(term) ||
       (txn.transaction_status || '').toLowerCase().includes(term) ||
       `INR ${txn.order_amount || ''}`.toLowerCase().includes(term) ||
       (txn.payment_mode || '').toLowerCase().includes(term) ||
@@ -91,7 +90,7 @@ export default function EarningsPayouts() {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #E8E0D5' }}>
-                  {['Driver', 'Order ID', 'Transaction ID', 'Date & Time', 'Amount', 'Payment Mode', 'Status'].map((h) => (
+                  {['Driver', 'Order ID', 'Date & Time', 'Amount', 'Payment Mode', 'Status'].map((h) => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -99,20 +98,17 @@ export default function EarningsPayouts() {
               <tbody>
                 {filteredTxns.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: '24px', textAlign: 'center', fontSize: '14px', color: '#9CA3AF' }}>No rental transactions recorded yet.</td>
+                    <td colSpan={6} style={{ padding: '24px', textAlign: 'center', fontSize: '14px', color: '#9CA3AF' }}>No rental transactions recorded yet.</td>
                   </tr>
                 ) : filteredTxns.map((txn, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #E8E0D5' }}>
-                    <td style={tdStyle}>{txn.payer_mobile || 'N/A'}</td>
+                    <td style={tdStyle}>{txn.payer_mobile}</td>
                     <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>{txn.order_id}</td>
-                    <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px', color: '#6B6B6B' }}>
-                      {txn.pg_transaction_id || 'N/A'}
-                    </td>
                     <td style={tdStyle}>{new Date(txn.order_initiation_date).toLocaleString('en-IN')}</td>
                     <td style={{ ...tdStyle, fontWeight: '600' }}>INR {parseFloat(txn.order_amount).toFixed(2)}</td>
                     <td style={tdStyle}>
                       <span style={{ fontWeight: '500', color: '#4B5563', fontSize: '13px' }}>
-                        {txn.payment_mode || 'N/A'}
+                        {txn.payment_mode || ''}
                       </span>
                     </td>
                     <td style={tdStyle}>

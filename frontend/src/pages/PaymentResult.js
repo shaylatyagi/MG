@@ -80,12 +80,12 @@ export default function PaymentResult() {
   const status = local.transaction_status || external.status || external.transactionStatus || statusParam || 'PENDING';
   const isSuccess = String(status).toUpperCase() === 'SUCCESS';
   // Amount & Currency
-  const amount = local.order_amount || external.amount || 'N/A';
+  const amount = local.order_amount || external.amount;
   const currency = local.currency || external.currency || 'INR';
   // IDs & References
-  const localOrderUuid = local.order_id || 'N/A';
-  const merchantRef = local.order_number || 'N/A';
-  const payyantraOrderId = external.orderId || external.pspOrderId || 'N/A';
+  const localOrderUuid = local.order_id;
+  const merchantRef = local.order_number;
+  const payyantraOrderId = external.orderId || external.pspOrderId;
   const payyantraReferenceId = external.referenceId || 'N/A';  
   // Transaction IDs (Crucial Fix)
   const pspTxnId = local.pg_transaction_id || external.transactionId || external.transactionPublicId || raw.txnId || 'N/A';
@@ -125,8 +125,8 @@ export default function PaymentResult() {
               <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
                 {fieldRow('Order Reference', orderId)}
                 {fieldRow('Status', statusParam || 'UNKNOWN')}
-                {fieldRow('Query Params', JSON.stringify(queryDetails) || 'N/A')}
-                {fieldRow('Note', 'This usually means the local backend DB did not find this order.')}
+                {fieldRow('Query Params', JSON.stringify(queryDetails))}
+
               </div>
               {!stopTimer ? (
                 <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '16px' }}>Redirecting to dashboard in {countdown} seconds...</p>
