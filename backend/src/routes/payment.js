@@ -587,7 +587,7 @@ router.get('/status/:orderId', async (req, res) => {
 
 
     const rawData = await statusRes.json();
-
+    console.log('🔥 PURE INQUIRY RESPONSE:', JSON.stringify(rawData, null, 2));
     const pyData = rawData.data || {};     
 
 
