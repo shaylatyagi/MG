@@ -442,4 +442,62 @@ router.get('/inquiry-by-order/:payyantraOrderId', async (req, res) => {
   }
 });
 
+// SYNC ALL MISSING DATA (One-Time Backfill)
+router.post('/sync-all-orders', async (req, res) => {
+  console.log('Starting full sync for missing payment modes...');
+  try {
+    const missingData = await pool.query("SELECT * FROM ms_orders WHERE payment_mode IS NULL OR payment_mode = ''");
+
+    if (missingData.rows.length === 0) {
+      return res.json({ message: 'All orders are already updated! No missing data found.' });
+    }
+
+    const token = await getToken();
+    const updated = [];
+
+    for (const order of missingData.rows) {
+      try {
+        const statusRes = await fetch(`${BASE_URL}/api/pay/status/by-reference/${order.order_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await statusRes.json();        
+        
+        let rawStatus = data.transactionStatus || data.status;        
+        let newStatus = rawStatus ? String(rawStatus).toUpperCase() : null;
+        if (newStatus === 'INITIATED') newStatus = 'PENDING';
+        if (newStatus === 'SUCCESSFUL') newStatus = 'SUCCESS';
+
+        const paymentMode = data.paymentMode || data.paymentMethod || data.payment_mode || data.method || null;
+
+        if (paymentMode || newStatus) {
+          await pool.query(
+            `UPDATE ms_orders SET 
+              transaction_status = COALESCE($1, transaction_status),
+              pg_transaction_id = COALESCE($2, pg_transaction_id),
+              bank_reference_no = COALESCE($3, bank_reference_no),
+              bank_utr_no = COALESCE($4, bank_utr_no),
+              payment_mode = COALESCE($5, payment_mode)
+             WHERE order_id = $6`,
+            [
+              newStatus, 
+              data.transactionId || data.transactionPublicId || null, 
+              data.bankReferenceNo || data.rrn || null, 
+              data.bankUTRNo || null, 
+              paymentMode, 
+              order.order_id
+            ]
+          );
+          updated.push(order.order_number);
+        }
+      } catch (err) {
+        console.error(`Sync failed for ${order.order_id}:`, err.message);
+      }
+    }
+    res.json({ message: 'Sync complete', updatedCount: updated.length, updatedOrders: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Sync failed' });
+  }
+});
+
 module.exports = router;
