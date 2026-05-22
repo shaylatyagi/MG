@@ -1,7 +1,7 @@
-const { Pool } = require('pg');
-require('dotenv').config();
-console.log('🔄 DB Connection Starting...');
-console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+const { Pool } = require('pg');//postgresql
+require('dotenv').config();//read .env files
+console.log('🔄 DB Connection Starting...');//message
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);//to check if db exists
 let pool;
 if (process.env.DATABASE_URL) {
   console.log('✅ Using DATABASE_URL');
@@ -10,7 +10,7 @@ if (process.env.DATABASE_URL) {
     ssl: false,
   });
 } else {
-  console.log('⚠️  Using individual PG variables');
+  console.log('⚠️  Using individual PG variables');//if db url is not found
   pool = new Pool({
     host: process.env.PGHOST || process.env.DB_HOST,
     port: process.env.PGPORT || process.env.DB_PORT || 5432,

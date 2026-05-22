@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config();//check .env file
 const { generateToken } = require('../middleware/auth');
 const express = require('express');
 const router = express.Router();
