@@ -16,12 +16,14 @@ import PaymentResult from './pages/PaymentResult';
 import Profile from './pages/Profile';
 import ComingSoon from './pages/ComingSoon';
 import ChargingStations from './pages/ChargingStations';
+import AdminDashboard from './pages/AdminDashboard';
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />        
+        <Route path="/login" element={<Login />} />  
+        <Route path="/admin/*" element={<AdminDashboard />} />      
         {/* Owner Routes */}
         <Route path="/owner/dashboard" element={<OwnerDashboard />} />
         <Route path="/owner/vehicles" element={<MyVehicles />} />

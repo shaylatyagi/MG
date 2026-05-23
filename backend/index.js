@@ -23,6 +23,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/owner', ownerRoutes);
+const adminRoutes = require('./routes/admin');
+app.use('/api/admin', adminRoutes);
 // Check Health
 app.get('/', (req, res) => {
   res.json({ 
