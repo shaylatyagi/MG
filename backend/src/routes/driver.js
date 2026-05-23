@@ -2,7 +2,20 @@ require('dotenv').config();
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
-const { verifyToken } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No token provided' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'voltops_super_secret_key_2025');
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid token' });
+  }
+};
+
 router.post('/profile', verifyToken, async (req, res) => {
   const user_id = req.user.id;
   try {
@@ -20,4 +33,5 @@ router.post('/profile', verifyToken, async (req, res) => {
     res.status(500).json({ message: 'Something went wrong' });
   }
 });
+
 module.exports = router;
