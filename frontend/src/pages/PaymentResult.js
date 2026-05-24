@@ -2,19 +2,21 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print';
 import api from '../api';
+
 export default function PaymentResult() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [countdown, setCountdown] = useState(60); // Print click hone par isko rok denge
-  const [stopTimer, setStopTimer] = useState(false); // Timer rokne ke liye state
+  const [countdown, setCountdown] = useState(60); 
+  const [stopTimer, setStopTimer] = useState(false); 
   const [orderData, setOrderData] = useState(null);
   const [error, setError] = useState(null);
-  // Print ke liye reference
+  
   const componentRef = useRef();
   const orderId = searchParams.get('ref') || searchParams.get('orderId');
   const statusParam = searchParams.get('status');
   const queryDetails = Object.fromEntries(searchParams.entries());
+
   const goToDashboard = useCallback(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.role === 'owner') {
@@ -23,15 +25,15 @@ export default function PaymentResult() {
       navigate('/driver/dashboard');
     }
   }, [navigate]);
-  // Print Handle Function
+
   const handlePrint = useReactToPrint({
     content: () => componentRef.current,
     documentTitle: `Receipt_${orderId || 'Payment'}`,
     onBeforeGetContent: () => {
-      // Jaise hi Print dabega, countdown ruk jayega taaki page redirect na ho!
-      setStopTimer(true);
+      setStopTimer(true); // Print dabte hi timer ruk jayega
     }
   });
+
   useEffect(() => {
     const fetchOrder = async () => {
       if (!orderId) {
@@ -41,10 +43,8 @@ export default function PaymentResult() {
       }
       try {
         const res = await api.get(`/api/payment/order/${orderId}`);
-        console.log("BACKEND SE AAYA DATA:", res.data);
         setOrderData(res.data);
       } catch (err) {
-        console.error('Payment result fetch failed:', err.response?.data || err.message || err);
         setError(err.response?.data?.message || err.message || 'Failed to fetch payment result');
       } finally {
         setLoading(false);
@@ -52,7 +52,7 @@ export default function PaymentResult() {
     };
     fetchOrder();
   }, [orderId]);
-  //Timer Logic
+
   useEffect(() => {
     if (!loading && !stopTimer) {
       const timer = setTimeout(goToDashboard, countdown * 1000);
@@ -71,154 +71,119 @@ export default function PaymentResult() {
       };
     }
   }, [loading, stopTimer, countdown, goToDashboard]);
+
   // ROBUST VARIABLE MAPPING
-  // extract from backend response structure
   const local = orderData?.local || {};
   const external = orderData?.pyData || orderData?.external || orderData?.data || {}; 
   const raw = orderData?.raw || {};
-  // Status Check
+  
   const status = local.transaction_status || external.status || external.transactionStatus || statusParam || 'PENDING';
   const isSuccess = String(status).toUpperCase() === 'SUCCESS';
-  // Amount & Currency
+  
   const amount = local.order_amount || external.amount;
   const currency = local.currency || external.currency || 'INR';
-  // IDs & References
-  const localOrderUuid = local.order_id;
-  const merchantRef = local.order_number;
-  const payyantraOrderId = external.orderId || external.pspOrderId;
-  const payyantraReferenceId = external.referenceId || 'N/A';  
-  // Transaction IDs (Crucial Fix)
+  
   const pspTxnId = local.pg_transaction_id || external.transactionId || external.transactionPublicId || raw.txnId || 'N/A';
-  const gatewayMerchantOrderId = external.merchantOrderId || 'N/A';
-  const statusCode = local.transaction_status_code || external.statusCode || 'N/A';
-  // Bank details (UAT environment usually returns null/NA for these)
   const referenceNumber = local.bank_reference_no || external.rrn || external.bankReferenceNo || raw.rrn || 'N/A';
-  const utrNumber = local.bank_utr_no || external.bankUTRNo || raw.utr || 'N/A';
-  // Customer Details
-  const payerName = local.payer_name || external.customerDetails?.name || 'N/A';
-  const payerEmail = local.payer_email || external.customerDetails?.email || 'N/A';
-  const payerPhone = local.payer_mobile || external.customerDetails?.phone || 'N/A';
-  // Timestamps
-  const createdAt = local.order_initiation_date || local.created_at || 'N/A';
-  const completedAt = local.order_completion_date || local.updated_at || 'N/A';
-  // URLs & Methods
-  const paymentUrl = external.checkoutUrl || local.payment_url || 'N/A';
-  const notifyUrl = external.notifyUrl || 'N/A';
-  const returnUrl = external.returnUrl || 'N/A';
-  const paymentMethod = external.paymentMode || raw.payment_method || 'N/A';  
+  
   const rawJSON = JSON.stringify(orderData, null, 2);
+
+  // Mobile App Styled Field Row
   const fieldRow = (label, value) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-      <span style={{ color: '#6B6B6B', fontSize: '13px' }}>{label}</span>
-      <span style={{ color: '#1A1A1A', fontSize: '13px', fontWeight: '600', textAlign: 'right', maxWidth: '220px' }}>{value || 'N/A'}</span>
+    <div className="flex justify-between items-center py-2.5 border-b border-slate-100 last:border-0">
+      <span className="text-slate-500 text-xs font-medium">{label}</span>
+      <span className="text-slate-800 text-xs font-bold text-right max-w-[60%] truncate">{value || 'N/A'}</span>
     </div>
   );
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', padding: '32px' }}>
-      <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 24px 60px rgba(0,0,0,0.08)' }}>
-          {loading ? (
-            <p style={{ fontSize: '16px', color: '#6B6B6B' }}>Loading payment result...</p>
-          ) : error ? (
-            <>
-              <p style={{ fontSize: '16px', color: '#DC2626', marginBottom: '16px' }}>{error}</p>
-              <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
-                {fieldRow('Order Reference', orderId)}
-                {fieldRow('Status', statusParam || 'UNKNOWN')}
-                {fieldRow('Query Params', JSON.stringify(queryDetails))}
 
-              </div>
-              {!stopTimer ? (
-                <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '16px' }}>Redirecting to dashboard in {countdown} seconds...</p>
-              ) : (
-                <p style={{ fontSize: '13px', color: '#8B5E3C', marginBottom: '16px' }}>Auto-redirect paused. You can safely print or inspect this error.</p>
-              )}
-              <button
-                onClick={goToDashboard}
-                style={{ width: '100%', padding: '14px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '10px', fontSize: '15px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
-              >
-                Back to Dashboard
-              </button>
-            </>
-          ) : (
-            <>
-              {/* Jisko print karna hai usko Ref de diya */}
-              <div ref={componentRef} style={{ padding: '20px', backgroundColor: 'white' }}>
-                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                  <div style={{ fontSize: '64px', marginBottom: '16px' }}>{isSuccess ? '✅' : '❌'}</div>
-                  <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1A1A1A', marginBottom: '8px' }}>
-                    {isSuccess ? 'Payment Completed' : 'Payment Status'}
-                  </h1>
-                  <p style={{ color: isSuccess ? '#16A34A' : '#DC2626', fontWeight: '700', marginBottom: '8px' }}>{status}</p>
-                  
-                  {/* Agar timer ruk gaya hai, toh user ko message dikhao ki timer paused hai */}
-                  {!stopTimer ? (
-                    <p style={{ fontSize: '13px', color: '#9CA3AF' }}>Redirecting to dashboard in {countdown} seconds...</p>
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
+      <div className="w-full max-w-md">
+        
+        {loading ? (
+          <div className="bg-white rounded-3xl p-8 shadow-sm text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-sm font-bold text-slate-500 tracking-widest">VERIFYING PAYMENT...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-3xl p-6 shadow-sm">
+            <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </div>
+            <p className="text-red-600 text-center font-bold mb-6">{error}</p>
+            <div className="bg-red-50 rounded-2xl p-4 mb-6">
+              {fieldRow('Order Ref', orderId)}
+              {fieldRow('Status', statusParam || 'UNKNOWN')}
+            </div>
+            <button onClick={goToDashboard} className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl text-sm transition">
+              BACK TO DASHBOARD
+            </button>
+          </div>
+        ) : (
+          <div className="w-full">
+            
+            {/* PRINTABLE RECEIPT AREA */}
+            <div ref={componentRef} className="bg-white rounded-3xl p-6 shadow-sm mb-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-emerald-400"></div>
+              
+              <div className="text-center mt-4 mb-6">
+                <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 shadow-md ${isSuccess ? 'bg-emerald-100 text-emerald-500' : 'bg-red-100 text-red-500'}`}>
+                  {isSuccess ? (
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
                   ) : (
-                    <p style={{ fontSize: '13px', color: '#8B5E3C' }}>Auto-redirect paused. You can safely print the receipt.</p>
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg>
                   )}
                 </div>
-                <div style={{ display: 'grid', gap: '20px', marginBottom: '24px' }}>
-                  <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px' }}>
-                    <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1A1A1A' }}>Local DB values</h2>
-                    {fieldRow('Order UUID', localOrderUuid)}
-                    {fieldRow('Order Number', merchantRef)}
-                    {fieldRow('Transaction Status', local.transaction_status || 'N/A')}
-                    {fieldRow('Status Code', local.transaction_status_code || 'N/A')}
-                    {fieldRow('PG Txn ID', local.pg_transaction_id || 'N/A')}
-                    {fieldRow('Amount', `${local.currency || 'INR'} ${local.order_amount || 'N/A'}`)}
-                    {fieldRow('Payer Name', local.payer_name || 'N/A')}
-                    {fieldRow('Payer Email', local.payer_email || 'N/A')}
-                    {fieldRow('Payer Mobile', local.payer_mobile || 'N/A')}
-                    {fieldRow('Bank Reference / RRN', local.bank_reference_no || 'N/A')}
-                    {fieldRow('Bank UTR', local.bank_utr_no || 'N/A')}
-                    {fieldRow('Created At', local.order_initiation_date || local.created_at || 'N/A')}
-                    {fieldRow('Completed At', local.order_completion_date || local.updated_at || 'N/A')}
-                  </div>
-                  <div style={{ backgroundColor: '#F8F5EF', borderRadius: '16px', padding: '24px' }}>
-                    <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1A1A1A' }}>PayYantra / Gateway values</h2>
-                    {fieldRow('PayYantra Ref ID', payyantraReferenceId)}
-                    {fieldRow('Payment Order ID', payyantraOrderId)}
-                    {fieldRow('PG Txn ID', pspTxnId)}
-                    {fieldRow('Status', status)}
-                    {fieldRow('Amount', `${currency} ${amount}`)}
-                    {fieldRow('Customer Name', payerName)}
-                    {fieldRow('Customer Email', payerEmail)}
-                    {fieldRow('Customer Phone', payerPhone)}
-                    {fieldRow('Payment Mode', paymentMethod)}
-                    {fieldRow('Gateway Order ID', gatewayMerchantOrderId)}
-                    {fieldRow('Payment URL', paymentUrl)}
-                    {fieldRow('Notify URL', notifyUrl)}
-                    {fieldRow('Return URL', returnUrl)}
-                    {fieldRow('Bank Reference / RRN', referenceNumber)}
-                    {fieldRow('Bank UTR', utrNumber)}
-                  </div>
+                <h1 className="text-2xl font-black text-slate-800">
+                  {isSuccess ? 'Payment Completed' : 'Payment Status'}
+                </h1>
+                <p className={`text-sm font-bold tracking-widest mt-1 ${isSuccess ? 'text-emerald-600' : 'text-red-600'}`}>{status}</p>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-4 mb-4">
+                <p className="text-[10px] font-bold text-slate-400 mb-2 tracking-wider">TRANSACTION DETAILS</p>
+                {fieldRow('Amount', `${currency} ${amount}`)}
+                {fieldRow('Order ID', local.order_id || orderId)}
+                {fieldRow('PG Txn ID', pspTxnId)}
+                {fieldRow('Bank Ref / RRN', referenceNumber)}
+                {fieldRow('Date', local.order_completion_date || local.created_at || 'N/A')}
+              </div>
+
+              {/* Developer Dropdown (Collapsed by default taaki app clean dikhe) */}
+              <details className="group">
+                <summary className="text-[10px] font-bold text-slate-400 tracking-wider cursor-pointer outline-none flex items-center gap-1">
+                  SHOW FULL DEVELOPER LOGS 
+                  <span className="transition group-open:rotate-180">▼</span>
+                </summary>
+                <div className="mt-3 bg-slate-900 rounded-xl p-4 overflow-x-auto">
+                  <pre className="text-[10px] text-emerald-400 font-mono whitespace-pre-wrap">{rawJSON}</pre>
                 </div>
-              </div>
-              {/* Action Buttons Container */}
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <button
-                  onClick={handlePrint}
-                  style={{ flex: 1, padding: '14px', backgroundColor: '#F8F5EF', color: '#8B5E3C', border: '2px solid #8B5E3C', borderRadius: '10px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  🖨️ Print Receipt
+              </details>
+            </div>
+
+            {/* ACTION BUTTONS & TIMER */}
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <button onClick={handlePrint} className="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold py-4 rounded-xl text-sm transition flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                  PRINT
                 </button>
-                <button
-                  onClick={goToDashboard}
-                  style={{ flex: 1, padding: '14px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '10px', fontSize: '15px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
-                >
-                  Back to Dashboard
+                <button onClick={goToDashboard} className="flex-[2] bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl text-sm transition shadow-lg">
+                  DONE
                 </button>
               </div>
-              <div style={{ marginTop: '24px', backgroundColor: '#F3F4F6', borderRadius: '16px', padding: '20px' }}>
-                <h2 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '700', color: '#1F2937' }}>Developer Details</h2>
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '12px', color: '#111827', background: '#FFFFFF', borderRadius: '12px', padding: '16px', overflowX: 'auto', maxHeight: '320px' }}>
-{rawJSON}
-                </pre>
+
+              <div className="text-center h-5">
+                {!stopTimer ? (
+                  <p className="text-xs text-slate-500 font-medium animate-pulse">Auto-redirecting in {countdown}s...</p>
+                ) : (
+                  <p className="text-xs text-amber-600 font-bold">Timer paused for printing.</p>
+                )}
               </div>
-            </>
-          )}
-        </div>
+            </div>
+
+          </div>
+        )}
       </div>
     </div>
   );
