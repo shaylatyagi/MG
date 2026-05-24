@@ -37,7 +37,7 @@ export default function OwnerApp() {
   ];
 
   return (
-    <div style={{ maxWidth: '390px', margin: '0 auto', minHeight: '100vh', backgroundColor: '#FAF7F2', fontFamily: 'Inter, sans-serif', position: 'relative', paddingBottom: '70px' }}>
+    <div style={{ maxWidth: '390px', margin: '0 auto', minHeight: '100vh', maxHeight: '100vh', overflowY: 'auto', backgroundColor: '#FAF7F2', fontFamily: 'Inter, sans-serif', position: 'relative', paddingBottom: '70px' }}>
 
       {/* Top Bar */}
       <div style={{ backgroundColor: '#7D5235', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
