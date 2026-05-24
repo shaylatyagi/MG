@@ -11,7 +11,7 @@ function LandingPage() {
           {/* Admin hata diya, ab Partner link hai */}
           <span 
             onClick={() => navigate('/partner')} 
-            style={{ fontSize: '14px', color: '#8B5E3C', cursor: 'pointer', fontWeight: '600' }}
+            style={{ fontSize: '14px', color: '#6B6B6B', cursor: 'pointer'}}
           >
             Partners
           </span>
