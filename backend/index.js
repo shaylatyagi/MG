@@ -23,7 +23,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/owner', ownerRoutes);
-const adminRoutes = require('./routes/admin');
+const adminRoutes = require('./src/routes/admin');
 app.use('/api/admin', adminRoutes);
 // Check Health
 app.get('/', (req, res) => {
@@ -73,4 +73,11 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Base URL: http://localhost:${PORT}`);
+});
+process.on('uncaughtException', (err) => {
+  console.error('There was an uncaught error', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
