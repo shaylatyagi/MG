@@ -1,55 +1,55 @@
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import api from '../api';
+
 export default function Login() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState('9876542345');
-  const [otp, setOtp] = useState('123456');
+  const [otp, setOtp] = useState('');
   const [role, setRole] = useState('driver');
   const [loading, setLoading] = useState(false);
-  const handleSendOTP = (e) => {
+
+  const handleSendOTP = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setStep(2);
-    }, 600);
-  };
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    
     try {
-      // 1. Backend ko real request bhejo (yahan tera phone aur OTP verify hoga)
-      const res = await api.post('/api/auth/login', { 
-        phone_number: phone, 
-        otp: otp,
-        role: role 
-      });
-
-      // 2. Server se jo 'token' mile, use store karo
-      localStorage.setItem('token', res.data.token); 
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-
-      // 3. Redirect
-      if (role === 'owner') {
-        navigate('/owner/dashboard');
-      } else {
-        navigate('/driver/dashboard');
-      }
+      await api.post('/api/auth/send-otp', { phone_number: phone });
+      setStep(2);
     } catch (err) {
-      alert("Invalid OTP or Server Error!");
+      alert("Failed to send OTP. Please check your network.");
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await api.post('/api/auth/verify-otp', { phone_number: phone, otp });
+      
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      
+      if (res.data.user.role === 'owner') {
+        navigate('/owner/dashboard');
+      } else {
+        navigate('/driver/dashboard');
+      }
+    } catch (err) {
+      alert("Verification failed: Check OTP or Server status.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '20px' }}>      
-      {/* FIXED: Chhota sa centered container card */}
-      <div style={{ background: '#ffffff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: '100%', maxWidth: '360px', border: '1px solid #E6DFD5', boxSizing: 'border-box' }}>        
-        {/* LOGO & TITLE */}
+    <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '20px' }}>
+      <div style={{ background: '#ffffff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: '100%', maxWidth: '360px', border: '1px solid #E6DFD5', boxSizing: 'border-box' }}>
+        
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontWeight: '700', color: '#8B5E3C', margin: '0 0 6px 0', fontSize: '24px' }}>
             ⚡ Mobility Grid
@@ -58,7 +58,7 @@ export default function Login() {
             {step === 1 ? 'Welcome back! Please enter your details.' : 'Enter the 6-digit code sent to your mobile.'}
           </p>
         </div>
-        {/* ROLE TOGGLE */}
+
         {step === 1 && (
           <div style={{ display: 'flex', backgroundColor: '#F3F4F6', padding: '3px', borderRadius: '6px', marginBottom: '20px' }}>
             <button 
@@ -77,7 +77,7 @@ export default function Login() {
             </button>
           </div>
         )}
-        {/* STEP 1: PHONE */}
+
         {step === 1 ? (
           <form onSubmit={handleSendOTP}>
             <div style={{ marginBottom: '16px' }}>
@@ -99,7 +99,6 @@ export default function Login() {
             </button>
           </form>
         ) : (
-          /* STEP 2: OTP */
           <form onSubmit={handleVerifyOTP}>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>One-Time Password (OTP)</label>
@@ -128,7 +127,6 @@ export default function Login() {
             </button>
           </form>
         )}
-
       </div>
     </div>
   );
