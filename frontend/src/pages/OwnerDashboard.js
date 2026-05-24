@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
-import BottomNav from '../../components/BottomNav';
+import BottomNav from '../components/BottomNav';
 import DashView from './views/DashView';
 import DispatchView from './views/DispatchView';
 import DriversView from './views/DriversView';
