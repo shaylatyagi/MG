@@ -7,7 +7,7 @@ import OwnerApp from './pages/OwnerApp';
 import DriverPWA from './pages/DriverPWA';
 import Profile from './pages/Profile';
 import PaymentResult from './pages/PaymentResult';
-import AdminDashboard from './pages/admin/AdminDashboard';
+import CompanyDashboard from './pages/admin/CompanyDashboard';
 import PartnerHub from './pages/PartnerHub';
 
 function App() {
@@ -20,7 +20,7 @@ function App() {
         <Route path="/driver/*" element={<DriverPWA />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/payment-result" element={<PaymentResult />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin" element={<CompanyDashboard />} />
         <Route path="/partner" element={<PartnerHub />} />
       </Routes>
     </Router>
