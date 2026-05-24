@@ -1,16 +1,30 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import api from '../../api';
 
-export default function DriverDashboardTab() {
+export default function DriverDashboardTab({ user }) {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const driverDetails = { wallet_balance: 1250, dues: 1450, battery_level: 92, kms_driven: 45, vehicle_number: 'MH-12-QX-4019' };
 
   const handlePayment = async () => {
     setPaymentLoading(true);
     try {
-      const res = await api.post('/api/payment/create-order', { amount: driverDetails.dues });
-      if (res.data?.data?.checkoutUrl) window.location.href = res.data.data.checkoutUrl;
-    } catch (err) { alert('Gateway connection error'); }
+      const payload = {
+        amount: driverDetails.dues,
+        customerName: user?.name || 'Driver',
+        customerPhone: user?.phone_number || '9999999999',
+        customerEmail: user?.email || 'driver@mobilitygrid.app'
+      };
+      const res = await api.post('/api/payment/create-order', payload);
+      const redirectUrl = res.data?.paymentUrl || res.data?.data?.checkoutUrl || res.data?.data?.url;
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      } else {
+        alert('Unable to open the payment gateway. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Gateway connection error');
+    }
     setPaymentLoading(false);
   };
 
