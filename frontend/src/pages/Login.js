@@ -15,25 +15,34 @@ export default function Login() {
       setStep(2);
     }, 600);
   };
-  const handleVerifyOTP = (e) => {
+  const handleVerifyOTP = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);      
-      // USER NAME CHANGED TO DEMO USER
-      const mockUser = {
-        phone_number: phone,
-        name: "demo user", 
-        role: role
-      };      
-      localStorage.setItem('token', 'mock-uat-token-9876542345');
-      localStorage.setItem('user', JSON.stringify(mockUser));      
+    
+    try {
+      // 1. Backend ko real request bhejo (yahan tera phone aur OTP verify hoga)
+      const res = await api.post('/api/auth/login', { 
+        phone_number: phone, 
+        otp: otp,
+        role: role 
+      });
+
+      // 2. Server se jo 'token' mile, use store karo
+      localStorage.setItem('token', res.data.token); 
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+
+      // 3. Redirect
       if (role === 'owner') {
         navigate('/owner/dashboard');
       } else {
         navigate('/driver/dashboard');
       }
-    }, 600);
+    } catch (err) {
+      alert("Invalid OTP or Server Error!");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '20px' }}>      
