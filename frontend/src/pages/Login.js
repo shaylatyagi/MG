@@ -1,89 +1,204 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Phone, Lock, ArrowRight, User, Building2, Truck, Shield } from 'lucide-react';
 import api from '../api';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
-  const [phone, setPhone] = useState('9876542345');
-  const [otp, setOtp] = useState('123456');
-  const [role, setRole] = useState('owner'); // Default role
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showRoleSelector, setShowRoleSelector] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState([]);
+  const [tempToken, setTempToken] = useState('');
+  const [usercode, setUsercode] = useState('');
 
-  const handleSendOTP = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      await api.post('/api/auth/send-otp', { phone_number: phone });
-      setStep(2);
-    } catch (err) {
-      alert("Failed to send OTP.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    setError('');
 
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    setLoading(true);
     try {
-      const res = await api.post('/api/auth/verify-otp', { phone_number: phone, otp: otp });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
+      const response = await api.post('/auth/login', { identifier, password });
       
-      // Original navigation logic: Role-based redirect
-      if (res.data.user.role === 'owner') {
-        navigate('/owner/dashboard');
+      if (response.data.requireRoleSelection) {
+        setAvailableRoles(response.data.data.availableRoles);
+        setTempToken(response.data.token);
+        setUsercode(response.data.data.usercode);
+        setShowRoleSelector(true);
       } else {
-        navigate('/driver/dashboard');
+        const { token, data } = response.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(data));
+        
+        // Role-based redirect
+        const roleRoutes = {
+          'PLATFORM_ADMIN': '/admin/dashboard',
+          'VEHICLE_OWNER_USER': '/owner/dashboard',
+          'VEHICLE_DRIVER': '/driver/dashboard'
+        };
+        navigate(roleRoutes[data.userType] || '/');
       }
     } catch (err) {
-      alert("Verification failed: Check OTP or Server!");
+      setError(err.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRoleSelect = async (role) => {
+    try {
+      const response = await api.post('/auth/select-role', 
+        { usercode, selectedRole: role },
+        { headers: { Authorization: `Bearer ${tempToken}` } }
+      );
+      
+      localStorage.setItem('token', response.data.token);
+      
+      const roleRoutes = {
+        'PLATFORM_ADMIN': '/admin/dashboard',
+        'VEHICLE_OWNER_USER': '/owner/dashboard',
+        'VEHICLE_DRIVER': '/driver/dashboard'
+      };
+      navigate(roleRoutes[role]);
+      
+    } catch (err) {
+      setError('Role selection failed');
+    }
+  };
+
+  // Role Selection Screen
+  if (showRoleSelector) {
+    const roleIcons = {
+      'PLATFORM_ADMIN': <Shield className="w-6 h-6" />,
+      'VEHICLE_OWNER_USER': <Building2 className="w-6 h-6" />,
+      'VEHICLE_DRIVER': <Truck className="w-6 h-6" />
+    };
+    
+    const roleNames = {
+      'PLATFORM_ADMIN': 'Platform Admin',
+      'VEHICLE_OWNER_USER': 'Vehicle Owner',
+      'VEHICLE_DRIVER': 'Driver'
+    };
+    
+    const roleDescs = {
+      'PLATFORM_ADMIN': 'Manage tenants, users, and platform operations',
+      'VEHICLE_OWNER_USER': 'Manage fleet, vehicles, drivers, and earnings',
+      'VEHICLE_DRIVER': 'Access wallet, payments, and trip management'
+    };
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-[500px] bg-white rounded-3xl shadow-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-center">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <User className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-xl font-bold text-white">Select Your Role</h2>
+            <p className="text-blue-100 text-sm mt-1">
+              Multiple roles found for {identifier.includes('_') ? usercode : identifier}
+            </p>
+          </div>
+          
+          <div className="p-6 space-y-3">
+            {availableRoles.map((role) => (
+              <button
+                key={role}
+                onClick={() => handleRoleSelect(role)}
+                className="w-full bg-slate-50 hover:bg-blue-50 text-slate-800 font-semibold py-4 rounded-xl transition-all text-left px-4 border border-slate-200 hover:border-blue-300 group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    {roleIcons[role]}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800">{roleNames[role]}</span>
+                      <span className="text-blue-600 group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{roleDescs[role]}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Login Form
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '20px' }}>
-      <div style={{ background: '#ffffff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: '100%', maxWidth: '360px', border: '1px solid #E6DFD5', boxSizing: 'border-box' }}>
-        
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontWeight: '700', color: '#8B5E3C', margin: '0 0 6px 0', fontSize: '24px' }}>⚡ Mobility Grid</h2>
-          <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
-            {step === 1 ? 'Welcome back! Please enter your details.' : 'Enter the 6-digit code sent to your mobile.'}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-[400px] bg-white rounded-3xl shadow-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-center">
+          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <User className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">MobilityGrid</h1>
+          <p className="text-blue-100 text-sm mt-1">
+            Login with Usercode or Mobile Number
           </p>
         </div>
 
-        {step === 1 && (
-          <div style={{ display: 'flex', backgroundColor: '#F3F4F6', padding: '3px', borderRadius: '6px', marginBottom: '20px' }}>
-            <button type="button" onClick={() => setRole('driver')} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', backgroundColor: role === 'driver' ? '#8B5E3C' : 'transparent', color: role === 'driver' ? '#ffffff' : '#4B5563', transition: 'all 0.15s' }}>Driver Mode</button>
-            <button type="button" onClick={() => setRole('owner')} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', backgroundColor: role === 'owner' ? '#8B5E3C' : 'transparent', color: role === 'owner' ? '#ffffff' : '#4B5563', transition: 'all 0.15s' }}>Owner Mode</button>
-          </div>
-        )}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium border border-red-200">
+              {error}
+            </div>
+          )}
 
-        {step === 1 ? (
-          <form onSubmit={handleSendOTP}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>Phone Number</label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '15px' }} />
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              Usercode or Mobile Number
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="e.g., OWN_ABC123_5678 or 9876543210"
+                className="w-full pl-9 pr-3 py-3 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-sm"
+                required
+              />
             </div>
-            <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
-              {loading ? 'Sending OTP...' : 'Request OTP'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOTP}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>One-Time Password (OTP)</label>
-              <input type="text" maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '16px', textAlign: 'center' }} />
+            <p className="text-[10px] text-slate-400 mt-1">
+              💡 Tip: Use usercode to login directly to a specific role
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full pl-9 pr-3 py-3 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-sm"
+                required
+              />
             </div>
-            <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
-              {loading ? 'Verifying...' : 'Verify & Log In'}
-            </button>
-            <button type="button" onClick={() => setStep(1)} style={{ width: '100%', background: 'none', border: 'none', color: '#4B5563', fontSize: '12px', marginTop: '12px', cursor: 'pointer', textDecoration: 'underline' }}>Back</button>
-          </form>
-        )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {loading ? 'Logging in...' : 'Login'}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+
+          <p className="text-center text-xs text-slate-500 mt-4">
+            New user? Contact your fleet manager for credentials
+          </p>
+        </form>
       </div>
     </div>
   );
