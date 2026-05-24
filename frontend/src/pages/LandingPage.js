@@ -8,12 +8,12 @@ function LandingPage() {
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 60px', backgroundColor: 'white', borderBottom: '1px solid #E8E0D5', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ fontSize: '18px', fontWeight: '800', color: '#8B5E3C', letterSpacing: '1px' }}>MOBILITY GRID</div>
         <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-          {/* Admin link - Vision ke left me */}
+          {/* Admin hata diya, ab Partner link hai */}
           <span 
-            onClick={() => navigate('/admin')} 
+            onClick={() => navigate('/partner')} 
             style={{ fontSize: '14px', color: '#8B5E3C', cursor: 'pointer', fontWeight: '600' }}
           >
-            Admin
+            Partners
           </span>
           <span style={{ fontSize: '14px', color: '#6B6B6B', cursor: 'pointer' }} onClick={() => document.getElementById('vision').scrollIntoView({ behavior: 'smooth' })}>Vision</span>
           <span style={{ fontSize: '14px', color: '#6B6B6B', cursor: 'pointer' }} onClick={() => document.getElementById('solutions').scrollIntoView({ behavior: 'smooth' })}>Solutions</span>
@@ -23,7 +23,7 @@ function LandingPage() {
       </nav>
       
       {/* Rest of your landing page remains SAME */}
-      {/* Hero */}
+      {/* Hero Section */}
       <div id="vision" style={{ textAlign: 'center', padding: '0 60px', minHeight: 'calc(100vh - 65px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundImage: 'radial-gradient(circle, #E8E0D5 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
         <div style={{ display: 'inline-block', backgroundColor: '#F3EDE5', color: '#8B5E3C', fontSize: '12px', fontWeight: '600', padding: '6px 16px', borderRadius: '20px', marginBottom: '24px', letterSpacing: '0.5px' }}>
           THE FUTURE OF FLEET OPS
