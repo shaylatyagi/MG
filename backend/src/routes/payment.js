@@ -192,7 +192,9 @@ router.post('/create-order', async (req, res) => {
 
       orderNumber,
 
-      paymentUrl: checkoutUrl
+      paymentUrl: checkoutUrl,
+
+      checkoutUrl
 
     });
 
