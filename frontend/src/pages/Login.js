@@ -5,12 +5,10 @@ import api from '../api';
 export default function Login() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [phone, setPhone] = useState('9876542345');
+  const [otp, setOtp] = useState('123456');
+  const [role, setRole] = useState('owner'); // Default role
   const [loading, setLoading] = useState(false);
-  
-  // FIXED: Details hardcoded taaki user ko type na karna pade
-  const phone = '9876542345';
-  const otp = '123456';
-  const [role, setRole] = useState('owner');
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
@@ -32,9 +30,15 @@ export default function Login() {
       const res = await api.post('/api/auth/verify-otp', { phone_number: phone, otp: otp });
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
-      navigate(res.data.user.role === 'owner' ? '/owner/dashboard' : '/driver/dashboard');
+      
+      // Original navigation logic: Role-based redirect
+      if (res.data.user.role === 'owner') {
+        navigate('/owner/dashboard');
+      } else {
+        navigate('/driver/dashboard');
+      }
     } catch (err) {
-      alert("Verification failed!");
+      alert("Verification failed: Check OTP or Server!");
     } finally {
       setLoading(false);
     }
@@ -42,32 +46,42 @@ export default function Login() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#FAF7F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '20px' }}>
-      <div style={{ background: '#ffffff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: '100%', maxWidth: '360px', border: '1px solid #E6DFD5' }}>
+      <div style={{ background: '#ffffff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', width: '100%', maxWidth: '360px', border: '1px solid #E6DFD5', boxSizing: 'border-box' }}>
+        
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontWeight: '700', color: '#8B5E3C', fontSize: '24px' }}>⚡ Mobility Grid</h2>
-          <p style={{ fontSize: '13px', color: '#6B7280' }}>{step === 1 ? 'Click to request OTP' : 'Click to verify automatically'}</p>
+          <h2 style={{ fontWeight: '700', color: '#8B5E3C', margin: '0 0 6px 0', fontSize: '24px' }}>⚡ Mobility Grid</h2>
+          <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
+            {step === 1 ? 'Welcome back! Please enter your details.' : 'Enter the 6-digit code sent to your mobile.'}
+          </p>
         </div>
+
+        {step === 1 && (
+          <div style={{ display: 'flex', backgroundColor: '#F3F4F6', padding: '3px', borderRadius: '6px', marginBottom: '20px' }}>
+            <button type="button" onClick={() => setRole('driver')} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', backgroundColor: role === 'driver' ? '#8B5E3C' : 'transparent', color: role === 'driver' ? '#ffffff' : '#4B5563', transition: 'all 0.15s' }}>Driver Mode</button>
+            <button type="button" onClick={() => setRole('owner')} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '13px', backgroundColor: role === 'owner' ? '#8B5E3C' : 'transparent', color: role === 'owner' ? '#ffffff' : '#4B5563', transition: 'all 0.15s' }}>Owner Mode</button>
+          </div>
+        )}
 
         {step === 1 ? (
           <form onSubmit={handleSendOTP}>
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>Phone Number (Auto-filled)</label>
-              <input disabled value={phone} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #D1D5DB', backgroundColor: '#F9F9F9' }} />
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>Phone Number</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '15px' }} />
             </div>
             <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
-              {loading ? 'Sending...' : 'Request OTP'}
+              {loading ? 'Sending OTP...' : 'Request OTP'}
             </button>
           </form>
         ) : (
           <form onSubmit={handleVerifyOTP}>
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>OTP (Auto-filled)</label>
-              <input disabled value={otp} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #D1D5DB', backgroundColor: '#F9F9F9', textAlign: 'center', fontSize: '16px' }} />
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#8B5E3C', marginBottom: '4px' }}>One-Time Password (OTP)</label>
+              <input type="text" maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '16px', textAlign: 'center' }} />
             </div>
             <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>
               {loading ? 'Verifying...' : 'Verify & Log In'}
             </button>
-            <button type="button" onClick={() => setStep(1)} style={{ width: '100%', background: 'none', border: 'none', color: '#4B5563', marginTop: '12px', cursor: 'pointer', textDecoration: 'underline' }}>Back</button>
+            <button type="button" onClick={() => setStep(1)} style={{ width: '100%', background: 'none', border: 'none', color: '#4B5563', fontSize: '12px', marginTop: '12px', cursor: 'pointer', textDecoration: 'underline' }}>Back</button>
           </form>
         )}
       </div>
