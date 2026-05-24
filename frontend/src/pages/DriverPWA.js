@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import DriverDashboardTab from './DriverDashboardTab';
-import DriverWalletTab from './DriverWalletTab';
-import DriverProfileTab from './DriverProfileTab';
-import DriverKYCTab from './DriverKYCTab';
+import DriverDashboardTab from './driver/DriverDashboardTab';
+import DriverWalletTab from './driver/DriverWalletTab';
+import DriverProfileTab from './driver/DriverProfileTab';
+import DriverKYCTab from './driver/DriverKYCTab';
 
 export default function DriverPWA() {
   const [activeTab, setActiveTab] = useState('home');
