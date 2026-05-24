@@ -30,8 +30,6 @@ function App() {
         <Route path="/owner/compliance" element={<ComplianceVault />} />
         <Route path="/owner/settings" element={<FleetSettings />} />        
 
-        {/* === Driver Routes (New PWA Style) === */}
-        <Route path="/driver" element={<DriverPWA />} />
         <Route path="/driver/*" element={<DriverPWA />} />   {/* Catch all driver routes */}
 
         {/* Shared Routes */}
