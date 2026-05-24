@@ -78,7 +78,7 @@ export default function PaymentResult() {
   const raw = orderData?.raw || {};
   
   const status = local.transaction_status || external.status || external.transactionStatus || statusParam || 'PENDING';
-  const isSuccess = String(status).toUpperCase() === 'SUCCESS';
+  const isSuccess = String(status).trim().toLowerCase() === 'success';
   
   const amount = local.order_amount || external.amount;
   const currency = local.currency || external.currency || 'INR';
