@@ -66,34 +66,14 @@ const getToken = async () => {
 
 // ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
 router.get('/order/:orderId', async (req, res) => {
-  const { orderId } = req.params;
-
-  try {
-    const result = await pool.query(
-      `SELECT * FROM ms_orders 
-       WHERE order_id = $1 OR order_number = $1 
-       LIMIT 1`,
-      [orderId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    const order = result.rows[0];
-
-    res.json({
-      success: true,
-      local: order,
-      pyData: order.payment_response ? JSON.parse(order.payment_response || '{}') : {},
-      status: order.transaction_status,
-      orderData: order
-    });
-
-  } catch (err) {
-    console.error('Order Fetch Error:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch order details' });
-  }
+  const result = await pool.query(
+  `SELECT * FROM ms_orders
+   WHERE order_id = $1
+   OR order_number = $1
+   OR pg_transaction_id = $1
+   LIMIT 1`,
+  [orderId]
+);
 });
 // =============================================================================
 
@@ -143,6 +123,7 @@ router.post('/create-order', async (req, res) => {
     const orderPayload = {
 
       referenceId: orderId,
+      merchantOrderId: orderNumber,
 
       amount: parsedAmount, 
 
@@ -410,7 +391,13 @@ router.post('/webhook', async (req, res) => {
     );
 
 
-    res.json({ success: true });
+    res.json({
+  success: true,
+  localOrderId: orderId,
+  localOrderNumber: orderNumber,
+  payyantraOrderId: orderData?.data?.orderId,
+  checkoutUrl
+});
 
 
   } catch (err) {

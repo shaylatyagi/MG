@@ -13,7 +13,10 @@ export default function PaymentResult() {
   const [error, setError] = useState(null);
 
   const componentRef = useRef();
-  const orderId = searchParams.get('ref') || searchParams.get('orderId');
+  const orderId =
+  localStorage.getItem('latest_order_number') ||
+  searchParams.get('ref') ||
+  searchParams.get('orderId');
   const statusParam = searchParams.get('status');
 
   const goToDashboard = useCallback(() => {
