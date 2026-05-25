@@ -940,5 +940,46 @@ router.post('/sync-all-orders', async (req, res) => {
 
 });
 
+// ====================== GET SINGLE ORDER (Payment Result Page) ======================
+router.get('/order/:orderId', async (req, res) => {
+  const { orderId } = req.params;
+  
+  console.log(`📋 Fetching order details for: ${orderId}`);
 
+  try {
+    const result = await pool.query(
+      `SELECT * FROM ms_orders 
+       WHERE order_id = $1 OR order_number = $1 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [orderId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Order not found',
+        orderId 
+      });
+    }
+
+    const order = result.rows[0];
+
+    res.json({
+      success: true,
+      local: order,
+      pyData: order.payment_response ? JSON.parse(order.payment_response || '{}') : {},
+      status: order.transaction_status,
+      orderData: order
+    });
+
+  } catch (err) {
+    console.error('Get Order Error:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch order details',
+      error: err.message 
+    });
+  }
+});
 module.exports = router;
