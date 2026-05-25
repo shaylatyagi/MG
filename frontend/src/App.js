@@ -15,6 +15,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/driver/dashboard" element={<DriverPWA />} />
         <Route path="/login" element={<Login />} />
         <Route path="/owner/*" element={<OwnerApp />} />
         <Route path="/driver/*" element={<DriverPWA />} />
