@@ -62,7 +62,42 @@ const getToken = async () => {
   }
 
 };
+// ... top pe sab imports ...
 
+// ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
+router.get('/order/:orderId', async (req, res) => {
+  const { orderId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT * FROM ms_orders 
+       WHERE order_id = $1 OR order_number = $1 
+       LIMIT 1`,
+      [orderId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const order = result.rows[0];
+
+    res.json({
+      success: true,
+      local: order,
+      pyData: order.payment_response ? JSON.parse(order.payment_response || '{}') : {},
+      status: order.transaction_status,
+      orderData: order
+    });
+
+  } catch (err) {
+    console.error('Order Fetch Error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch order details' });
+  }
+});
+// =============================================================================
+
+// Baaki sab routes (create-order, webhook, my-transactions, etc.) yahan rahenge...
 
 // CREATE ORDER 
 router.post('/create-order', async (req, res) => {
@@ -940,47 +975,4 @@ router.post('/sync-all-orders', async (req, res) => {
 
 });
 
-// ====================== GET SINGLE ORDER (Payment Result) ======================
-router.get('/order/:orderId', async (req, res) => {
-  const { orderId } = req.params;
-  
-  console.log(`📋 Fetching order: ${orderId}`);
-
-  try {
-    const result = await pool.query(
-      `SELECT * FROM ms_orders 
-       WHERE order_id = $1 OR order_number = $1 
-       ORDER BY order_initiation_date DESC 
-       LIMIT 1`,
-      [orderId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Order not found',
-        orderId 
-      });
-    }
-
-    const order = result.rows[0];
-
-    res.json({
-      success: true,
-      local: order,
-      pyData: order.payment_response ? JSON.parse(order.payment_response || '{}') : {},
-      status: order.transaction_status,
-      orderData: order
-    });
-
-  } catch (err) {
-    console.error('Get Order Error:', err);
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to fetch order details',
-      error: err.message 
-    });
-  }
-});
-// =====================================================================
 module.exports = router;
