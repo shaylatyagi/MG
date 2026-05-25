@@ -940,17 +940,17 @@ router.post('/sync-all-orders', async (req, res) => {
 
 });
 
-// ====================== GET SINGLE ORDER (Payment Result Page) ======================
+// ====================== GET SINGLE ORDER (Payment Result) ======================
 router.get('/order/:orderId', async (req, res) => {
   const { orderId } = req.params;
   
-  console.log(`📋 Fetching order details for: ${orderId}`);
+  console.log(`📋 Fetching order: ${orderId}`);
 
   try {
     const result = await pool.query(
       `SELECT * FROM ms_orders 
        WHERE order_id = $1 OR order_number = $1 
-       ORDER BY created_at DESC 
+       ORDER BY order_initiation_date DESC 
        LIMIT 1`,
       [orderId]
     );
@@ -982,4 +982,5 @@ router.get('/order/:orderId', async (req, res) => {
     });
   }
 });
+// =====================================================================
 module.exports = router;
