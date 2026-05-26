@@ -77,8 +77,8 @@ export default function PaymentResult() {
   }, [loading, stopTimer, countdown, goToDashboard]);
 
   // Status from your order data
-  const dbStatus = orderData?.transaction_status || orderData?.status;
-  const isSuccess = dbStatus === 'SUCCESS';
+  const dbStatus = orderData?.transaction_status || orderData?.status || statusParam;
+  const isSuccess = dbStatus === 'SUCCESS' || dbStatus === 'Successful' || statusParam === 'SUCCESS';
   const amount = orderData?.order_amount || 0;
   const referenceNumber = orderData?.bank_reference_no || orderData?.pg_transaction_id || 'N/A';
 
