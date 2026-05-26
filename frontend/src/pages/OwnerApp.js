@@ -47,72 +47,82 @@ export default function OwnerApp() {
   };
 
   // Fetch data from backend
-  useEffect(() => {
-    const fetchData = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      try {
-        // Fetch vehicles
-        const vehicleRes = await fetch('https://mg-qw5s.onrender.com/api/owner/vehicles', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const vehicleData = await vehicleRes.json();
-        if (Array.isArray(vehicleData)) {
-          setVehicles(vehicleData.map(v => ({
-            id: v.id,
-            plate: v.vehicle_number,
-            model: v.vehicle_age || 'EV Truck',
-            driver: v.driver_name || 'Unassigned',
-            rent: v.daily_rent || 0,
-            status: v.driver_name ? 'Bound & Active' : 'Awaiting Assignment'
-          })));
-        }
-        
-        // Fetch drivers
-        const driverRes = await fetch('https://mg-qw5s.onrender.com/api/owner/drivers/list', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const driverData = await driverRes.json();
-        if (driverData.drivers) {
-          setDrivers(driverData.drivers.map(d => ({
-            id: d.driver_code,
-            name: d.full_name,
-            phone: d.phone_number || 'N/A',
-            license: 'DL-XXXXXX',
-            status: 'Verified & Cleared'
-          })));
-          setAvailableDrivers(driverData.drivers);
-        }
-        
-        // Fetch stats
-        const statsRes = await fetch('https://mg-qw5s.onrender.com/api/owner/stats', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const statsData = await statsRes.json();
-        setStats({
-          totalVehicles: statsData.total_vehicles || vehicles.length,
-          totalDrivers: statsData.total_drivers || drivers.length,
-          totalEarnings: statsData.total_earnings || 1550
-        });
-      } catch (err) {
-        console.error('Fetch error:', err);
-        // Demo data if API fails
-        setVehicles([
-          { id: 1, plate: "MH-12-QX-4019", model: "Tata Ace EV Truck", driver: "Rajesh Kumar", rent: 850, status: "Bound & Active" },
-          { id: 2, plate: "MH-14-EU-8821", model: "Mahindra Treo Zor", driver: "Amit Sharma", rent: 700, status: "Bound & Active" }
-        ]);
-        setDrivers([
-          { id: 1, name: "Rajesh Kumar", phone: "9876543210", license: "DL-142021008892", status: "Verified & Cleared" },
-          { id: 2, name: "Amit Sharma", phone: "9876543211", license: "DL-142021008893", status: "Verified & Cleared" }
-        ]);
-        setAvailableDrivers([
-          { driver_code: 'DRV_DEMO_001', full_name: 'Rajesh Kumar' },
-          { driver_code: 'DRV_DEMO_002', full_name: 'Amit Sharma' }
-        ]);
+  const fetchDashboardData = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      // Fetch vehicles
+      const vehicleRes = await fetch('https://mg-qw5s.onrender.com/api/owner/vehicles', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const vehicleData = await vehicleRes.json();
+      if (Array.isArray(vehicleData)) {
+        setVehicles(vehicleData.map(v => ({
+          id: v.id,
+          plate: v.vehicle_number,
+          model: v.vehicle_age || 'EV Truck',
+          driver: v.driver_name || 'Unassigned',
+          rent: v.daily_rent || 0,
+          status: v.driver_name ? 'Bound & Active' : 'Awaiting Assignment'
+        })));
       }
-    };
-    fetchData();
+      
+      // Fetch drivers
+      const driverRes = await fetch('https://mg-qw5s.onrender.com/api/owner/drivers/list', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const driverData = await driverRes.json();
+      if (driverData.drivers) {
+        setDrivers(driverData.drivers.map(d => ({
+          id: d.driver_code,
+          name: d.full_name,
+          phone: d.phone_number || 'N/A',
+          license: 'DL-XXXXXX',
+          status: 'Verified & Cleared'
+        })));
+        setAvailableDrivers(driverData.drivers);
+      }
+      
+      // Fetch stats
+      const statsRes = await fetch('https://mg-qw5s.onrender.com/api/owner/stats', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const statsData = await statsRes.json();
+      setStats({
+        totalVehicles: statsData.total_vehicles || vehicles.length,
+        totalDrivers: statsData.total_drivers || drivers.length,
+        totalEarnings: statsData.total_earnings || 1550
+      });
+    } catch (err) {
+      console.error('Fetch error:', err);
+      // Demo data if API fails
+      setVehicles([
+        { id: 1, plate: "MH-12-QX-4019", model: "Tata Ace EV Truck", driver: "Rajesh Kumar", rent: 850, status: "Bound & Active" },
+        { id: 2, plate: "MH-14-EU-8821", model: "Mahindra Treo Zor", driver: "Amit Sharma", rent: 700, status: "Bound & Active" }
+      ]);
+      setDrivers([
+        { id: 1, name: "Rajesh Kumar", phone: "9876543210", license: "DL-142021008892", status: "Verified & Cleared" },
+        { id: 2, name: "Amit Sharma", phone: "9876543211", license: "DL-142021008893", status: "Verified & Cleared" }
+      ]);
+      setAvailableDrivers([
+        { driver_code: 'DRV_DEMO_001', full_name: 'Rajesh Kumar' },
+        { driver_code: 'DRV_DEMO_002', full_name: 'Amit Sharma' }
+      ]);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  // MODIFICATION: Polling add kiya hai. Har 10 second mein API check karega ki Driver ne payment kar di kya.
+  // Isse real-time stats update ho jayenge bina Papa ko page refresh kiye.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 10000); // 10 seconds polling
+    return () => clearInterval(interval);
   }, []);
 
   // Update time
