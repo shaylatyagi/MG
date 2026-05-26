@@ -63,7 +63,264 @@ const getToken = async () => {
 
 };
 // ... top pe sab imports ...
+// ====================== ADD TO YOUR EXISTING payment.js ======================
 
+// GET DRIVER WALLET (from vehicle_drivers table - auth schema)
+router.get('/driver/wallet', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.status(400).json({ message: 'Phone number required' });
+    
+    const result = await pool.query(
+      `SELECT COALESCE(vd.wallet_balance, 0) as balance 
+       FROM auth.vehicle_drivers vd
+       JOIN auth.users u ON u.id = vd.user_id
+       WHERE u.mobile_number = $1`,
+      [phone]
+    );
+    
+    res.json({ balance: parseFloat(result.rows[0]?.balance || 0) });
+  } catch (err) {
+    console.error('Wallet fetch error:', err);
+    res.status(500).json({ message: 'Failed to fetch wallet' });
+  }
+});
+
+// GET DRIVER DUES
+router.get('/driver/dues', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.status(400).json({ message: 'Phone number required' });
+    
+    // Get daily rent from assigned vehicle
+    const vehicleResult = await pool.query(
+      `SELECT ov.daily_rent 
+       FROM auth.owner_vehicles ov
+       JOIN auth.users u ON u.id = ov.driver_id
+       WHERE u.mobile_number = $1`,
+      [phone]
+    );
+    
+    const dailyRent = vehicleResult.rows[0]?.daily_rent || 850;
+    
+    // Get total paid today
+    const paidResult = await pool.query(
+      `SELECT COALESCE(SUM(order_amount), 0) as total_paid
+       FROM ms_orders
+       WHERE payer_mobile = $1 
+       AND transaction_status = 'SUCCESS'
+       AND order_completion_date >= CURRENT_DATE`,
+      [phone]
+    );
+    
+    const totalPaid = parseFloat(paidResult.rows[0]?.total_paid || 0);
+    const pendingDues = Math.max(0, dailyRent - totalPaid);
+    
+    res.json({ dues: pendingDues, daily_rent: dailyRent });
+  } catch (err) {
+    console.error('Dues fetch error:', err);
+    res.status(500).json({ message: 'Failed to fetch dues' });
+  }
+});
+
+// GET DRIVER TELEMETRY
+router.get('/driver/telemetry', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.status(400).json({ message: 'Phone number required' });
+    
+    const result = await pool.query(
+      `SELECT 
+        COALESCE(ov.vehicle_number, 'MH-12-QX-4019') as vehicleNumber,
+        COALESCE(vd.wallet_balance, 0) as wallet
+       FROM auth.users u
+       LEFT JOIN auth.owner_vehicles ov ON ov.driver_id = u.id
+       LEFT JOIN auth.vehicle_drivers vd ON vd.user_id = u.id
+       WHERE u.mobile_number = $1`,
+      [phone]
+    );
+    
+    res.json({
+      vehicleNumber: result.rows[0]?.vehiclenumber || 'MH-12-QX-4019',
+      battery: 92,
+      driven: 45,
+      wallet: parseFloat(result.rows[0]?.wallet || 0)
+    });
+  } catch (err) {
+    console.error('Telemetry error:', err);
+    res.json({ vehicleNumber: 'MH-12-QX-4019', battery: 92, driven: 45, wallet: 0 });
+  }
+});
+
+// GET DRIVER NOTIFICATIONS
+router.get('/driver/notifications', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.status(400).json({ message: 'Phone number required' });
+    
+    const result = await pool.query(
+      `SELECT n.* FROM auth.notifications n
+       JOIN auth.users u ON u.id = n.user_id
+       WHERE u.mobile_number = $1 AND n.user_type = 'DRIVER'
+       ORDER BY n.created_at DESC LIMIT 50`,
+      [phone]
+    );
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Notifications error:', err);
+    res.json([]);
+  }
+});
+
+// GET OWNER VEHICLES
+router.get('/owner/vehicles', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+    
+    const result = await pool.query(
+      `SELECT 
+        ov.*,
+        u.mobile_number as driver_phone,
+        vd.full_name as driver_name
+       FROM auth.owner_vehicles ov
+       LEFT JOIN auth.users u ON u.id = ov.driver_id
+       LEFT JOIN auth.vehicle_drivers vd ON vd.user_id = u.id
+       WHERE ov.owner_id = $1
+       ORDER BY ov.created_at DESC`,
+      [ownerId]
+    );
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Owner vehicles error:', err);
+    res.json([]);
+  }
+});
+
+// GET OWNER DRIVERS LIST
+router.get('/owner/drivers/list', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+    
+    const result = await pool.query(
+      `SELECT 
+        vd.user_id as id,
+        vd.full_name,
+        u.mobile_number as phone_number,
+        u.user_code as driver_code,
+        COALESCE(ov.vehicle_number, 'Not Assigned') as assigned_vehicle
+       FROM auth.vehicle_drivers vd
+       JOIN auth.users u ON u.id = vd.user_id
+       LEFT JOIN auth.owner_vehicles ov ON ov.driver_id = u.id
+       WHERE vd.vehicle_owner_company_id = (
+         SELECT cc.id FROM auth.client_companies cc
+         JOIN auth.client_company_users ccu ON ccu.client_company_id = cc.id
+         WHERE ccu.user_id = $1
+       )
+       ORDER BY vd.created_at DESC`,
+      [ownerId]
+    );
+    
+    res.json({ drivers: result.rows });
+  } catch (err) {
+    console.error('Owner drivers error:', err);
+    res.json({ drivers: [] });
+  }
+});
+
+// GET OWNER STATS
+router.get('/owner/stats', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+    
+    const vehiclesResult = await pool.query(
+      'SELECT COUNT(*) as total FROM auth.owner_vehicles WHERE owner_id = $1',
+      [ownerId]
+    );
+    
+    const driversResult = await pool.query(
+      `SELECT COUNT(*) as total FROM auth.vehicle_drivers vd
+       WHERE vd.vehicle_owner_company_id = (
+         SELECT cc.id FROM auth.client_companies cc
+         JOIN auth.client_company_users ccu ON ccu.client_company_id = cc.id
+         WHERE ccu.user_id = $1
+       )`,
+      [ownerId]
+    );
+    
+    const earningsResult = await pool.query(
+      `SELECT COALESCE(SUM(mo.order_amount), 0) as total
+       FROM ms_orders mo
+       WHERE mo.payer_mobile IN (
+         SELECT u.mobile_number FROM auth.users u
+         JOIN auth.vehicle_drivers vd ON vd.user_id = u.id
+         WHERE vd.vehicle_owner_company_id = (
+           SELECT cc.id FROM auth.client_companies cc
+           JOIN auth.client_company_users ccu ON ccu.client_company_id = cc.id
+           WHERE ccu.user_id = $1
+         )
+       )
+       AND mo.transaction_status = 'SUCCESS'
+       AND mo.order_completion_date >= CURRENT_DATE`,
+      [ownerId]
+    );
+    
+    res.json({
+      total_vehicles: parseInt(vehiclesResult.rows[0]?.total || 0),
+      total_drivers: parseInt(driversResult.rows[0]?.total || 0),
+      total_earnings: parseFloat(earningsResult.rows[0]?.total || 0)
+    });
+  } catch (err) {
+    console.error('Owner stats error:', err);
+    res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0 });
+  }
+});
+
+// ADD VEHICLE
+router.post('/owner/vehicles', async (req, res) => {
+  try {
+    const { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id } = req.body;
+    
+    if (!owner_id || !vehicle_number || !vehicle_model || !daily_rent) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+    
+    const existing = await pool.query(
+      'SELECT id FROM auth.owner_vehicles WHERE vehicle_number = $1',
+      [vehicle_number]
+    );
+    
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: 'Vehicle number already exists' });
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO auth.owner_vehicles 
+       (owner_id, vehicle_number, vehicle_model, daily_rent, driver_id, status)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [owner_id, vehicle_number, vehicle_model, daily_rent, driver_id || null, driver_id ? 'ASSIGNED' : 'AVAILABLE']
+    );
+    
+    if (driver_id) {
+      await pool.query(
+        `INSERT INTO auth.notifications (user_id, user_type, title, message)
+         VALUES ($1, 'DRIVER', 'Vehicle Assigned', 
+                 'You have been assigned vehicle ${vehicle_number}')`,
+        [driver_id]
+      );
+    }
+    
+    res.json({ success: true, vehicle: result.rows[0] });
+  } catch (err) {
+    console.error('Add vehicle error:', err);
+    res.status(500).json({ message: 'Failed to add vehicle' });
+  }
+});
 // ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
 router.get('/order/:orderId', async (req, res) => {
 
