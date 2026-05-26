@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Wifi, Battery, Users, Car, Wallet, Plus, CheckCircle,
-  Phone, Home, LogOut, CircleUser, Receipt, ShieldCheck
+  Phone, Home, LogOut, CircleUser, Receipt, ShieldCheck, X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
