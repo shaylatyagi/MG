@@ -1,201 +1,139 @@
-router.post('/create-order', async (req, res) => {
+// ====================== WEBHOOK ======================
+router.post('/webhook', async (req, res) => {
 
-  const { amount, customerName, customerPhone, customerEmail } = req.body;
+  const body = req.body;
 
-  console.log('Create Order Received:', {
-    amount,
-    customerName,
-    customerPhone,
-    customerEmail
-  });
-
-  if (!amount || Number(amount) <= 0 || !customerPhone) {
-
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid amount or phone number'
-    });
-
-  }
-
-  const parsedAmount = Number(amount);
-
-  // LOCAL UUID
-  const orderId = uuidv4();
-
-  // HUMAN READABLE ORDER NUMBER
-  const orderNumber =
-    `ORD-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+  console.log('🔥 Webhook received:', JSON.stringify(body, null, 2));
 
   try {
 
-    // ================= INSERT INTO DB =================
+    const payload = body.data || body;
 
-    const insertResult = await pool.query(
+    const orderId =
+      payload.referenceId ||
+      payload.merchantOrderId ||
+      payload.orderId;
 
-      `INSERT INTO ms_orders
-      (
-        order_id,
-        order_number,
-        order_amount,
-        currency,
-        payer_name,
-        payer_mobile,
-        payer_email,
-        transaction_status
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')
-      RETURNING *`,
+    let rawStatus =
+      payload.transactionStatus ||
+      payload.status;
 
-      [
-        orderId,
-        orderNumber,
-        parsedAmount,
-        'INR',
-        customerName,
-        customerPhone,
-        customerEmail
-      ]
+    let status = rawStatus
+      ? String(rawStatus).toUpperCase()
+      : 'PENDING';
 
+    if (status === 'INITIATED') status = 'PENDING';
+    if (status === 'SUCCESSFUL') status = 'SUCCESS';
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: 'orderId missing'
+      });
+    }
+
+    console.log('🔍 Updating Order:', orderId);
+    console.log('📌 Final Status:', status);
+
+    const localOrder = await pool.query(
+      `SELECT * FROM ms_orders
+       WHERE order_id = $1
+       OR order_number = $1
+       LIMIT 1`,
+      [orderId]
     );
 
-    console.log('✅ ORDER INSERTED IN DB');
+    if (localOrder.rows.length === 0) {
 
-    console.log(insertResult.rows[0]);
+      console.log('❌ Order not found in DB');
 
-    // ================= GET TOKEN =================
-
-    const token = await getToken();
-
-    // ================= PAYLOAD =================
-
-    const orderPayload = {
-
-      referenceId: orderId,
-
-      merchantOrderId: orderNumber,
-
-      amount: parsedAmount,
-
-      currency: 'INR',
-
-      customerName: customerName || 'Driver',
-
-      customerEmail:
-        customerEmail || process.env.DEFAULT_EMAIL,
-
-      customerPhone: customerPhone,
-
-      notifyUrl: process.env.PAYYANTRA_NOTIFY_URL,
-
-      returnUrl: process.env.PAYYANTRA_RETURN_URL,
-
-      allowedPaymentMethods: [
-        'UPI',
-        'CREDIT_CARD',
-        'DEBIT_CARD',
-        'INTERNET_BANKING'
-      ]
-
-    };
-
-    console.log('Sending to PayYantra:', orderPayload);
-
-    // ================= CREATE PAYYANTRA ORDER =================
-
-    const orderRes = await fetch(
-      `${BASE_URL}/api/v2/merchant/orders`,
-      {
-        method: 'POST',
-
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-
-        body: JSON.stringify(orderPayload)
-      }
-    );
-
-    const orderData = await orderRes.json();
-
-    console.log('PayYantra Response:', orderData);
-
-    if (!orderRes.ok) {
-
-      throw new Error(
-        orderData.message ||
-        `PayYantra Error: ${orderRes.status}`
-      );
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
 
     }
 
-    // ================= UPDATE PG TRANSACTION ID =================
+    const paymentMode =
+      payload.paymentMode ||
+      payload.paymentMethod ||
+      payload.payment_mode ||
+      payload.method ||
+      null;
 
-    if (orderData?.data?.transactionId) {
+    // ✅ MAIN UPDATE QUERY
+    await pool.query(
+      `UPDATE ms_orders SET
+        transaction_status = $1,
+        transaction_status_code = $2,
+        pg_transaction_id = COALESCE($3, pg_transaction_id),
+        bank_reference_no = COALESCE($4, bank_reference_no),
+        bank_utr_no = COALESCE($5, bank_utr_no),
+        payment_mode = COALESCE($6, payment_mode),
+        payment_response = $7,
+        order_completion_date = NOW()
+       WHERE order_id = $8
+       OR order_number = $8`,
+      [
+        status,
+        payload.statusCode || null,
+        payload.transactionId || payload.transactionPublicId || null,
+        payload.bankReferenceNo || payload.rrn || null,
+        payload.bankUTRNo || null,
+        paymentMode,
+        JSON.stringify(payload),
+        orderId
+      ]
+    );
+
+    console.log('✅ ORDER UPDATED SUCCESSFULLY');
+
+    // ✅ WALLET UPDATE ONLY ON SUCCESS
+    if (
+      status === 'SUCCESS' &&
+      localOrder.rows[0].transaction_status !== 'SUCCESS'
+    ) {
+
+      const amount = parseFloat(
+        localOrder.rows[0].order_amount || 0
+      );
 
       await pool.query(
-
-        `UPDATE ms_orders
-         SET pg_transaction_id = $1
-         WHERE order_id = $2`,
-
+        `UPDATE driver_details
+         SET
+           wallet_balance = COALESCE(wallet_balance, 0) + $1,
+           amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
+           updated_at = NOW()
+         WHERE user_id = (
+           SELECT id
+           FROM users
+           WHERE phone_number = $2
+           LIMIT 1
+         )`,
         [
-          orderData.data.transactionId,
-          orderId
+          amount,
+          localOrder.rows[0].payer_mobile
         ]
-
       );
 
-    }
-
-    // ================= CHECKOUT URL =================
-
-    const checkoutUrl =
-      orderData?.data?.checkoutUrl ||
-      orderData?.data?.data?.checkoutUrl ||
-      orderData?.checkoutUrl;
-
-    if (!checkoutUrl) {
-
-      throw new Error(
-        'No checkout URL received from PayYantra'
+      console.log(
+        `💰 Wallet Updated +₹${amount}`
       );
-
     }
 
-    // ================= FINAL RESPONSE =================
-
-    res.json({
-
+    return res.json({
       success: true,
-
-      orderId,
-
-      orderNumber,
-
-      checkoutUrl,
-
-      paymentUrl: checkoutUrl,
-
-      data: orderData
-
+      message: 'Webhook processed successfully'
     });
 
   } catch (err) {
 
-    console.error('❌ CREATE ORDER ERROR');
+    console.error('❌ WEBHOOK ERROR:', err);
 
-    console.error(err);
-
-    res.status(500).json({
-
+    return res.status(500).json({
       success: false,
-
-      message: 'Payment initiation failed',
-
+      message: 'Webhook processing failed',
       error: err.message
-
     });
 
   }
