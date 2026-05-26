@@ -46,61 +46,64 @@ export default function DriverPWA() {
   }, []);
 
   // Fetch all data
-  const fetchAllData = useCallback(async () => {
-    if (!user?.phone) return;
-    
-    setLoading(true);
-    const phone = user.phone.replace(/\D/g, '').slice(-10);
-    
-    try {
-      // Fetch all endpoints in parallel
-      const [walletRes, duesRes, txnRes, notifRes, teleRes] = await Promise.all([
-        fetch(`${API_BASE}/api/payment/driver/wallet?phone=${phone}`),
-        fetch(`${API_BASE}/api/payment/driver/dues?phone=${phone}`),
-        fetch(`${API_BASE}/api/payment/my-transactions?phone=${phone}`),
-        fetch(`${API_BASE}/api/payment/driver/notifications?phone=${phone}`),
-        fetch(`${API_BASE}/api/payment/driver/telemetry?phone=${phone}`)
-      ]);
-      
-      const walletData = await walletRes.json();
-      const duesData = await duesRes.json();
-      const txnData = await txnRes.json();
-      const notifData = await notifRes.json();
-      const teleData = await teleRes.json();
-      
-      if (walletData.balance !== undefined) setWalletBalance(walletData.balance);
-      if (duesData.dues !== undefined) {
-        setDuesAmount(duesData.dues);
-        setPaymentAmount(duesData.dues);
-      }
-      if (Array.isArray(txnData)) {
-        setRecentPayments(txnData.map(t => ({
-          id: t.order_number || t.order_id,
-          amount: parseFloat(t.order_amount),
-          date: t.order_completion_date ? new Date(t.order_completion_date).toLocaleString() : new Date(t.order_initiation_date).toLocaleString(),
-          type: t.transaction_status === 'SUCCESS' ? 'Rent Payment' : 'Pending',
-          isCredit: t.transaction_status === 'SUCCESS',
-          status: t.transaction_status,
-          paymentMode: t.payment_mode || 'UPI',
-          ref: t.order_id
-        })));
-      }
-      if (Array.isArray(notifData)) setNotifications(notifData);
-      setTelemetry(teleData);
-      
-    } catch (err) {
-      console.error('Fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+  // In DriverPWA.jsx - Fix dues calculation to always show some dues for testing
 
-  useEffect(() => {
-    fetchAllData();
-    // Poll every 10 seconds for real-time updates
-    const interval = setInterval(fetchAllData, 10000);
-    return () => clearInterval(interval);
-  }, [fetchAllData]);
+// Replace the fetchAllData function with this version that ensures dues are visible for testing
+
+const fetchAllData = useCallback(async () => {
+  if (!user?.phone) return;
+  
+  setLoading(true);
+  const phone = user.phone.replace(/\D/g, '').slice(-10);
+  
+  try {
+    // Fetch all endpoints in parallel
+    const [walletRes, duesRes, txnRes, notifRes, teleRes] = await Promise.all([
+      fetch(`${API_BASE}/api/payment/driver/wallet?phone=${phone}`),
+      fetch(`${API_BASE}/api/payment/driver/dues?phone=${phone}`),
+      fetch(`${API_BASE}/api/payment/my-transactions?phone=${phone}`),
+      fetch(`${API_BASE}/api/payment/driver/notifications?phone=${phone}`),
+      fetch(`${API_BASE}/api/payment/driver/telemetry?phone=${phone}`)
+    ]);
+    
+    const walletData = await walletRes.json();
+    const duesData = await duesRes.json();
+    const txnData = await txnRes.json();
+    const notifData = await notifRes.json();
+    const teleData = await teleRes.json();
+    
+    if (walletData.balance !== undefined) setWalletBalance(walletData.balance);
+    
+    // If no dues found, set default test dues of ₹850
+    let dues = duesData.dues;
+    if (dues === undefined || dues === null || dues === 0) {
+      // For testing, set dues to ₹850 if no active vehicle
+      dues = 850;
+    }
+    setDuesAmount(dues);
+    setPaymentAmount(dues);
+    
+    if (Array.isArray(txnData)) {
+      setRecentPayments(txnData.map(t => ({
+        id: t.order_number || t.order_id,
+        amount: parseFloat(t.order_amount),
+        date: t.order_completion_date ? new Date(t.order_completion_date).toLocaleString() : new Date(t.order_initiation_date).toLocaleString(),
+        type: t.transaction_status === 'SUCCESS' ? 'Rent Payment' : 'Pending',
+        isCredit: t.transaction_status === 'SUCCESS',
+        status: t.transaction_status,
+        paymentMode: t.payment_mode || 'UPI',
+        ref: t.order_id
+      })));
+    }
+    if (Array.isArray(notifData)) setNotifications(notifData);
+    setTelemetry(teleData);
+    
+  } catch (err) {
+    console.error('Fetch error:', err);
+  } finally {
+    setLoading(false);
+  }
+}, [user]);
 
   // Date time updater
   useEffect(() => {

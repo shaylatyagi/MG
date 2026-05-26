@@ -413,18 +413,81 @@ export default function OwnerApp() {
         )}
 
         {/* Add Driver Modal */}
-        {showAddDriver && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-sm p-5">
-              <div className="flex justify-between mb-4"><h3 className="font-bold text-lg">{tx.addDriver}</h3><button onClick={() => setShowAddDriver(false)}><X size={20} /></button></div>
-              <input type="text" placeholder="Driver Name" value={newDriver.name} onChange={(e) => setNewDriver({...newDriver, name: e.target.value})} className="w-full border rounded-xl p-2 mb-3 text-sm" />
-              <input type="tel" placeholder="Phone Number (10 digits)" value={newDriver.phone} onChange={(e) => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g, '').slice(0,10)})} className={`w-full border rounded-xl p-2 mb-3 text-sm ${phoneError ? 'border-red-500' : ''}`} />
-              {phoneError && <p className="text-red-500 text-[10px] -mt-2 mb-2">{phoneError}</p>}
-              <input type="text" placeholder="License Number" value={newDriver.license} onChange={(e) => setNewDriver({...newDriver, license: e.target.value})} className="w-full border rounded-xl p-2 mb-3 text-sm" />
-              <button onClick={handleAddDriver} className="w-full bg-blue-600 text-white py-2 rounded-xl font-semibold">Add Driver</button>
-            </div>
-          </div>
-        )}
+        // In OwnerApp.jsx - Replace the Add Driver Modal section
+
+{/* Add Driver Modal - With proper validation */}
+{showAddDriver && (
+  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+      <div className="flex justify-between mb-4">
+        <h3 className="font-bold text-lg">{tx.addDriver}</h3>
+        <button onClick={() => { setShowAddDriver(false); setPhoneError(''); setNameError(''); setAddDriverLoading(false); }}>
+          <X size={20} />
+        </button>
+      </div>
+      
+      {/* Driver Name Input - with validation */}
+      <input 
+        type="text" 
+        placeholder="Driver Full Name (Letters only)" 
+        value={newDriver.name} 
+        onChange={(e) => {
+          // Allow only letters and spaces
+          const value = e.target.value.replace(/[^A-Za-z\s]/g, '');
+          setNewDriver({...newDriver, name: value});
+          if (value.match(/[0-9]/)) {
+            setNameError('Name cannot contain numbers');
+          } else {
+            setNameError('');
+          }
+        }} 
+        className={`w-full border rounded-xl p-2 mb-3 text-sm ${nameError ? 'border-red-500' : ''}`}
+      />
+      {nameError && <p className="text-red-500 text-[10px] -mt-2 mb-2">{nameError}</p>}
+      
+      {/* Phone Input - only 10 digits */}
+      <input 
+        type="tel" 
+        placeholder="Phone Number (10 digits only)" 
+        value={newDriver.phone} 
+        onChange={(e) => {
+          const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+          setNewDriver({...newDriver, phone: value});
+          if (value.length === 10) {
+            setPhoneError('');
+          } else if (value.length > 0 && value.length !== 10) {
+            setPhoneError('Phone number must be exactly 10 digits');
+          } else {
+            setPhoneError('');
+          }
+        }} 
+        className={`w-full border rounded-xl p-2 mb-3 text-sm ${phoneError ? 'border-red-500' : ''}`}
+      />
+      {phoneError && <p className="text-red-500 text-[10px] -mt-2 mb-2">{phoneError}</p>}
+      
+      {/* License Number Input */}
+      <input 
+        type="text" 
+        placeholder="License Number" 
+        value={newDriver.license} 
+        onChange={(e) => setNewDriver({...newDriver, license: e.target.value})} 
+        className="w-full border rounded-xl p-2 mb-3 text-sm"
+      />
+      
+      <button 
+        onClick={handleAddDriver} 
+        disabled={addDriverLoading || !newDriver.name || !newDriver.phone || newDriver.phone.length !== 10 || nameError}
+        className={`w-full py-2 rounded-xl font-semibold transition-all ${
+          !addDriverLoading && newDriver.name && newDriver.phone.length === 10 && !nameError
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+        }`}
+      >
+        {addDriverLoading ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Add Driver'}
+      </button>
+    </div>
+  </div>
+)}
 
         {/* Chatbot Modal */}
         {showChatbot && (
