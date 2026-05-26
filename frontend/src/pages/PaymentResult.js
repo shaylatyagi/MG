@@ -14,9 +14,8 @@ export default function PaymentResult() {
 
   const componentRef = useRef();
   const orderId =
-  localStorage.getItem('latest_order_number') ||
-  searchParams.get('ref') ||
-  searchParams.get('orderId');
+  searchParams.get('orderId') ||
+  searchParams.get('ref');
   const statusParam = searchParams.get('status');
 
   const goToDashboard = useCallback(() => {

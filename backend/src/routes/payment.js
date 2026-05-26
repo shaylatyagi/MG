@@ -66,14 +66,46 @@ const getToken = async () => {
 
 // ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
 router.get('/order/:orderId', async (req, res) => {
-  const result = await pool.query(
-  `SELECT * FROM ms_orders
-   WHERE order_id = $1
-   OR order_number = $1
-   OR pg_transaction_id = $1
-   LIMIT 1`,
-  [orderId]
-);
+
+  try {
+
+    const { orderId } = req.params;
+
+    console.log('Fetching order:', orderId);
+
+    const result = await pool.query(
+      `SELECT * FROM ms_orders
+       WHERE order_number = $1
+       OR order_id = $1
+       OR pg_transaction_id = $1
+       LIMIT 1`,
+      [orderId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      order: result.rows[0]
+    });
+
+  } catch (err) {
+
+    console.error('Order fetch error:', err);
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: err.message
+    });
+
+  }
+
 });
 // =============================================================================
 
