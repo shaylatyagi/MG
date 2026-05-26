@@ -481,46 +481,41 @@ router.post('/owner/vehicles', async (req, res) => {
   }
 });
 // ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
+// backend/src/routes/payment.js me replace kar
 router.get('/order/:orderId', async (req, res) => {
-
   try {
-
     const { orderId } = req.params;
-
-    console.log('Fetching order:', orderId);
-
-    const result = await pool.query(
-      `SELECT * FROM ms_orders
-       WHERE order_id = $1
-       OR order_number = $1
-       OR pg_transaction_id = $1
-       LIMIT 1`,
-      [orderId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found'
-      });
+    const { status } = req.query; // Frontend se PayYantra ka status aayega
+    
+    // 1. Agar payment successful hui hai, toh pehle apne DB ko UPDATE karo
+    if (status === 'Success' || status === 'SUCCESS') {
+      await pool.query(
+        `UPDATE ms_orders 
+         SET transaction_status = 'SUCCESS', status = 'SUCCESS', order_completion_date = NOW() 
+         WHERE order_id = $1 OR order_number = $1 OR pg_transaction_id = $1`, 
+        [orderId]
+      );
     }
 
-    res.json({
-      success: true,
-      order: result.rows[0]
-    });
-
+    // 2. Ab updated record ko Database se READ karo
+    // Note: Hum multiple columns check kar rahe hain taaki column name ki wajah se 404 na aaye
+    const order = await pool.query(
+      `SELECT * FROM ms_orders 
+       WHERE order_id = $1 OR order_number = $1 OR pg_transaction_id = $1`, 
+      [orderId]
+    );
+    
+    // Agar DB me order sach me nahi mila, toh hi 404 bhejenge
+    if (order.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order strictly not found in ms_orders' });
+    }
+    
+    // 100% Real DB data return karo
+    res.json({ success: true, data: order.rows[0] });
   } catch (err) {
-
-    console.error('Order fetch error:', err);
-
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch order'
-    });
-
+    console.error('DB Fetch/Update Error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
-
 });
 // =============================================================================
 

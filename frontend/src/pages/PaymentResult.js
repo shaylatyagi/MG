@@ -43,7 +43,7 @@ export default function PaymentResult() {
       }
       
       try {
-        const res = await fetch(`https://mg-qw5s.onrender.com/api/payment/order/${orderId}`);
+        const res = await fetch(`https://mg-qw5s.onrender.com/api/payment/order/${orderId}?status=${statusParam}`);
         const data = await res.json(); // Correctly parsed JSON
         
         console.log('📦 Real DB Order API Response:', data);
