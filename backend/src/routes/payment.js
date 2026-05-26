@@ -337,7 +337,10 @@ router.post('/webhook', async (req, res) => {
 
     const payload = body.data || body;     
 
-    const orderId = payload.referenceId || payload.orderId;
+    const orderId =
+  payload.referenceId ||
+  payload.merchantOrderId ||
+  payload.orderId;
 
     let rawStatus = payload.transactionStatus || payload.status;    
 
@@ -353,7 +356,7 @@ router.post('/webhook', async (req, res) => {
     if (!orderId) return res.status(400).json({ message: 'orderId missing' });
 
 
-    const localOrder = await pool.query('SELECT * FROM ms_orders WHERE order_id = $1', [orderId]);
+    const localOrder = await pool.query('SELECT * FROM ms_orders WHERE order_id = $1 OR order_number = $1 LIMIT 1', [orderId]);
 
 
     if (localOrder.rows.length === 0) {
@@ -796,7 +799,7 @@ router.get('/inquiry-by-order/:payyantraOrderId', async (req, res) => {
 
     const localOrderResult = await pool.query(
 
-      'SELECT * FROM ms_orders WHERE order_id = $1', 
+      'SELECT * FROM ms_orders WHERE order_id = $1 OR order_number = $1', 
 
       [localOrderId]
 
