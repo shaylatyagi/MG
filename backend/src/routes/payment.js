@@ -488,19 +488,18 @@ router.get('/order/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
     
-    // SIRF READ KARENGE: Webhook ne already DB update kar diya hai!
-    // BINGO FIX: 'order_number' use kar rahe hain
+    // SMART QUERY: Ab ye order_number aur pg_transaction_id dono mein dhoondhega
     const order = await pool.query(
-      `SELECT * FROM ms_orders WHERE order_number = $1`, 
+      `SELECT * FROM ms_orders WHERE order_number = $1 OR pg_transaction_id = $1`, 
       [orderId]
     );
     
-    // Agar DB me order sach me nahi mila
+    // Agar sach me DB me nahi hai, toh gracefully 404
     if (order.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Order strictly not found in ms_orders' });
     }
     
-    // 100% Real DB data return karo
+    // Real DB data return karo
     res.json({ success: true, data: order.rows[0] });
   } catch (err) {
     console.error('DB Fetch Error:', err.message);
