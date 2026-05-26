@@ -1033,148 +1033,28 @@ router.post('/check-pending', async (req, res) => {
 
 
 // SINGLE ORDER STATUS (Frontend ke liye)
-router.get('/status/:orderId', async (req, res) => {
-
-  const { orderId } = req.params;
-
-  console.log('Status check requested for:', orderId);
-
-
+router.get('/order/:orderId', async (req, res) => {
   try {
-
-    const localResult = await pool.query(
-
-      'SELECT * FROM ms_orders WHERE order_id = $1 OR order_number = $1',
-
-      [orderId]
-
-    );
-
-
-    if (localResult.rows.length === 0) {
-
-      return res.status(404).json({ 
-
-        message: 'Order not found in local DB',
-
-        orderId 
-
-      });
-
-    }
-
-
-    const token = await getToken();
-
-    const localOrder = localResult.rows[0];
-
-const statusRes = await fetch(
-  `${BASE_URL}/api/pay/status/by-reference/${localOrder.order_id}`,
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  }
-);
-
-
-    const rawData = await statusRes.json();
-    console.log('🔥 PURE INQUIRY RESPONSE:', JSON.stringify(rawData, null, 2));
-    const pyData = rawData.data || {};     
-
-
-    // STATUS MAPPER
-    let rawStatus = pyData.status || pyData.transactionStatus || localResult.rows[0].transaction_status;
-
-    let newStatus = rawStatus ? String(rawStatus).toUpperCase() : 'PENDING';    
-
-    if (newStatus === 'INITIATED') newStatus = 'PENDING';
-
-    if (newStatus === 'SUCCESSFUL') newStatus = 'SUCCESS';
-
-
-    const amount = parseFloat(localResult.rows[0].order_amount);
-
+    // Frontend se 'ORD-xxx' aayega
+    const { orderId } = req.params;
     
-
-    // Update local DB if status changed
-    if (newStatus && newStatus !== localResult.rows[0].transaction_status) {      
-
-      if (newStatus === 'SUCCESS') {
-
-        await pool.query(
-
-          `UPDATE driver_details 
-           SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
-               amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
-               updated_at = NOW()
-           WHERE user_id = (SELECT id FROM users WHERE phone_number = $2 LIMIT 1)`,
-
-          [amount, localResult.rows[0].payer_mobile]
-
-        );
-
-      }
-
-
-      const paymentMode = pyData.paymentMode || pyData.paymentMethod || pyData.payment_mode || pyData.method || null;
-
-
-      await pool.query(
-
-        `UPDATE ms_orders SET 
-          transaction_status = $1,
-          pg_transaction_id = COALESCE($2, pg_transaction_id),
-          bank_reference_no = COALESCE($3, bank_reference_no),
-          bank_utr_no = COALESCE($4, bank_utr_no),
-          payment_mode = COALESCE($5, payment_mode),
-          order_completion_date = NOW()
-         WHERE order_id = $6`,
-
-        [
-
-          newStatus,
-
-          pyData.transactionPublicId || pyData.transactionId || null,
-
-          pyData.rrn || pyData.bankReferenceNo || null,
-
-          pyData.bankUTRNo || null,
-
-          paymentMode,
-
-          orderId
-
-        ]
-
-      );
-
+    // BINGO FIX: Yahan 'order_number' column use karna hai, 'order_id' nahi!
+    const order = await pool.query(
+      `SELECT * FROM ms_orders WHERE order_number = $1`, 
+      [orderId]
+    );
+    
+    // Agar Webhook slow hai ya DB me record nahi hai
+    if (order.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order strictly not found in ms_orders' });
     }
-
-
-    res.json({
-
-      success: true,
-
-      status: newStatus,
-
-      amount: amount, 
-
-      orderId: orderId,
-
-      pyData: pyData
-
-    });
-
-
+    
+    // Frontend ko 100% Real DB Data bhej do
+    res.json({ success: true, data: order.rows[0] });
   } catch (err) {
-
-    console.error('Status check error:', err.message);
-
-    res.status(500).json({ message: 'Status check failed', error: err.message });
-
+    console.error('DB Fetch Error:', err.message);
+    res.status(500).json({ success: false, message: `DB Crash: ${err.message}` });
   }
-
 });
 
 
