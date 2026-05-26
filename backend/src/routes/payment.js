@@ -482,30 +482,20 @@ router.post('/owner/vehicles', async (req, res) => {
 });
 // ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
 // backend/src/routes/payment.js me replace kar
+// ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
+// backend/src/routes/payment.js me replace kar
 router.get('/order/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { status } = req.query; // Frontend se PayYantra ka status aayega
     
-    // 1. Agar payment successful hui hai, toh pehle apne DB ko UPDATE karo
-    if (status === 'Success' || status === 'SUCCESS') {
-      await pool.query(
-        `UPDATE ms_orders 
-         SET transaction_status = 'SUCCESS', status = 'SUCCESS', order_completion_date = NOW() 
-         WHERE order_id = $1 OR order_number = $1 OR pg_transaction_id = $1`, 
-        [orderId]
-      );
-    }
-
-    // 2. Ab updated record ko Database se READ karo
-    // Note: Hum multiple columns check kar rahe hain taaki column name ki wajah se 404 na aaye
+    // SIRF READ KARENGE: Webhook ne already DB update kar diya hai!
+    // BINGO FIX: 'order_number' use kar rahe hain
     const order = await pool.query(
-      `SELECT * FROM ms_orders 
-       WHERE order_id = $1 OR order_number = $1 OR pg_transaction_id = $1`, 
+      `SELECT * FROM ms_orders WHERE order_number = $1`, 
       [orderId]
     );
     
-    // Agar DB me order sach me nahi mila, toh hi 404 bhejenge
+    // Agar DB me order sach me nahi mila
     if (order.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Order strictly not found in ms_orders' });
     }
@@ -513,10 +503,11 @@ router.get('/order/:orderId', async (req, res) => {
     // 100% Real DB data return karo
     res.json({ success: true, data: order.rows[0] });
   } catch (err) {
-    console.error('DB Fetch/Update Error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('DB Fetch Error:', err.message);
+    res.status(500).json({ success: false, message: `DB Crash: ${err.message}` });
   }
 });
+// =============================================================================
 // =============================================================================
 
 // Baaki sab routes (create-order, webhook, my-transactions, etc.) yahan rahenge...
