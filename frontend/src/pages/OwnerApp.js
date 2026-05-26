@@ -5,8 +5,9 @@ import {
   Bell, Search, MessageCircle, X, Send, Home, User,
   TrendingUp, Shield, Award, Clock, CheckCircle, 
   UserPlus, FileText, Copy, Activity, Building2, 
-  MapPin, Scroll, Fingerprint, FileCheck2, Eye
+  MapPin, Scroll, Fingerprint, FileCheck2, Eye,Loader2
 } from 'lucide-react';
+
 
 export default function OwnerApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -21,6 +22,9 @@ export default function OwnerApp() {
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [showAddDriver, setShowAddDriver] = useState(false);
   const [phoneError, setPhoneError] = useState('');
+  // Inside OwnerApp component, after other useState declarations
+const [nameError, setNameError] = useState('');
+const [addDriverLoading, setAddDriverLoading] = useState(false);
   
   // Form states
   const [newVehicle, setNewVehicle] = useState({ model: '', plate: '', rent: '' });
