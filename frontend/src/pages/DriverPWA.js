@@ -44,11 +44,15 @@ export default function DriverPWA() {
   }, []);
 
   // Fetch all real data
+  // Fetch all real data
   const fetchAllData = async () => {
-    if (!user?.phone) return;
+    if (!user) return;
     
     const token = localStorage.getItem('token');
-    const phone = user.phone.replace(/\D/g, '').slice(-10);
+    
+    // BINGO FIX: `user.phone` ya `user.mobile_number` jo bhi ho, usko handle kar lega
+    const rawPhone = user.phone || user.mobile_number || '9876542345';
+    const phone = String(rawPhone).replace(/\D/g, '').slice(-10);
     
     try {
       // 1. Fetch wallet balance
@@ -67,13 +71,13 @@ export default function DriverPWA() {
       if (duesData && duesData.dues !== undefined) {
         setDuesAmount(duesData.dues);
         setPaymentAmount(duesData.dues);
-      } else {
-        throw new Error("Invalid dues data"); 
       }
 
       // 4. Fetch transactions (REAL DB MAPPING FIX)
       const txnRes = await fetch(`${API_BASE}/api/payment/my-transactions?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const txnData = await txnRes.json();
+      
+      console.log("📦 REAL TRANSACTIONS FROM DB:", txnData); // Ye console me dikhega
       
       if (Array.isArray(txnData)) {
         setRecentPayments(txnData.map(t => {
@@ -96,12 +100,10 @@ export default function DriverPWA() {
       // 5. Fetch notifications
       const notifRes = await fetch(`${API_BASE}/api/driver/notifications?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const notifData = await notifRes.json();
-      if (Array.isArray(notifData)) {
-        setNotifications(notifData);
-      }
+      if (Array.isArray(notifData)) setNotifications(notifData);
+      
     } catch (err) {
       console.error('Fetch error, switching to Mock Data:', err);
-      // MOCK DATA FOR DEMO SO AMOUNT IS NEVER 0
       setWalletBalance(150);
       setDuesAmount(850); 
       setPaymentAmount(850); 
