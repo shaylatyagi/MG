@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Wifi, Battery, Truck, Wallet, CreditCard, Clock, CheckCircle,
   Phone, Eye, EyeOff, Copy, X, Send, Bell, Search, MessageCircle,
-  Home, LogOut, CircleUser, History, Receipt, ExternalLink
+  Home, LogOut, CircleUser, History, Receipt, ExternalLink, User
 } from 'lucide-react';
 
 export default function DriverPWA() {
