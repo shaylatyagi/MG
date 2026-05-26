@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print';
-import api from '../api';
 
 export default function PaymentResult() {
   const [searchParams] = useSearchParams();
@@ -16,14 +15,15 @@ export default function PaymentResult() {
   
   // Get params from URL
   const orderId = searchParams.get('orderId') || searchParams.get('ref');
-  const statusParam = searchParams.get('status');
+  const statusParam = searchParams.get('status'); // Sirf display ke liye rakh rahe hain
 
   const goToDashboard = useCallback(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.userType === 'VEHICLE_OWNER_USER') {
       navigate('/owner/dashboard');
     } else {
-      navigate('/driver/dashboard');
+      // Refresh flag ke sath bhej rahe hain taaki recent transactions update ho jaye
+      navigate('/driver/dashboard?refresh=true');
     }
   }, [navigate]);
 
@@ -33,7 +33,7 @@ export default function PaymentResult() {
     onBeforeGetContent: () => setStopTimer(true),
   });
 
-  // Fetch order details using your /order/:orderId endpoint
+  // Fetch order details from msorders table via backend
   useEffect(() => {
     const fetchOrder = async () => {
       if (!orderId) {
@@ -43,19 +43,21 @@ export default function PaymentResult() {
       }
       
       try {
-        // Your API returns: { success: true, order: {...} }
         const res = await fetch(`https://mg-qw5s.onrender.com/api/payment/order/${orderId}`);
-        const data = await res.json();
-        console.log('📦 Order API Response:', res.data);
+        const data = await res.json(); // Correctly parsed JSON
         
-        if (res.data.success && res.data.order) {
-          setOrderData(res.data.order);
+        console.log('📦 Real DB Order API Response:', data);
+        
+        // FIX: Used 'data' instead of 'res.data'
+        // Aur backend (jo humne last step me banaya) 'data' key ke andar row bhejta hai
+        if (data.success && data.data) {
+          setOrderData(data.data);
         } else {
-          setError('Order not found');
+          setError('Order not found in records');
         }
       } catch (err) {
         console.error('Fetch error:', err);
-        setError('Failed to fetch payment details');
+        setError('Failed to fetch payment details from server');
       } finally {
         setLoading(false);
       }
@@ -66,7 +68,7 @@ export default function PaymentResult() {
 
   // Auto redirect timer
   useEffect(() => {
-    if (loading || stopTimer) return;
+    if (loading || stopTimer || error) return; // Error pe auto-redirect nahi karenge
     const timer = setTimeout(goToDashboard, countdown * 1000);
     const interval = setInterval(() => {
       setCountdown(prev => prev > 0 ? prev - 1 : 0);
@@ -75,13 +77,16 @@ export default function PaymentResult() {
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [loading, stopTimer, countdown, goToDashboard]);
+  }, [loading, stopTimer, countdown, error, goToDashboard]);
 
-  // Status from your order data
-  const dbStatus = orderData?.transaction_status || orderData?.status || statusParam;
-  const isSuccess = dbStatus === 'SUCCESS' || dbStatus === 'Successful' || statusParam === 'SUCCESS';
-  const amount = orderData?.order_amount || 0;
-  const referenceNumber = orderData?.bank_reference_no || orderData?.pg_transaction_id || 'N/A';
+  // STRICT DB CHECK: Fake verification hata di gayi hai
+  const dbStatus = orderData?.transaction_status || orderData?.status;
+  const isSuccess = dbStatus === 'SUCCESS' || dbStatus === 'Success';
+  
+  // Real DB amounts and refs
+  const amount = orderData?.order_amount || orderData?.amount || 0;
+  const referenceNumber = orderData?.bank_reference_no || orderData?.pg_transaction_id || orderId || 'N/A';
+  const displayStatus = dbStatus || statusParam || 'PENDING'; // Fallback text if DB is slow
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
@@ -89,7 +94,7 @@ export default function PaymentResult() {
         {loading ? (
           <div className="bg-white rounded-3xl p-8 shadow-sm text-center">
             <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-sm font-bold text-slate-500 tracking-widest">VERIFYING PAYMENT...</p>
+            <p className="text-sm font-bold text-slate-500 tracking-widest">VERIFYING WITH DATABASE...</p>
           </div>
         ) : error ? (
           <div className="bg-white rounded-3xl p-6 shadow-sm text-center">
@@ -120,7 +125,9 @@ export default function PaymentResult() {
             <h1 className={`text-2xl font-black text-center mb-1 ${isSuccess ? 'text-emerald-600' : 'text-red-600'}`}>
               {isSuccess ? 'Payment Successful!' : 'Payment Failed'}
             </h1>
-            <p className="text-center text-sm font-medium text-slate-500 mb-6">{dbStatus || statusParam || 'PENDING'}</p>
+            <p className="text-center text-sm font-medium text-slate-500 mb-6 uppercase">
+              {displayStatus}
+            </p>
 
             <div className="bg-slate-50 rounded-2xl p-5 mb-6 space-y-3 text-sm">
               <div className="flex justify-between">
@@ -137,16 +144,22 @@ export default function PaymentResult() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Date</span>
-                <span className="font-mono">{new Date().toLocaleString()}</span>
+                <span className="font-mono">
+                  {orderData?.order_completion_date 
+                    ? new Date(orderData.order_completion_date).toLocaleString() 
+                    : new Date().toLocaleString()}
+                </span>
               </div>
             </div>
 
             <div className="flex gap-3">
-              <button onClick={handlePrint} className="flex-1 bg-blue-50 text-blue-700 font-bold py-4 rounded-2xl text-sm hover:bg-blue-100 transition">
-                PRINT RECEIPT
-              </button>
-              <button onClick={goToDashboard} className="flex-[2] bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-2xl text-sm transition">
-                BACK TO DASHBOARD
+              {isSuccess && (
+                <button onClick={handlePrint} className="flex-1 bg-blue-50 text-blue-700 font-bold py-4 rounded-2xl text-xs hover:bg-blue-100 transition">
+                  PRINT RECEIPT
+                </button>
+              )}
+              <button onClick={goToDashboard} className="flex-[2] bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-2xl text-xs transition">
+                DASHBOARD ({countdown}s)
               </button>
             </div>
 
