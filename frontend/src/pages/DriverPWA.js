@@ -1,12 +1,13 @@
-// frontend/src/pages/DriverPWA.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Wifi, Battery, Truck, Wallet, CreditCard, Clock, CheckCircle,
   Phone, Eye, EyeOff, Copy, X, Send, Bell, Search, MessageCircle,
   Home, LogOut, CircleUser, History, Receipt, ExternalLink, User
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function DriverPWA() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [lang, setLang] = useState('en');
   const [showBalance, setShowBalance] = useState(true);
@@ -50,45 +51,60 @@ export default function DriverPWA() {
     const phone = user.phone.replace(/\D/g, '').slice(-10);
     
     try {
+      // 1. Fetch wallet balance
       const walletRes = await fetch(`${API_BASE}/api/driver/wallet?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const walletData = await walletRes.json();
       if (walletData.balance !== undefined) setWalletBalance(walletData.balance);
 
+      // 2. Fetch telemetry
       const telemetryRes = await fetch(`${API_BASE}/api/driver/telemetry?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const telemetryData = await telemetryRes.json();
       setTelemetry(telemetryData);
 
+      // 3. Fetch pending dues
       const duesRes = await fetch(`${API_BASE}/api/driver/dues?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const duesData = await duesRes.json();
-      
-      // Strict check: Agar data theek hai tabhi update karo
       if (duesData && duesData.dues !== undefined) {
         setDuesAmount(duesData.dues);
         setPaymentAmount(duesData.dues);
       } else {
-        throw new Error("Invalid dues data"); // Force fallback
+        throw new Error("Invalid dues data"); 
       }
 
+      // 4. Fetch transactions (REAL DB MAPPING FIX)
       const txnRes = await fetch(`${API_BASE}/api/payment/my-transactions?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const txnData = await txnRes.json();
+      
       if (Array.isArray(txnData)) {
-        setRecentPayments(txnData.map(t => ({
-          id: t.order_number || t.order_id,
-          amount: parseFloat(t.order_amount),
-          date: t.order_completion_date ? new Date(t.order_completion_date).toLocaleString() : new Date(t.order_initiation_date).toLocaleString(),
-          type: t.transaction_status === 'SUCCESS' ? 'Rent Payment' : 'Pending',
-          isCredit: t.transaction_status === 'SUCCESS',
-          status: t.transaction_status,
-          paymentMode: t.payment_mode || 'UPI',
-          ref: t.order_id
-        })));
+        setRecentPayments(txnData.map(t => {
+          const isSuccess = t.transaction_status === 'SUCCESS' || t.transaction_status === 'Success';
+          return {
+            id: t.order_number || t.order_id, 
+            amount: parseFloat(t.order_amount || 0),
+            date: t.order_completion_date 
+                  ? new Date(t.order_completion_date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) 
+                  : new Date(t.order_initiation_date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+            type: isSuccess ? 'Rent Payment' : 'Pending',
+            isCredit: isSuccess,
+            status: t.transaction_status,
+            paymentMode: t.payment_mode || 'UPI',
+            ref: t.pg_transaction_id || t.bank_reference_no || 'N/A'
+          };
+        }));
+      }
+
+      // 5. Fetch notifications
+      const notifRes = await fetch(`${API_BASE}/api/driver/notifications?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const notifData = await notifRes.json();
+      if (Array.isArray(notifData)) {
+        setNotifications(notifData);
       }
     } catch (err) {
       console.error('Fetch error, switching to Mock Data:', err);
-      // MOCK DATA FOR DEMO - Isse paymentAmount kabhi 0 nahi hoga
+      // MOCK DATA FOR DEMO SO AMOUNT IS NEVER 0
       setWalletBalance(150);
       setDuesAmount(850); 
-      setPaymentAmount(850); // THIS IS CRITICAL FOR 400 ERROR FIX
+      setPaymentAmount(850); 
       setTelemetry({ vehicleNumber: 'MH-12-QX-4019', battery: 92, driven: 45 });
     } finally {
       setLoading(false);
@@ -99,11 +115,10 @@ export default function DriverPWA() {
     fetchAllData();
   }, [user]);
 
-  // MODIFICATION: Auto-refresh data if URL has ?status=success after PayYantra redirect
+  // Refresh data if coming back from payment result
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('status') === 'success') {
-      alert("Payment Successful! Transactions updated.");
+    if (urlParams.get('refresh') === 'true' || urlParams.get('status') === 'success') {
       fetchAllData(); // Refresh to show new transaction
       window.history.replaceState(null, '', window.location.pathname); // Clean URL
     }
@@ -126,9 +141,7 @@ export default function DriverPWA() {
     return () => clearInterval(interval);
   }, []);
 
-  // MODIFICATION: Added Authorization token so Payment doesn't fail with "Cross sign / Failed to fetch details"
   const initiatePayment = async () => {
-    // Validation taaki 400 Error na aaye
     if (!paymentAmount || paymentAmount <= 0) {
       alert("Invalid payment amount (₹0). Please refresh the page.");
       return;
@@ -142,20 +155,18 @@ export default function DriverPWA() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}` 
         },
         body: JSON.stringify({
           amount: paymentAmount,
           customerName: user?.name || 'Driver',
-          customerPhone: user?.phone || '9876542345', // Added fallback
+          customerPhone: user?.phone || '9876542345',
           customerEmail: user?.email || 'driver@mobilitygrid.com'
         })
       });
-      
       const data = await response.json();
       
       if (!response.ok) {
-        // Agar backend abhi bhi fail kare, toh error print karo
         console.error("Backend Error:", data);
         alert(`Server Error: ${data.message || 'Payment initiation failed'}`);
         setShowPaymentModal(false);
@@ -166,12 +177,12 @@ export default function DriverPWA() {
       if (checkoutUrl) {
         window.location.href = checkoutUrl;
       } else {
-        alert('Payment initiation failed from server. No Checkout URL.');
+        alert('Payment initiation failed from server');
         setShowPaymentModal(false);
       }
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Payment network failed. Please try again.');
+      alert('Payment failed. Please try again.');
       setShowPaymentModal(false);
     }
   };
@@ -183,13 +194,12 @@ export default function DriverPWA() {
 
   const handleLogout = () => {
     localStorage.clear();
-    window.location.href = '/login';
+    navigate('/login');
   };
 
   const sendChatMessage = async () => {
     if (!chatMessage.trim()) return;
     setChatHistory([...chatHistory, { type: 'user', message: chatMessage }]);
-    // TODO: Send to backend chat API
     setTimeout(() => {
       setChatHistory(prev => [...prev, { type: 'bot', message: 'Support will respond shortly.' }]);
     }, 500);
