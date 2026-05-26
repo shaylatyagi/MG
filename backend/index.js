@@ -22,6 +22,7 @@ const ownerRoutes = require('./src/routes/owner');
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/payment', paymentRoutes); 
 app.use('/api/owner', ownerRoutes);
 const adminRoutes = require('./src/routes/admin');
 app.use('/api/admin', adminRoutes);

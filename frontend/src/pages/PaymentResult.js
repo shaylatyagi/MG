@@ -44,7 +44,7 @@ export default function PaymentResult() {
       
       try {
         // Your API returns: { success: true, order: {...} }
-        const res = await api.get(`/payment/order/${orderId}`);
+        const res = await api.get(`/api/payment/order/${orderId}`);
         console.log('📦 Order API Response:', res.data);
         
         if (res.data.success && res.data.order) {
