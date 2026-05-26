@@ -44,7 +44,8 @@ export default function PaymentResult() {
       
       try {
         // Your API returns: { success: true, order: {...} }
-        const res = await api.get(`/api/payment/order/${orderId}`);
+        const res = await fetch(`https://mg-qw5s.onrender.com/api/payment/order/${orderId}`);
+        const data = await res.json();
         console.log('📦 Order API Response:', res.data);
         
         if (res.data.success && res.data.order) {
