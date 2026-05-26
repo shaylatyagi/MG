@@ -294,10 +294,18 @@ const fetchAllData = useCallback(async () => {
       </div>
 
       {/* Payment Button */}
-      <button onClick={initiatePayment} disabled={paymentProcessing || duesAmount === 0} className={`w-full font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs uppercase transition-all ${duesAmount > 0 && !paymentProcessing ? 'bg-blue-600 hover:bg-blue-700 text-white' : duesAmount === 0 ? 'bg-emerald-100 text-emerald-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-        {paymentProcessing ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
-        {duesAmount === 0 ? 'No Dues Pending' : tx.payNow}
-      </button>
+      <button 
+  onClick={initiatePayment} 
+  disabled={paymentProcessing}
+  className={`w-full font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs uppercase transition-all ${
+    paymentProcessing 
+      ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+      : 'bg-blue-600 hover:bg-blue-700 text-white'
+  }`}
+>
+  {paymentProcessing ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+  PAY VIA PAYYANTRA
+</button>
 
       {/* Recent Transactions */}
       <div className="bg-white border rounded-2xl p-4 shadow-sm">
