@@ -551,6 +551,75 @@ router.post('/owner/add-driver', async (req, res) => {
 // GET OWNER DRIVERS
 // ============================================
 // Backend payment.js - Replace this endpoint
+// ============================================
+// GET OWNER TRANSACTIONS - All driver payments
+// ============================================
+router.get('/owner/transactions', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    console.log('🔍 Fetching transactions for ownerId:', ownerId);
+    
+    if (!ownerId) {
+      return res.status(400).json({ error: 'Owner ID required' });
+    }
+    
+    const ownerIdInt = parseInt(ownerId);
+    
+    // Get all drivers under this owner
+    const ownerResult = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id = $1',
+      [ownerIdInt]
+    );
+    
+    if (ownerResult.rows.length === 0) {
+      return res.json([]);
+    }
+    
+    const ownerCode = ownerResult.rows[0].owner_code;
+    
+    // Get all drivers' phone numbers
+    const driversResult = await pool.query(
+      'SELECT mobile_number, full_name FROM public.drivers WHERE owner_code = $1',
+      [ownerCode]
+    );
+    
+    const driverPhones = driversResult.rows.map(d => d.mobile_number);
+    
+    if (driverPhones.length === 0) {
+      return res.json([]);
+    }
+    
+    // Get all transactions for these drivers
+    const result = await pool.query(
+      `SELECT 
+         mo.order_id,
+         mo.order_number,
+         mo.order_amount,
+         mo.order_initiation_date,
+         mo.order_completion_date,
+         mo.transaction_status,
+         mo.payment_mode,
+         mo.payer_name,
+         mo.payer_mobile,
+         mo.vehicle_number,
+         d.full_name as driver_name
+       FROM public.ms_orders mo
+       LEFT JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+       WHERE mo.payer_mobile = ANY($1::text[])
+         AND mo.transaction_status = 'SUCCESS'
+       ORDER BY mo.order_completion_date DESC
+       LIMIT 50`,
+      [driverPhones]
+    );
+    
+    console.log(`✅ Found ${result.rows.length} transactions`);
+    res.json(result.rows);
+    
+  } catch (err) {
+    console.error('Get transactions error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 router.get('/owner/drivers/list', async (req, res) => {
   try {
     const { ownerId } = req.query;

@@ -543,13 +543,10 @@ const fetchAllData = useCallback(async () => {
 
   // PAYMENTS TAB
   // PAYMENTS TAB with transaction history
+// PAYMENTS TAB with transaction history - FIXED
 const PaymentsTab = () => {
   const [transactions, setTransactions] = useState([]);
   const [loadingTx, setLoadingTx] = useState(false);
-  
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
   
   const fetchTransactions = async () => {
     setLoadingTx(true);
@@ -558,13 +555,27 @@ const PaymentsTab = () => {
         headers: { Authorization: `Bearer ${token()}` }
       });
       const data = await res.json();
-      setTransactions(data);
+      console.log('Transactions response:', data);
+      
+      // Ensure data is an array
+      if (Array.isArray(data)) {
+        setTransactions(data);
+      } else if (data && Array.isArray(data.transactions)) {
+        setTransactions(data.transactions);
+      } else {
+        setTransactions([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Fetch transactions error:', err);
+      setTransactions([]);
     } finally {
       setLoadingTx(false);
     }
   };
+  
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
   
   return (
     <div className="space-y-4 pb-4">
@@ -587,13 +598,17 @@ const PaymentsTab = () => {
             transactions.map((tx, i) => (
               <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
                 <div>
-                  <p className="text-xs font-black text-slate-800">{tx.driver_name || 'Driver'}</p>
+                  <p className="text-xs font-black text-slate-800">{tx.driver_name || tx.payer_name || 'Driver'}</p>
                   <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
-                  <p className="text-[9px] text-slate-400 font-mono">{new Date(tx.order_completion_date || tx.date).toLocaleString()}</p>
+                  <p className="text-[9px] text-slate-400 font-mono">
+                    {tx.order_completion_date ? new Date(tx.order_completion_date).toLocaleString() : new Date(tx.order_initiation_date).toLocaleString()}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-emerald-600">₹{tx.order_amount || tx.amount}</p>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{tx.transaction_status || 'SUCCESS'}</span>
+                  <p className="text-sm font-black text-emerald-600">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                    {tx.transaction_status || 'SUCCESS'}
+                  </span>
                 </div>
               </div>
             ))
@@ -685,7 +700,7 @@ const ProfileTab = () => (
   className="p-2 rounded-xl bg-purple-100 hover:bg-purple-200 transition"
   title="AI Assistant"
 >
-  <span className="text-lg">🤖</span>
+  <span className="text-lg">💬</span>
 </button>
             <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition">
               {unreadCount > 0 ? <BellRing size={18} className="text-blue-600" /> : <Bell size={18} className="text-slate-600" />}
