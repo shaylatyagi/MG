@@ -524,11 +524,52 @@ useEffect(() => {
       <div className="w-full max-w-[412px] bg-slate-50 h-full flex flex-col shadow-2xl relative overflow-hidden">
 
         {/* STATUS BAR */}
-        <div className="bg-slate-950 text-white text-[11px] px-4 py-2 flex justify-between shrink-0 z-50">
-          <span className="text-emerald-400 font-black tracking-widest text-[10px]">DRIVER TERMINAL</span>
-          <span>{time}</span>
-          <div className="flex gap-1.5"><Wifi size={11} className="text-emerald-400" /><Battery size={11} /></div>
-        </div>
+<div className="bg-slate-950 text-white text-[11px] px-4 py-2 flex justify-between shrink-0 z-50">
+  <span className="text-emerald-400 font-black tracking-widest text-[10px]">DRIVER TERMINAL</span>
+  <span>{time}</span>
+  <div className="flex gap-1.5"><Wifi size={11} className="text-emerald-400" /><Battery size={11} /></div>
+</div>
+
+{/* HEADER - WITH ALL BUTTONS */}
+<div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0 shadow-sm z-40">
+  <div className="flex items-center gap-2.5">
+    <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-600/20">MG</div>
+    <div>
+      <span className="font-black text-slate-800 text-sm tracking-tight block">{getHeaderTitle(tab)}</span>
+      <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest -mt-0.5 block">
+        {tab === 'home' && 'Driver Terminal'}
+        {tab === 'wallet' && 'Balance & Transactions'}
+        {tab === 'account' && 'Profile & KYC'}
+      </span>
+    </div>
+  </div>
+  
+  {/* RIGHT SIDE BUTTONS - CHAT, BELL, LOGOUT */}
+  <div className="flex items-center gap-2">
+    {/* Language Toggle */}
+    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+      <button onClick={()=>setLang('en')} className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all ${lang==='en'?'bg-white text-blue-600 shadow-sm':'text-slate-400'}`}>EN</button>
+      <button onClick={()=>setLang('hi')} className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all ${lang==='hi'?'bg-white text-blue-600 shadow-sm':'text-slate-400'}`}>हिं</button>
+    </div>
+    
+    {/* CHAT BUTTON */}
+    <button onClick={()=>setShowChat(true)} className="relative p-2 rounded-xl bg-slate-100 hover:bg-blue-50 transition">
+      <MessageCircle size={16} className="text-slate-600"/>
+      <span className="absolute top-0 right-0 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white"/>
+    </button>
+    
+    {/* NOTIFICATION BELL BUTTON */}
+    <button onClick={()=>{setShowNotif(!showNotif); if(!showNotif) markRead();}} className="relative p-2 rounded-xl bg-slate-100 hover:bg-blue-50 transition">
+      {unread > 0 ? <BellRing size={16} className="text-blue-600"/> : <Bell size={16} className="text-slate-600"/>}
+      {unread > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{unread > 9 ? '9+' : unread}</span>}
+    </button>
+    
+    {/* LOGOUT BUTTON */}
+    <button onClick={logout} className="p-2 rounded-xl bg-red-50 hover:bg-red-100 transition">
+      <LogOut size={16} className="text-red-600"/>
+    </button>
+  </div>
+</div>
 
         <div className="flex items-center gap-2.5">
   <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-600/20">MG</div>
