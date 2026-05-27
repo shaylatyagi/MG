@@ -1,7 +1,7 @@
 // frontend/src/pages/DriverPWA.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Wifi, Battery, Bell, BellRing, Home, CircleUser, Wallet,
+  Wifi,Edit, Battery, Bell, BellRing, Home, CircleUser, Wallet,
   CreditCard, Eye, EyeOff, Copy, X, Send, CheckCircle, Clock,
   AlertTriangle, MessageCircle, ShieldAlert, FileText, Camera, LogOut,
   Receipt, Trophy, Star, PackageCheck, PlusCircle, ArrowDownLeft,
@@ -647,4 +647,3 @@ export default function DriverPWA() {
 }
 
 // Add missing Edit icon import
-import { Edit } from 'lucide-react';
