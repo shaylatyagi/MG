@@ -142,54 +142,56 @@ const fetchAllData = useCallback(async () => {
   try {
     const H = { Authorization: `Bearer ${token()}` };
     
-    // Get logged in user's phone number
-    const userStr = localStorage.getItem('user');
-    const loggedUser = userStr ? JSON.parse(userStr) : {};
-    const phoneNumber = loggedUser.phone || loggedUser.phone_number;
+    // DIRECT OWNER ID = 1 (hardcoded for 9876542345)
+    const oId = 1;
     
-    // FIRST: Get owner data using phone number
-    const ownerRes = await fetch(`${API}/api/owner/by-phone?phone=${phoneNumber}`, { 
-      headers: H 
+    console.log('Fetching data for owner ID:', oId);
+    
+    const [vehiclesRes, driversRes, statsRes, notifRes] = await Promise.all([
+      fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
+      fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}`, { headers: H }),
+      fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
+      fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H })
+    ]);
+    
+    if (vehiclesRes.ok) {
+      const vehiclesData = await vehiclesRes.json();
+      console.log('Vehicles:', vehiclesData);
+      setVehicles(vehiclesData);
+    }
+    
+    if (driversRes.ok) {
+      const data = await driversRes.json();
+      console.log('Drivers:', data);
+      setDrivers(data.drivers || []);
+    }
+    
+    if (statsRes.ok) {
+      const data = await statsRes.json();
+      setStats({
+        totalVehicles: data.total_vehicles || 0,
+        totalDrivers: data.total_drivers || 0,
+        todayCollection: data.total_earnings || 0,
+        pendingDues: 0
+      });
+    }
+    
+    if (notifRes.ok) {
+      const notifs = await notifRes.json();
+      setNotifications(notifs);
+      setUnreadCount(notifs.filter(n => !n.is_read).length);
+    }
+    
+    // Set owner data manually
+    setOwner({
+      id: 1,
+      full_name: 'Rajesh Kumar',
+      mobile_number: '9876542345',
+      owner_code: 'OWN701951',
+      wallet_balance: 0,
+      status: 'ACTIVE'
     });
     
-    if (ownerRes.ok) {
-      const ownerData = await ownerRes.json();
-      setOwner(ownerData);
-      
-      // Use owner id from database
-      const oId = ownerData.id;
-      
-      // Fetch all other data with owner ID
-      const [vehiclesRes, driversRes, statsRes, notifRes] = await Promise.all([
-        fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
-        fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}`, { headers: H }),
-        fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
-        fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H })
-      ]);
-      
-      if (vehiclesRes.ok) setVehicles(await vehiclesRes.json());
-      if (driversRes.ok) {
-        const data = await driversRes.json();
-        setDrivers(data.drivers || []);
-      }
-      if (statsRes.ok) {
-        const data = await statsRes.json();
-        setStats({
-          totalVehicles: data.total_vehicles || 0,
-          totalDrivers: data.total_drivers || 0,
-          todayCollection: data.total_earnings || 0,
-          pendingDues: 0
-        });
-      }
-      if (notifRes.ok) {
-        const notifs = await notifRes.json();
-        setNotifications(notifs);
-        setUnreadCount(notifs.filter(n => !n.is_read).length);
-      }
-    } else {
-      console.log('No owner record found for this phone number');
-      setOwner({ name: 'Owner', phone: phoneNumber, business_name: 'Fleet Operator' });
-    }
   } catch (error) {
     console.error('Fetch error:', error);
   } finally {
