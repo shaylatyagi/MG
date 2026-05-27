@@ -21,10 +21,152 @@
   --white: #FFFFFF;
 }
 
-body {
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: auto;
   background-color: var(--bg);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text-primary);
+}
+
+/* ============================================ */
+/* RESPONSIVE FIXES - NO ZOOM OUT NEEDED */
+/* ============================================ */
+
+/* Desktop screens (default) */
+@media (min-width: 1024px) {
+  body {
+    zoom: 1;
+  }
+  
+  /* Owner dashboard fit fix */
+  .owner-dashboard-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+/* Tablet screens */
+@media (min-width: 768px) and (max-width: 1023px) {
+  body {
+    zoom: 0.9;
+  }
+  
+  .sidebar {
+    width: 240px;
+  }
+  
+  .main-content {
+    margin-left: 240px;
+  }
+}
+
+/* Mobile screens */
+@media (max-width: 767px) {
+  body {
+    zoom: 1;
+    font-size: 14px;
+  }
+  
+  /* Driver dashboard mobile fix */
+  .driver-dashboard-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  
+  /* Cards full width on mobile */
+  .card, .stat-card, .payment-card {
+    width: 100%;
+    margin: 0;
+  }
+  
+  /* Grid responsive */
+  .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+    display: grid;
+    gap: 0.75rem;
+  }
+  
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Very small screens (below 400px) */
+@media (max-width: 400px) {
+  .grid-cols-3, .grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  
+  .text-sm {
+    font-size: 12px;
+  }
+  
+  .text-xs {
+    font-size: 10px;
+  }
+  
+  .p-4, .p-5, .p-6 {
+    padding: 0.75rem;
+  }
+}
+
+/* ============================================ */
+/* SCROLLBAR STYLING (Optional) */
+/* ============================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bronze-light);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bronze);
+}
+
+/* ============================================ */
+/* UTILITY CLASSES */
+/* ============================================ */
+
+/* No horizontal scroll */
+.no-horizontal-scroll {
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+}
+
+/* Responsive container */
+.responsive-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Fix for Tailwind overflow issues */
+.overflow-auto, .overflow-y-auto, .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
 }
 
 button {
@@ -33,7 +175,119 @@ button {
   outline: none;
 }
 
-input {
+input, textarea, select {
   outline: none;
   border: none;
+}
+
+/* ============================================ */
+/* OWNER DASHBOARD SPECIFIC FIXES */
+/* ============================================ */
+
+/* Owner dashboard sidebar responsive */
+@media (max-width: 768px) {
+  .owner-sidebar {
+    position: fixed;
+    left: -100%;
+    transition: left 0.3s ease;
+    z-index: 100;
+  }
+  
+  .owner-sidebar.open {
+    left: 0;
+  }
+  
+  .owner-main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  /* Stats cards stack on mobile */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}
+
+/* Table responsive */
+@media (max-width: 768px) {
+  table, thead, tbody, th, td, tr {
+    display: block;
+  }
+  
+  thead {
+    display: none;
+  }
+  
+  tr {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    padding: 0.75rem;
+  }
+  
+  td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border: none;
+  }
+  
+  td:before {
+    content: attr(data-label);
+    font-weight: bold;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+}
+
+/* ============================================ */
+/* DRIVER DASHBOARD SPECIFIC FIXES */
+/* ============================================ */
+
+/* Driver container - always fit screen */
+.driver-container {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+}
+
+/* Bottom nav fixed on mobile */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  padding: 0.5rem 1rem;
+  z-index: 50;
+}
+
+/* Ensure content doesn't go under bottom nav */
+.content-with-bottom-nav {
+  padding-bottom: 80px;
+}
+
+/* ============================================ */
+/* PRINT STYLES (for receipts) */
+/* ============================================ */
+
+@media print {
+  button, .no-print, .sidebar, .bottom-nav {
+    display: none !important;
+  }
+  
+  body {
+    background: white;
+    zoom: 1;
+  }
+  
+  .receipt-container {
+    margin: 0;
+    padding: 0;
+  }
 }

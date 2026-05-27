@@ -13,6 +13,14 @@ const API = 'https://mg-qw5s.onrender.com';
 const KYC_API = 'https://mg-qw5s.onrender.com';
 
 export default function DriverPWA() {
+  const getHeaderTitle = (tab) => {
+  const titles = {
+    'home': 'Dashboard',
+    'wallet': 'Wallet',
+    'account': 'My Account'
+  };
+  return titles[tab] || 'MobilityGrid';
+};
   const navigate = useNavigate();
   const [tab, setTab] = useState('account'); // Changed from 'home' to 'account'
   const [historyFrom, setHistoryFrom] = useState('tab');
@@ -492,31 +500,17 @@ export default function DriverPWA() {
           <div className="flex gap-1.5"><Wifi size={11} className="text-emerald-400" /><Battery size={11} /></div>
         </div>
 
-        {/* HEADER */}
-        <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0 shadow-sm z-40">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm">MG</div>
-            <div>
-              <span className="font-black text-slate-800 text-sm tracking-tight block">MobilityGrid</span>
-              <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest -mt-0.5 block">Driver PWA</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button onClick={() => setLang('en')} className={`px-3 py-1.5 text-xs font-black rounded-lg ${lang === 'en' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>EN</button>
-              <button onClick={() => setLang('hi')} className={`px-3 py-1.5 text-xs font-black rounded-lg ${lang === 'hi' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>हिं</button>
-            </div>
-            <button onClick={() => setShowChat(true)} className="relative p-2 rounded-xl bg-slate-100">
-              <MessageCircle size={16} className="text-slate-600" />
-              <span className="absolute top-0 right-0 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
-            </button>
-            <button onClick={() => { setShowNotif(!showNotif); if (!showNotif) markRead(); }} className="relative p-2 rounded-xl bg-slate-100">
-              {unread > 0 ? <BellRing size={16} className="text-blue-600" /> : <Bell size={16} className="text-slate-600" />}
-              {unread > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{unread > 9 ? '9+' : unread}</span>}
-            </button>
-            <button onClick={logout} className="p-2 rounded-xl bg-red-50"><LogOut size={16} className="text-red-600" /></button>
-          </div>
-        </div>
+        <div className="flex items-center gap-2.5">
+  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-600/20">MG</div>
+  <div>
+    <span className="font-black text-slate-800 text-sm tracking-tight block">{getHeaderTitle(tab)}</span>
+    <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest -mt-0.5 block">
+      {tab === 'home' && 'Driver Terminal'}
+      {tab === 'wallet' && 'Balance & Transactions'}
+      {tab === 'account' && 'Profile & KYC'}
+    </span>
+  </div>
+</div>
 
         {/* NOTIFICATION DROPDOWN */}
         {showNotif && (
