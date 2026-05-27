@@ -22,6 +22,7 @@ export default function DriverPWA() {
   const [lang, setLang]         = useState('en');
   const [time, setTime]         = useState('');
   const [showBalance, setShowBal] = useState(true);
+  const [historySource, setHistorySource] = useState('tab');
 
   const [user, setUser]           = useState(null);
   const [wallet, setWallet]       = useState(0);
@@ -92,7 +93,7 @@ export default function DriverPWA() {
         const t=await txR.json();
         if(Array.isArray(t)) setPayments(t.map(x=>({
           id:x.pg_transaction_id||x.order_id, type:'Rent Payment',
-          amount:x.order_amount, date:new Date(x.order_initiation_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}),
+          amount:x.order_amount, date: new Date(t.order_initiation_date).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}),
           status:x.transaction_status, ref:x.order_number,
         })));
       }
@@ -125,7 +126,7 @@ export default function DriverPWA() {
   };
 
   const pay=async()=>{
-    if(telemetry.vehicleNumber==='Not Assigned') return alert('No vehicle assigned. Contact your owner.');
+    //if(telemetry.vehicleNumber==='Not Assigned') return alert('No vehicle assigned. Contact your owner.');
     setShowPaying(true);
     try{
       const u=JSON.parse(localStorage.getItem('user')||'{}'); const ph=phone();
@@ -286,7 +287,7 @@ export default function DriverPWA() {
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-50 flex justify-between items-center">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Recent Transactions</h3>
-          <button onClick={()=>goHistory('viewAll')} className="text-[10px] text-blue-600 font-black">View All →</button>
+          <button onClick={() => { setHistorySource('tab'); setActiveTab('history'); }} className="text-[10px] text-blue-600 font-black">View All →</button>
         </div>
         <div className="divide-y">
           {payments.slice(0,3).map((p,i)=>(
