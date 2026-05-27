@@ -701,22 +701,7 @@ console.log(insertResult.rows[0]);
   }
 
 });
-router.post('/driver/update-profile', async (req, res) => {
-  try {
-    const { phone, name, photo } = req.body;
-    // Database me realtime name aur photo update kar rahe hain
-    await pool.query(
-      `UPDATE auth.vehicle_drivers vd
-       SET full_name = $1, profile_photo_url = $2
-       FROM auth.users u
-       WHERE vd.user_id = u.id AND u.mobile_number = $3`,
-      [name, photo, phone]
-    );
-    res.json({ success: true, message: 'Real-time DB Updated!' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'DB Error' });
-  }
-});
+
 
 router.get('/driver-details', async (req, res) => {
 
