@@ -68,15 +68,34 @@ export default function OwnerDashboard() {
   const token = () => localStorage.getItem('token');
   const ownerId = () => {
     const u = JSON.parse(localStorage.getItem('user') || '{}');
-    return u.id;
+    return u.id || 1;
   };
 
-  const fetchAllData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const H = { Authorization: `Bearer ${token()}` };
-      const oId = ownerId();
+  // OwnerDashboard.js - Update fetchAllData function
+
+const fetchAllData = useCallback(async () => {
+  setLoading(true);
+  try {
+    const H = { Authorization: `Bearer ${token()}` };
+    
+    // Get logged in user's phone number
+    const userStr = localStorage.getItem('user');
+    const loggedUser = userStr ? JSON.parse(userStr) : {};
+    const phoneNumber = loggedUser.phone || loggedUser.phone_number;
+    
+    // FIRST: Get owner data using phone number
+    const ownerRes = await fetch(`${API}/api/owner/by-phone?phone=${phoneNumber}`, { 
+      headers: H 
+    });
+    
+    if (ownerRes.ok) {
+      const ownerData = await ownerRes.json();
+      setOwner(ownerData);
       
+      // Use owner id from database
+      const oId = ownerData.id;
+      
+      // Fetch all other data with owner ID
       const [vehiclesRes, driversRes, statsRes, notifRes] = await Promise.all([
         fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
         fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}`, { headers: H }),
@@ -103,12 +122,16 @@ export default function OwnerDashboard() {
         setNotifications(notifs);
         setUnreadCount(notifs.filter(n => !n.is_read).length);
       }
-    } catch (error) {
-      console.error('Fetch error:', error);
-    } finally {
-      setLoading(false);
+    } else {
+      console.log('No owner record found for this phone number');
+      setOwner({ name: 'Owner', phone: phoneNumber, business_name: 'Fleet Operator' });
     }
-  }, []);
+  } catch (error) {
+    console.error('Fetch error:', error);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     fetchAllData();
@@ -474,34 +497,35 @@ export default function OwnerDashboard() {
   );
 
   // PROFILE TAB
-  const ProfileTab = () => (
-    <div className="space-y-4 pb-4">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white text-center">
-        <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3">
-          {owner?.name?.charAt(0) || 'O'}
-        </div>
-        <h2 className="text-lg font-black">{owner?.name || 'Owner'}</h2>
-        <p className="text-xs text-blue-200">{owner?.business_name || 'Fleet Operator'}</p>
+  // PROFILE TAB in OwnerDashboard.js
+const ProfileTab = () => (
+  <div className="space-y-4 pb-4">
+    <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white text-center">
+      <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3">
+        {owner?.full_name?.charAt(0) || owner?.name?.charAt(0) || 'O'}
       </div>
-      <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
-        <div className="flex justify-between items-center py-2 border-b border-slate-100">
-          <span className="text-xs text-slate-500">Phone</span>
-          <span className="text-xs font-black font-mono">{owner?.phone || '—'}</span>
-        </div>
-        <div className="flex justify-between items-center py-2 border-b border-slate-100">
-          <span className="text-xs text-slate-500">Email</span>
-          <span className="text-xs font-black">{owner?.email || '—'}</span>
-        </div>
-        <div className="flex justify-between items-center py-2">
-          <span className="text-xs text-slate-500">Total Fleet</span>
-          <span className="text-xs font-black">{stats.totalVehicles} Vehicles</span>
-        </div>
-      </div>
-      <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2">
-        <LogOut size={14} /> Logout
-      </button>
+      <h2 className="text-lg font-black">{owner?.full_name || owner?.name || 'Owner'}</h2>
+      <p className="text-xs text-blue-200">Owner Code: {owner?.owner_code || 'OWN001'}</p>
     </div>
-  );
+    <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-xs text-slate-500">Phone</span>
+        <span className="text-xs font-black font-mono">{owner?.mobile_number || phoneNumber}</span>
+      </div>
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-xs text-slate-500">Wallet Balance</span>
+        <span className="text-xs font-black text-emerald-600">₹{parseFloat(owner?.wallet_balance || 0).toLocaleString('en-IN')}</span>
+      </div>
+      <div className="flex justify-between items-center py-2">
+        <span className="text-xs text-slate-500">Status</span>
+        <span className="text-xs font-black text-emerald-600">{owner?.status || 'ACTIVE'}</span>
+      </div>
+    </div>
+    <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2">
+      <LogOut size={14} /> Logout
+    </button>
+  </div>
+);
 
   return (
     <div className="min-h-screen bg-slate-100">

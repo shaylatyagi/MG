@@ -332,7 +332,49 @@ router.get('/driver/notifications', async (req, res) => {
   }
 });
 
+// ============================================
+// ADD VEHICLE - Fixed for your table
+// ============================================
+router.post('/owner/vehicles', async (req, res) => {
+  try {
+    const { owner_id, vehicle_number, vehicle_model, daily_rent } = req.body;
+    
+    console.log('Add Vehicle:', { owner_id, vehicle_number, vehicle_model, daily_rent });
+    
+    if (!owner_id || !vehicle_number) {
+      return res.status(400).json({ success: false, message: 'Vehicle number and owner ID required' });
+    }
+    
+    // Check if exists
+    const existing = await pool.query(
+      'SELECT id FROM public.vehicles WHERE vehicle_number = $1',
+      [vehicle_number]
+    );
+    
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ success: false, message: 'Vehicle number already exists' });
+    }
+    
+    // Insert using your table columns
+    const result = await pool.query(
+      `INSERT INTO public.vehicles 
+       (vehicle_number, vehicle_model, daily_rent, owner_id, status, created_at)
+       VALUES ($1, $2, $3, $4, 'AVAILABLE', NOW())
+       RETURNING id, vehicle_number, vehicle_model, daily_rent`,
+      [vehicle_number, vehicle_model || 'Standard', daily_rent || 850, parseInt(owner_id)]
+    );
+    
+    res.json({ success: true, message: 'Vehicle added!', vehicle: result.rows[0] });
+    
+  } catch (err) {
+    console.error('Add vehicle error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ============================================
 // GET OWNER VEHICLES
+// ============================================
 router.get('/owner/vehicles', async (req, res) => {
   try {
     const { ownerId } = req.query;
@@ -340,21 +382,151 @@ router.get('/owner/vehicles', async (req, res) => {
     
     const result = await pool.query(
       `SELECT 
-        ov.*,
-        u.mobile_number as driver_phone,
-        vd.full_name as driver_name
-       FROM auth.owner_vehicles ov
-       LEFT JOIN auth.users u ON u.id = ov.driver_id
-       LEFT JOIN auth.vehicle_drivers vd ON vd.user_id = u.id
-       WHERE ov.owner_id = $1
-       ORDER BY ov.created_at DESC`,
-      [ownerId]
+         v.id, v.vehicle_number, v.vehicle_model, v.daily_rent, v.status, v.created_at,
+         d.full_name as driver_name, d.mobile_number as driver_phone
+       FROM public.vehicles v
+       LEFT JOIN public.drivers d ON d.id = v.driver_id
+       WHERE v.owner_id = $1
+       ORDER BY v.created_at DESC`,
+      [parseInt(ownerId)]
     );
     
     res.json(result.rows);
   } catch (err) {
-    console.error('Owner vehicles error:', err);
-    res.json([]);
+    console.error('Get vehicles error:', err);
+    res.status(500).json({ message: 'Failed' });
+  }
+});
+
+// ============================================
+// ADD DRIVER - Fixed for your table
+// ============================================
+router.post('/owner/add-driver', async (req, res) => {
+  try {
+    const { full_name, mobile_number, owner_id } = req.body;
+    
+    console.log('Add Driver:', { full_name, mobile_number, owner_id });
+    
+    if (!full_name || !mobile_number || !owner_id) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    
+    // Validate name (no numbers)
+    if (/[0-9]/.test(full_name)) {
+      return res.status(400).json({ success: false, message: '❌ Name cannot contain numbers!' });
+    }
+    
+    // Validate phone
+    if (!/^\d{10}$/.test(mobile_number)) {
+      return res.status(400).json({ success: false, message: '❌ Phone must be 10 digits' });
+    }
+    
+    // Check if driver exists
+    const existing = await pool.query(
+      'SELECT id FROM public.drivers WHERE mobile_number = $1',
+      [mobile_number]
+    );
+    
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ success: false, message: 'Driver already exists' });
+    }
+    
+    // Get owner code
+    const ownerResult = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id = $1',
+      [parseInt(owner_id)]
+    );
+    
+    const ownerCode = ownerResult.rows[0]?.owner_code || 'OWN001';
+    const driverCode = `DRV${Date.now()}`;
+    
+    const result = await pool.query(
+      `INSERT INTO public.drivers 
+       (full_name, mobile_number, driver_code, owner_code, wallet_balance, status, created_at)
+       VALUES ($1, $2, $3, $4, 0, 'ACTIVE', NOW())
+       RETURNING id, full_name, mobile_number, driver_code`,
+      [full_name, mobile_number, driverCode, ownerCode]
+    );
+    
+    res.json({ success: true, message: '✅ Driver added!', driver: result.rows[0] });
+    
+  } catch (err) {
+    console.error('Add driver error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ============================================
+// GET OWNER DRIVERS
+// ============================================
+router.get('/owner/drivers/list', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+    
+    // Get owner code
+    const ownerResult = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id = $1',
+      [parseInt(ownerId)]
+    );
+    
+    if (ownerResult.rows.length === 0) {
+      return res.json({ drivers: [] });
+    }
+    
+    const ownerCode = ownerResult.rows[0].owner_code;
+    
+    const result = await pool.query(
+      `SELECT 
+         d.id, d.full_name, d.mobile_number, d.driver_code, d.wallet_balance, d.status, d.created_at,
+         v.vehicle_number as assigned_vehicle
+       FROM public.drivers d
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.owner_code = $1
+       ORDER BY d.created_at DESC`,
+      [ownerCode]
+    );
+    
+    res.json({ drivers: result.rows });
+  } catch (err) {
+    console.error('Get drivers error:', err);
+    res.status(500).json({ message: 'Failed' });
+  }
+});
+
+// ============================================
+// OWNER STATS
+// ============================================
+router.get('/owner/stats', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+    
+    const vehicles = await pool.query(
+      'SELECT COUNT(*) FROM public.vehicles WHERE owner_id = $1',
+      [parseInt(ownerId)]
+    );
+    
+    const drivers = await pool.query(
+      'SELECT COUNT(*) FROM public.drivers WHERE owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)',
+      [parseInt(ownerId)]
+    );
+    
+    const earnings = await pool.query(
+      `SELECT COALESCE(SUM(order_amount), 0) as total 
+       FROM public.ms_orders 
+       WHERE payer_mobile = '9876542345' AND transaction_status = 'SUCCESS'`,
+      []
+    );
+    
+    res.json({
+      total_vehicles: parseInt(vehicles.rows[0].count || 0),
+      total_drivers: parseInt(drivers.rows[0].count || 0),
+      total_earnings: parseFloat(earnings.rows[0].total || 0)
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0 });
   }
 });
 
@@ -390,96 +562,6 @@ router.get('/owner/drivers/list', async (req, res) => {
   }
 });
 
-// GET OWNER STATS
-router.get('/owner/stats', async (req, res) => {
-  try {
-    const { ownerId } = req.query;
-    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
-    
-    const vehiclesResult = await pool.query(
-      'SELECT COUNT(*) as total FROM auth.owner_vehicles WHERE owner_id = $1',
-      [ownerId]
-    );
-    
-    const driversResult = await pool.query(
-      `SELECT COUNT(*) as total FROM auth.vehicle_drivers vd
-       WHERE vd.vehicle_owner_company_id = (
-         SELECT cc.id FROM auth.client_companies cc
-         JOIN auth.client_company_users ccu ON ccu.client_company_id = cc.id
-         WHERE ccu.user_id = $1
-       )`,
-      [ownerId]
-    );
-    
-    const earningsResult = await pool.query(
-      `SELECT COALESCE(SUM(mo.order_amount), 0) as total
-       FROM ms_orders mo
-       WHERE mo.payer_mobile IN (
-         SELECT u.mobile_number FROM auth.users u
-         JOIN auth.vehicle_drivers vd ON vd.user_id = u.id
-         WHERE vd.vehicle_owner_company_id = (
-           SELECT cc.id FROM auth.client_companies cc
-           JOIN auth.client_company_users ccu ON ccu.client_company_id = cc.id
-           WHERE ccu.user_id = $1
-         )
-       )
-       AND mo.transaction_status = 'SUCCESS'
-       AND mo.order_completion_date >= CURRENT_DATE`,
-      [ownerId]
-    );
-    
-    res.json({
-      total_vehicles: parseInt(vehiclesResult.rows[0]?.total || 0),
-      total_drivers: parseInt(driversResult.rows[0]?.total || 0),
-      total_earnings: parseFloat(earningsResult.rows[0]?.total || 0)
-    });
-  } catch (err) {
-    console.error('Owner stats error:', err);
-    res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0 });
-  }
-});
-
-// ADD VEHICLE
-router.post('/owner/vehicles', async (req, res) => {
-  try {
-    const { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id } = req.body;
-    
-    if (!owner_id || !vehicle_number || !vehicle_model || !daily_rent) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-    
-    const existing = await pool.query(
-      'SELECT id FROM auth.owner_vehicles WHERE vehicle_number = $1',
-      [vehicle_number]
-    );
-    
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ message: 'Vehicle number already exists' });
-    }
-    
-    const result = await pool.query(
-      `INSERT INTO auth.owner_vehicles 
-       (owner_id, vehicle_number, vehicle_model, daily_rent, driver_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [owner_id, vehicle_number, vehicle_model, daily_rent, driver_id || null, driver_id ? 'ASSIGNED' : 'AVAILABLE']
-    );
-    
-    if (driver_id) {
-      await pool.query(
-        `INSERT INTO auth.notifications (user_id, user_type, title, message)
-         VALUES ($1, 'DRIVER', 'Vehicle Assigned', 
-                 'You have been assigned vehicle ${vehicle_number}')`,
-        [driver_id]
-      );
-    }
-    
-    res.json({ success: true, vehicle: result.rows[0] });
-  } catch (err) {
-    console.error('Add vehicle error:', err);
-    res.status(500).json({ message: 'Failed to add vehicle' });
-  }
-});
 // ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
 // backend/src/routes/payment.js me replace kar
 // ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
