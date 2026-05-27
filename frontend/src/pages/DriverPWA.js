@@ -44,7 +44,6 @@ export default function DriverPWA() {
   // Modals
   const [showNotif, setShowNotif] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [showSOS, setShowSOS] = useState(false);
   const [showPaying, setShowPaying] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -603,19 +602,10 @@ const AccountTab = () => {
     </div>
     
     {/* CHAT BUTTON */}
-    <button onClick={()=>setShowChat(true)} className="relative p-2 rounded-xl bg-slate-100 hover:bg-blue-50 transition">
+    <button onClick={()=>setShowChatbot(true)} className="relative p-2 rounded-xl bg-slate-100 hover:bg-blue-50 transition">
       <MessageCircle size={16} className="text-slate-600"/>
       <span className="absolute top-0 right-0 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white"/>
     </button>
-    
-    {/* NOTIFICATION BELL BUTTON */}
-    <button 
-  onClick={() => setShowChatbot(true)} 
-  className="p-2 rounded-xl bg-purple-100 hover:bg-purple-200 transition"
-  title="AI Assistant"
->
-  <span className="text-lg">🤖</span>
-</button>
     <button onClick={()=>{setShowNotif(!showNotif); if(!showNotif) markRead();}} className="relative p-2 rounded-xl bg-slate-100 hover:bg-blue-50 transition">
       {unread > 0 ? <BellRing size={16} className="text-blue-600"/> : <Bell size={16} className="text-slate-600"/>}
       {unread > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{unread > 9 ? '9+' : unread}</span>}
@@ -690,32 +680,6 @@ const AccountTab = () => {
   />
 )}
         {/* CHAT MODAL */}
-        {showChat && (
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex flex-col justify-end">
-            <div className="bg-white rounded-t-[28px] h-[78%] flex flex-col shadow-2xl">
-              <div className="px-4 py-3 bg-blue-600 text-white rounded-t-[28px] flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">CC</div>
-                  <div><p className="text-xs font-black">Support Chat</p><p className="text-[9px] text-blue-200">Online</p></div>
-                </div>
-                <button onClick={() => setShowChat(false)}><X size={18} /></button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
-                {chatHistory.map((c, i) => (
-                  <div key={i} className={`flex gap-2 ${c.from === 'user' ? 'justify-end' : ''}`}>
-                    {c.from === 'bot' && <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[9px] font-black">AI</div>}
-                    <div className={`p-3 rounded-2xl text-[11px] ${c.from === 'user' ? 'bg-blue-600 text-white' : 'bg-white border'}`}>{c.text}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="p-3 border-t bg-white flex gap-2">
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()}
-                  placeholder="Type your message..." className="flex-1 bg-slate-50 border rounded-xl px-3 py-2 text-xs" />
-                <button onClick={sendChat} className="bg-blue-600 text-white p-2.5 rounded-xl"><Send size={14} /></button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* SOS MODAL, PAYMENT MODAL, RECEIPT MODAL remain same */}
         {showSOS && (
