@@ -108,7 +108,33 @@ export default function OwnerDashboard() {
       setLoading(false);
     }
   }, []);
-
+  // Add this useEffect in OwnerDashboard.js
+useEffect(() => {
+  const fetchNotifications = async () => {
+    try {
+      const oId = ownerId();
+      if (!oId) return;
+      
+      const res = await fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      });
+      const data = await res.json();
+      
+      if (Array.isArray(data)) {
+        setNotifications(data);
+        const newUnread = data.filter(n => !n.is_read).length;
+        setUnreadCount(newUnread);
+      }
+    } catch (err) {
+      console.error('Notification fetch error:', err);
+    }
+  };
+  
+  fetchNotifications();
+  const interval = setInterval(fetchNotifications, 15000);
+  
+  return () => clearInterval(interval);
+}, []);
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);

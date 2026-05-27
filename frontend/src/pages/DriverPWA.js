@@ -73,6 +73,36 @@ export default function DriverPWA() {
     setProf({ name: u.name || '', phone: u.phone || u.mobile_number || '' });
     if (!u?.id) setLoading(false);
   }, []);
+  // Add this useEffect in DriverPWA.js for real-time notifications
+useEffect(() => {
+  if (!user) return;
+  
+  const fetchNotifications = async () => {
+    try {
+      const ph = phone();
+      const res = await fetch(`${API}/api/payment/driver/notifications?phone=${ph}`, {
+        headers: { Authorization: `Bearer ${tk()}` }
+      });
+      const data = await res.json();
+      
+      if (Array.isArray(data)) {
+        setNotifs(data);
+        const newUnread = data.filter(n => !n.is_read).length;
+        if (newUnread > unread) {
+          setUnread(newUnread);
+          // Optional: Show toast or play sound
+        }
+      }
+    } catch (err) {
+      console.error('Notification fetch error:', err);
+    }
+  };
+  
+  fetchNotifications();
+  const interval = setInterval(fetchNotifications, 15000); // Every 15 seconds
+  
+  return () => clearInterval(interval);
+}, [user]);
 
   useEffect(() => {
     const tick = () => {

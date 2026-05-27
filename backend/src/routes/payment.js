@@ -816,28 +816,82 @@ router.post('/webhook', async (req, res) => {
     }
 
 
-    if (status === 'SUCCESS' && localOrder.rows[0].transaction_status !== 'SUCCESS') {
-
-      const amount = parseFloat(localOrder.rows[0].order_amount || 0);
-
-      await pool.query(
-
-        `UPDATE driver_details 
-         SET 
-           wallet_balance = COALESCE(wallet_balance, 0) + $1,
+    // In webhook - after successful payment
+if (status === 'SUCCESS' && localOrder.rows[0].transaction_status !== 'SUCCESS') {
+  const amount = parseFloat(localOrder.rows[0].order_amount || 0);
+  const driverPhone = localOrder.rows[0].payer_mobile;
+  
+  // ============================================
+  // 1. UPDATE DRIVER WALLET in driver_details
+  // ============================================
+  const driverUser = await pool.query(
+    'SELECT id FROM public.users WHERE phone_number = $1',
+    [driverPhone]
+  );
+  
+  if (driverUser.rows.length > 0) {
+    const driverUserId = driverUser.rows[0].id;
+    
+    // Update driver_details
+    await pool.query(
+      `UPDATE public.driver_details 
+       SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
            amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
            updated_at = NOW()
-         WHERE user_id = (
-           SELECT id FROM users WHERE phone_number = $2 LIMIT 1
-         )`,
-
-        [amount, localOrder.rows[0].payer_mobile]
-
+       WHERE user_id = $2`,
+      [amount, driverUserId]
+    );
+    
+    // Also update public.drivers table if exists
+    await pool.query(
+      `UPDATE public.drivers 
+       SET wallet_balance = COALESCE(wallet_balance, 0) + $1
+       WHERE mobile_number = $2`,
+      [amount, driverPhone]
+    ).catch(() => {});
+    
+    // ============================================
+    // 2. SEND NOTIFICATION TO DRIVER
+    // ============================================
+    await pool.query(
+      `INSERT INTO public.notifications (user_id, user_type, title, message, metadata, created_at)
+       VALUES ($1, 'DRIVER', '✅ Payment Successful', 
+               'Your payment of ₹${amount} has been received successfully.',
+               $2, NOW())`,
+      [driverUserId, JSON.stringify({ amount, status: 'SUCCESS', type: 'payment' })]
+    );
+    
+    console.log(`📢 Notification sent to DRIVER ${driverPhone}`);
+    
+    // ============================================
+    // 3. GET OWNER AND SEND NOTIFICATION
+    // ============================================
+    // Find owner from vehicles table
+    const ownerData = await pool.query(
+      `SELECT v.owner_id 
+       FROM public.vehicles v
+       WHERE v.driver_phone = $1
+       LIMIT 1`,
+      [driverPhone]
+    );
+    
+    if (ownerData.rows.length > 0) {
+      const ownerId = ownerData.rows[0].owner_id;
+      
+      await pool.query(
+        `INSERT INTO public.notifications (user_id, user_type, title, message, metadata, created_at)
+         VALUES ($1, 'OWNER', '💰 Rent Payment Received', 
+                 'Driver ${driverPhone} paid ₹${amount}.',
+                 $2, NOW())`,
+        [ownerId, JSON.stringify({ driverPhone, amount, status: 'SUCCESS', type: 'payment' })]
       );
-
-      console.log(`💰 Wallet Updated: +₹${amount} for ${localOrder.rows[0].payer_mobile}`);
-
+      
+      console.log(`📢 Notification sent to OWNER ID: ${ownerId}`);
+    } else {
+      console.log(`⚠️ No owner found for driver ${driverPhone}`);
     }
+  }
+}
 
 
     const paymentMode = payload.paymentMode || payload.paymentMethod || payload.payment_mode || payload.method || null;
@@ -937,7 +991,83 @@ router.get('/my-transactions', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch transactions' });
   }
 });
+// ============================================
+// NOTIFICATION ROUTES
+// ============================================
 
+// GET driver notifications
+router.get('/driver/notifications', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.status(400).json({ message: 'Phone required' });
+    
+    // Get user_id from phone number
+    const userResult = await pool.query(
+      'SELECT id FROM public.users WHERE phone_number = $1',
+      [phone]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.json([]);
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    const result = await pool.query(
+      `SELECT id, title, message, is_read, created_at, metadata
+       FROM public.notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [userId]
+    );
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Driver notifications error:', err);
+    res.json([]);
+  }
+});
+
+// GET owner notifications
+router.get('/owner/notifications', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+    
+    const result = await pool.query(
+      `SELECT id, title, message, is_read, created_at, metadata
+       FROM public.notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [ownerId]
+    );
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Owner notifications error:', err);
+    res.json([]);
+  }
+});
+
+// MARK notifications as read
+router.put('/notifications/mark-read', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ message: 'User ID required' });
+    
+    await pool.query(
+      'UPDATE public.notifications SET is_read = TRUE WHERE user_id = $1',
+      [userId]
+    );
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Mark read error:', err);
+    res.status(500).json({ success: false });
+  }
+});
 
 // CHECK PENDING (Inquiry API) 
 router.post('/check-pending', async (req, res) => {
