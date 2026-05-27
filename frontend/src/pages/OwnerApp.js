@@ -76,8 +76,6 @@ const [selectedDriverId, setSelectedDriverId] = useState('');
 
   // OwnerDashboard.js - Update fetchAllData function
 // Add these states at the top with other states
-const [availableDrivers, setAvailableDrivers] = useState([]);
-const [selectedDriverId, setSelectedDriverId] = useState('');
 
 // Add this function to fetch available drivers
 const fetchAvailableDrivers = async () => {
