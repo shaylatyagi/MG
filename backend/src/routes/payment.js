@@ -335,17 +335,18 @@ router.get('/driver/notifications', async (req, res) => {
 // ============================================
 // ADD VEHICLE - Fixed for your table
 // ============================================
+// Backend - Add Vehicle with driver assignment
 router.post('/owner/vehicles', async (req, res) => {
   try {
-    const { owner_id, vehicle_number, vehicle_model, daily_rent } = req.body;
+    const { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id } = req.body;
     
-    console.log('Add Vehicle:', { owner_id, vehicle_number, vehicle_model, daily_rent });
+    console.log('Add Vehicle:', { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id });
     
     if (!owner_id || !vehicle_number) {
       return res.status(400).json({ success: false, message: 'Vehicle number and owner ID required' });
     }
     
-    // Check if exists
+    // Check if vehicle exists
     const existing = await pool.query(
       'SELECT id FROM public.vehicles WHERE vehicle_number = $1',
       [vehicle_number]
@@ -355,16 +356,41 @@ router.post('/owner/vehicles', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vehicle number already exists' });
     }
     
-    // Insert using your table columns
+    // Insert vehicle
     const result = await pool.query(
       `INSERT INTO public.vehicles 
-       (vehicle_number, vehicle_model, daily_rent, owner_id, status, created_at)
-       VALUES ($1, $2, $3, $4, 'AVAILABLE', NOW())
-       RETURNING id, vehicle_number, vehicle_model, daily_rent`,
-      [vehicle_number, vehicle_model || 'Standard', daily_rent || 850, parseInt(owner_id)]
+       (vehicle_number, vehicle_model, daily_rent, owner_id, driver_id, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       RETURNING id, vehicle_number, vehicle_model, daily_rent, driver_id`,
+      [vehicle_number, vehicle_model || 'Standard', daily_rent || 850, parseInt(owner_id), driver_id || null, driver_id ? 'ASSIGNED' : 'AVAILABLE']
     );
     
-    res.json({ success: true, message: 'Vehicle added!', vehicle: result.rows[0] });
+    // If driver assigned, update driver's assigned_vehicle_id
+    if (driver_id) {
+      await pool.query(
+        `UPDATE public.drivers 
+         SET assigned_vehicle_id = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [result.rows[0].id, driver_id]
+      );
+      
+      // Also update vehicle's driver_name and driver_phone for quick access
+      const driverInfo = await pool.query(
+        'SELECT full_name, mobile_number FROM public.drivers WHERE id = $1',
+        [driver_id]
+      );
+      
+      if (driverInfo.rows.length > 0) {
+        await pool.query(
+          `UPDATE public.vehicles 
+           SET driver_name = $1, driver_phone = $2
+           WHERE id = $3`,
+          [driverInfo.rows[0].full_name, driverInfo.rows[0].mobile_number, result.rows[0].id]
+        );
+      }
+    }
+    
+    res.json({ success: true, message: 'Vehicle added successfully!', vehicle: result.rows[0] });
     
   } catch (err) {
     console.error('Add vehicle error:', err);

@@ -15,6 +15,8 @@ import {
 const API = 'https://mg-qw5s.onrender.com';
 
 export default function OwnerDashboard() {
+  const [availableDrivers, setAvailableDrivers] = useState([]);
+const [selectedDriverId, setSelectedDriverId] = useState('');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
@@ -73,7 +75,70 @@ export default function OwnerDashboard() {
   };
 
   // OwnerDashboard.js - Update fetchAllData function
+// Add these states at the top with other states
+const [availableDrivers, setAvailableDrivers] = useState([]);
+const [selectedDriverId, setSelectedDriverId] = useState('');
 
+// Add this function to fetch available drivers
+const fetchAvailableDrivers = async () => {
+  try {
+    const response = await fetch(`${API}/api/payment/owner/drivers/list?ownerId=${ownerId()}`, {
+      headers: { Authorization: `Bearer ${token()}` }
+    });
+    const data = await response.json();
+    setAvailableDrivers(data.drivers || []);
+  } catch (err) {
+    console.error('Fetch drivers error:', err);
+  }
+};
+
+// Call this when opening Add Vehicle modal
+const openAddVehicleModal = () => {
+  setShowAddVehicle(true);
+  fetchAvailableDrivers();
+  setSelectedDriverId('');
+  setNewVehicle({ number: '', model: '', rent: 850 });
+};
+
+// Updated addVehicle function with driver assignment
+const addVehicle = async () => {
+  if (!newVehicle.number || !newVehicle.model) {
+    alert('Please fill vehicle number and model');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${API}/api/payment/owner/vehicles`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${token()}` 
+      },
+      body: JSON.stringify({
+        owner_id: ownerId(),
+        vehicle_number: newVehicle.number.toUpperCase(),
+        vehicle_model: newVehicle.model,
+        daily_rent: parseFloat(newVehicle.rent),
+        driver_id: selectedDriverId || null  // Assign driver if selected
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      alert('✅ Vehicle added successfully!');
+      setShowAddVehicle(false);
+      setNewVehicle({ number: '', model: '', rent: 850 });
+      setSelectedDriverId('');
+      fetchAllData(); // Refresh vehicles list
+    } else {
+      alert(data.message || 'Failed to add vehicle');
+    }
+  } catch (error) {
+    console.error('Add vehicle error:', error);
+    alert('Network error: ' + error.message);
+  }
+};
 const fetchAllData = useCallback(async () => {
   setLoading(true);
   try {
@@ -200,36 +265,6 @@ const fetchAllData = useCallback(async () => {
       setChatHistory(prev => [...prev, { from: 'bot', text: 'Message sent to driver!', time: new Date().toLocaleTimeString() }]);
     }, 500);
     setChatInput('');
-  };
-
-  const addVehicle = async () => {
-    if (!newVehicle.number || !newVehicle.model) {
-      alert('Please fill all fields');
-      return;
-    }
-    try {
-      const response = await fetch(`${API}/api/payment/owner/vehicles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify({
-          owner_id: ownerId(),
-          vehicle_number: newVehicle.number,
-          vehicle_model: newVehicle.model,
-          daily_rent: newVehicle.rent
-        })
-      });
-      if (response.ok) {
-        alert('✅ Vehicle added successfully!');
-        setShowAddVehicle(false);
-        setNewVehicle({ number: '', model: '', rent: 850 });
-        fetchAllData();
-      } else {
-        alert('Failed to add vehicle');
-      }
-    } catch (error) {
-      console.error('Add vehicle error:', error);
-      alert('Network error');
-    }
   };
 
   const addDriver = async () => {
@@ -437,37 +472,66 @@ const fetchAllData = useCallback(async () => {
 
   // VEHICLES TAB
   const VehiclesTab = () => (
-    <div className="space-y-3 pb-4">
-      <button onClick={() => setShowAddVehicle(true)} className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
-        <Plus size={16} /> Add Vehicle
-      </button>
-      <div className="space-y-3">
-        {vehicles.map((vehicle, i) => (
-          <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center"><Truck size={16} className="text-amber-600" /></div>
-                <div>
-                  <p className="font-black text-slate-800">{vehicle.vehicle_number}</p>
-                  <p className="text-[10px] text-slate-400">{vehicle.vehicle_model}</p>
-                </div>
+  <div className="space-y-3 pb-4">
+    <button 
+      onClick={openAddVehicleModal}  // Use updated function
+      className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2"
+    >
+      <Plus size={16} /> Add Vehicle
+    </button>
+    
+    <div className="space-y-3">
+      {vehicles.map((vehicle, i) => (
+        <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                <Truck size={16} className="text-amber-600" />
               </div>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-700">
-                ₹{vehicle.daily_rent}/day
-              </span>
+              <div>
+                <p className="font-black text-slate-800">{vehicle.vehicle_number}</p>
+                <p className="text-[10px] text-slate-400">{vehicle.vehicle_model}</p>
+              </div>
             </div>
-            <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-              <p className="text-[10px] text-slate-400">Driver: {vehicle.driver_name || 'Unassigned'}</p>
-              <span className={`text-[9px] font-black ${vehicle.status === 'ASSIGNED' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                {vehicle.status || 'AVAILABLE'}
-              </span>
-            </div>
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-700">
+              ₹{vehicle.daily_rent}/day
+            </span>
           </div>
-        ))}
-        {vehicles.length === 0 && <div className="bg-white rounded-2xl p-8 text-center text-slate-400">No vehicles yet</div>}
-      </div>
+          
+          {/* Assigned Driver Info */}
+          <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+            <div>
+              <p className="text-[10px] text-slate-400">Assigned Driver</p>
+              <p className="text-xs font-black text-slate-800">
+                {vehicle.driver_name || 'Not Assigned'}
+              </p>
+              {vehicle.driver_phone && (
+                <p className="text-[9px] text-slate-400 font-mono">{vehicle.driver_phone}</p>
+              )}
+            </div>
+            <span className={`text-[9px] font-black px-2 py-1 rounded-full ${
+              vehicle.status === 'ASSIGNED' 
+                ? 'bg-green-100 text-green-700' 
+                : 'bg-amber-100 text-amber-700'
+            }`}>
+              {vehicle.status === 'ASSIGNED' ? 'ASSIGNED' : 'AVAILABLE'}
+            </span>
+          </div>
+        </div>
+      ))}
+      
+      {vehicles.length === 0 && (
+        <div className="bg-white rounded-2xl p-8 text-center text-slate-400">
+          <Truck size={32} className="mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No vehicles yet</p>
+          <button onClick={openAddVehicleModal} className="mt-2 text-blue-600 text-xs font-black">
+            + Add your first vehicle
+          </button>
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
 
   // PAYMENTS TAB
   const PaymentsTab = () => (
@@ -653,24 +717,76 @@ const ProfileTab = () => (
           </div>
         )}
 
-        {/* Add Vehicle Modal */}
-        {showAddVehicle && (
-          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl w-full max-w-sm p-6">
-              <h3 className="text-lg font-black mb-4">Add Vehicle</h3>
-              <input placeholder="Vehicle Number (e.g., MH01AB1234)" className="w-full border rounded-xl p-3 mb-3 text-sm" 
-                value={newVehicle.number} onChange={e => setNewVehicle({...newVehicle, number: e.target.value})} />
-              <input placeholder="Model (e.g., Tata Ace)" className="w-full border rounded-xl p-3 mb-3 text-sm"
-                value={newVehicle.model} onChange={e => setNewVehicle({...newVehicle, model: e.target.value})} />
-              <input type="number" placeholder="Daily Rent (₹)" className="w-full border rounded-xl p-3 mb-4 text-sm"
-                value={newVehicle.rent} onChange={e => setNewVehicle({...newVehicle, rent: parseInt(e.target.value)})} />
-              <div className="flex gap-3">
-                <button onClick={() => setShowAddVehicle(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
-                <button onClick={addVehicle} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Add</button>
-              </div>
-            </div>
-          </div>
+        {/* Add Vehicle Modal with Driver Assignment */}
+{showAddVehicle && (
+  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-sm p-6">
+      <h3 className="text-lg font-black mb-4">Add New Vehicle</h3>
+      
+      {/* Vehicle Number */}
+      <input 
+        type="text"
+        placeholder="Vehicle Number (e.g., MH01AB1234)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm" 
+        value={newVehicle.number} 
+        onChange={e => setNewVehicle({...newVehicle, number: e.target.value})} 
+      />
+      
+      {/* Vehicle Model */}
+      <input 
+        placeholder="Model (e.g., Tata Ace)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm"
+        value={newVehicle.model} 
+        onChange={e => setNewVehicle({...newVehicle, model: e.target.value})} 
+      />
+      
+      {/* Daily Rent */}
+      <input 
+        type="number" 
+        placeholder="Daily Rent (₹)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm"
+        value={newVehicle.rent} 
+        onChange={e => setNewVehicle({...newVehicle, rent: parseInt(e.target.value)})} 
+      />
+      
+      {/* Assign Driver - Dropdown */}
+      <div className="mb-4">
+        <label className="block text-xs font-black text-slate-500 mb-1">Assign Driver (Optional)</label>
+        <select 
+          value={selectedDriverId} 
+          onChange={(e) => setSelectedDriverId(e.target.value)}
+          className="w-full border rounded-xl p-3 text-sm bg-white"
+        >
+          <option value="">-- Select Driver --</option>
+          {availableDrivers.map(driver => (
+            <option key={driver.id} value={driver.id}>
+              {driver.full_name} - {driver.mobile_number}
+            </option>
+          ))}
+        </select>
+        {availableDrivers.length === 0 && (
+          <p className="text-[10px] text-slate-400 mt-1">No drivers available. Add a driver first.</p>
         )}
+      </div>
+      
+      {/* Buttons */}
+      <div className="flex gap-3">
+        <button 
+          onClick={() => setShowAddVehicle(false)} 
+          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black"
+        >
+          Cancel
+        </button>
+        <button 
+          onClick={addVehicle} 
+          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black"
+        >
+          Add Vehicle
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* Add Driver Modal */}
         {showAddDriver && (
