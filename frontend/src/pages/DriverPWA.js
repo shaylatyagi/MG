@@ -156,7 +156,7 @@ export default function DriverPWA() {
 
   const claimRewards=()=>{
     if(rewards<=0) return alert('No unclaimed rewards.');
-    if(!confirm(`Claim ₹${rewards} bonus into your Wallet Float?`)) return;
+    if(!window.confirm(`Claim ₹${rewards} bonus into your Wallet Float?`)) return;
     setWallet(w=>w+rewards); setRewards(0);
     alert(`✅ ₹${rewards} credited to Wallet Float!`);
   };
@@ -287,7 +287,7 @@ export default function DriverPWA() {
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-50 flex justify-between items-center">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Recent Transactions</h3>
-          <button onClick={() => { setHistorySource('tab'); setActiveTab('history'); }} className="text-[10px] text-blue-600 font-black">View All →</button>
+          <button onClick={() => { setHistorySource('tab'); setTab('history'); }} className="text-[10px] text-blue-600 font-black">View All →</button>
         </div>
         <div className="divide-y">
           {payments.slice(0,3).map((p,i)=>(
