@@ -1,19 +1,4 @@
-// =====================================================================
-// payment_additions.js
-// ADD THESE ROUTES to your existing payment.js (or replace the matching ones)
-// Key fixes:
-//   1. add-driver → auto-creates company if owner has none
-//   2. webhook → updates auth.vehicle_drivers wallet + notifies owner
-//   3. /owner/notifications  → new endpoint
-//   4. /owner/recent-payments → new endpoint
-//   5. /notifications/mark-read → new endpoint
-//   6. /driver/dues → returns 0 if no vehicle assigned
-// =====================================================================
-
-// ─────────────────────────────────────────────────────────────────────
-// REPLACE: POST /owner/add-driver
-// Fix: auto-create company if owner has none; fix profile_photo_url
-// ─────────────────────────────────────────────────────────────────────
+const router = express.Router()
 router.post('/owner/add-driver', async (req, res) => {
   try {
     const { full_name, mobile_number, owner_id } = req.body;
