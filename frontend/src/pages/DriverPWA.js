@@ -43,6 +43,7 @@ export default function DriverPWA() {
 
   // Modals
   const [showNotif, setShowNotif] = useState(false);
+  const [showChatbot, setShowChatbot] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showSOS, setShowSOS] = useState(false);
   const [showPaying, setShowPaying] = useState(false);
@@ -608,6 +609,13 @@ const AccountTab = () => {
     </button>
     
     {/* NOTIFICATION BELL BUTTON */}
+    <button 
+  onClick={() => setShowChatbot(true)} 
+  className="p-2 rounded-xl bg-purple-100 hover:bg-purple-200 transition"
+  title="AI Assistant"
+>
+  <span className="text-lg">🤖</span>
+</button>
     <button onClick={()=>{setShowNotif(!showNotif); if(!showNotif) markRead();}} className="relative p-2 rounded-xl bg-slate-100 hover:bg-blue-50 transition">
       {unread > 0 ? <BellRing size={16} className="text-blue-600"/> : <Bell size={16} className="text-slate-600"/>}
       {unread > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{unread > 9 ? '9+' : unread}</span>}
