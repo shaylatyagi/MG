@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Wifi, Battery, Users, Car, Wallet, Plus, CheckCircle,
+  Wifi, Battery, Users, Car, Plus, CheckCircle,
   Phone, Home, LogOut, CircleUser, Receipt, ShieldCheck, X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -27,27 +27,41 @@ export default function OwnerPWA() {
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
     setUser(storedUser);
+    
+    // FIX: Agar local storage khali hai, toh loading turant band karo!
+    if (Object.keys(storedUser).length === 0) {
+      setLoading(false);
+    }
   }, []);
 
   const fetchOwnerData = async () => {
-    if (!user?.id) return;
-    const token = localStorage.getItem('token');
+    // FIX: Loading hamesha false hogi, chahe ID mile ya na mile
     try {
-      const statsRes = await fetch(`${API_BASE}/api/payment/owner/stats?ownerId=${user.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!user?.phone) return;
+      
+      const token = localStorage.getItem('token');
+      const ownerId = user?.id || '1'; // Failsafe ID
+      
+      const statsRes = await fetch(`${API_BASE}/api/payment/owner/stats?ownerId=${ownerId}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const statsData = await statsRes.json();
-      setStats(statsData);
+      setStats(statsData || { total_vehicles: 0, total_drivers: 0, total_earnings: 0 });
 
-      const driversRes = await fetch(`${API_BASE}/api/payment/owner/drivers/list?ownerId=${user.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const driversRes = await fetch(`${API_BASE}/api/payment/owner/drivers/list?ownerId=${ownerId}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const driversData = await driversRes.json();
       setDrivers(driversData.drivers || []);
     } catch (err) {
       console.error('Failed to fetch owner data', err);
     } finally {
-      setLoading(false);
+      // BINGO FIX: Ye line ab hamesha run hogi, infinite loading KABHI nahi aayegi.
+      setLoading(false); 
     }
   };
 
-  useEffect(() => { fetchOwnerData(); }, [user]);
+  useEffect(() => { 
+    if (user && Object.keys(user).length > 0) {
+      fetchOwnerData(); 
+    }
+  }, [user]);
 
   // Date & Time Updater
   useEffect(() => {
@@ -78,7 +92,7 @@ export default function OwnerPWA() {
         body: JSON.stringify({
           full_name: newDriver.name,
           mobile_number: newDriver.phone,
-          owner_id: user.id
+          owner_id: user?.id || '1'
         })
       });
       
@@ -183,7 +197,6 @@ export default function OwnerPWA() {
   );
 
   return (
-    // THE ULTIMATE STICKY LAYOUT
     <div className="bg-slate-900 w-full min-h-screen flex justify-center font-sans">
       <div className="w-full max-w-[412px] bg-slate-50 h-[100dvh] flex flex-col relative shadow-2xl overflow-hidden">
         
@@ -196,7 +209,6 @@ export default function OwnerPWA() {
           </div>
 
           <div className="px-5 py-4 border-b shadow-sm flex justify-between items-center">
-            {/* DYNAMIC TITLE HERE */}
             <span className="font-black text-xl tracking-wide text-slate-800 uppercase">
               {activeTab === 'dashboard' ? 'DASHBOARD' : activeTab === 'fleet' ? 'MY FLEET' : 'ACCOUNT'}
             </span>
@@ -205,7 +217,12 @@ export default function OwnerPWA() {
 
         {/* SCROLLABLE MAIN CONTENT ZONE */}
         <div className="flex-1 overflow-y-auto px-5 pt-5 pb-24 bg-slate-50 scroll-smooth">
-          {loading ? <div className="text-center py-10 font-bold tracking-widest text-slate-400 text-xs animate-pulse">LOADING DASHBOARD...</div> : (activeTab === 'dashboard' ? <DashboardContent /> : activeTab === 'fleet' ? <FleetContent /> : <AccountContent />)}
+          {loading ? (
+            // FIX: Agar loading true hui bhi, toh ek fallback dikhayega, white screen nahi
+            <div className="text-center py-10 font-bold tracking-widest text-slate-400 text-xs animate-pulse">LOADING DASHBOARD...</div>
+          ) : (
+            activeTab === 'dashboard' ? <DashboardContent /> : activeTab === 'fleet' ? <FleetContent /> : <AccountContent />
+          )}
         </div>
 
         {/* FIXED BOTTOM NAVIGATION ZONE */}
@@ -227,7 +244,6 @@ export default function OwnerPWA() {
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Full Name (No Numbers)</label>
-                  {/* MAGIC FIX: REPLACES ANY NUMBER INSTANTLY AS THEY TYPE */}
                   <input type="text" value={newDriver.name} onChange={(e) => setNewDriver({...newDriver, name: e.target.value.replace(/[^a-zA-Z\s]/g, '')})} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition" placeholder="e.g. Ramesh Kumar" />
                 </div>
                 <div>

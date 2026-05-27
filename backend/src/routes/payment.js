@@ -838,6 +838,29 @@ router.post('/webhook', async (req, res) => {
       console.log(`💰 Wallet Updated: +₹${amount} for ${localOrder.rows[0].payer_mobile}`);
 
     }
+    const driverInfo = await pool.query(
+  `SELECT u.id as user_id, dd.company_id 
+   FROM users u 
+   JOIN driver_details dd ON u.id = dd.user_id 
+   WHERE u.phone_number = $1 LIMIT 1`, 
+  [localOrder.rows[0].payer_mobile]
+);
+
+const driverId = driverInfo.rows[0]?.user_id;
+const companyId = driverInfo.rows[0]?.company_id;
+
+// 2. Ab update query mein inko add karo
+await pool.query(
+  `UPDATE ms_orders SET
+    transaction_status = $1,
+    transaction_status_code = $2,
+    driver_id = $3,          // <--- Naya field
+    company_id = $4,         // <--- Naya field
+    pg_transaction_id = COALESCE($5, pg_transaction_id),
+    order_completion_date = NOW()
+   WHERE order_id = $6`,
+  [status, payload.statusCode, driverId, companyId, payload.transactionId, orderId]
+);
 
 
     const paymentMode = payload.paymentMode || payload.paymentMethod || payload.payment_mode || payload.method || null;

@@ -19,16 +19,29 @@ const verifyToken = (req, res, next) => {
 // ==================== EXISTING ROUTE ====================
 router.post('/profile', verifyToken, async (req, res) => {
   const user_id = req.user.id;
+  const { name, phone, companyId } = req.body; // Frontend se ye fields aane chahiye
+
   try {
     const existing = await pool.query('SELECT * FROM drivers WHERE user_id = $1', [user_id]);
     if (existing.rows.length > 0) {
       return res.status(400).json({ message: 'Driver profile already exists' });
     }
+
+    // 1. UNIQUE DRIVER ID GENERATOR (Last 5 digits of phone + Name prefix)
+    const userCode = `MG-${name.substring(0, 3).toUpperCase()}-${phone.slice(-5)}`;
+
+    // 2. INSERT WITH ALL METADATA
     const result = await pool.query(
-      'INSERT INTO drivers (user_id) VALUES ($1) RETURNING *',
-      [user_id]
+      `INSERT INTO drivers (user_id, driver_id, vehicle_owner_company_id, full_name) 
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [user_id, userCode, companyId, name]
     );
-    res.status(201).json({ message: 'Driver profile created', driver: result.rows[0] });
+
+    res.status(201).json({ 
+      message: 'Driver profile created', 
+      driver: result.rows[0],
+      userCode: userCode // Frontend ko bhej rahe hain taaki localStorage mein save ho
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Something went wrong' });
