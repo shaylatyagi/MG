@@ -19,7 +19,8 @@ export default function OwnerDashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState('');
-  const [searchQuery, setSearchQuery] = useState(''); // SEARCH - ADDED
+  const [searchQuery, setSearchQuery] = useState('');
+  const [phoneNumber] = useState('9876542345'); // SEARCH - ADDED
   
   // Owner data
   const [owner, setOwner] = useState(null);
@@ -509,9 +510,9 @@ const ProfileTab = () => (
     </div>
     <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
-        <span className="text-xs text-slate-500">Phone</span>
-        <span className="text-xs font-black font-mono">{owner?.mobile_number || phoneNumber}</span>
-      </div>
+  <span className="text-xs text-slate-500">Phone</span>
+  <span className="text-xs font-black font-mono">{owner?.mobile_number || '9876542345'}</span>
+</div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500">Wallet Balance</span>
         <span className="text-xs font-black text-emerald-600">₹{parseFloat(owner?.wallet_balance || 0).toLocaleString('en-IN')}</span>
