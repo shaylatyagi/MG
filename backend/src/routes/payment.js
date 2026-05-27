@@ -838,29 +838,6 @@ router.post('/webhook', async (req, res) => {
       console.log(`💰 Wallet Updated: +₹${amount} for ${localOrder.rows[0].payer_mobile}`);
 
     }
-    const driverInfo = await pool.query(
-  `SELECT u.id as user_id, dd.company_id 
-   FROM users u 
-   JOIN driver_details dd ON u.id = dd.user_id 
-   WHERE u.phone_number = $1 LIMIT 1`, 
-  [localOrder.rows[0].payer_mobile]
-);
-
-const driverId = driverInfo.rows[0]?.user_id;
-const companyId = driverInfo.rows[0]?.company_id;
-
-// 2. Ab update query mein inko add karo
-await pool.query(
-  `UPDATE ms_orders SET
-    transaction_status = $1,
-    transaction_status_code = $2,
-    driver_id = $3,          // <--- Naya field
-    company_id = $4,         // <--- Naya field
-    pg_transaction_id = COALESCE($5, pg_transaction_id),
-    order_completion_date = NOW()
-   WHERE order_id = $6`,
-  [status, payload.statusCode, driverId, companyId, payload.transactionId, orderId]
-);
 
 
     const paymentMode = payload.paymentMode || payload.paymentMethod || payload.payment_mode || payload.method || null;
@@ -1074,36 +1051,23 @@ router.post('/check-pending', async (req, res) => {
 
 
 // SINGLE ORDER STATUS (Frontend ke liye)
-// backend/src/routes/payment.js me replace kar
 router.get('/order/:orderId', async (req, res) => {
   try {
+    // Frontend se 'ORD-xxx' aayega
     const { orderId } = req.params;
-    const cleanId = orderId ? orderId.trim() : '';
     
-    // STEP 1: Pehle ID se dhoondhne ki koshish karo
-    let order = await pool.query(
-      `SELECT * FROM ms_orders 
-       WHERE order_number ILIKE $1 
-          OR order_id::text ILIKE $1 
-          OR pg_transaction_id ILIKE $1`, 
-      [`%${cleanId}%`]
+    // BINGO FIX: Yahan 'order_number' column use karna hai, 'order_id' nahi!
+    const order = await pool.query(
+      `SELECT * FROM ms_orders WHERE order_number = $1`, 
+      [orderId]
     );
     
-    // STEP 2: THE LIFESAVER (NO FAKE DATA)
-    // Agar ID matching fail hui (jaise abhi format mismatch se ho rahi thi), 
-    // toh seedha DB se LATEST payment utha lo!
+    // Agar Webhook slow hai ya DB me record nahi hai
     if (order.rows.length === 0) {
-      order = await pool.query(
-        `SELECT * FROM ms_orders ORDER BY order_initiation_date DESC LIMIT 1`
-      );
+      return res.status(404).json({ success: false, message: 'Order strictly not found in ms_orders' });
     }
     
-    // Agar poora database hi khali ho tabhi 404 aayega
-    if (order.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Database is empty' });
-    }
-    
-    // 100% REAL DATABASE ROW
+    // Frontend ko 100% Real DB Data bhej do
     res.json({ success: true, data: order.rows[0] });
   } catch (err) {
     console.error('DB Fetch Error:', err.message);
