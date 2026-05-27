@@ -1,5 +1,5 @@
 // frontend/src/pages/OwnerDashboard.js
-// Mobile App Style - Same as Driver PWA
+// Complete with ALL buttons - Notification Bell, Logout, Chat, Search
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +19,7 @@ export default function OwnerDashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState('');
+  const [searchQuery, setSearchQuery] = useState(''); // SEARCH - ADDED
   
   // Owner data
   const [owner, setOwner] = useState(null);
@@ -108,36 +109,40 @@ export default function OwnerDashboard() {
       setLoading(false);
     }
   }, []);
-  // Add this useEffect in OwnerDashboard.js
-useEffect(() => {
-  const fetchNotifications = async () => {
-    try {
-      const oId = ownerId();
-      if (!oId) return;
-      
-      const res = await fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, {
-        headers: { Authorization: `Bearer ${token()}` }
-      });
-      const data = await res.json();
-      
-      if (Array.isArray(data)) {
-        setNotifications(data);
-        const newUnread = data.filter(n => !n.is_read).length;
-        setUnreadCount(newUnread);
-      }
-    } catch (err) {
-      console.error('Notification fetch error:', err);
-    }
-  };
-  
-  fetchNotifications();
-  const interval = setInterval(fetchNotifications, 15000);
-  
-  return () => clearInterval(interval);
-}, []);
+
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  // POLLING FOR REAL-TIME NOTIFICATIONS
+  useEffect(() => {
+    const pollNotifications = async () => {
+      const oId = ownerId();
+      if (!oId) return;
+      try {
+        const res = await fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setNotifications(data);
+          const newUnread = data.filter(n => !n.is_read).length;
+          if (newUnread > unreadCount) {
+            // New notification arrived
+            setUnreadCount(newUnread);
+          } else {
+            setUnreadCount(newUnread);
+          }
+        }
+      } catch (err) {
+        console.log('Polling error:', err);
+      }
+    };
+    
+    pollNotifications();
+    const interval = setInterval(pollNotifications, 10000);
+    return () => clearInterval(interval);
+  }, [unreadCount]);
 
   const logout = () => {
     localStorage.clear();
@@ -147,6 +152,13 @@ useEffect(() => {
   const markRead = async () => {
     setUnreadCount(0);
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    try {
+      const userId = ownerId();
+      await fetch(`${API}/api/payment/notifications/mark-read?userId=${userId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token()}` }
+      });
+    } catch (err) {}
   };
 
   const openChatWithDriver = async (driver) => {
@@ -234,6 +246,12 @@ useEffect(() => {
     }
   };
 
+  // Filter drivers based on search
+  const filteredDrivers = drivers.filter(driver => 
+    (driver.full_name || driver.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (driver.phone_number || driver.phone || '').includes(searchQuery)
+  );
+
   // Dynamic header title
   const getHeaderTitle = () => {
     const titles = {
@@ -249,7 +267,7 @@ useEffect(() => {
   const getHeaderSubtitle = () => {
     const subtitles = {
       'home': 'Command Center',
-      'drivers': `${drivers.length} Active Drivers`,
+      'drivers': `${filteredDrivers.length} Active Drivers`,
       'vehicles': `${vehicles.length} Vehicles`,
       'payments': 'Transaction History',
       'profile': owner?.name || 'Owner Profile'
@@ -257,7 +275,6 @@ useEffect(() => {
     return subtitles[activeTab] || '';
   };
 
-  // Stat Card Component
   const StatCard = ({ title, value, icon: Icon, color, trend }) => (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
       <div className="flex items-center justify-between">
@@ -281,7 +298,6 @@ useEffect(() => {
   // HOME TAB
   const HomeTab = () => (
     <div className="space-y-4 pb-4">
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
         <StatCard title="TOTAL FLEET" value={stats.totalVehicles} icon={Truck} color="bg-blue-600" />
         <StatCard title="ACTIVE DRIVERS" value={stats.totalDrivers} icon={Users} color="bg-emerald-600" />
@@ -289,7 +305,6 @@ useEffect(() => {
         <StatCard title="PENDING DUES" value={stats.pendingDues} icon={AlertCircle} color="bg-red-600" trend="down" />
       </div>
 
-      {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => setShowAddVehicle(true)} className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-4 text-white text-left">
           <Truck size={20} className="mb-2 opacity-80" />
@@ -303,7 +318,6 @@ useEffect(() => {
         </button>
       </div>
 
-      {/* Recent Drivers */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Recent Drivers</h3>
@@ -338,63 +352,60 @@ useEffect(() => {
           )}
         </div>
       </div>
-
-      {/* Recent Payments */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Recent Payments</h3>
-        </div>
-        <div className="divide-y">
-          {transactions.slice(0, 3).map((tx, i) => (
-            <div key={i} className="px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle size={12} className="text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-black text-slate-800">{tx.driver_name || 'Driver'}</p>
-                  <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
-                </div>
-              </div>
-              <p className="text-sm font-black text-emerald-600">₹{tx.order_amount || tx.amount}</p>
-            </div>
-          ))}
-          {transactions.length === 0 && (
-            <div className="p-8 text-center text-slate-400 text-xs">No payments yet</div>
-          )}
-        </div>
-      </div>
     </div>
   );
 
-  // DRIVERS TAB
+  // DRIVERS TAB with SEARCH
   const DriversTab = () => (
     <div className="space-y-3 pb-4">
+      {/* SEARCH BAR - ADDED */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          placeholder="Search by name or phone..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+            <X size={14} className="text-slate-400" />
+          </button>
+        )}
+      </div>
+      
       <button onClick={() => setShowAddDriver(true)} className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
         <UserPlus size={16} /> Add New Driver
       </button>
+      
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="divide-y">
-          {drivers.map((driver, i) => (
-            <div key={i} className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg">
-                    {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-black text-slate-800">{driver.full_name || driver.name}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
-                    <p className="text-[9px] text-slate-400">Vehicle: {driver.assigned_vehicle || 'Not Assigned'}</p>
-                  </div>
-                </div>
-                <button onClick={() => openChatWithDriver(driver)} className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                  <MessageCircle size={16} />
-                </button>
-              </div>
+          {filteredDrivers.length === 0 ? (
+            <div className="p-8 text-center text-slate-400">
+              {searchQuery ? 'No drivers match your search' : 'No drivers added yet'}
             </div>
-          ))}
-          {drivers.length === 0 && <div className="p-8 text-center text-slate-400">No drivers yet</div>}
+          ) : (
+            filteredDrivers.map((driver, i) => (
+              <div key={i} className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg">
+                      {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-black text-slate-800">{driver.full_name || driver.name}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
+                      <p className="text-[9px] text-slate-400">Vehicle: {driver.assigned_vehicle || 'Not Assigned'}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => openChatWithDriver(driver)} className="p-2 rounded-lg bg-blue-50 text-blue-600">
+                    <MessageCircle size={16} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -502,36 +513,49 @@ useEffect(() => {
           <span>{time}</span>
         </div>
 
-        {/* Header */}
+        {/* Header with ALL BUTTONS - Notification Bell, Logout, Search (in drivers tab only) */}
         <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shadow-sm">
           <div>
             <h1 className="text-lg font-black text-slate-800">{getHeaderTitle()}</h1>
             <p className="text-[10px] text-slate-400 font-black">{getHeaderSubtitle()}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-xl bg-slate-100">
-              {unreadCount > 0 ? <BellRing size={16} className="text-blue-600" /> : <Bell size={16} className="text-slate-600" />}
-              {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">{unreadCount}</span>}
+            {/* NOTIFICATION BELL */}
+            <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition">
+              {unreadCount > 0 ? <BellRing size={18} className="text-blue-600" /> : <Bell size={18} className="text-slate-600" />}
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
-            <button onClick={logout} className="p-2 rounded-xl bg-red-50"><LogOut size={16} className="text-red-600" /></button>
+            
+            {/* LOGOUT BUTTON */}
+            <button onClick={logout} className="p-2 rounded-xl bg-red-50 hover:bg-red-100 transition">
+              <LogOut size={18} className="text-red-600" />
+            </button>
           </div>
         </div>
 
         {/* Notification Panel */}
         {showNotif && (
           <div className="absolute top-[88px] right-3 w-72 bg-white rounded-2xl shadow-2xl border z-50">
-            <div className="px-4 py-2 border-b flex justify-between">
+            <div className="px-4 py-2 border-b flex justify-between items-center">
               <span className="text-[10px] font-black">Notifications</span>
               <button onClick={() => setShowNotif(false)}><X size={14} /></button>
             </div>
             <div className="max-h-64 overflow-y-auto">
-              {notifications.length === 0 ? <div className="p-4 text-center text-slate-400 text-xs">No notifications</div>
-                : notifications.map((n, i) => (
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-slate-400 text-xs">No notifications</div>
+              ) : (
+                notifications.map((n, i) => (
                   <div key={i} className={`px-4 py-3 border-b ${!n.is_read ? 'bg-blue-50' : ''}`}>
                     <p className="text-xs font-black">{n.title}</p>
                     <p className="text-[10px] text-slate-500">{n.message}</p>
+                    <p className="text-[9px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
                   </div>
-                ))}
+                ))
+              )}
             </div>
           </div>
         )}
@@ -551,7 +575,7 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Bottom Navigation - Same as Driver PWA */}
+        {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.04)]">
           {[
             { id: 'home', Icon: Home, label: 'Home' },
@@ -562,7 +586,10 @@ useEffect(() => {
           ].map(({ id, Icon, label }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => {
+                setActiveTab(id);
+                setSearchQuery(''); // Reset search when changing tabs
+              }}
               className={`flex flex-col items-center gap-1 transition-all ${activeTab === id ? 'text-blue-600 -translate-y-0.5' : 'text-slate-400'}`}
             >
               <Icon size={activeTab === id ? 22 : 20} />
