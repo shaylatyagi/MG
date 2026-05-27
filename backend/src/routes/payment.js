@@ -245,40 +245,58 @@ router.post('/driver/set-test-dues', async (req, res) => {
     res.status(500).json({ message: 'Failed to set test dues' });
   }
 });
-// GET DRIVER DUES
+// Backend payment.js - Add this endpoint
 router.get('/driver/dues', async (req, res) => {
   try {
     const { phone } = req.query;
-    if (!phone) return res.status(400).json({ message: 'Phone number required' });
     
-    // Get daily rent from assigned vehicle
+    if (!phone) {
+      return res.status(400).json({ message: 'Phone required' });
+    }
+    
+    // Get assigned vehicle daily rent
     const vehicleResult = await pool.query(
-      `SELECT ov.daily_rent 
-       FROM auth.owner_vehicles ov
-       JOIN auth.users u ON u.id = ov.driver_id
-       WHERE u.mobile_number = $1`,
+      `SELECT v.daily_rent, v.vehicle_number
+       FROM public.vehicles v
+       JOIN public.drivers d ON d.id = v.driver_id
+       WHERE d.mobile_number = $1`,
       [phone]
     );
     
-    const dailyRent = vehicleResult.rows[0]?.daily_rent || 850;
+    let dailyRent = 850;
+    let vehicleNumber = 'Not Assigned';
+    let vehicleAssigned = false;
     
-    // Get total paid today
+    if (vehicleResult.rows.length > 0) {
+      dailyRent = parseFloat(vehicleResult.rows[0].daily_rent || 850);
+      vehicleNumber = vehicleResult.rows[0].vehicle_number;
+      vehicleAssigned = true;
+    }
+    
+    // Get today's paid amount
     const paidResult = await pool.query(
-      `SELECT COALESCE(SUM(order_amount), 0) as total_paid
-       FROM ms_orders
+      `SELECT COALESCE(SUM(order_amount), 0) as paid
+       FROM public.ms_orders
        WHERE payer_mobile = $1 
-       AND transaction_status = 'SUCCESS'
-       AND order_completion_date >= CURRENT_DATE`,
+         AND transaction_status = 'SUCCESS'
+         AND DATE(order_completion_date) = CURRENT_DATE`,
       [phone]
     );
     
-    const totalPaid = parseFloat(paidResult.rows[0]?.total_paid || 0);
-    const pendingDues = Math.max(0, dailyRent - totalPaid);
+    const paidToday = parseFloat(paidResult.rows[0]?.paid || 0);
+    const dues = Math.max(0, dailyRent - paidToday);
     
-    res.json({ dues: pendingDues, daily_rent: dailyRent });
+    res.json({
+      dues: dues,
+      daily_rent: dailyRent,
+      vehicle_number: vehicleNumber,
+      vehicle_assigned: vehicleAssigned,
+      paid_today: paidToday
+    });
+    
   } catch (err) {
-    console.error('Dues fetch error:', err);
-    res.status(500).json({ message: 'Failed to fetch dues' });
+    console.error('Driver dues error:', err);
+    res.status(500).json({ message: 'Failed' });
   }
 });
 
@@ -397,30 +415,60 @@ router.post('/owner/vehicles', async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
+// Add this to your payment.js
+router.get('/owner/by-phone', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    const result = await pool.query(
+      'SELECT id, full_name, mobile_number, owner_code, wallet_balance, status FROM public.owners WHERE mobile_number = $1',
+      [phone]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Owner not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // ============================================
 // GET OWNER VEHICLES
 // ============================================
+// Backend payment.js - Replace this endpoint
 router.get('/owner/vehicles', async (req, res) => {
   try {
     const { ownerId } = req.query;
-    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+    console.log('Fetching vehicles for ownerId:', ownerId);
+    
+    if (!ownerId) {
+      return res.status(400).json({ message: 'Owner ID required' });
+    }
     
     const result = await pool.query(
       `SELECT 
-         v.id, v.vehicle_number, v.vehicle_model, v.daily_rent, v.status, v.created_at,
-         d.full_name as driver_name, d.mobile_number as driver_phone
+         v.id, 
+         v.vehicle_number, 
+         v.vehicle_model, 
+         v.daily_rent, 
+         v.status, 
+         v.created_at,
+         v.driver_id,
+         v.driver_name,
+         v.driver_phone
        FROM public.vehicles v
-       LEFT JOIN public.drivers d ON d.id = v.driver_id
        WHERE v.owner_id = $1
        ORDER BY v.created_at DESC`,
       [parseInt(ownerId)]
     );
     
+    console.log('Vehicles found:', result.rows.length);
     res.json(result.rows);
+    
   } catch (err) {
     console.error('Get vehicles error:', err);
-    res.status(500).json({ message: 'Failed' });
+    res.status(500).json({ message: 'Failed to fetch vehicles', error: err.message });
   }
 });
 
@@ -485,12 +533,17 @@ router.post('/owner/add-driver', async (req, res) => {
 // ============================================
 // GET OWNER DRIVERS
 // ============================================
+// Backend payment.js - Replace this endpoint
 router.get('/owner/drivers/list', async (req, res) => {
   try {
     const { ownerId } = req.query;
-    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+    console.log('Fetching drivers for ownerId:', ownerId);
     
-    // Get owner code
+    if (!ownerId) {
+      return res.status(400).json({ message: 'Owner ID required' });
+    }
+    
+    // First get owner_code
     const ownerResult = await pool.query(
       'SELECT owner_code FROM public.owners WHERE id = $1',
       [parseInt(ownerId)]
@@ -501,22 +554,29 @@ router.get('/owner/drivers/list', async (req, res) => {
     }
     
     const ownerCode = ownerResult.rows[0].owner_code;
+    console.log('Owner code:', ownerCode);
     
     const result = await pool.query(
       `SELECT 
-         d.id, d.full_name, d.mobile_number, d.driver_code, d.wallet_balance, d.status, d.created_at,
-         v.vehicle_number as assigned_vehicle
+         d.id, 
+         d.full_name, 
+         d.mobile_number, 
+         d.driver_code, 
+         d.wallet_balance, 
+         d.status, 
+         d.created_at
        FROM public.drivers d
-       LEFT JOIN public.vehicles v ON v.driver_id = d.id
        WHERE d.owner_code = $1
        ORDER BY d.created_at DESC`,
       [ownerCode]
     );
     
+    console.log('Drivers found:', result.rows.length);
     res.json({ drivers: result.rows });
+    
   } catch (err) {
     console.error('Get drivers error:', err);
-    res.status(500).json({ message: 'Failed' });
+    res.status(500).json({ message: 'Failed to fetch drivers', error: err.message });
   }
 });
 
@@ -553,38 +613,6 @@ router.get('/owner/stats', async (req, res) => {
   } catch (err) {
     console.error('Stats error:', err);
     res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0 });
-  }
-});
-
-// GET OWNER DRIVERS LIST
-router.get('/owner/drivers/list', async (req, res) => {
-  try {
-    const { ownerId } = req.query;
-    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
-    
-    const result = await pool.query(
-      `SELECT 
-        vd.user_id as id,
-        vd.full_name,
-        u.mobile_number as phone_number,
-        u.user_code as driver_code,
-        COALESCE(ov.vehicle_number, 'Not Assigned') as assigned_vehicle
-       FROM auth.vehicle_drivers vd
-       JOIN auth.users u ON u.id = vd.user_id
-       LEFT JOIN auth.owner_vehicles ov ON ov.driver_id = u.id
-       WHERE vd.vehicle_owner_company_id = (
-         SELECT cc.id FROM auth.client_companies cc
-         JOIN auth.client_company_users ccu ON ccu.client_company_id = cc.id
-         WHERE ccu.user_id = $1
-       )
-       ORDER BY vd.created_at DESC`,
-      [ownerId]
-    );
-    
-    res.json({ drivers: result.rows });
-  } catch (err) {
-    console.error('Owner drivers error:', err);
-    res.json({ drivers: [] });
   }
 });
 
@@ -1099,44 +1127,49 @@ router.get('/my-transactions', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch transactions' });
   }
 });
-// ============================================
-// NOTIFICATION ROUTES
-// ============================================
-
-// GET driver notifications
-router.get('/driver/notifications', async (req, res) => {
+// ====================================
+// Backend payment.js - Add this endpoint
+router.get('/driver/profile', async (req, res) => {
   try {
     const { phone } = req.query;
-    if (!phone) return res.status(400).json({ message: 'Phone required' });
+    console.log('Fetching driver profile for phone:', phone);
     
-    // Get user_id from phone number
-    const userResult = await pool.query(
-      'SELECT id FROM public.users WHERE phone_number = $1',
+    if (!phone) {
+      return res.status(400).json({ message: 'Phone required' });
+    }
+    
+    const result = await pool.query(
+      `SELECT 
+         d.id,
+         d.full_name as name,
+         d.mobile_number as phone,
+         d.driver_code,
+         d.wallet_balance,
+         d.status,
+         v.id as vehicle_id,
+         v.vehicle_number,
+         v.vehicle_model,
+         v.daily_rent as vehicle_daily_rent,
+         v.status as vehicle_status
+       FROM public.drivers d
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.mobile_number = $1`,
       [phone]
     );
     
-    if (userResult.rows.length === 0) {
-      return res.json([]);
+    console.log('Driver found:', result.rows.length);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Driver not found' });
     }
     
-    const userId = userResult.rows[0].id;
+    res.json(result.rows[0]);
     
-    const result = await pool.query(
-      `SELECT id, title, message, is_read, created_at, metadata
-       FROM public.notifications
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 50`,
-      [userId]
-    );
-    
-    res.json(result.rows);
   } catch (err) {
-    console.error('Driver notifications error:', err);
-    res.json([]);
+    console.error('Driver profile error:', err);
+    res.status(500).json({ message: 'Failed' });
   }
 });
-
 // GET owner notifications
 router.get('/owner/notifications', async (req, res) => {
   try {
