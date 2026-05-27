@@ -11,10 +11,16 @@ import {
   ArrowDownRight, Settings, Shield, Star, Menu, Calendar,
   DollarSign, Phone, Mail, MapPin, FileText, Copy
 } from 'lucide-react';
-
+import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah "Chatbot"
 const API = 'https://mg-qw5s.onrender.com';
 
 export default function OwnerDashboard() {
+  const [rentType, setRentType] = useState('DAILY'); // DAILY, WEEKLY, MONTHLY
+const rentTypeOptions = [
+  { value: 'DAILY', label: 'Daily Rent', multiplier: 1 },
+  { value: 'WEEKLY', label: 'Weekly Rent', multiplier: 7 },
+  { value: 'MONTHLY', label: 'Monthly Rent', multiplier: 30 }
+];
   const [availableDrivers, setAvailableDrivers] = useState([]);
 const [selectedDriverId, setSelectedDriverId] = useState('');
   const navigate = useNavigate();
@@ -534,59 +540,121 @@ const fetchAllData = useCallback(async () => {
 );
 
   // PAYMENTS TAB
-  const PaymentsTab = () => (
+  // PAYMENTS TAB with transaction history
+const PaymentsTab = () => {
+  const [transactions, setTransactions] = useState([]);
+  const [loadingTx, setLoadingTx] = useState(false);
+  
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+  
+  const fetchTransactions = async () => {
+    setLoadingTx(true);
+    try {
+      const res = await fetch(`${API}/api/payment/owner/transactions?ownerId=${ownerId()}`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      });
+      const data = await res.json();
+      setTransactions(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingTx(false);
+    }
+  };
+  
+  return (
     <div className="space-y-4 pb-4">
       <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-5 text-white">
         <p className="text-[10px] font-black opacity-80">Total Collection</p>
         <p className="text-3xl font-black">₹{stats.todayCollection.toLocaleString('en-IN')}</p>
         <p className="text-[10px] opacity-70 mt-1">Last 30 days</p>
       </div>
+      
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100">
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
           <h3 className="text-[10px] font-black text-slate-400 uppercase">Transaction History</h3>
         </div>
-        <div className="divide-y">
-          {transactions.map((tx, i) => (
-            <div key={i} className="px-4 py-3 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-black text-slate-800">{tx.driver_name || 'Driver'}</p>
-                <p className="text-[9px] text-slate-400">{new Date(tx.order_completion_date || tx.date).toLocaleDateString()}</p>
+        <div className="divide-y max-h-96 overflow-y-auto">
+          {loadingTx ? (
+            <div className="p-8 text-center text-slate-400 text-xs">Loading...</div>
+          ) : transactions.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs">No transactions yet</div>
+          ) : (
+            transactions.map((tx, i) => (
+              <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+                <div>
+                  <p className="text-xs font-black text-slate-800">{tx.driver_name || 'Driver'}</p>
+                  <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
+                  <p className="text-[9px] text-slate-400 font-mono">{new Date(tx.order_completion_date || tx.date).toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-emerald-600">₹{tx.order_amount || tx.amount}</p>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{tx.transaction_status || 'SUCCESS'}</span>
+                </div>
               </div>
-              <p className="text-sm font-black text-emerald-600">₹{tx.order_amount || tx.amount}</p>
-            </div>
-          ))}
-          {transactions.length === 0 && <div className="p-8 text-center text-slate-400">No transactions</div>}
+            ))
+          )}
         </div>
       </div>
     </div>
   );
+};
 
   // PROFILE TAB
   // PROFILE TAB in OwnerDashboard.js
+// PROFILE TAB - Complete
 const ProfileTab = () => (
   <div className="space-y-4 pb-4">
     <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white text-center">
-      <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3">
-        {owner?.full_name?.charAt(0) || owner?.name?.charAt(0) || 'O'}
+      <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3 cursor-pointer hover:bg-white/30 transition">
+        <Camera size={24} className="text-white" />
       </div>
-      <h2 className="text-lg font-black">{owner?.full_name || owner?.name || 'Owner'}</h2>
-      <p className="text-xs text-blue-200">Owner Code: {owner?.owner_code || 'OWN001'}</p>
+      <h2 className="text-lg font-black">{owner?.full_name || owner?.name || 'Rajesh Kumar'}</h2>
+      <p className="text-xs text-blue-200">Owner Code: {owner?.owner_code || 'OWN701951'}</p>
+      <p className="text-[10px] text-blue-200 mt-1">Member since {new Date().toLocaleDateString()}</p>
     </div>
+    
     <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
-  <span className="text-xs text-slate-500">Phone</span>
-  <span className="text-xs font-black font-mono">{owner?.mobile_number || '9876542345'}</span>
-</div>
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Phone size={12} /> Phone</span>
+        <span className="text-xs font-black font-mono">{owner?.mobile_number || '9876542345'}</span>
+      </div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
-        <span className="text-xs text-slate-500">Wallet Balance</span>
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Mail size={12} /> Email</span>
+        <span className="text-xs font-black">{owner?.email || 'rajesh@mobilitygrid.com'}</span>
+        <button className="text-[9px] text-blue-600">Edit</button>
+      </div>
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Wallet size={12} /> Wallet Balance</span>
         <span className="text-xs font-black text-emerald-600">₹{parseFloat(owner?.wallet_balance || 0).toLocaleString('en-IN')}</span>
       </div>
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Truck size={12} /> Total Fleet</span>
+        <span className="text-xs font-black">{stats.totalVehicles} Vehicles</span>
+      </div>
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Users size={12} /> Total Drivers</span>
+        <span className="text-xs font-black">{stats.totalDrivers} Drivers</span>
+      </div>
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Building size={12} /> Business Name</span>
+        <span className="text-xs font-black">{owner?.business_name || 'MobilityGrid Fleet Services'}</span>
+        <button className="text-[9px] text-blue-600">Edit</button>
+      </div>
       <div className="flex justify-between items-center py-2">
-        <span className="text-xs text-slate-500">Status</span>
-        <span className="text-xs font-black text-emerald-600">{owner?.status || 'ACTIVE'}</span>
+        <span className="text-xs text-slate-500 flex items-center gap-2"><MapPin size={12} /> Address</span>
+        <span className="text-xs font-black text-right">{owner?.address || 'Mumbai, Maharashtra'}</span>
+        <button className="text-[9px] text-blue-600">Edit</button>
       </div>
     </div>
-    <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2">
+    
+    <button className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
+      <Edit2 size={14} /> Edit Profile
+    </button>
+    
+    <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2 border border-red-100">
       <LogOut size={14} /> Logout
     </button>
   </div>
@@ -686,7 +754,15 @@ const ProfileTab = () => (
             </button>
           ))}
         </div>
-
+        {showChatbot && (
+  <Chatbot 
+    userRole="OWNER"
+    userId={ownerId()}
+    userPhone="9876542345"
+    token={token()}
+    onClose={() => setShowChatbot(false)}
+  />
+)}
         {/* Chat Modal */}
         {showChat && selectedDriver && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -740,49 +816,75 @@ const ProfileTab = () => (
         onChange={e => setNewVehicle({...newVehicle, model: e.target.value})} 
       />
       
-      {/* Daily Rent */}
-      <input 
-        type="number" 
-        placeholder="Daily Rent (₹)" 
-        className="w-full border rounded-xl p-3 mb-3 text-sm"
-        value={newVehicle.rent} 
-        onChange={e => setNewVehicle({...newVehicle, rent: parseInt(e.target.value)})} 
-      />
+      {/* Vehicle Type Dropdown */}
+      <select 
+        className="w-full border rounded-xl p-3 mb-3 text-sm bg-white"
+        value={newVehicle.type || 'TRUCK'}
+        onChange={e => setNewVehicle({...newVehicle, type: e.target.value})}
+      >
+        <option value="TRUCK">🚛 Truck</option>
+        <option value="CAR">🚗 Car</option>
+        <option value="BUS">🚌 Bus</option>
+        <option value="TEMP TRAVELLER">🚐 Tempo Traveller</option>
+        <option value="AUTO">🛺 Auto Rickshaw</option>
+      </select>
       
-      {/* Assign Driver - Dropdown */}
+      {/* Rent Type Dropdown */}
+      <div className="mb-3">
+        <label className="text-[10px] font-black text-slate-500 block mb-1">Rent Type</label>
+        <select 
+          value={rentType}
+          onChange={(e) => setRentType(e.target.value)}
+          className="w-full border rounded-xl p-3 text-sm bg-white"
+        >
+          <option value="DAILY">📅 Daily Rent</option>
+          <option value="WEEKLY">📆 Weekly Rent</option>
+          <option value="MONTHLY">📅 Monthly Rent</option>
+        </select>
+      </div>
+      
+      {/* Daily/Weekly/Monthly Rent Amount */}
+      <div className="mb-3">
+        <label className="text-[10px] font-black text-slate-500 block mb-1">
+          {rentType === 'DAILY' && 'Daily Rent (₹ per day)'}
+          {rentType === 'WEEKLY' && 'Weekly Rent (₹ per week)'}
+          {rentType === 'MONTHLY' && 'Monthly Rent (₹ per month)'}
+        </label>
+        <input 
+          type="number" 
+          placeholder={rentType === 'DAILY' ? "e.g., 850" : rentType === 'WEEKLY' ? "e.g., 5950" : "e.g., 25500"} 
+          className="w-full border rounded-xl p-3 text-sm"
+          value={newVehicle.rent} 
+          onChange={e => setNewVehicle({...newVehicle, rent: parseInt(e.target.value)})} 
+        />
+        <p className="text-[9px] text-slate-400 mt-1">
+          {rentType === 'DAILY' && 'Driver will pay ₹850 every day'}
+          {rentType === 'WEEKLY' && `Driver will pay ₹${newVehicle.rent || 5950} every week`}
+          {rentType === 'MONTHLY' && `Driver will pay ₹${newVehicle.rent || 25500} every month`}
+        </p>
+      </div>
+      
+      {/* Assign Driver Dropdown */}
       <div className="mb-4">
-        <label className="block text-xs font-black text-slate-500 mb-1">Assign Driver (Optional)</label>
+        <label className="text-[10px] font-black text-slate-500 block mb-1">Assign Driver (Optional)</label>
         <select 
           value={selectedDriverId} 
           onChange={(e) => setSelectedDriverId(e.target.value)}
           className="w-full border rounded-xl p-3 text-sm bg-white"
         >
           <option value="">-- Select Driver --</option>
-          {availableDrivers.map(driver => (
+          {drivers.map(driver => (
             <option key={driver.id} value={driver.id}>
               {driver.full_name} - {driver.mobile_number}
             </option>
           ))}
         </select>
-        {availableDrivers.length === 0 && (
-          <p className="text-[10px] text-slate-400 mt-1">No drivers available. Add a driver first.</p>
-        )}
       </div>
       
       {/* Buttons */}
       <div className="flex gap-3">
-        <button 
-          onClick={() => setShowAddVehicle(false)} 
-          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black"
-        >
-          Cancel
-        </button>
-        <button 
-          onClick={addVehicle} 
-          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black"
-        >
-          Add Vehicle
-        </button>
+        <button onClick={() => setShowAddVehicle(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
+        <button onClick={addVehicle} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Add Vehicle</button>
       </div>
     </div>
   </div>

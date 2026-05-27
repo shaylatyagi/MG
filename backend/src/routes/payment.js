@@ -416,20 +416,37 @@ router.post('/owner/vehicles', async (req, res) => {
   }
 });
 // Add this to your payment.js
+// ============================================
+// GET OWNER BY PHONE NUMBER - ADD THIS ENDPOINT
+// ============================================
 router.get('/owner/by-phone', async (req, res) => {
   try {
     const { phone } = req.query;
+    console.log('🔍 /owner/by-phone called for phone:', phone);
+    
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number required' });
+    }
+    
     const result = await pool.query(
-      'SELECT id, full_name, mobile_number, owner_code, wallet_balance, status FROM public.owners WHERE mobile_number = $1',
+      `SELECT id, full_name, mobile_number, owner_code, wallet_balance, status, created_at
+       FROM public.owners 
+       WHERE mobile_number = $1`,
       [phone]
     );
     
+    console.log('📊 Query result rows:', result.rows.length);
+    
     if (result.rows.length === 0) {
+      console.log('❌ Owner not found for phone:', phone);
       return res.status(404).json({ error: 'Owner not found' });
     }
     
+    console.log('✅ Owner found:', result.rows[0]);
     res.json(result.rows[0]);
+    
   } catch (err) {
+    console.error('Owner by phone error:', err);
     res.status(500).json({ error: err.message });
   }
 });
