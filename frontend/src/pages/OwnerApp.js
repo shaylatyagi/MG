@@ -3,13 +3,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
+import { 
+  Camera, Edit2, Building, MapPin, Mail, Phone, 
   Home, Users, Truck, Wallet, CreditCard, Bell, BellRing,
   LogOut, MessageCircle, X, Send, CheckCircle, Clock,
   AlertCircle, ChevronLeft, Plus, Eye, EyeOff, Search,
   Filter, UserPlus, TruckIcon, TrendingUp, ArrowUpRight,
   ArrowDownRight, Settings, Shield, Star, Menu, Calendar,
-  DollarSign, Phone, Mail, MapPin, FileText, Copy
+  DollarSign, Copy, FileText, Landmark, Fingerprint, FileCheck2
 } from 'lucide-react';
 import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah "Chatbot"
 const API = 'https://mg-qw5s.onrender.com';
@@ -46,6 +47,7 @@ const [selectedDriverId, setSelectedDriverId] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   
   // Chat state
+  const [showChatbot, setShowChatbot] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [chatInput, setChatInput] = useState('');
@@ -678,6 +680,13 @@ const ProfileTab = () => (
           </div>
           <div className="flex items-center gap-2">
             {/* NOTIFICATION BELL */}
+            <button 
+  onClick={() => setShowChatbot(true)} 
+  className="p-2 rounded-xl bg-purple-100 hover:bg-purple-200 transition"
+  title="AI Assistant"
+>
+  <span className="text-lg">🤖</span>
+</button>
             <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition">
               {unreadCount > 0 ? <BellRing size={18} className="text-blue-600" /> : <Bell size={18} className="text-slate-600" />}
               {unreadCount > 0 && (
