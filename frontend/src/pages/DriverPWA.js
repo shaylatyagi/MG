@@ -58,20 +58,57 @@ export default function DriverPWA() {
   }, []);
 
   // Fetch all real data
+  const fetchAllData = async () => {
+  if (!user) return;
+  setLoading(true);
   try {
-  const duesRes = await fetch(`${API_BASE}/api/driver/dues?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
-  const duesData = await duesRes.json();
-  if (duesData && duesData.dues !== undefined) {
-    setDuesAmount(duesData.dues);
-    setPaymentAmount(duesData.dues);
-  } else {
+    const token = localStorage.getItem('token');
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const rawPhone = storedUser?.phone_number || storedUser?.mobile_number || '9876542345';
+    const phone = String(rawPhone).replace(/\D/g, '').slice(-10);
+
+    // Transactions fetch karo
+    const txnRes = await fetch(`${API_BASE}/api/payment/my-transactions?phone=${phone}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const txnData = await txnRes.json();
+    if (Array.isArray(txnData)) {
+      const payments = txnData.map(t => ({
+        id: t.pg_transaction_id || t.order_id,
+        type: 'Rent Payment',
+        amount: t.order_amount,
+        date: new Date(t.order_initiation_date).toLocaleDateString('en-IN'),
+        status: t.transaction_status,
+        ref: t.order_number,
+        isCredit: false
+      }));
+      setRecentPayments(payments);
+    }
+
+    // Driver details fetch karo
+    const detailsRes = await fetch(`${API_BASE}/api/payment/driver-details`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const detailsData = await detailsRes.json();
+    if (detailsData) {
+      setWalletBalance(detailsData.wallet_balance || 0);
+      const dues = (detailsData.daily_rent || 0) - (detailsData.amount_paid_today || 0);
+      setDuesAmount(dues > 0 ? dues : 0);
+      setPaymentAmount(dues > 0 ? dues : 0);
+      setTelemetry({
+        vehicleNumber: detailsData.vehicle_number || 'Not Assigned',
+        battery: detailsData.battery_level || 0,
+        driven: detailsData.kms_driven || 0
+      });
+    }
+  } catch (err) {
+    console.error('fetchAllData error:', err);
     setDuesAmount(850);
     setPaymentAmount(850);
+  } finally {
+    setLoading(false);
   }
-} catch {
-  setDuesAmount(850);
-  setPaymentAmount(850);
-}
+};
 
   useEffect(() => {
     fetchAllData();
