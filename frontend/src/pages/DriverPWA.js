@@ -58,67 +58,20 @@ export default function DriverPWA() {
   }, []);
 
   // Fetch all real data
-  const fetchAllData = async () => {
-    if (!user) return;
-    const token = localStorage.getItem('token');
-    
-    // PHONE NUMBER FIX:
-    const rawPhone = user.phone || user.mobile_number || '9876542345';
-    const phone = String(rawPhone).replace(/\D/g, '').slice(-10);
-    
-    try {
-      const walletRes = await fetch(`${API_BASE}/api/driver/wallet?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const walletData = await walletRes.json();
-      if (walletData.balance !== undefined) setWalletBalance(walletData.balance);
-
-      const telemetryRes = await fetch(`${API_BASE}/api/driver/telemetry?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const telemetryData = await telemetryRes.json();
-      setTelemetry(telemetryData);
-
-      const duesRes = await fetch(`${API_BASE}/api/driver/dues?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const duesData = await duesRes.json();
-      if (duesData && duesData.dues !== undefined) {
-        setDuesAmount(duesData.dues||850);
-        setPaymentAmount(duesData.dues);
-      }
-
-      // TRANSACTIONS FETCH FIX (Debit / Minus handling)
-      const txnRes = await fetch(`${API_BASE}/api/payment/my-transactions?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const txnData = await txnRes.json();
-      
-      if (Array.isArray(txnData)) {
-        setRecentPayments(txnData.map(t => {
-          const isSuccess = t.transaction_status === 'SUCCESS' || t.transaction_status === 'Success';
-          return {
-            id: t.order_number || t.order_id, 
-            amount: parseFloat(t.order_amount || 0),
-            date: t.order_completion_date 
-                  ? new Date(t.order_completion_date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) 
-                  : new Date(t.order_initiation_date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-            type: isSuccess ? 'Rent Paid' : 'Pending',
-            isCredit: false, // DRIVER IS PAYING = DEBIT (-)
-            status: t.transaction_status,
-            paymentMode: t.payment_mode || 'UPI',
-            ref: t.pg_transaction_id || t.bank_reference_no || 'N/A'
-          };
-        }));
-      }
-
-      const notifRes = await fetch(`${API_BASE}/api/driver/notifications?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const notifData = await notifRes.json();
-      if (Array.isArray(notifData)) setNotifications(notifData);
-      
-    } catch (err) {
-      console.error('Fetch error:', err);
-      // Fallbacks just in case
-      setWalletBalance(150);
-      setDuesAmount(850); 
-      setPaymentAmount(850); 
-      setTelemetry({ vehicleNumber: 'MH-12-QX-4019', battery: 92, driven: 45 });
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+  const duesRes = await fetch(`${API_BASE}/api/driver/dues?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
+  const duesData = await duesRes.json();
+  if (duesData && duesData.dues !== undefined) {
+    setDuesAmount(duesData.dues);
+    setPaymentAmount(duesData.dues);
+  } else {
+    setDuesAmount(850);
+    setPaymentAmount(850);
+  }
+} catch {
+  setDuesAmount(850);
+  setPaymentAmount(850);
+}
 
   useEffect(() => {
     fetchAllData();
@@ -151,42 +104,43 @@ export default function DriverPWA() {
   }, []);
 
   const initiatePayment = async () => {
-    if (!paymentAmount || paymentAmount <= 0) {
-      alert("No pending dues found or invalid amount.");
-      return;
-    }
-    setShowPaymentModal(true);
-    const token = localStorage.getItem('token');
-    try {
-      const rawPhone = user?.phone || user?.mobile_number || '9876542345';
-      const phone = String(rawPhone).replace(/\D/g, '').slice(-10);
+  setShowPaymentModal(true);
+  const token = localStorage.getItem('token');
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const rawPhone = storedUser?.phone_number || storedUser?.phone || storedUser?.mobile_number || '9876542345';
+  const phone = String(rawPhone).replace(/\D/g, '').slice(-10);
+  const amount = duesAmount > 0 ? duesAmount : 850;
 
-      const response = await fetch(`${API_BASE}/api/payment/create-order`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({
-          amount: paymentAmount,
-          customerName: user?.name || 'Driver',
-          customerPhone: phone,
-          customerEmail: user?.email || 'driver@mobilitygrid.com'
-        })
-      });
-      const data = await response.json();
-      
-      if (!response.ok) throw new Error(data.message || 'Payment initiation failed');
-      
-      const checkoutUrl = data?.data?.data?.checkoutUrl || data?.checkoutUrl;
-      if (checkoutUrl) window.location.href = checkoutUrl;
-      else throw new Error('No checkout URL received');
-    } catch (error) {
-      console.error('Payment error:', error);
-      alert(`Payment failed: ${error.message}`);
+  try {
+    const response = await fetch(`${API_BASE}/api/payment/create-order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        amount: amount,
+        customerName: storedUser?.name || 'Driver',
+        customerPhone: phone,
+        customerEmail: storedUser?.email || 'driver@mobilitygrid.com'
+      })
+    });
+
+    const data = await response.json();
+    const checkoutUrl = data?.data?.data?.checkoutUrl || data?.checkoutUrl;
+
+    if (checkoutUrl) {
+      window.location.href = checkoutUrl;
+    } else {
+      alert('Payment gateway error. Please try again.');
       setShowPaymentModal(false);
     }
-  };
+  } catch (error) {
+    console.error('Payment error:', error);
+    alert('Network error. Please check your connection.');
+    setShowPaymentModal(false);
+  }
+};
 
   const handleUpdateProfile = () => {
     // Save to local storage for real-time reflection
