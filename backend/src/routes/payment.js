@@ -1,4 +1,7 @@
-const router = express.Router()
+const express = require('express');
+const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
+const pool = require('../config/db');
 router.post('/owner/add-driver', async (req, res) => {
   try {
     const { full_name, mobile_number, owner_id } = req.body;
@@ -476,3 +479,4 @@ router.get('/owner/stats', async (req, res) => {
     res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0, paid_today: 0 });
   }
 });
+module.exports = router;
