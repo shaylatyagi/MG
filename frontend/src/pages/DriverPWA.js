@@ -22,7 +22,7 @@ export default function DriverPWA() {
   return titles[tab] || 'MobilityGrid';
 };
   const navigate = useNavigate();
-  const [tab, setTab] = useState('account'); // Changed from 'home' to 'account'
+  const [tab, setTab] = useState('home'); // Changed from 'home' to 'account'
   const [historyFrom, setHistoryFrom] = useState('tab');
   const [lang, setLang] = useState('en');
   const [time, setTime] = useState('');
@@ -397,7 +397,7 @@ useEffect(() => {
   const WalletTab = () => (
     <div className="space-y-4 pb-4">
       {historyFrom === 'transaction' && (
-        <button onClick={() => { setHistoryFrom('tab'); setTab('account'); }} className="flex items-center gap-1 text-blue-600 font-black text-xs mb-2">
+        <button onClick={() => { setHistoryFrom('tab'); setTab('home'); }} className="flex items-center gap-1 text-blue-600 font-black text-xs mb-2">
           <ChevronLeft size={16} /> Back to Dashboard
         </button>
       )}
@@ -570,19 +570,6 @@ useEffect(() => {
     </button>
   </div>
 </div>
-
-        <div className="flex items-center gap-2.5">
-  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-600/20">MG</div>
-  <div>
-    <span className="font-black text-slate-800 text-sm tracking-tight block">{getHeaderTitle(tab)}</span>
-    <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest -mt-0.5 block">
-      {tab === 'home' && 'Driver Terminal'}
-      {tab === 'wallet' && 'Balance & Transactions'}
-      {tab === 'account' && 'Profile & KYC'}
-    </span>
-  </div>
-</div>
-
         {/* NOTIFICATION DROPDOWN */}
         {showNotif && (
           <div className="absolute top-[108px] right-3 w-72 bg-white rounded-2xl shadow-2xl border z-[60] overflow-hidden">
