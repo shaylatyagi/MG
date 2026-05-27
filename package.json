@@ -4,5 +4,10 @@
     "react-router-dom": "^7.15.0",
     "recharts": "^3.8.1",
     "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.0"
   }
 }
