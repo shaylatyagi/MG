@@ -78,7 +78,7 @@ export default function DriverPWA() {
       const duesRes = await fetch(`${API_BASE}/api/driver/dues?phone=${phone}`, { headers: { 'Authorization': `Bearer ${token}` } });
       const duesData = await duesRes.json();
       if (duesData && duesData.dues !== undefined) {
-        setDuesAmount(duesData.dues);
+        setDuesAmount(duesData.dues||850);
         setPaymentAmount(duesData.dues);
       }
 
