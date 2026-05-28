@@ -19,7 +19,27 @@ router.get('/available/vehicles', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
+router.post('/unassign', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { vehicleId } = req.body;
+    await client.query('BEGIN');
+    const veh = await client.query('SELECT driver_id FROM vehicles WHERE id=$1', [vehicleId]);
+    const driverId = veh.rows[0]?.driver_id;
+    await client.query(
+      `UPDATE vehicles SET driver_id=NULL, driver_name=NULL, driver_phone=NULL, status='AVAILABLE' WHERE id=$1`,
+      [vehicleId]
+    );
+    if (driverId) {
+      await client.query('UPDATE drivers SET assigned_vehicle_id=NULL WHERE id=$1', [driverId]);
+    }
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ success: false, error: err.message });
+  } finally { client.release(); }
+});
 // Get available drivers for a vehicle (drivers without vehicle)
 router.get('/available/drivers', async (req, res) => {
   try {

@@ -709,9 +709,24 @@ const fetchAllData = useCallback(async () => {
       </div>
     </div>
   );
-
-  // DRIVERS TAB with SEARCH
-  // DRIVERS TAB with SEARCH and Assignment - COMPLETE FIXED VERSION
+  const handleUnassign = async (vehicleId) => {
+  if (!window.confirm('Remove this driver from the vehicle?')) return;
+  try {
+    const res = await fetch(`${API}/api/assignment/unassign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      body: JSON.stringify({ vehicleId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('✅ Driver removed from vehicle');
+      setShowVehicleDetailModal(false);
+      setSelectedVehicleDetails(null);
+      fetchAllData();
+      fetchUnassignedData();
+    } else alert(data.error || 'Failed');
+  } catch (err) { alert('Network error'); }
+};
 const DriversTab = () => {
   const [selectedDriverForAssignInTab, setSelectedDriverForAssignInTab] = useState(null);
   const [showDriverAssignModal, setShowDriverAssignModal] = useState(false);
@@ -731,7 +746,6 @@ const DriversTab = () => {
       console.error(err);
     }
   };
-  
   const handleAssignFromDriversTab = async () => {
     if (!selectedDriverForAssignInTab || !selectedVehicleForAssign) {
       alert('Please select both driver and vehicle');
@@ -1026,13 +1040,34 @@ const DriversTab = () => {
         
         {/* Rest of the modal content */}
         <div className="p-5">
-          {/* ... existing content ... */}
-          
-          {/* Rent Type Selection - add stopPropagation */}
           <div className="border-t pt-4">
-            <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
-              <UserPlus size={16} /> Assign to Driver
-            </h3>
+            {vehicle.driver_id ? (
+              // Already assigned — show current driver + unassign button
+              <div className="space-y-3">
+                <h3 className="font-black text-slate-800 flex items-center gap-2">
+                  <Users size={16} /> Assigned Driver
+                </h3>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <p className="font-black text-slate-800 text-lg">{vehicle.driver_name}</p>
+                  <p className="text-xs text-slate-500 font-mono mt-1">{vehicle.driver_phone}</p>
+                  <div className="mt-2 pt-2 border-t border-emerald-200">
+                    <p className="text-[10px] text-slate-400">Daily Rent</p>
+                    <p className="font-black text-emerald-600">₹{vehicle.daily_rent}/day</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleUnassign(vehicle.id)}
+                  className="w-full py-3 bg-red-50 text-red-600 rounded-xl text-sm font-black border border-red-200 hover:bg-red-100 transition"
+                >
+                  🔗 Remove Driver Assignment
+                </button>
+              </div>
+            ) : (
+              // Not assigned — show assignment form
+              <>
+                <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+                  <UserPlus size={16} /> Assign to Driver
+                </h3>
             
             <div className="mb-4">
               <label className="text-xs font-black text-slate-600 block mb-2">Select Rent Plan</label>
@@ -1124,6 +1159,8 @@ const DriversTab = () => {
             >
               {assigning ? 'Assigning...' : '✓ Assign & Notify Driver'}
             </button>
+              </>
+            )}
           </div>
         </div>
       </div>
