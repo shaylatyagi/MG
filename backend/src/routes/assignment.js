@@ -2,7 +2,41 @@ const express = require('express');
 const pool = require('../config/db');
 
 const router = express.Router();
+// Get available vehicles for a driver (vehicles without driver)
+router.get('/available/vehicles', async (req, res) => {
+  try {
+    const { driverId } = req.query;
+    
+    const result = await pool.query(
+      `SELECT id, vehicle_number, vehicle_model, daily_rent 
+       FROM vehicles 
+       WHERE driver_id IS NULL 
+       AND status = 'ACTIVE'
+       ORDER BY vehicle_number`
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
+// Get available drivers for a vehicle (drivers without vehicle)
+router.get('/available/drivers', async (req, res) => {
+  try {
+    const { vehicleId } = req.query;
+    
+    const result = await pool.query(
+      `SELECT id, full_name, mobile_number, driver_code 
+       FROM drivers 
+       WHERE assigned_vehicle_id IS NULL 
+       AND status = 'ACTIVE'
+       ORDER BY full_name`
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 // Get unassigned drivers (for owner dashboard top section)
 router.get('/unassigned/drivers', async (req, res) => {
   try {
@@ -36,7 +70,54 @@ router.get('/unassigned/vehicles', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
+// Assign vehicle to driver with rent type
+router.post('/assign-with-rent', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { vehicleId, driverId, rentType, rentAmount, dailyRent } = req.body;
+    
+    await client.query('BEGIN');
+    
+    // Update vehicle
+    await client.query(
+      `UPDATE vehicles SET driver_id = $1, rent_type = $2, rent_amount = $3, daily_rent = $4 WHERE id = $5`,
+      [driverId, rentType, rentAmount, dailyRent, vehicleId]
+    );
+    
+    // Update driver
+    await client.query(
+      `UPDATE drivers SET assigned_vehicle_id = $1, rent_type = $2, rent_amount = $3 WHERE id = $4`,
+      [vehicleId, rentType, rentAmount, driverId]
+    );
+    
+    // Create notification for driver
+    await client.query(
+      `INSERT INTO notifications (user_id, user_type, title, message, type, is_read, created_at)
+       VALUES ($1, 'driver', 'New Vehicle Assigned', $2, 'assignment', false, NOW())`,
+      [driverId, `You have been assigned vehicle with ${rentType} rent of ₹${rentAmount}`]
+    );
+    
+    await client.query('COMMIT');
+    
+    // Get driver name for response
+    const driverResult = await client.query(
+      `SELECT full_name FROM drivers WHERE id = $1`,
+      [driverId]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Vehicle assigned successfully',
+      driverName: driverResult.rows[0]?.full_name
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Assignment error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    client.release();
+  }
+});
 // Assign vehicle to driver
 router.post('/assign', async (req, res) => {
   const client = await pool.connect();
