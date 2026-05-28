@@ -14,6 +14,23 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// DEDICATED DRIVERS LIST ROUTE - ADD THIS AT THE TOP, BEFORE OTHER ROUTES
+app.get('/api/drivers/list', async (req, res) => {
+  try {
+    console.log('🎯 Direct /api/drivers/list called');
+    const result = await pool.query(
+      `SELECT id, full_name, mobile_number, driver_code 
+       FROM public.drivers 
+       WHERE status = 'ACTIVE'
+       ORDER BY full_name`
+    );
+    console.log(`✅ Found ${result.rows.length} drivers`);
+    res.json({ drivers: result.rows, success: true });
+  } catch (err) {
+    console.error('Error:', err);
+    res.json({ drivers: [], success: false, error: err.message });
+  }
+});
 // ROUTES
 const authRoutes = require('./src/routes/auth');
 const driverRoutes = require('./src/routes/driver');
@@ -27,6 +44,7 @@ const adminRoutes = require('./src/routes/admin');
 app.use('/api/admin', adminRoutes);
 const assignmentRoutes = require('./src/routes/assignment');
 app.use('/api/assignment', assignmentRoutes);
+
 // Check Health
 app.get('/', (req, res) => {
   res.json({ 
