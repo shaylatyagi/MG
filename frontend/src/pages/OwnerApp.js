@@ -1016,10 +1016,11 @@ const DriversTab = () => {
 };
 
   // VEHICLES TAB
-  const VehiclesTab = () => (
+  // VEHICLES TAB - FIXED STATUS
+const VehiclesTab = () => (
   <div className="space-y-3 pb-4">
     <button 
-      onClick={openAddVehicleModal}  // Use updated function
+      onClick={openAddVehicleModal}
       className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2"
     >
       <Plus size={16} /> Add Vehicle
@@ -1028,14 +1029,14 @@ const DriversTab = () => {
     <div className="space-y-3">
       {vehicles.map((vehicle, i) => (
         <div 
-  key={i} 
-  onClick={() => {
-    setSelectedVehicleDetails(vehicle);
-    fetchUnassignedDriversList();
-    setShowVehicleDetailModal(true);
-  }}
-  className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition"
->
+          key={i} 
+          onClick={() => {
+            setSelectedVehicleDetails(vehicle);
+            fetchUnassignedDriversList();
+            setShowVehicleDetailModal(true);
+          }}
+          className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition"
+        >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
@@ -1062,12 +1063,13 @@ const DriversTab = () => {
                 <p className="text-[9px] text-slate-400 font-mono">{vehicle.driver_phone}</p>
               )}
             </div>
+            {/* FIXED: Check driver_id instead of status */}
             <span className={`text-[9px] font-black px-2 py-1 rounded-full ${
-              vehicle.status === 'ASSIGNED' 
+              vehicle.driver_id 
                 ? 'bg-green-100 text-green-700' 
                 : 'bg-amber-100 text-amber-700'
             }`}>
-              {vehicle.status === 'ASSIGNED' ? 'ASSIGNED' : 'AVAILABLE'}
+              {vehicle.driver_id ? 'ASSIGNED' : 'AVAILABLE'}
             </span>
           </div>
         </div>
