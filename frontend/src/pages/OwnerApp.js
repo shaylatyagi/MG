@@ -24,6 +24,8 @@ const rentTypeOptions = [
 ];
   const [availableDrivers, setAvailableDrivers] = useState([]);
 const [selectedDriverId, setSelectedDriverId] = useState('');
+const [selectedDriverDetails, setSelectedDriverDetails] = useState(null);
+const [showDriverDetailsModal, setShowDriverDetailsModal] = useState(false);
 const [assignMode, setAssignMode] = useState('driver'); // 'driver' or 'vehicle'
 const [availableVehiclesForDriver, setAvailableVehiclesForDriver] = useState([]);
 const [availableDriversForVehicle, setAvailableDriversForVehicle] = useState([]);
@@ -143,7 +145,129 @@ const fetchAvailableVehicles = async (driverId) => {
     console.error(err);
   }
 };
-
+const DriverDetailsModal = () => {
+  if (!selectedDriverDetails) return null;
+  
+  const driver = selectedDriverDetails;
+  const assignedVehicle = vehicles.find(v => v.driver_id === driver.id);
+  
+  return (
+    <div 
+      className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setShowDriverDetailsModal(false);
+          setSelectedDriverDetails(null);
+        }
+      }}
+    >
+      <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        {/* Driver Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white text-center rounded-t-3xl">
+          <div className="w-24 h-24 rounded-full bg-white/20 mx-auto flex items-center justify-center text-4xl font-black mb-3">
+            {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
+          </div>
+          <h2 className="text-xl font-black">{driver.full_name || driver.name}</h2>
+          <p className="text-sm opacity-90">{driver.driver_code}</p>
+          <p className="text-xs opacity-75 mt-1">{driver.phone_number || driver.mobile_number}</p>
+        </div>
+        
+        <div className="p-5">
+          {/* Vehicle Assignment Info */}
+          <div className="mb-5">
+            <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+              <Truck size={18} /> Assigned Vehicle
+            </h3>
+            {assignedVehicle ? (
+              <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-black text-slate-800 text-lg">{assignedVehicle.vehicle_number}</p>
+                  <span className="px-2 py-1 rounded-full text-[10px] font-black bg-green-100 text-green-700">
+                    ASSIGNED
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600">{assignedVehicle.vehicle_model}</p>
+                <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-green-200">
+                  <div>
+                    <p className="text-[9px] text-slate-400">Rent Type</p>
+                    <p className="text-sm font-black text-emerald-600">{driver.rent_type || assignedVehicle.rent_type || 'DAILY'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-slate-400">Rent Amount</p>
+                    <p className="text-sm font-black text-emerald-600">
+                      ₹{driver.rent_amount || assignedVehicle.rent_amount || assignedVehicle.daily_rent}/{
+                        driver.rent_type === 'WEEKLY' ? 'week' : 
+                        driver.rent_type === 'MONTHLY' ? 'month' : 'day'
+                      }
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-slate-400">Daily Rate</p>
+                    <p className="text-sm font-black">₹{assignedVehicle.daily_rent}/day</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-slate-400">Status</p>
+                    <p className="text-sm font-black text-green-600">ACTIVE</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-amber-50 rounded-xl p-4 text-center border border-amber-200">
+                <p className="text-amber-600 font-medium">No vehicle assigned yet</p>
+                <p className="text-xs text-amber-500 mt-1">Assign a vehicle to see details here</p>
+              </div>
+            )}
+          </div>
+          
+          {/* Wallet Info */}
+          <div className="mb-5">
+            <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+              <Wallet size={18} /> Wallet
+            </h3>
+            <div className="bg-slate-50 rounded-xl p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Current Balance</span>
+                <span className="text-xl font-black text-emerald-600">₹{driver.wallet_balance || 0}</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Contact Info */}
+          <div className="mb-5">
+            <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+              <Phone size={18} /> Contact
+            </h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                <span className="text-sm text-slate-500">Phone</span>
+                <span className="text-sm font-mono">{driver.phone_number || driver.mobile_number}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                <span className="text-sm text-slate-500">Owner Code</span>
+                <span className="text-sm font-mono">{driver.owner_code || 'OWN701951'}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-slate-500">Joined</span>
+                <span className="text-sm">{new Date(driver.created_at).toLocaleDateString() || 'Recently'}</span>
+              </div>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => {
+              setShowDriverDetailsModal(false);
+              setSelectedDriverDetails(null);
+              openChatWithDriver(driver);
+            }}
+            className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2"
+          >
+            <MessageCircle size={16} /> Chat with Driver
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 // Fetch available drivers for selected vehicle
 const fetchAvailableDrivers = async (vehicleId) => {
   try {
@@ -726,7 +850,6 @@ const DriversTab = () => {
           )}
         </div>
       </div>
-      // Driver Assignment Modal - FIXED VERSION
 {showDriverAssignModal && selectedDriverForAssignInTab && (
   <div 
     className="fixed inset-0 bg-black/50 z-[1000] flex items-center justify-center p-4" 
@@ -934,13 +1057,12 @@ const DriversTab = () => {
                 {selectedRentType === 'MONTHLY' && 'Monthly Rent (₹)'}
               </label>
               <input
-                type="number"
-                value={customRentAmount}
-                onChange={(e) => setCustomRentAmount(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full border rounded-xl p-3 text-sm"
-                placeholder="Enter rent amount"
-              />
+  type="number"
+  defaultValue={customRentAmount}
+  onBlur={(e) => setCustomRentAmount(e.target.value)}
+  className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500"
+  placeholder="Enter rent amount"
+/>
             </div>
             
             {/* Driver Selection */}
@@ -1617,6 +1739,7 @@ const ProfileTab = () => (
           </div>
         )}
         {showVehicleDetailModal && <VehicleDetailModal />}
+{showDriverDetailsModal && <DriverDetailsModal />}
       </div>
     </div>
   );
