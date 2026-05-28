@@ -444,6 +444,63 @@ Reply in Hindi + English mix. Keep it short (2-3 lines max). Only answer fleet/p
     res.json({ reply: 'AI service unavailable. Please try again.' });
   }
 });
+router.post('/owner/cash-payment', async (req, res) => {
+  try {
+    const { driverPhone, driverName, amount, ownerId } = req.body;
+    if (!driverPhone || !amount) return res.status(400).json({ success: false, message: 'Missing fields' });
+
+    const { v4: uuidv4 } = require('uuid');
+    const orderId = uuidv4();
+    const orderNumber = `CASH-${Date.now()}-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
+
+    await pool.query(
+      `INSERT INTO ms_orders (order_id, order_number, order_amount, currency, payer_name, payer_mobile,
+         transaction_status, payment_mode, order_completion_date, order_initiation_date)
+       VALUES ($1,$2,$3,'INR',$4,$5,'SUCCESS','CASH',NOW(),NOW())`,
+      [orderId, orderNumber, parseFloat(amount), driverName, driverPhone]
+    );
+
+    await pool.query(
+      `UPDATE public.drivers SET wallet_balance = COALESCE(wallet_balance,0) + $1 WHERE mobile_number = $2`,
+      [parseFloat(amount), driverPhone]
+    );
+
+    await pool.query(
+      `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+       SELECT id, 'DRIVER', '💵 Cash Payment Recorded',
+              'Owner recorded your cash payment of ₹${amount}', NOW()
+       FROM public.drivers WHERE mobile_number = $1`,
+      [driverPhone]
+    ).catch(()=>{});
+
+    res.json({ success: true, message: 'Cash payment recorded!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+router.get('/owner/ledger', async (req, res) => {
+  try {
+    const { period } = req.query;
+    let where = '';
+    switch(period) {
+      case 'yesterday': where = `DATE(order_completion_date) = CURRENT_DATE - INTERVAL '1 day'`; break;
+      case 'week':      where = `order_completion_date >= NOW() - INTERVAL '7 days'`; break;
+      case 'this_month':where = `DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW())`; break;
+      case 'last_month':where = `DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')`; break;
+      default:          where = `DATE(order_completion_date) = CURRENT_DATE`;
+    }
+    const received = await pool.query(
+      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='SUCCESS' AND ${where}`
+    );
+    const pending = await pool.query(
+      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='PENDING' AND DATE(order_initiation_date)=CURRENT_DATE`
+    );
+    res.json({
+      received: parseFloat(received.rows[0].total),
+      outstanding: parseFloat(pending.rows[0].total),
+    });
+  } catch(err) { res.json({ received: 0, outstanding: 0 }); }
+});
 router.get('/owner/by-phone', async (req, res) => {
   try {
     const { phone } = req.query;

@@ -26,6 +26,27 @@ export default function DriverPWA() {
   const [tab, setTab] = useState('home'); // Changed from 'home' to 'account'
   const [historyFrom, setHistoryFrom] = useState('tab');
   const [lang, setLang] = useState('en');
+  const T = {
+  en: {
+    outstanding: "{t.outstanding}", duesPending: '{t.duesPending}',
+    settled: '{t.settled}', pay: '{t.pay}',
+    recent: '{t.recent}', viewAll: '{t.viewAll}',
+    noTx: '{t.noTx}', wallet: '{t.wallet}',
+    totalPaid: '{t.totalPaid}', outstanding2: '{t.outstanding2}',
+    txHistory: '{t.txHistory}', emergency: 'Emergency Support',
+    triggerSos: 'Trigger SOS'
+  },
+  hi: {
+    outstanding: 'आज का बकाया', duesPending: 'बकाया है',
+    settled: 'खाता सेटल', pay: 'PayYantra से भुगतान करें',
+    recent: 'हाल के लेनदेन', viewAll: 'सभी देखें →',
+    noTx: 'अभी कोई लेनदेन नहीं', wallet: 'उपलब्ध एडवांस',
+    totalPaid: 'कुल भुगतान', outstanding2: 'बकाया',
+    txHistory: 'लेनदेन इतिहास', emergency: 'आपातकालीन सहायता',
+    triggerSos: 'SOS भेजें'
+  }
+};
+const t = T[lang];
   const [time, setTime] = useState('');
   const [showBalance, setShowBal] = useState(true);
   const [historySource, setHistorySource] = useState('tab');

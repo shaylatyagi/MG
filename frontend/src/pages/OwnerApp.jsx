@@ -17,6 +17,10 @@ const API = 'https://mg-qw5s.onrender.com';
 
 export default function OwnerDashboard() {
   const [horizon, setHorizon] = useState('today');
+const [ledger, setLedger] = useState({ received: 0, outstanding: 0 });
+  const [showCashModal, setShowCashModal] = useState(false);
+const [cashDriver, setCashDriver] = useState(null);
+const [cashAmount, setCashAmount] = useState('');
   const [rentType, setRentType] = useState('DAILY'); // DAILY, WEEKLY, MONTHLY
 const rentTypeOptions = [
   { value: 'DAILY', label: 'Daily Rent', multiplier: 1 },
@@ -917,6 +921,20 @@ const DriversTab = () => {
                           <Truck size={14} />
                         </button>
                       )}
+                      {hasVehicle && (
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setCashDriver(driver);
+      setCashAmount('');
+      setShowCashModal(true);
+    }}
+    className="p-2 rounded-lg bg-emerald-50 text-emerald-600"
+    title="Record Cash Payment"
+  >
+    <span className="text-xs font-black">₹</span>
+  </button>
+)}
                       <button 
                         onClick={() => openChatWithDriver(driver)}
                         className="p-2 rounded-lg bg-blue-50 text-blue-600"
@@ -1313,10 +1331,6 @@ const VehiclesTab = () => {
     </div>
   </div>
 );}
-
-  // PAYMENTS TAB
-  // PAYMENTS TAB with transaction history
-// PAYMENTS TAB with transaction history - FIXED
 const PaymentsTab = () => {
   const [transactions, setTransactions] = useState([]);
   const [loadingTx, setLoadingTx] = useState(false);
@@ -1379,9 +1393,16 @@ const PaymentsTab = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-black text-emerald-600">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                    {tx.transaction_status || 'SUCCESS'}
-                  </span>
+                  <div className="flex gap-1 justify-end flex-wrap">
+  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+    tx.payment_mode === 'CASH' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+  }`}>
+    {tx.payment_mode === 'CASH' ? '💵 CASH' : tx.payment_mode || 'UPI'}
+  </span>
+  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+    {tx.transaction_status}
+  </span>
+</div>
                 </div>
               </div>
             ))
@@ -1872,6 +1893,50 @@ const ProfileTab = () => (
         )}
         {showVehicleDetailModal && <VehicleDetailModal />}
 {showDriverDetailsModal && <DriverDetailsModal />}
+{showCashModal && cashDriver && (
+  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-sm p-6">
+      <h3 className="text-lg font-black mb-1">Record Cash Payment</h3>
+      <p className="text-sm text-slate-500 mb-4">{cashDriver.full_name} — {cashDriver.phone_number}</p>
+      <input
+        type="number"
+        placeholder="Enter amount (₹)"
+        value={cashAmount}
+        onChange={e => setCashAmount(e.target.value)}
+        className="w-full border rounded-xl p-3 mb-4 text-sm font-mono"
+      />
+      <div className="flex gap-3">
+        <button onClick={() => setShowCashModal(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
+        <button
+          onClick={async () => {
+            if (!cashAmount || parseFloat(cashAmount) <= 0) return alert('Enter valid amount');
+            try {
+              const res = await fetch(`${API}/api/payment/owner/cash-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                body: JSON.stringify({
+                  driverPhone: cashDriver.phone_number,
+                  driverName: cashDriver.full_name,
+                  amount: parseFloat(cashAmount),
+                  ownerId: ownerId()
+                })
+              });
+              const d = await res.json();
+              if (d.success) {
+                alert(`✅ ₹${cashAmount} cash payment recorded for ${cashDriver.full_name}`);
+                setShowCashModal(false);
+                setCashAmount('');
+              } else alert(d.message || 'Failed');
+            } catch { alert('Network error'); }
+          }}
+          className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-black"
+        >
+          💵 Record Cash
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );

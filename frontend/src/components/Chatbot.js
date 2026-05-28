@@ -179,7 +179,10 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       }
 
       // Which drivers haven't paid?
-      if ((lowerMsg.includes('not paid') || lowerMsg.includes('didn\'t pay') || lowerMsg.includes('नहीं दिया') || lowerMsg.includes('pending')) && 
+      if ((lowerMsg.includes('not paid') || lowerMsg.includes('didn\'t pay') || 
+     lowerMsg.includes('नहीं दिया') || lowerMsg.includes('pending') ||
+     lowerMsg.includes('nahi') || lowerMsg.includes('nhi') || 
+     lowerMsg.includes('due') || lowerMsg.includes('baaki') || lowerMsg.includes('baki')) && 
           (lowerMsg.includes('driver') || lowerMsg.includes('ड्राइवर'))) {
         const notPaidDrivers = [];
         for (const driver of data.drivers) {
@@ -206,7 +209,9 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       }
 
       // Driver who paid today
-      if (lowerMsg.includes('who paid') || lowerMsg.includes('किसने दिया') || (lowerMsg.includes('paid') && lowerMsg.includes('today'))) {
+      if (lowerMsg.includes('who paid') || lowerMsg.includes('किसने दिया') || 
+    lowerMsg.includes('paid') || lowerMsg.includes('de diya') || 
+    lowerMsg.includes('diya') || lowerMsg.includes('pay kar')) {
         const paidDrivers = [];
         for (const driver of data.drivers) {
           const paid = hasDriverPaidToday(driver.mobile_number, data.orders);
