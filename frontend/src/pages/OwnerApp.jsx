@@ -206,10 +206,22 @@ const DriverDetailsModal = () => {
                     <p className="text-[9px] text-slate-400">Daily Rate</p>
                     <p className="text-sm font-black">₹{assignedVehicle.daily_rent}/day</p>
                   </div>
-                  <div>
-                    <p className="text-[9px] text-slate-400">Status</p>
-                    <p className="text-sm font-black text-green-600">ACTIVE</p>
+                  <div className="mt-3 pt-3 border-t border-green-200">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Rent Breakdown</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      {label:'Weekly',    val:(assignedVehicle.daily_rent||0)*7},
+                      {label:'Monthly',   val:(assignedVehicle.daily_rent||0)*30},
+                      {label:'Quarterly', val:(assignedVehicle.daily_rent||0)*90},
+                      {label:'Annual',    val:(assignedVehicle.daily_rent||0)*365},
+                    ].map(({label,val})=>(
+                      <div key={label} className="bg-white rounded-xl p-2 text-center border border-green-100">
+                        <p className="text-[9px] text-slate-400 font-bold">{label}</p>
+                        <p className="text-sm font-black text-slate-700">₹{val.toLocaleString('en-IN')}</p>
+                      </div>
+                    ))}
                   </div>
+                </div>
                 </div>
               </div>
             ) : (
@@ -860,7 +872,14 @@ const DriversTab = () => {
               const assignedVehicle = vehicles.find(v => v.driver_id === driver.id);
               
               return (
-                <div key={i} className="p-4">
+                <div key={i} className={`p-4 transition ${hasVehicle ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                  onClick={() => {
+                    if (hasVehicle) {
+                      setSelectedDriverDetails(driver);
+                      setShowDriverDetailsModal(true);
+                    }
+                  }}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg">
@@ -1082,9 +1101,25 @@ const DriversTab = () => {
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                   <p className="font-black text-slate-800 text-lg">{vehicle.driver_name}</p>
                   <p className="text-xs text-slate-500 font-mono mt-1">{vehicle.driver_phone}</p>
-                  <div className="mt-2 pt-2 border-t border-emerald-200">
-                    <p className="text-[10px] text-slate-400">Daily Rent</p>
-                    <p className="font-black text-emerald-600">₹{vehicle.daily_rent}/day</p>
+                  <div className="mt-2 pt-2 border-t border-emerald-200 space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Rent Breakdown</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        {label:'Daily',  val: vehicle.daily_rent * 1},
+                        {label:'Weekly', val: vehicle.daily_rent * 7},
+                        {label:'Monthly',val: vehicle.daily_rent * 30},
+                        {label:'Annual', val: vehicle.daily_rent * 365},
+                      ].map(({label,val})=>(
+                        <div key={label} className="bg-white rounded-xl p-2 text-center border border-emerald-100">
+                          <p className="text-[9px] text-slate-400 font-bold">{label}</p>
+                          <p className="text-sm font-black text-slate-800">₹{(val||0).toLocaleString('en-IN')}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center pt-1">
+                      <span className="text-[10px] text-slate-400">Contract</span>
+                      <span className="text-[10px] font-black text-emerald-600">● Active / Ongoing</span>
+                    </div>
                   </div>
                 </div>
                 <button
@@ -1622,10 +1657,19 @@ const ProfileTab = () => (
                 <div className="p-4 text-center text-slate-400 text-xs">No notifications</div>
               ) : (
                 notifications.map((n, i) => (
-                  <div key={i} className={`px-4 py-3 border-b ${!n.is_read ? 'bg-blue-50' : ''}`}>
+                  <div key={i}
+                    className={`px-4 py-3 border-b cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-blue-50' : ''}`}
+                    onClick={() => {
+                      setNotifications(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
+                      setUnreadCount(prev => Math.max(0, prev - 1));
+                      setShowNotif(false);
+                      setActiveTab('payments');
+                    }}
+                  >
                     <p className="text-xs font-black">{n.title}</p>
                     <p className="text-[10px] text-slate-500">{n.message}</p>
                     <p className="text-[9px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
+                    {!n.is_read && <p className="text-[9px] text-blue-500 font-black mt-0.5">Tap to view transaction →</p>}
                   </div>
                 ))
               )}
