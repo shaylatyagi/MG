@@ -119,10 +119,28 @@ router.post('/assign-with-rent', async (req, res) => {
     }
     
     // Update vehicle
-    await client.query(
-      `UPDATE vehicles SET driver_id = $1, rent_type = $2, rent_amount = $3, daily_rent = $4 WHERE id = $5`,
-      [driverId, rentType, rentAmount, finalDailyRent, vehicleId]
-    );
+    // Get driver details first
+const dInfo = await client.query(
+  'SELECT full_name, mobile_number FROM public.drivers WHERE id = $1', [driverId]
+);
+const dName = dInfo.rows[0]?.full_name || '';
+const dPhone = dInfo.rows[0]?.mobile_number || '';
+
+await client.query(
+  `UPDATE vehicles 
+   SET driver_id=$1, driver_name=$2, driver_phone=$3, 
+       rent_type=$4, rent_amount=$5, daily_rent=$6, status='ASSIGNED'
+   WHERE id=$7`,
+  [driverId, dName, dPhone, rentType, rentAmount, finalDailyRent, vehicleId]
+);
+
+// Notify driver
+await pool.query(
+  `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+   VALUES ($1, 'DRIVER', '🚛 Vehicle Assigned', 
+           'A vehicle has been assigned to you. Check your dashboard.', NOW())`,
+  [driverId]
+).catch(() => {});
     
     // Update driver
     await client.query(
@@ -148,6 +166,20 @@ router.post('/assign-with-rent', async (req, res) => {
     });
   } finally {
     client.release();
+  }
+});
+// Unassigned vehicles
+router.get('/unassigned/vehicles', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, vehicle_number, vehicle_model, daily_rent, status
+       FROM public.vehicles
+       WHERE driver_id IS NULL
+       ORDER BY vehicle_number`
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    res.json({ success: true, data: [] });
   }
 });
 // Assign vehicle to driver

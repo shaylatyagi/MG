@@ -597,10 +597,16 @@ const fetchAllData = useCallback(async () => {
   };
 
   // Filter drivers based on search
-  const filteredDrivers = drivers.filter(driver => 
+  const filteredDrivers = drivers
+  .filter(driver =>
     (driver.full_name || driver.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (driver.phone_number || driver.phone || '').includes(searchQuery)
-  );
+  )
+  .sort((a, b) => {
+    const aHas = vehicles.some(v => v.driver_id === a.id);
+    const bHas = vehicles.some(v => v.driver_id === b.id);
+    return aHas === bHas ? 0 : aHas ? 1 : -1; // unassigned first
+  });
 
   // Dynamic header title
   const getHeaderTitle = () => {
@@ -1127,7 +1133,9 @@ const DriversTab = () => {
 
   // VEHICLES TAB
   // VEHICLES TAB - FIXED STATUS
-const VehiclesTab = () => (
+const VehiclesTab = () => {
+  const sorted = [...vehicles].sort((a,b) => (a.driver_id ? 1 : -1) - (b.driver_id ? 1 : -1));
+  return (
   <div className="space-y-3 pb-4">
     <button 
       onClick={openAddVehicleModal}
@@ -1137,7 +1145,8 @@ const VehiclesTab = () => (
     </button>
     
     <div className="space-y-3">
-      {vehicles.map((vehicle, i) => (
+      
+      {sorted.map((vehicle, i) => (
         <div 
           key={i} 
           onClick={() => {
@@ -1196,7 +1205,7 @@ const VehiclesTab = () => (
       )}
     </div>
   </div>
-);
+);}
 
   // PAYMENTS TAB
   // PAYMENTS TAB with transaction history
@@ -1415,6 +1424,7 @@ const ProfileTab = () => (
               }}
             >
               <option value="">-- Choose Driver --</option>
+              
               {unassignedDrivers.map(driver => (
                 <option key={driver.id} value={driver.id}>
                   {driver.full_name} ({driver.driver_code})
@@ -1710,7 +1720,7 @@ const ProfileTab = () => (
           className="w-full border rounded-xl p-3 text-sm bg-white"
         >
           <option value="">-- Select Driver --</option>
-          {drivers.map(driver => (
+          {[...drivers].sort(a => !a.assigned_vehicle ? -1 : 1).map(driver => (
             <option key={driver.id} value={driver.id}>
               {driver.full_name} - {driver.mobile_number}
             </option>

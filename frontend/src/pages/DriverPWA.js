@@ -144,9 +144,13 @@ useEffect(() => {
 
   const tk = () => localStorage.getItem('token');
   const phone = () => {
+  try {
     const u = JSON.parse(localStorage.getItem('user') || '{}');
-    return String(u?.phone_number || u?.mobile_number || u?.phone || '').replace(/\D/g, '').slice(-10);
-  };
+    const raw = u?.phone_number || u?.mobile_number || u?.phone || u?.customerPhone || '';
+    const cleaned = String(raw).replace(/\D/g, '');
+    return cleaned.length >= 10 ? cleaned.slice(-10) : cleaned;
+  } catch { return ''; }
+};
 
   const fetchAll = useCallback(async () => {
     if (!user) return; setLoading(true);

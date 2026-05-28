@@ -1778,5 +1778,94 @@ router.post('/sync-all-orders', async (req, res) => {
   }
 
 });
+// ── DRIVER LOGIN: List all active drivers ──
+router.get('/drivers-list', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT d.id, d.full_name, d.mobile_number, d.driver_code,
+              COALESCE(v.vehicle_number, 'Not Assigned') as vehicle
+       FROM public.drivers d
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.status = 'ACTIVE'
+       ORDER BY d.full_name`
+    );
+    res.json({ success: true, drivers: result.rows });
+  } catch (err) { res.json({ success: true, drivers: [] }); }
+});
 
+// ── DRIVER OTP REQUEST ──
+router.post('/driver-otp-request', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    const driver = await pool.query(
+      `SELECT id, full_name, mobile_number, driver_code
+       FROM public.drivers WHERE mobile_number = $1 AND status = 'ACTIVE'`,
+      [phone]
+    );
+    if (driver.rows.length === 0)
+      return res.status(404).json({ success: false, message: 'Driver not found' });
+    res.json({ success: true, message: 'OTP sent', name: driver.rows[0].full_name });
+  } catch (err) { res.status(500).json({ success: false, message: 'Failed' }); }
+});
+
+// ── DRIVER OTP VERIFY ──
+router.post('/driver-otp-verify', async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (otp !== '123456')
+      return res.status(400).json({ success: false, message: 'Invalid OTP. Demo OTP is 123456' });
+
+    const driver = await pool.query(
+      `SELECT d.id, d.full_name, d.mobile_number, d.driver_code, d.wallet_balance,
+              COALESCE(v.vehicle_number, 'Not Assigned') as vehicle_number,
+              COALESCE(v.vehicle_model, '') as vehicle_model,
+              COALESCE(v.daily_rent, 0) as daily_rent
+       FROM public.drivers d
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.mobile_number = $1 AND d.status = 'ACTIVE'`,
+      [phone]
+    );
+    if (driver.rows.length === 0)
+      return res.status(404).json({ success: false, message: 'Driver not found' });
+
+    const d = driver.rows[0];
+    const jwt = require('jsonwebtoken');
+    const token = jwt.sign(
+      { id: d.id, driver_code: d.driver_code, user_type: 'VEHICLE_DRIVER' },
+      process.env.JWT_SECRET || 'voltops_super_secret_key_2025',
+      { expiresIn: '7d' }
+    );
+    res.json({
+      success: true, token,
+      data: {
+        id:           d.id,
+        name:         d.full_name,
+        usercode:     d.driver_code,
+        phone_number: d.mobile_number,
+        phone:        d.mobile_number,
+        mobile_number:d.mobile_number,
+        vehicle:      d.vehicle_number,
+        daily_rent:   d.daily_rent,
+        userType:     'VEHICLE_DRIVER'
+      }
+    });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ── DRIVER NOTIFICATIONS (public schema) ──
+router.get('/driver/notifications', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.json([]);
+    const result = await pool.query(
+      `SELECT n.id, n.title, n.message, n.is_read, n.created_at, n.metadata
+       FROM public.notifications n
+       JOIN public.drivers d ON d.id = n.driver_id
+       WHERE d.mobile_number = $1
+       ORDER BY n.created_at DESC LIMIT 50`,
+      [phone]
+    );
+    res.json(result.rows);
+  } catch (err) { res.json([]); }
+});
 module.exports = router;
