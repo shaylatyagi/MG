@@ -290,7 +290,7 @@ User ka sawaal: ${message}
 Sirf Hindi mein jawab de. 2-3 lines max. Sirf fleet/payment related sawaalon ka jawab de.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.AQ.Ab8RN6JuktnjCGRZnySEWb2USgB6sdLg5JZBAGAobKNb0tnB7w}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
