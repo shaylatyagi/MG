@@ -1454,10 +1454,6 @@ const ProfileTab = () => (
         <button className="text-[9px] text-blue-600">Edit</button>
       </div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
-        <span className="text-xs text-slate-500 flex items-center gap-2"><Wallet size={12} /> Wallet Balance</span>
-        <span className="text-xs font-black text-emerald-600">₹{parseFloat(owner?.wallet_balance || 0).toLocaleString('en-IN')}</span>
-      </div>
-      <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500 flex items-center gap-2"><Truck size={12} /> Total Fleet</span>
         <span className="text-xs font-black">{stats.totalVehicles} Vehicles</span>
       </div>
