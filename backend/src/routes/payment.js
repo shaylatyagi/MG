@@ -127,61 +127,32 @@ router.post('/driver/set-test-dues', async (req, res) => {
     res.status(500).json({ message: 'Failed to set test dues' });
   }
 });
-// Backend payment.js - Add this endpoint
 router.get('/driver/dues', async (req, res) => {
   try {
     const { phone } = req.query;
-    
-    if (!phone) {
-      return res.status(400).json({ message: 'Phone required' });
-    }
-    
-    // Get assigned vehicle daily rent
-    const vehicleResult = await pool.query(
-      `SELECT v.daily_rent, v.vehicle_number
-       FROM public.vehicles v
-       JOIN public.drivers d ON d.id = v.driver_id
+    const result = await pool.query(
+      `SELECT d.*, v.daily_rent as vehicle_daily_rent, v.vehicle_number
+       FROM public.drivers d
+       LEFT JOIN public.vehicles v ON v.id = d.assigned_vehicle_id
        WHERE d.mobile_number = $1`,
       [phone]
     );
-    
-    let dailyRent = 850;
-    let vehicleNumber = 'Not Assigned';
-    let vehicleAssigned = false;
-    
-    if (vehicleResult.rows.length > 0) {
-      dailyRent = parseFloat(vehicleResult.rows[0].daily_rent || 850);
-      vehicleNumber = vehicleResult.rows[0].vehicle_number;
-      vehicleAssigned = true;
+    const driver = result.rows[0];
+    if (!driver || !driver.assigned_vehicle_id) {
+      return res.json({ dues: 0, daily_rent: 0, paid_today: 0, vehicle_number: null });
     }
-    
-    // Get today's paid amount
-    const paidResult = await pool.query(
-      `SELECT COALESCE(SUM(order_amount), 0) as paid
-       FROM public.ms_orders
-       WHERE payer_mobile = $1 
-         AND transaction_status = 'SUCCESS'
-         AND DATE(order_completion_date) = CURRENT_DATE`,
+    const dailyRent = parseFloat(driver.vehicle_daily_rent || 0);
+    const paid = await pool.query(
+      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders
+       WHERE payer_mobile=$1 AND transaction_status='SUCCESS' AND DATE(order_completion_date)=CURRENT_DATE`,
       [phone]
     );
-    
-    const paidToday = parseFloat(paidResult.rows[0]?.paid || 0);
-    const dues = Math.max(0, dailyRent - paidToday);
-    
-    res.json({
-      dues: dues,
-      daily_rent: dailyRent,
-      vehicle_number: vehicleNumber,
-      vehicle_assigned: vehicleAssigned,
-      paid_today: paidToday
-    });
-    
-  } catch (err) {
-    console.error('Driver dues error:', err);
-    res.status(500).json({ message: 'Failed' });
+    const paidToday = parseFloat(paid.rows[0].total);
+    res.json({ dues: Math.max(0, dailyRent - paidToday), daily_rent: dailyRent, paid_today: paidToday, vehicle_number: driver.vehicle_number });
+  } catch(err) {
+    res.json({ dues: 0, daily_rent: 0, paid_today: 0 });
   }
 });
-
 // GET DRIVER TELEMETRY
 router.get('/driver/telemetry', async (req, res) => {
   try {
@@ -297,33 +268,43 @@ router.post('/owner/vehicles', async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-// Add this to your payment.js
-// ============================================
-// GET OWNER BY PHONE NUMBER - ADD THIS ENDPOINT
-// ============================================
 router.post('/chatbot', async (req, res) => {
   try {
     const { message, context } = req.body;
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
-        system: `You are a helpful assistant for MobilityGrid EV fleet management platform. 
-Context: ${JSON.stringify(context)}
-Reply in Hindi + English mix. Keep it short (2-3 lines max). Only answer fleet/payment related questions.`,
-        messages: [{ role: 'user', content: message }]
-      })
-    });
+
+    const driverSummary = (context.drivers || []).map(d => {
+      const paid = (context.orders || []).some(o =>
+        o.payer_mobile === d.mobile_number &&
+        o.transaction_status === 'SUCCESS' &&
+        new Date(o.order_completion_date).toDateString() === new Date().toDateString()
+      );
+      return `${d.full_name}: ${paid ? 'PAID' : 'NOT PAID'}, Vehicle: ${d.vehicle_number || 'N/A'}`;
+    }).join('\n');
+
+    const prompt = `Tu MobilityGrid fleet assistant hai. Real data:
+Aaj collection: ₹${context.todayCollection || 0}
+Drivers:\n${driverSummary}
+
+User ka sawaal: ${message}
+
+Sirf Hindi mein jawab de. 2-3 lines max. Sirf fleet/payment related sawaalon ka jawab de.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.AQ.Ab8RN6JuktnjCGRZnySEWb2USgB6sdLg5JZBAGAobKNb0tnB7w}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      }
+    );
+
     const d = await response.json();
-    res.json({ reply: d.content?.[0]?.text || 'समझ नहीं आया।' });
+    const reply = d.candidates?.[0]?.content?.parts?.[0]?.text || 'समझ नहीं आया।';
+    res.json({ reply });
   } catch (err) {
-    res.json({ reply: 'AI service unavailable. Please try again.' });
+    res.json({ reply: 'समझ नहीं आया।' });
   }
 });
 router.post('/owner/cash-payment', async (req, res) => {

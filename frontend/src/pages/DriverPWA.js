@@ -205,14 +205,14 @@ useEffect(() => {
         const rent = parseFloat(p.vehicle_daily_rent || p.daily_rent || 0);
         const paid = parseFloat(p.amount_paid_today || 0);
         const d = p.vehicle_number ? Math.max(0, rent - paid) : 0;
-        setDues(d); setPayAmt(d > 0 ? d : rent || 0);
+        setDues(d); setPayAmt(d > 0 ? d : 0);
         setTelemetry({ vehicleNumber: p.vehicle_number || 'Not Assigned', vehicleModel: p.vehicle_model || '', dailyRent: rent });
       } else {
         const dR = await fetch(`${API}/api/payment/driver/dues?phone=${ph}`, { headers: H });
         if (dR.ok) { const d = await dR.json(); setDues(d.dues || 0); setPayAmt(d.daily_rent || 0); setTelemetry(p => ({ ...p, vehicleNumber: d.vehicle_number || 'Not Assigned', dailyRent: d.daily_rent || 0 })); }
       }
       if (nR.ok) { const n = await nR.json(); const a = Array.isArray(n) ? n : []; setNotifs(a); setUnread(a.filter(x => !x.is_read).length); }
-    } catch (e) { console.error(e); setDues(850); setPayAmt(850); }
+    } catch (e) { console.error(e); setDues(0); setPayAmt(0); }
     finally { setLoading(false); }
   }, [user]);
 

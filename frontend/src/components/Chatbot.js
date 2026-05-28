@@ -171,151 +171,106 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       order.order_completion_date?.split('T')[0] === today
     );
   };
-
-  // Process intent based on role
   const processIntent = async (userMessage) => {
-    const lowerMsg = userMessage.toLowerCase();
-    const data = await fetchUserData();
-    
-    if (!data) {
-      return "डेटा लोड नहीं हो पाया। कृपया दोबारा कोशिश करें।";
+  const lowerMsg = userMessage.toLowerCase();
+  const data = await fetchUserData();
+  if (!data) return "डेटा लोड नहीं हो पाया। दोबारा कोशिश करें।";
+
+  if (isOwner) {
+    // Collection query
+    if (lowerMsg.includes('collection') || lowerMsg.includes('kitna aaya') || 
+        lowerMsg.includes('earnings') || lowerMsg.includes('कमाई') || lowerMsg.includes('कलेक्शन')) {
+      return `💰 आज का कुल collection ₹${data.todayCollection.toLocaleString('en-IN')} है।`;
     }
 
-    // ========== OWNER INTENTS ==========
-    if (isOwner) {
-      // Today's collection
-      if (lowerMsg.includes('collection') || lowerMsg.includes('earning') || lowerMsg.includes('कलेक्शन') || 
-          lowerMsg.includes('कमाई') || lowerMsg.includes('today') && (lowerMsg.includes('kitna') || lowerMsg.includes('how much'))) {
-        return `💰 आज का कुल collection ₹${data.todayCollection.toLocaleString('en-IN')} है।\n\n💰 Today's total collection is ₹${data.todayCollection.toLocaleString('en-IN')}.`;
+    // Payment status / who paid / who didn't
+    if (lowerMsg.includes('status') || lowerMsg.includes('स्टेटस') ||
+        lowerMsg.includes('payment') || lowerMsg.includes('paid') ||
+        lowerMsg.includes('diya') || lowerMsg.includes('nahi') ||
+        lowerMsg.includes('किसने') || lowerMsg.includes('kaun')) {
+      const paidList = [], notPaidList = [];
+      for (const driver of (data.drivers || [])) {
+        const paid = hasDriverPaidToday(driver.mobile_number, data.orders);
+        if (paid) paidList.push(driver.full_name);
+        else notPaidList.push(driver.full_name);
       }
-
-      // Which drivers haven't paid?
-      if ((lowerMsg.includes('not paid') || lowerMsg.includes('didn\'t pay') || 
-     lowerMsg.includes('नहीं दिया') || lowerMsg.includes('pending') ||
-     lowerMsg.includes('nahi') || lowerMsg.includes('nhi') || 
-     lowerMsg.includes('due') || lowerMsg.includes('baaki') || lowerMsg.includes('baki')) && 
-          (lowerMsg.includes('driver') || lowerMsg.includes('ड्राइवर'))) {
-        const notPaidDrivers = [];
-        for (const driver of data.drivers) {
-          const paid = hasDriverPaidToday(driver.mobile_number, data.orders);
-          if (!paid) {
-            notPaidDrivers.push(`${driver.full_name} (${driver.mobile_number})`);
-          }
-        }
-        if (notPaidDrivers.length === 0) {
-          return "🎉 बहुत अच्छा! सभी drivers ने आज payment कर दी है।\n\n🎉 Great! All drivers have made their payments today.";
-        } else {
-          return `⚠️ इन drivers ने आज payment नहीं दी है: ${notPaidDrivers.join(', ')}\n\n⚠️ These drivers haven't paid today: ${notPaidDrivers.join(', ')}`;
-        }
-      }
-
-      // Total drivers
-      if (lowerMsg.includes('how many drivers') || lowerMsg.includes('kitne driver') || lowerMsg.includes('total drivers')) {
-        return `👥 आपके पास कुल ${data.totalDrivers} drivers हैं।\n\n👥 You have a total of ${data.totalDrivers} drivers.`;
-      }
-
-      // Total vehicles
-      if (lowerMsg.includes('how many vehicles') || lowerMsg.includes('kitne vehicles') || lowerMsg.includes('total vehicles') || lowerMsg.includes('fleet')) {
-        return `🚛 आपके पास कुल ${data.totalVehicles} vehicles हैं।\n\n🚛 You have a total of ${data.totalVehicles} vehicles.`;
-      }
-
-      // Driver who paid today
-      if (lowerMsg.includes('who paid') || lowerMsg.includes('किसने दिया') || 
-    lowerMsg.includes('paid') || lowerMsg.includes('de diya') || 
-    lowerMsg.includes('diya') || lowerMsg.includes('pay kar')) {
-        const paidDrivers = [];
-        for (const driver of data.drivers) {
-          const paid = hasDriverPaidToday(driver.mobile_number, data.orders);
-          if (paid) {
-            paidDrivers.push(`${driver.full_name} (${driver.mobile_number})`);
-          }
-        }
-        if (paidDrivers.length === 0) {
-          return "📭 आज किसी driver ने payment नहीं दी है।\n\n📭 No driver has paid today.";
-        } else {
-          return `✅ इन drivers ने आज payment दी है: ${paidDrivers.join(', ')}\n\n✅ These drivers have paid today: ${paidDrivers.join(', ')}`;
-        }
-      }
+      return `✅ Paid (${paidList.length}): ${paidList.join(', ') || 'कोई नहीं'}\n\n❌ Nahi diya (${notPaidList.length}): ${notPaidList.join(', ') || 'कोई नहीं'}`;
     }
 
-    // ========== DRIVER INTENTS ==========
-    else {
-      // Today's due
-      if (lowerMsg.includes('बकाया') || lowerMsg.includes('due') || lowerMsg.includes('कितना देना') || lowerMsg.includes('pending')) {
-        if (data.todayDues <= 0) {
-          return "🎉 बधाई हो! आपका आज का कोई बकाया नहीं है।\n\n🎉 Congratulations! You have no pending dues today.";
-        } else {
-          return `🚨 आपका आज का बकाया ₹${data.todayDues} है।\n\n🚨 Your pending dues today are ₹${data.todayDues}.`;
-        }
-      }
-
-      // Wallet balance
-      if (lowerMsg.includes('वॉलेट') || lowerMsg.includes('wallet') || lowerMsg.includes('balance') || lowerMsg.includes('बैलेंस')) {
-        return `💰 आपके wallet में ₹${data.walletBalance} का balance है।\n\n💰 Your wallet balance is ₹${data.walletBalance}.`;
-      }
-
-      // Did I pay today?
-      if (lowerMsg.includes('pay kiya') || lowerMsg.includes('paid') || lowerMsg.includes('भुगतान किया') || lowerMsg.includes('किराया दिया')) {
-        const paid = data.paidToday > 0;
-        if (paid) {
-          return "✅ हाँ, आपने आज का किराया दे दिया है। शुक्रिया!\n\n✅ Yes, you have paid today's rent. Thank you!";
-        } else {
-          return `❌ नहीं, आपने आज का किराया नहीं दिया है। आपका बकाया ₹${data.todayDues} है।\n\n❌ No, you haven't paid today's rent yet. Your pending dues are ₹${data.todayDues}.`;
-        }
-      }
-
-      // Vehicle details
-      if (lowerMsg.includes('गाड़ी') || lowerMsg.includes('vehicle') || lowerMsg.includes('वाहन')) {
-        if (data.vehicleNumber === 'Not Assigned') {
-          return "🚨 आपको अभी कोई गाड़ी assign नहीं की गई है।\n\n🚨 No vehicle has been assigned to you yet.";
-        } else {
-          return `🚛 आपकी गाड़ी: ${data.vehicleNumber}, दैनिक किराया: ₹${data.dailyRent}\n\n🚛 Your vehicle: ${data.vehicleNumber}, Daily rent: ₹${data.dailyRent}`;
-        }
-      }
-
-      // Daily rent
-      if (lowerMsg.includes('किराया') || lowerMsg.includes('rent') || lowerMsg.includes('daily rent')) {
-        return `📅 आपका दैनिक किराया ₹${data.dailyRent} है।\n\n📅 Your daily rent is ₹${data.dailyRent}.`;
-      }
+    // Total drivers
+    if (lowerMsg.includes('kitne driver') || lowerMsg.includes('total driver') || lowerMsg.includes('drivers')) {
+      return `👥 कुल ${data.totalDrivers} drivers हैं।`;
     }
 
-    // ========== COMMON INTENTS ==========
-    
+    // Total vehicles / fleet
+    if (lowerMsg.includes('vehicle') || lowerMsg.includes('fleet') || lowerMsg.includes('gaadi')) {
+      return `🚛 कुल ${data.totalVehicles} vehicles हैं।`;
+    }
+
+    // Individual driver check — "abdul ne diya kya", "rajesh ka status"
+    const namedDriver = (data.drivers || []).find(d => {
+      const parts = (d.full_name || '').toLowerCase().split(' ');
+      return parts.some(part => part.length > 2 && lowerMsg.includes(part));
+    });
+    if (namedDriver) {
+      const paid = hasDriverPaidToday(namedDriver.mobile_number, data.orders);
+      const vehicle = namedDriver.vehicle_number || 'assign nahi';
+      return `${namedDriver.full_name}: ${paid ? '✅ आज payment कर दी है' : '❌ आज payment नहीं की'}\nVehicle: ${vehicle}\nWallet: ₹${namedDriver.wallet_balance || 0}`;
+    }
+
     // Greeting
-    if (lowerMsg.includes('नमस्ते') || lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('हैलो')) {
-      if (isOwner) {
-        return `नमस्ते! आज का collection ₹${data.todayCollection} है। ${data.totalDrivers} drivers में से कितने ने payment दी है? मैं बता सकता हूँ।\n\nHello! Today's collection is ₹${data.todayCollection}. I can tell you how many drivers have paid.`;
-      } else {
-        return `नमस्ते! आपका आज का बकाया ₹${data.todayDues} है। वॉलेट में ₹${data.walletBalance} है।\n\nHello! Your pending dues today are ₹${data.todayDues}. Wallet balance is ₹${data.walletBalance}.`;
-      }
+    if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('नमस्ते') || lowerMsg.includes('haan')) {
+      const notPaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders)).length;
+      return `नमस्ते! आज ₹${data.todayCollection.toLocaleString('en-IN')} collection हुआ। ${notPaid} drivers ने अभी payment नहीं दी।`;
     }
 
     // Help
-    if (lowerMsg.includes('help') || lowerMsg.includes('मदद') || lowerMsg.includes('क्या कर सकते हो')) {
-      if (isOwner) {
-        return `Chat मैं आपकी मदद कर सकता हूँ:\n\n• "आज का collection कितना है?"\n• "किस driver ने payment नहीं दी?"\n• "कितने drivers हैं?"\n• "कितने vehicles हैं?"\n\n• "What is today's collection?"\n• "Which drivers haven't paid?"\n• "How many drivers?"\n• "How many vehicles?"`;
-      } else {
-        return `Chat मैं आपकी मदद कर सकता हूँ:\n\n• "मेरा बकाया कितना है?"\n• "वॉलेट में कितना है?"\n• "क्या मैंने आज pay किया?"\n• "मेरी गाड़ी कौन सी है?"\n\n• "What is my pending dues?"\n• "Wallet balance?"\n• "Did I pay today?"\n• "My vehicle details?"`;
-      }
+    if (lowerMsg.includes('help') || lowerMsg.includes('मदद')) {
+      return `मैं इन सवालों का जवाब दे सकता हूँ:\n• "आज कितना collection हुआ?"\n• "Abdul ne pay kar diya kya?"\n• "Driver payment status"\n• "Kitne vehicles hain?"`;
     }
+  }
 
-    // Thank you
-    if (lowerMsg.includes('धन्यवाद') || lowerMsg.includes('thank you') || lowerMsg.includes('शुक्रिया')) {
-      return "आपका स्वागत है! 😊 क्या मैं और मदद कर सकता हूँ?\n\nYou're welcome! 😊 Can I help you with anything else?";
+  else {
+    // Driver intents
+    if (lowerMsg.includes('bakaya') || lowerMsg.includes('due') || lowerMsg.includes('kitna dena')) {
+      return data.todayDues <= 0
+        ? `🎉 आपका कोई बकाया नहीं है।`
+        : `🚨 आपका बकाया ₹${data.todayDues} है।`;
     }
+    if (lowerMsg.includes('wallet') || lowerMsg.includes('balance') || lowerMsg.includes('paisa')) {
+      return `💰 आपके wallet में ₹${data.walletBalance} है।`;
+    }
+    if (lowerMsg.includes('pay') || lowerMsg.includes('diya') || lowerMsg.includes('bhugtan')) {
+      return data.paidToday > 0
+        ? `✅ हाँ, आपने आज का किराया दे दिया है।`
+        : `❌ नहीं, आपने अभी payment नहीं की। बकाया: ₹${data.todayDues}`;
+    }
+    if (lowerMsg.includes('vehicle') || lowerMsg.includes('gaadi')) {
+      return data.vehicleNumber === 'Not Assigned'
+        ? `🚨 कोई vehicle assign नहीं है।`
+        : `🚛 आपकी vehicle: ${data.vehicleNumber}, किराया: ₹${data.dailyRent}/day`;
+    }
+    if (lowerMsg.includes('rent') || lowerMsg.includes('kiraya')) {
+      return `📅 आपका daily किराया ₹${data.dailyRent} है।`;
+    }
+    if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('नमस्ते')) {
+      return `नमस्ते! बकाया: ₹${data.todayDues} | Wallet: ₹${data.walletBalance}`;
+    }
+  }
 
-    try {
-  const aiRes = await fetch(`${API}/api/payment/chatbot`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ message: userMessage, context: data })
-  });
-  const aiData = await aiRes.json();
-  return aiData.reply;
-} catch {
-  return `मुझे समझ नहीं आया। "help" लिखें।\n\nI didn't understand. Type "help".`;
-}
-  };
+  // AI fallback for unknown queries
+  try {
+    const aiRes = await fetch(`${API}/api/payment/chatbot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message: userMessage, context: data })
+    });
+    const aiData = await aiRes.json();
+    return aiData.reply || 'समझ नहीं आया। "help" type करें।';
+  } catch {
+    return 'समझ नहीं आया। "help" type करें।';
+  }
+};
 
   const handleUserMessage = async (message) => {
     if (!message.trim()) return;

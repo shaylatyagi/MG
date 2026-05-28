@@ -692,16 +692,16 @@ useEffect(() => {
           <option value="last_month">Last Month</option>
         </select>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100">
-          <span className="text-[9px] text-emerald-600 font-bold uppercase block">Received</span>
-          <b className="text-sm font-mono font-bold text-emerald-700 block mt-0.5">₹{ledger.received.toLocaleString('en-IN')}</b>
-        </div>
-        <div className="bg-amber-50/60 p-2 rounded-xl border border-amber-100">
-          <span className="text-[9px] text-amber-600 font-bold uppercase block">Outstanding</span>
-          <b className="text-sm font-mono font-bold text-amber-700 block mt-0.5">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
-        </div>
-      </div>
+      <div className="grid grid-cols-2 gap-3 text-center">
+  <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+    <span className="text-[9px] text-emerald-600 font-bold uppercase block">Received</span>
+    <b className="text-base font-mono font-bold text-emerald-700 block mt-1">₹{ledger.received.toLocaleString('en-IN')}</b>
+  </div>
+  <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
+    <span className="text-[9px] text-amber-600 font-bold uppercase block">Outstanding</span>
+    <b className="text-base font-mono font-bold text-amber-700 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
+  </div>
+</div>
       <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
         <span className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"/>Virtual Escrow Connected</span>
         <span className="font-bold">Calculated for Today</span>
@@ -1899,7 +1899,7 @@ const ProfileTab = () => (
         {/* Add Driver Modal */}
         {showAddDriver && (
           <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl w-full max-w-sm p-6">
+            <div className="bg-white rounded-3xl w-full max-w-sm p-6 max-h-[85vh] overflow-y-auto">
               <h3 className="text-lg font-black mb-4">Add Driver</h3>
               <input placeholder="Full Name (Letters only)" className="w-full border rounded-xl p-3 mb-3 text-sm"
                 value={newDriver.name} onChange={e => setNewDriver({...newDriver, name: e.target.value})} />
