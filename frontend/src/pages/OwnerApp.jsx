@@ -374,12 +374,9 @@ const addVehicle = async () => {
         'Authorization': `Bearer ${token()}` 
       },
       body: JSON.stringify({
-        owner_id: ownerId(),
-        vehicle_number: newVehicle.number.toUpperCase(),
-        vehicle_model: newVehicle.model,
-        daily_rent: parseFloat(newVehicle.rent),
-        driver_id: selectedDriverId || null  // Assign driver if selected
-      })
+  full_name: newDriver.name,
+  mobile_number: newDriver.phone,
+})
     });
     
     const data = await response.json();
@@ -704,10 +701,6 @@ useEffect(() => {
           <span className="text-[9px] text-amber-600 font-bold uppercase block">Outstanding</span>
           <b className="text-sm font-mono font-bold text-amber-700 block mt-0.5">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
         </div>
-        <div className="bg-rose-50/60 p-2 rounded-xl border border-rose-100">
-          <span className="text-[9px] text-rose-600 font-bold uppercase block">Pending</span>
-          <b className="text-sm font-mono font-bold text-rose-700 block mt-0.5">₹0</b>
-        </div>
       </div>
       <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
         <span className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"/>Virtual Escrow Connected</span>
@@ -719,7 +712,7 @@ useEffect(() => {
 
         <StatCard title="TOTAL FLEET" value={stats.totalVehicles} icon={Truck} color="bg-blue-600" />
         <StatCard title="ACTIVE DRIVERS" value={stats.totalDrivers} icon={Users} color="bg-emerald-600" />
-        <StatCard title="TODAY'S COLLECTION" value={stats.todayCollection} icon={Wallet} color="bg-amber-600" trend="up" isMoney/>
+        <StatCard title="TOTAL COLLECTION" value={stats.todayCollection} icon={Wallet} color="bg-amber-600" isMoney/>
         <StatCard title="PENDING DUES" value={stats.pendingDues} icon={AlertCircle} color="bg-red-600" trend="down" isMoney/>
       </div>
 
@@ -1496,7 +1489,7 @@ const ProfileTab = () => (
 
   return (
     <div className="min-h-screen bg-slate-200 flex items-center justify-center p-4">
-      <div className="w-full bg-slate-50 flex flex-col" style={{maxWidth:412, minHeight:'100dvh'}}> 
+      <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, minHeight:'100dvh'}}>
         {/* Status Bar */}
         <div className="bg-slate-900 text-white text-[11px] px-4 py-2 flex justify-between">
           <span className="text-emerald-400 font-black text-[10px] tracking-widest">OWNER PORTAL</span>
@@ -1886,7 +1879,7 @@ const ProfileTab = () => (
           className="w-full border rounded-xl p-3 text-sm bg-white"
         >
           <option value="">-- Select Driver --</option>
-          {[...drivers].sort(a => !a.assigned_vehicle ? -1 : 1).map(driver => (
+          {drivers.filter(d => !vehicles.some(v => v.driver_id === d.id)).map(driver => (
             <option key={driver.id} value={driver.id}>
               {driver.full_name} - {driver.mobile_number}
             </option>
@@ -1915,6 +1908,18 @@ const ProfileTab = () => (
               <input placeholder="Email (optional)" className="w-full border rounded-xl p-3 mb-4 text-sm"
                 value={newDriver.email} onChange={e => setNewDriver({...newDriver, email: e.target.value})} />
               <div className="flex gap-3">
+                <select
+  className="w-full border rounded-xl p-3 mb-4 text-sm bg-white"
+  value={newDriver.vehicleId || ''}
+  onChange={e => setNewDriver({...newDriver, vehicleId: e.target.value})}
+>
+  <option value="">-- Assign Vehicle (Optional) --</option>
+  {vehicles.filter(v => !v.driver_id).map(v => (
+    <option key={v.id} value={v.id}>
+      {v.vehicle_number} — {v.vehicle_model} (₹{v.daily_rent}/day)
+    </option>
+  ))}
+</select>
                 <button onClick={() => setShowAddDriver(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
                 <button onClick={addDriver} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Add</button>
               </div>

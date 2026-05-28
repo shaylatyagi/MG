@@ -116,19 +116,23 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
   const speak = (text) => {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  // Sirf English part bolo (Hindi script hata do)
-  const englishOnly = text
-    .split('\n\n').pop()
-    .replace(/[\u0900-\u097F]+/g, '') // Hindi script remove
-    .replace(/[🎉✅❌⚠️💰🚨🚛📅👥📭]/gu, '')
+  const clean = text
+    .replace(/[\u0900-\u097F\s]+/g, ' ')
+    .replace(/[^\x00-\x7F]/g, '')
     .trim();
-  if (!englishOnly) return;
+  if (!clean) return;
   setIsSpeaking(true);
-  const u = new SpeechSynthesisUtterance(englishOnly);
+  const u = new SpeechSynthesisUtterance(clean);
+  const voices = window.speechSynthesis.getVoices();
+  const female = voices.find(v =>
+    (v.name.toLowerCase().includes('female') || v.name.includes('Heera') || 
+     v.name.includes('Priya') || v.name.includes('Zira')) &&
+    (v.lang.startsWith('en') || v.lang.startsWith('hi'))
+  ) || voices.find(v => v.lang === 'en-IN');
+  if (female) u.voice = female;
   u.lang = 'en-IN';
-  u.rate = 0.85;
-  u.pitch = 1;
-  u.volume = 1;
+  u.rate = 0.82;
+  u.pitch = 1.4;
   u.onend = () => setIsSpeaking(false);
   u.onerror = () => setIsSpeaking(false);
   window.speechSynthesis.speak(u);

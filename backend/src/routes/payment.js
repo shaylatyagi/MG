@@ -85,125 +85,7 @@ router.get('/driver/wallet', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch wallet' });
   }
 });
-// ADD DRIVER - Fixed version
-// ADD DRIVER - With proper validation and error messages
-router.post('/owner/add-driver', async (req, res) => {
-  try {
-    const { full_name, mobile_number, license_number, owner_id } = req.body;
-    
-    console.log('Add driver request:', { full_name, mobile_number, owner_id });
-    
-    // Validate required fields
-    if (!full_name || !mobile_number || !owner_id) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields' 
-      });
-    }
-    
-    // Validate name - NO NUMBERS ALLOWED
-    if (/[0-9]/.test(full_name)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: '❌ Name cannot contain numbers! Only letters and spaces allowed.' 
-      });
-    }
-    
-    // Validate name - only letters, spaces, dots
-    if (!/^[A-Za-z\s\.]+$/.test(full_name)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: '❌ Name can only contain letters, spaces, and dots.' 
-      });
-    }
-    
-    // Validate phone number (exactly 10 digits)
-    if (!/^\d{10}$/.test(mobile_number)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: '❌ Phone number must be exactly 10 digits' 
-      });
-    }
-    
-    // Check if user already exists
-    const existingUser = await pool.query(
-      'SELECT id FROM auth.users WHERE mobile_number = $1',
-      [mobile_number]
-    );
-    
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: '❌ Driver with this phone number already exists' 
-      });
-    }
-    
-    // Get owner's company ID
-    const companyResult = await pool.query(
-      `SELECT cc.id as company_id 
-       FROM auth.client_companies cc
-       JOIN auth.client_company_users ccu ON ccu.client_company_id = cc.id
-       WHERE ccu.user_id = $1
-       LIMIT 1`,
-      [owner_id]
-    );
-    
-    const companyId = companyResult.rows[0]?.company_id;
-    
-    if (!companyId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Owner company not found' 
-      });
-    }
-    
-    // Generate unique user code
-    const userCode = `DRV${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    
-    // Create user
-    const newUser = await pool.query(
-      `INSERT INTO auth.users (user_code, mobile_number, user_type, account_status, created_at)
-       VALUES ($1, $2, 'VEHICLE_DRIVER', 'ACTIVE', NOW())
-       RETURNING id`,
-      [userCode, mobile_number]
-    );
-    
-    const userId = newUser.rows[0].id;
-    
-    // Create vehicle driver record
-    await pool.query(
-      `INSERT INTO auth.vehicle_drivers 
-       (user_id, vehicle_owner_company_id, driver_code, full_name, profile_photo_url, onboarding_status, wallet_balance, daily_rent, created_at)
-       VALUES ($1, $2, $3, $4, '', 'VERIFIED', 0, 850, NOW())`,
-      [userId, companyId, userCode, full_name]
-    );
-    
-    console.log(`✅ Driver added successfully: ${full_name} (${mobile_number})`);
-    
-    res.json({ 
-      success: true, 
-      message: '✅ Driver added successfully!', 
-      driver_id: userId,
-      driver_code: userCode
-    });
-    
-  } catch (err) {
-    console.error('Add driver error:', err);
-    
-    // Check for specific constraint violation
-    if (err.message.includes('numbers')) {
-      return res.status(400).json({ 
-        success: false, 
-        message: '❌ Name cannot contain numbers! Please use only letters.' 
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to add driver: ' + err.message 
-    });
-  }
-});
+
 // TEST ENDPOINT - Set test dues for a driver (REMOVE IN PRODUCTION)
 router.post('/driver/set-test-dues', async (req, res) => {
   try {
@@ -570,62 +452,36 @@ router.get('/owner/vehicles', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch vehicles', error: err.message });
   }
 });
-
-// ============================================
-// ADD DRIVER - Fixed for your table
-// ============================================
 router.post('/owner/add-driver', async (req, res) => {
   try {
-    const { full_name, mobile_number, owner_id } = req.body;
-    
-    console.log('Add Driver:', { full_name, mobile_number, owner_id });
-    
-    if (!full_name || !mobile_number || !owner_id) {
-      return res.status(400).json({ success: false, message: 'Missing required fields' });
-    }
-    
-    // Validate name (no numbers)
-    if (/[0-9]/.test(full_name)) {
+    const { full_name, mobile_number } = req.body;
+
+    if (!full_name || !mobile_number)
+      return res.status(400).json({ success: false, message: 'Name and phone required' });
+
+    if (/[0-9]/.test(full_name))
       return res.status(400).json({ success: false, message: '❌ Name cannot contain numbers!' });
-    }
-    
-    // Validate phone
-    if (!/^\d{10}$/.test(mobile_number)) {
+
+    if (!/^\d{10}$/.test(mobile_number))
       return res.status(400).json({ success: false, message: '❌ Phone must be 10 digits' });
-    }
-    
-    // Check if driver exists
+
     const existing = await pool.query(
-      'SELECT id FROM public.drivers WHERE mobile_number = $1',
-      [mobile_number]
+      'SELECT id FROM public.drivers WHERE mobile_number = $1', [mobile_number]
     );
-    
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ success: false, message: 'Driver already exists' });
-    }
-    
-    // Get owner code
-    const ownerResult = await pool.query(
-      'SELECT owner_code FROM public.owners WHERE id = $1',
-      [parseInt(owner_id)]
-    );
-    
-    const ownerCode = ownerResult.rows[0]?.owner_code || 'OWN001';
-    const driverCode = `DRV${Date.now()}`;
-    
+    if (existing.rows.length > 0)
+      return res.status(400).json({ success: false, message: '❌ Driver with this phone already exists' });
+
+    const driverCode = 'DRV' + Date.now().toString().slice(-6);
+
     const result = await pool.query(
-      `INSERT INTO public.drivers 
-       (full_name, mobile_number, driver_code, owner_code, wallet_balance, status, created_at)
-       VALUES ($1, $2, $3, $4, 0, 'ACTIVE', NOW())
-       RETURNING id, full_name, mobile_number, driver_code`,
-      [full_name, mobile_number, driverCode, ownerCode]
+      `INSERT INTO public.drivers (full_name, mobile_number, owner_code, driver_code, wallet_balance, status)
+       VALUES ($1, $2, 'OWN701951', $3, 0, 'ACTIVE') RETURNING id, driver_code`,
+      [full_name, mobile_number, driverCode]
     );
-    
-    res.json({ success: true, message: '✅ Driver added!', driver: result.rows[0] });
-    
+
+    res.json({ success: true, message: '✅ Driver added!', driver_code: result.rows[0].driver_code });
   } catch (err) {
-    console.error('Add driver error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: 'Failed to add driver: ' + err.message });
   }
 });
 router.get('/owner/transactions', async (req, res) => {
