@@ -323,6 +323,35 @@ useEffect(() => {
 const AccountTab = () => {
   const [uploading, setUploading] = useState(false);
   
+  // Add this function for file uploads
+  const handleFileUpload = async (docType, file) => {
+    if (!file) return;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('document', file);
+    formData.append('type', docType);
+    formData.append('phone', phone());
+    
+    try {
+      const res = await fetch(`${API}/api/kyc/upload-document`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tk()}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ ${docType} uploaded successfully!`);
+      } else {
+        alert('Upload failed: ' + (data.message || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+  
   // Get driver details from localStorage and fetched data
   const driverName = user?.name || user?.full_name || 'Driver Name';
   const driverPhone = phone();
@@ -397,7 +426,7 @@ const AccountTab = () => {
         </div>
       </div>
 
-      {/* TRANSACTIONS SECTION - Add this */}
+      {/* TRANSACTIONS SECTION */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -435,14 +464,14 @@ const AccountTab = () => {
         )}
       </div>
 
-      {/* KYC Documents Section - Keep existing */}
+      {/* KYC Documents Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Verified Documents</h3>
           <span className="text-[9px] text-blue-600 font-black">API Setu Connected</span>
         </div>
 
-        {/* Aadhaar Card - Keep existing */}
+        {/* Aadhaar Card */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-black text-slate-800 flex items-center gap-1"><Fingerprint size={14} /> Aadhaar Card</span>
@@ -471,7 +500,7 @@ const AccountTab = () => {
           </div>
         </div>
 
-        {/* PAN Card - Keep existing */}
+        {/* PAN Card */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-black text-slate-800 flex items-center gap-1"><FileText size={14} /> PAN Card</span>
@@ -494,7 +523,7 @@ const AccountTab = () => {
           </div>
         </div>
 
-        {/* Driving License - Keep existing */}
+        {/* Driving License */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-black text-slate-800 flex items-center gap-1"><FileCheck2 size={14} /> Driving License</span>
@@ -519,7 +548,7 @@ const AccountTab = () => {
           </div>
         </div>
 
-        {/* Bank Account - Keep existing */}
+        {/* Bank Account */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-black text-slate-800 flex items-center gap-1"><Landmark size={14} /> Bank Account</span>
