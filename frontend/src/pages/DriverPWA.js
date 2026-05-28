@@ -348,11 +348,6 @@ const AccountTab = () => {
   
   return (
     <div className="space-y-4 pb-4">
-      {/* Profile Header - Same as before */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
-        {/* ... existing profile header ... */}
-      </div>
-
       {/* KYC Documents Section - Full Version */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
