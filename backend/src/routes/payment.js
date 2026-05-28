@@ -623,19 +623,39 @@ router.get('/owner/transactions', async (req, res) => {
 // Add to payment.js
 
 // GET all drivers list (for login screen)
+// GET all drivers list (for login screen) - FIXED
 router.get('/drivers/list', async (req, res) => {
   try {
+    console.log('📋 Fetching all active drivers...');
+    
     const result = await pool.query(
-      `SELECT id, full_name, mobile_number, driver_code, 
-              (SELECT vehicle_number FROM public.vehicles WHERE driver_id = drivers.id LIMIT 1) as vehicle_number
-       FROM public.drivers 
-       WHERE status = 'ACTIVE'
-       ORDER BY full_name`
+      `SELECT 
+         d.id, 
+         d.full_name, 
+         d.mobile_number, 
+         d.driver_code,
+         d.wallet_balance,
+         COALESCE(v.vehicle_number, 'Not Assigned') as assigned_vehicle
+       FROM public.drivers d
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.status = 'ACTIVE'
+       ORDER BY d.full_name`
     );
-    res.json({ drivers: result.rows });
+    
+    console.log(`✅ Found ${result.rows.length} active drivers`);
+    
+    res.json({ 
+      success: true, 
+      drivers: result.rows,
+      count: result.rows.length
+    });
   } catch (err) {
     console.error('Error fetching drivers:', err);
-    res.json({ drivers: [] });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch drivers',
+      error: err.message 
+    });
   }
 });
 

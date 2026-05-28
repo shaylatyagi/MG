@@ -41,7 +41,19 @@ export default function Login() {
     setStep('select-role');
     setSelectedRole(null);
   };
-
+  const fetchDrivers = async () => {
+  try {
+    const response = await fetch(`${API}/api/drivers/list`)  // ← sahi (plural)
+    const data = await response.json();
+    console.log('Drivers API response:', data);
+    
+    // Handle both response formats
+    const driversList = data.drivers || data.data || (Array.isArray(data) ? data : []);
+    setDrivers(driversList);
+  } catch (error) {
+    console.error('Error fetching drivers:', error);
+  }
+};
   if (step === 'select-role') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
