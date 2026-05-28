@@ -319,44 +319,130 @@ useEffect(() => {
 
   // ACCOUNT TAB (Merged Profile + KYC)
   // ACCOUNT TAB with full KYC and document upload
+// ACCOUNT TAB with Profile Details, Vehicle Info, and KYC
 const AccountTab = () => {
   const [uploading, setUploading] = useState(false);
   
-  const handleFileUpload = async (docType, file) => {
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('document', file);
-    formData.append('type', docType);
-    formData.append('phone', phone());
-    
-    try {
-      const res = await fetch(`${API}/api/kyc/upload-document`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${tk()}` },
-        body: formData
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`✅ ${docType} uploaded successfully!`);
-        // Refresh KYC status
-      }
-    } catch (err) {
-      alert('Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  };
+  // Get driver details from localStorage and fetched data
+  const driverName = user?.name || user?.full_name || 'Driver Name';
+  const driverPhone = phone();
+  const driverCode = user?.driver_code || user?.usercode || 'Not Available';
   
   return (
     <div className="space-y-4 pb-4">
-      {/* KYC Documents Section - Full Version */}
+      {/* PROFILE HEADER - Driver Details */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-black">
+            {driverName.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h2 className="text-xl font-black">{driverName}</h2>
+            <p className="text-sm opacity-90">{driverPhone}</p>
+            <p className="text-xs opacity-75">Driver Code: {driverCode}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ASSIGNED VEHICLE DETAILS */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+        <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Truck size={14} /> Assigned Vehicle
+        </h3>
+        
+        {assignedVehicle ? (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-black text-slate-800 text-lg">{assignedVehicle.number}</p>
+                <p className="text-sm text-slate-500">{assignedVehicle.model}</p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-black bg-green-100 text-green-700">
+                ACTIVE
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+              <div>
+                <p className="text-[10px] text-slate-400">Daily Rent</p>
+                <p className="text-base font-black text-emerald-600">₹{assignedVehicle.dailyRent}/day</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400">Assigned Since</p>
+                <p className="text-sm font-black">{new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-amber-50 rounded-xl p-4 text-center">
+            <p className="text-amber-600 font-medium">No vehicle assigned</p>
+            <p className="text-xs text-amber-500 mt-1">Contact your owner to assign a vehicle</p>
+          </div>
+        )}
+      </div>
+
+      {/* RENT SUMMARY */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+        <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Wallet size={14} /> Rent Summary
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-slate-50 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-slate-400">Today's Dues</p>
+            <p className="text-xl font-black text-amber-600">₹{dues}</p>
+          </div>
+          <div className="bg-slate-50 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-slate-400">Total Paid</p>
+            <p className="text-xl font-black text-emerald-600">₹{totalPaid}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* TRANSACTIONS SECTION - Add this */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <History size={14} /> Recent Transactions
+          </h3>
+          <button 
+            onClick={() => { setTab('wallet'); setActiveTab('wallet'); }} 
+            className="text-[10px] text-blue-600 font-black"
+          >
+            View All →
+          </button>
+        </div>
+        
+        {payments.length === 0 ? (
+          <div className="text-center py-6 text-slate-400 text-xs">
+            No transactions yet
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {payments.slice(0, 5).map((p, i) => (
+              <div key={i} className="flex justify-between items-center py-2 border-b border-slate-100">
+                <div>
+                  <p className="text-xs font-semibold text-slate-800">{p.type}</p>
+                  <p className="text-[9px] text-slate-400">{p.date}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-emerald-600">₹{p.amount}</p>
+                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                    {p.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* KYC Documents Section - Keep existing */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Verified Documents</h3>
           <span className="text-[9px] text-blue-600 font-black">API Setu Connected</span>
         </div>
 
-        {/* Aadhaar Card */}
+        {/* Aadhaar Card - Keep existing */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-black text-slate-800 flex items-center gap-1"><Fingerprint size={14} /> Aadhaar Card</span>
@@ -376,7 +462,6 @@ const AccountTab = () => {
               <button onClick={kycAadhaarVerify} className="bg-emerald-600 text-white px-4 rounded-xl text-xs font-black">Verify</button>
             </div>
           )}
-          {/* Document Upload */}
           <div className="mt-2 pt-2 border-t border-dashed border-slate-200">
             <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100">
               <Camera size={12} /> Upload Aadhaar PDF/Image
@@ -386,7 +471,7 @@ const AccountTab = () => {
           </div>
         </div>
 
-        {/* PAN Card - Full */}
+        {/* PAN Card - Keep existing */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-black text-slate-800 flex items-center gap-1"><FileText size={14} /> PAN Card</span>
@@ -409,7 +494,7 @@ const AccountTab = () => {
           </div>
         </div>
 
-        {/* Driving License - Full */}
+        {/* Driving License - Keep existing */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-black text-slate-800 flex items-center gap-1"><FileCheck2 size={14} /> Driving License</span>
@@ -434,7 +519,7 @@ const AccountTab = () => {
           </div>
         </div>
 
-        {/* Bank Account - Full */}
+        {/* Bank Account - Keep existing */}
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="font-black text-slate-800 flex items-center gap-1"><Landmark size={14} /> Bank Account</span>
