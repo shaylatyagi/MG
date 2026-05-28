@@ -506,6 +506,18 @@ const fetchAllData = useCallback(async () => {
     setLoading(false);
   }
 }, []);
+useEffect(() => {
+  const fetchLedger = async () => {
+    try {
+      const res = await fetch(`${API}/api/payment/owner/ledger?period=${horizon}`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      });
+      const d = await res.json();
+      setLedger(d);
+    } catch {}
+  };
+  fetchLedger();
+}, [horizon]);
 
   useEffect(() => {
     fetchAllData();
@@ -670,7 +682,6 @@ const fetchAllData = useCallback(async () => {
   // HOME TAB
   const HomeTab = () => (
     <div className="space-y-4 pb-4">
-
     {/* Yield Ledger — YAHAN ADD KARO */}
     <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-3">
       <div className="flex items-center justify-between">
@@ -687,11 +698,11 @@ const fetchAllData = useCallback(async () => {
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100">
           <span className="text-[9px] text-emerald-600 font-bold uppercase block">Received</span>
-          <b className="text-sm font-mono font-bold text-emerald-700 block mt-0.5">₹{stats.todayCollection.toLocaleString('en-IN')}</b>
+          <b className="text-sm font-mono font-bold text-emerald-700 block mt-0.5">₹{ledger.received.toLocaleString('en-IN')}</b>
         </div>
         <div className="bg-amber-50/60 p-2 rounded-xl border border-amber-100">
           <span className="text-[9px] text-amber-600 font-bold uppercase block">Outstanding</span>
-          <b className="text-sm font-mono font-bold text-amber-700 block mt-0.5">₹{stats.pendingDues.toLocaleString('en-IN')}</b>
+          <b className="text-sm font-mono font-bold text-amber-700 block mt-0.5">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
         </div>
         <div className="bg-rose-50/60 p-2 rounded-xl border border-rose-100">
           <span className="text-[9px] text-rose-600 font-bold uppercase block">Pending</span>
@@ -1342,36 +1353,29 @@ const PaymentsTab = () => {
         headers: { Authorization: `Bearer ${token()}` }
       });
       const data = await res.json();
-      console.log('Transactions response:', data);
-      
-      // Ensure data is an array
-      if (Array.isArray(data)) {
-        setTransactions(data);
-      } else if (data && Array.isArray(data.transactions)) {
-        setTransactions(data.transactions);
-      } else {
-        setTransactions([]);
-      }
-    } catch (err) {
-      console.error('Fetch transactions error:', err);
-      setTransactions([]);
-    } finally {
-      setLoadingTx(false);
-    }
+      if (Array.isArray(data)) setTransactions(data);
+      else if (data?.transactions) setTransactions(data.transactions);
+      else setTransactions([]);
+    } catch { setTransactions([]); }
+    finally { setLoadingTx(false); }
   };
   
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
+  useEffect(() => { fetchTransactions(); }, []);
   
+  const liveTx = transactions.filter(tx => tx.payment_mode !== 'CASH');
+  const cashTx = transactions.filter(tx => tx.payment_mode === 'CASH');
+
   return (
     <div className="space-y-4 pb-4">
+      
+      {/* Total Banner */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-5 text-white">
         <p className="text-[10px] font-black opacity-80">Total Collection</p>
         <p className="text-3xl font-black">₹{stats.todayCollection.toLocaleString('en-IN')}</p>
         <p className="text-[10px] opacity-70 mt-1">Last 30 days</p>
       </div>
-      
+
+      {/* Live Transaction History — mat chedo, simple rakho */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
           <h3 className="text-[10px] font-black text-slate-400 uppercase">Transaction History</h3>
@@ -1379,42 +1383,61 @@ const PaymentsTab = () => {
         <div className="divide-y max-h-96 overflow-y-auto">
           {loadingTx ? (
             <div className="p-8 text-center text-slate-400 text-xs">Loading...</div>
-          ) : transactions.length === 0 ? (
+          ) : liveTx.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs">No transactions yet</div>
           ) : (
-            transactions.map((tx, i) => (
+            liveTx.map((tx, i) => (
               <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
                 <div>
                   <p className="text-xs font-black text-slate-800">{tx.driver_name || tx.payer_name || 'Driver'}</p>
                   <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
                   <p className="text-[9px] text-slate-400 font-mono">
-                    {tx.order_completion_date ? new Date(tx.order_completion_date).toLocaleString() : new Date(tx.order_initiation_date).toLocaleString()}
+                    {new Date(tx.order_completion_date || tx.order_initiation_date).toLocaleString()}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-black text-emerald-600">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
-                  <div className="flex gap-1 justify-end flex-wrap">
-  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
-    tx.payment_mode === 'CASH' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
-  }`}>
-    {tx.payment_mode === 'CASH' ? '💵 CASH' : tx.payment_mode || 'UPI'}
-  </span>
-  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-    {tx.transaction_status}
-  </span>
-</div>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                    {tx.transaction_status || 'SUCCESS'}
+                  </span>
                 </div>
               </div>
             ))
           )}
         </div>
       </div>
+
+      {/* Cash Payments — ALAG SECTION NICHE */}
+      {cashTx.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-4 py-3 border-b bg-emerald-50">
+            <h3 className="text-[10px] font-black text-emerald-700 uppercase">💵 Cash Payments Recorded</h3>
+          </div>
+          <div className="divide-y max-h-64 overflow-y-auto">
+            {cashTx.map((tx, i) => (
+              <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+                <div>
+                  <p className="text-xs font-black text-slate-800">{tx.driver_name || tx.payer_name}</p>
+                  <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
+                  <p className="text-[9px] text-slate-400 font-mono">
+                    {new Date(tx.order_completion_date || tx.order_initiation_date).toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-emerald-600">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                    💵 CASH
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
-
-  // PROFILE TAB
-  // PROFILE TAB in OwnerDashboard.js
 // PROFILE TAB - Complete
 const ProfileTab = () => (
   <div className="space-y-4 pb-4">
@@ -1670,7 +1693,7 @@ const ProfileTab = () => (
 )}
         {/* Notification Panel */}
         {showNotif && (
-          <div className="absolute top-[88px] right-3 w-72 bg-white rounded-2xl shadow-2xl border z-50">
+          <div className="absolute top-[88px] left-3 right-3 sm:left-auto sm:right-3 sm:w-72 bg-white rounded-2xl shadow-2xl border z-50">
             <div className="px-4 py-2 border-b flex justify-between items-center">
               <span className="text-[10px] font-black">Notifications</span>
               <button onClick={() => setShowNotif(false)}><X size={14} /></button>
@@ -1683,11 +1706,18 @@ const ProfileTab = () => (
                   <div key={i}
                     className={`px-4 py-3 border-b cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-blue-50' : ''}`}
                     onClick={() => {
-                      setNotifications(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
-                      setUnreadCount(prev => Math.max(0, prev - 1));
-                      setShowNotif(false);
-                      setActiveTab('payments');
-                    }}
+  setNotifications(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
+  setUnreadCount(prev => Math.max(0, prev - 1));
+  setShowNotif(false);
+  const title = (n.title || '').toLowerCase();
+  if (title.includes('payment') || title.includes('rent') || title.includes('cash')) {
+    setActiveTab('payments');
+  } else if (title.includes('vehicle') || title.includes('assign')) {
+    setActiveTab('vehicles');
+  } else {
+    setActiveTab('home');
+  }
+}}
                   >
                     <p className="text-xs font-black">{n.title}</p>
                     <p className="text-[10px] text-slate-500">{n.message}</p>

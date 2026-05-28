@@ -719,7 +719,7 @@ const AccountTab = () => {
 </div>
         {/* NOTIFICATION DROPDOWN */}
         {showNotif && (
-          <div className="absolute top-[108px] right-3 w-72 bg-white rounded-2xl shadow-2xl border z-[60] overflow-hidden">
+          <div className="absolute top-[108px] left-3 right-3 sm:left-auto sm:right-3 sm:w-72 bg-white rounded-2xl shadow-2xl border z-[60] overflow-hidden">
             <div className="px-4 py-2.5 border-b flex justify-between items-center bg-slate-50">
               <span className="text-[10px] font-black text-slate-700 uppercase">Notifications</span>
               <button onClick={() => setShowNotif(false)}><X size={14} /></button>
@@ -730,12 +730,16 @@ const AccountTab = () => {
                   <div key={i}
                     className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-blue-50/40' : ''}`}
                     onClick={() => {
-                      setNotifs(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
-                      setUnread(prev => Math.max(0, prev - 1));
-                      setShowNotif(false);
-                      setTab('wallet');
-                      setActiveTab('wallet');
-                    }}
+  setNotifs(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
+  setUnread(prev => Math.max(0, prev - 1));
+  setShowNotif(false);
+  const title = (n.title || '').toLowerCase();
+  if (title.includes('payment') || title.includes('rent')) {
+    setTab('wallet'); setActiveTab('wallet');
+  } else if (title.includes('vehicle') || title.includes('assign')) {
+    setTab('account'); setActiveTab('account');
+  }
+}}
                   >
                     <p className="text-xs font-black text-slate-800">{n.title}</p>
                     <p className="text-[10px] text-slate-500">{n.message}</p>

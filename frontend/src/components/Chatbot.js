@@ -113,19 +113,26 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       };
     }
   }, []);
-
   const speak = (text) => {
-    if ('speechSynthesis' in window) {
-      setIsSpeaking(true);
-      const utterance = new SpeechSynthesisUtterance(text);
-      const hasHindi = /[\u0900-\u097F]/.test(text);
-      utterance.lang = hasHindi ? 'hi-IN' : 'en-IN';
-      utterance.rate = 0.9;
-      utterance.onend = () => setIsSpeaking(false);
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    }
-  };
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  // Sirf English part bolo (Hindi script hata do)
+  const englishOnly = text
+    .split('\n\n').pop()
+    .replace(/[\u0900-\u097F]+/g, '') // Hindi script remove
+    .replace(/[🎉✅❌⚠️💰🚨🚛📅👥📭]/gu, '')
+    .trim();
+  if (!englishOnly) return;
+  setIsSpeaking(true);
+  const u = new SpeechSynthesisUtterance(englishOnly);
+  u.lang = 'en-IN';
+  u.rate = 0.85;
+  u.pitch = 1;
+  u.volume = 1;
+  u.onend = () => setIsSpeaking(false);
+  u.onerror = () => setIsSpeaking(false);
+  window.speechSynthesis.speak(u);
+};
 
   const stopSpeaking = () => {
     if ('speechSynthesis' in window) {
