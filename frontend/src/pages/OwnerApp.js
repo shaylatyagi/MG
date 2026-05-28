@@ -574,9 +574,76 @@ const fetchAllData = useCallback(async () => {
   );
 
   // DRIVERS TAB with SEARCH
-  const DriversTab = () => (
+  // DRIVERS TAB with SEARCH and Assignment - COMPLETE FIXED VERSION
+const DriversTab = () => {
+  const [selectedDriverForAssignInTab, setSelectedDriverForAssignInTab] = useState(null);
+  const [showDriverAssignModal, setShowDriverAssignModal] = useState(false);
+  const [availableVehiclesForDriverTab, setAvailableVehiclesForDriverTab] = useState([]);
+  const [driverRentType, setDriverRentType] = useState('DAILY');
+  const [driverRentAmount, setDriverRentAmount] = useState('');
+  
+  const fetchAvailableVehiclesForDriverTab = async (driverId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API}/api/assignment/available/vehicles?driverId=${driverId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) setAvailableVehiclesForDriverTab(data.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
+  const handleAssignFromDriversTab = async () => {
+    if (!selectedDriverForAssignInTab || !selectedVehicleForAssign) {
+      alert('Please select both driver and vehicle');
+      return;
+    }
+    
+    setAssigning(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API}/api/assignment/assign-with-rent`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          vehicleId: selectedVehicleForAssign.id,
+          driverId: selectedDriverForAssignInTab.id,
+          rentType: driverRentType,
+          rentAmount: parseFloat(driverRentAmount),
+          dailyRent: driverRentType === 'DAILY' ? parseFloat(driverRentAmount) : 
+                     driverRentType === 'WEEKLY' ? parseFloat(driverRentAmount) / 7 : 
+                     parseFloat(driverRentAmount) / 30
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`✅ Vehicle assigned to ${selectedDriverForAssignInTab.full_name}`);
+        setShowDriverAssignModal(false);
+        setSelectedDriverForAssignInTab(null);
+        setSelectedVehicleForAssign(null);
+        fetchAllData();
+        fetchUnassignedData();
+      } else {
+        alert(data.error || 'Assignment failed');
+      }
+    } catch (err) {
+      console.error('Assign error:', err);
+      alert('Network error');
+    } finally {
+      setAssigning(false);
+    }
+  };
+  
+  return (
     <div className="space-y-3 pb-4">
-      {/* SEARCH BAR - ADDED */}
+      {/* SEARCH BAR */}
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -604,30 +671,156 @@ const fetchAllData = useCallback(async () => {
               {searchQuery ? 'No drivers match your search' : 'No drivers added yet'}
             </div>
           ) : (
-            filteredDrivers.map((driver, i) => (
-              <div key={i} className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg">
-                      {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
+            filteredDrivers.map((driver, i) => {
+              // Check if driver has assigned vehicle
+              const hasVehicle = vehicles.some(v => v.driver_id === driver.id);
+              const assignedVehicle = vehicles.find(v => v.driver_id === driver.id);
+              
+              return (
+                <div key={i} className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg">
+                        {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-800">{driver.full_name || driver.name}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
+                        <p className="text-[9px] text-slate-400">
+                          Vehicle: {assignedVehicle?.vehicle_number || 'Not Assigned'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-black text-slate-800">{driver.full_name || driver.name}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
-                      <p className="text-[9px] text-slate-400">Vehicle: {driver.assigned_vehicle || 'Not Assigned'}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-black px-2 py-1 rounded-full ${
+                        hasVehicle ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {hasVehicle ? 'ASSIGNED' : 'UNASSIGNED'}
+                      </span>
+                      {!hasVehicle && (
+                        <button 
+                          onClick={() => {
+                            setSelectedDriverForAssignInTab(driver);
+                            fetchAvailableVehiclesForDriverTab(driver.id);
+                            setDriverRentType('DAILY');
+                            setDriverRentAmount('');
+                            setShowDriverAssignModal(true);
+                          }}
+                          className="p-2 rounded-lg bg-blue-50 text-blue-600"
+                          title="Assign Vehicle"
+                        >
+                          <Truck size={14} />
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => openChatWithDriver(driver)}
+                        className="p-2 rounded-lg bg-blue-50 text-blue-600"
+                      >
+                        <MessageCircle size={16} />
+                      </button>
                     </div>
                   </div>
-                  <button onClick={() => openChatWithDriver(driver)} className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                    <MessageCircle size={16} />
-                  </button>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
+      
+      {/* Driver Assignment Modal */}
+      {showDriverAssignModal && selectedDriverForAssignInTab && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-black mb-4">
+              Assign Vehicle to {selectedDriverForAssignInTab.full_name}
+            </h3>
+            
+            {/* Rent Type Selection */}
+            <div className="mb-4">
+              <label className="text-xs font-black text-slate-600 block mb-2">Select Rent Plan</label>
+              <div className="flex gap-2">
+                {['DAILY', 'WEEKLY', 'MONTHLY'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setDriverRentType(type);
+                      setDriverRentAmount('');
+                    }}
+                    className={`flex-1 py-2 rounded-lg text-xs font-black transition ${
+                      driverRentType === type 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {type === 'DAILY' && '📅 Daily'}
+                    {type === 'WEEKLY' && '📆 Weekly'}
+                    {type === 'MONTHLY' && '📅 Monthly'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Rent Amount */}
+            <div className="mb-4">
+              <label className="text-xs font-black text-slate-600 block mb-2">
+                {driverRentType === 'DAILY' && 'Daily Rent (₹)'}
+                {driverRentType === 'WEEKLY' && 'Weekly Rent (₹)'}
+                {driverRentType === 'MONTHLY' && 'Monthly Rent (₹)'}
+              </label>
+              <input
+                type="number"
+                value={driverRentAmount}
+                onChange={(e) => setDriverRentAmount(e.target.value)}
+                className="w-full border rounded-xl p-3 text-sm"
+                placeholder="Enter rent amount"
+              />
+            </div>
+            
+            {/* Vehicle Selection */}
+            <div className="mb-4">
+              <label className="text-xs font-black text-slate-600 block mb-2">Select Vehicle</label>
+              <select
+                className="w-full border rounded-xl p-3 text-sm bg-white"
+                value={selectedVehicleForAssign?.id || ''}
+                onChange={(e) => {
+                  const vehicle = availableVehiclesForDriverTab.find(v => v.id === parseInt(e.target.value));
+                  setSelectedVehicleForAssign(vehicle);
+                }}
+              >
+                <option value="">-- Choose Vehicle --</option>
+                {availableVehiclesForDriverTab.map(vehicle => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.vehicle_number} - {vehicle.vehicle_model} (₹{vehicle.daily_rent}/day)
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={() => {
+                  setShowDriverAssignModal(false);
+                  setSelectedDriverForAssignInTab(null);
+                  setSelectedVehicleForAssign(null);
+                }} 
+                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleAssignFromDriversTab} 
+                disabled={!selectedVehicleForAssign || !driverRentAmount || assigning}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
+              >
+                {assigning ? 'Assigning...' : '✓ Assign Vehicle'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
   const VehicleDetailModal = () => {
   if (!selectedVehicleDetails) return null;
   
