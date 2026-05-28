@@ -16,6 +16,7 @@ import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah
 const API = 'https://mg-qw5s.onrender.com';
 
 export default function OwnerDashboard() {
+  const [horizon, setHorizon] = useState('today');
   const [rentType, setRentType] = useState('DAILY'); // DAILY, WEEKLY, MONTHLY
 const rentTypeOptions = [
   { value: 'DAILY', label: 'Daily Rent', multiplier: 1 },
@@ -630,13 +631,44 @@ const fetchAllData = useCallback(async () => {
     };
     return subtitles[activeTab] || '';
   };
-
-  const StatCard = ({ title, value, icon: Icon, color, trend }) => (
+  {/* Yield Ledger */}
+<div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-3">
+  <div className="flex items-center justify-between">
+    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ecosystem Yield Ledger</span>
+    <select value={horizon} onChange={e=>setHorizon(e.target.value)}
+      className="bg-slate-100 px-2 py-1 rounded text-[11px] font-bold text-slate-700 outline-none border border-slate-200">
+      <option value="today">Today (Live)</option>
+      <option value="yesterday">Yesterday</option>
+      <option value="week">Last 7 Days</option>
+      <option value="this_month">This Month</option>
+      <option value="last_month">Last Month</option>
+    </select>
+  </div>
+  <div className="grid grid-cols-3 gap-2 text-center">
+    <div className="bg-emerald-50/60 p-2 rounded-xl border border-emerald-100">
+      <span className="text-[9px] text-emerald-600 font-bold uppercase block">Received</span>
+      <b className="text-sm font-mono font-bold text-emerald-700 block mt-0.5">₹{stats.todayCollection.toLocaleString('en-IN')}</b>
+    </div>
+    <div className="bg-amber-50/60 p-2 rounded-xl border border-amber-100">
+      <span className="text-[9px] text-amber-600 font-bold uppercase block">Outstanding</span>
+      <b className="text-sm font-mono font-bold text-amber-700 block mt-0.5">₹{stats.pendingDues.toLocaleString('en-IN')}</b>
+    </div>
+    <div className="bg-rose-50/60 p-2 rounded-xl border border-rose-100">
+      <span className="text-[9px] text-rose-600 font-bold uppercase block">Pending</span>
+      <b className="text-sm font-mono font-bold text-rose-700 block mt-0.5">₹0</b>
+    </div>
+  </div>
+  <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-1">
+    <span className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"/>Virtual Escrow Connected</span>
+    <span className="font-bold text-slate-500">Calculated for Today</span>
+  </div>
+</div>
+  const StatCard = ({ title, value, icon: Icon, color, trend,isMoney = false }) => (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
-          <p className="text-xl font-black text-slate-800 mt-1">₹{value.toLocaleString('en-IN')}</p>
+          <p className="text-xl font-black text-slate-800 mt-1">{isMoney ? `₹${value.toLocaleString('en-IN')}` : value}</p>
           {trend && (
             <div className="flex items-center gap-1 mt-1">
               {trend === 'up' ? <ArrowUpRight size={10} className="text-emerald-500" /> : <ArrowDownRight size={10} className="text-red-500" />}
@@ -657,8 +689,8 @@ const fetchAllData = useCallback(async () => {
       <div className="grid grid-cols-2 gap-3">
         <StatCard title="TOTAL FLEET" value={stats.totalVehicles} icon={Truck} color="bg-blue-600" />
         <StatCard title="ACTIVE DRIVERS" value={stats.totalDrivers} icon={Users} color="bg-emerald-600" />
-        <StatCard title="TODAY'S COLLECTION" value={stats.todayCollection} icon={Wallet} color="bg-amber-600" trend="up" />
-        <StatCard title="PENDING DUES" value={stats.pendingDues} icon={AlertCircle} color="bg-red-600" trend="down" />
+        <StatCard title="TODAY'S COLLECTION" value={stats.todayCollection} icon={Wallet} color="bg-amber-600" trend="up" isMoney/>
+        <StatCard title="PENDING DUES" value={stats.pendingDues} icon={AlertCircle} color="bg-red-600" trend="down" isMoney/>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
