@@ -18,19 +18,20 @@ export default function Login() {
   }, []);
 
   const fetchDrivers = async () => {
-    try {
-      // Try this endpoint instead
-const response = await fetch(`${API}/api/payment/drivers/list`);
-      const data = await response.json();
-      console.log('Drivers API response:', data);
-      
-      // Extract drivers array
-      const driversList = data.drivers || [];
-      setDrivers(driversList);
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
-    }
-  };
+  try {
+    const response = await fetch(`${API}/api/drivers/list`);
+    const data = await response.json();
+    console.log('Drivers API response:', data);
+    
+    // Extract drivers array from response
+    const driversList = data.drivers || [];
+    setDrivers(driversList);
+    setLoading(false);
+  } catch (error) {
+    console.error('Error fetching drivers:', error);
+    setLoading(false);
+  }
+};
 
   const roles = [
     { type: 'driver', name: 'Driver', icon: <Truck className="w-8 h-8" />, bgColor: 'from-emerald-500 to-teal-600', redirect: '/driver/dashboard' },
