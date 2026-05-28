@@ -237,7 +237,8 @@ useEffect(() => {
         body: JSON.stringify({ amount: payAmt || dues || 850, customerName: u.name || 'Driver', customerPhone: ph, customerEmail: u.email || 'driver@mg.com' })
       });
       const d = await r.json();
-      const url = d?.data?.data?.checkoutUrl || d?.checkoutUrl || d?.paymentUrl || d?.data?.checkoutUrl;
+      const url = d?.intentURL || d?.data?.intentURL 
+         || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
       if (url) {
         window.location.href = url;
       } else {

@@ -640,202 +640,65 @@ router.get('/order/:orderId', async (req, res) => {
     res.status(500).json({ success: false, message: `DB Crash: ${err.message}` });
   }
 });
-// =============================================================================
-// =============================================================================
-
-// Baaki sab routes (create-order, webhook, my-transactions, etc.) yahan rahenge...
-
-// CREATE ORDER 
 router.post('/create-order', async (req, res) => {
-
-  const { amount, customerName, customerPhone, customerEmail } = req.body;
-
-  console.log('Create Order Received:', { amount, customerName, customerPhone, customerEmail });
-
-  if (!amount || Number(amount) <= 0 || !customerPhone) {
-
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Invalid amount or phone number',
-      received: { amount, phone: customerPhone }
-    });
-
-  }
-
-
-  const parsedAmount = Number(amount);
-
-  const orderId = uuidv4();
-
-  const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
-
-
   try {
+    const { amount, customerName, customerPhone, customerEmail } = req.body;
 
-    // Insert order in db
-    const insertResult = await pool.query(
+    if (!amount || !customerPhone) {
+      return res.status(400).json({ success: false, message: 'Amount and phone required' });
+    }
 
-  `INSERT INTO ms_orders 
-  (
-    order_id,
-    order_number,
-    order_amount,
-    currency,
-    payer_name,
-    payer_mobile,
-    payer_email,
-    transaction_status
-  )
-  VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')
-  RETURNING *`,
-
-  [
-    orderId,
-    orderNumber,
-    parsedAmount,
-    'INR',
-    customerName,
-    customerPhone,
-    customerEmail
-  ]
-
-);
-
-console.log('✅ ORDER INSERTED IN DB');
-
-console.log(insertResult.rows[0]);
-
-
-    const token = await getToken();
-
-    const orderPayload = {
-
-      referenceId: orderId,
-      merchantOrderId: orderNumber,
-
-      amount: parsedAmount, 
-
-      currency: 'INR',
-
-      customerName: customerName || 'Driver',
-
-      customerEmail: customerEmail || process.env.DEFAULT_EMAIL,
-
-      customerPhone: customerPhone,
-
-      notifyUrl: process.env.PAYYANTRA_NOTIFY_URL,
-
-      returnUrl: process.env.PAYYANTRA_RETURN_URL,
-
-      allowedPaymentMethods: ['UPI', 'CREDIT_CARD', 'DEBIT_CARD', 'INTERNET_BANKING'],
-
-    };
-
-
-    console.log('Sending to PayYantra:', orderPayload);
-
-    const orderRes = await fetch(`${BASE_URL}/api/v2/merchant/orders`, {
-
+    // Step 1: Token lo
+    const tokenRes = await fetch('https://payin-api.payyantra.com/api/auth/token', {
       method: 'POST',
-
       headers: {
-
-        'Authorization': `Bearer ${token}`,
-
-        'Content-Type': 'application/json',
-
-      },
-
-      body: JSON.stringify(orderPayload),
-
+        'x-client-id': process.env.PAYYANTRA_CLIENT_ID,
+        'x-client-secret': process.env.PAYYANTRA_CLIENT_SECRET,
+        'Content-Type': 'application/json'
+      }
     });
+    const tokenData = await tokenRes.json();
+    console.log('Token response:', JSON.stringify(tokenData));
 
+    const token = tokenData.token || tokenData.data?.token || tokenData.access_token || tokenData.data?.access_token;
+    if (!token) {
+      return res.status(500).json({ success: false, message: 'Token failed', raw: tokenData });
+    }
+
+    // Step 2: Order banao
+    const orderId = `MG${Date.now()}`;
+    const orderRes = await fetch('https://payin-api.payyantra.com/api/merchant/orders', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        amount: parseFloat(amount),
+        customerName: customerName || 'Driver',
+        customerPhone: customerPhone,
+        customerEmail: customerEmail || 'driver@mobilitygrid.com',
+        orderId: orderId,
+        returnUrl: 'https://mg-sandy.vercel.app/driver/dashboard?refresh=true',
+        notifyUrl: 'https://mg-qw5s.onrender.com/api/payment/webhook'
+      })
+    });
 
     const orderData = await orderRes.json();
+    console.log('Order response:', JSON.stringify(orderData));
 
-    console.log('PayYantra Response:', { status: orderRes.status, data: orderData });
+    const intentURL = orderData?.intentURL || orderData?.data?.intentURL;
+    const checkoutUrl = orderData?.checkoutUrl || orderData?.data?.checkoutUrl || orderData?.data?.data?.checkoutUrl;
 
-
-    if (!orderRes.ok) {
-
-      throw new Error(orderData.message || `PayYantra Error: ${orderRes.status}`);
-
+    if (!intentURL && !checkoutUrl) {
+      return res.status(500).json({ success: false, message: 'No URL in response', raw: orderData });
     }
 
-
-    if (orderData?.data?.transactionId) {
-
-      await pool.query(
-
-        `UPDATE ms_orders SET pg_transaction_id = $1 WHERE order_id = $2`,
-
-        [orderData.data.transactionId, orderId]
-
-      );
-
-    }
-
-
-    const checkoutUrl = orderData?.data?.data?.checkoutUrl || orderData?.data?.checkoutUrl || orderData?.data?.url;
-
-
-    if (!checkoutUrl) {
-
-      throw new Error('No checkout URL received from PayYantra');
-
-    }
-
-
-    res.json({
-
-      success: true,
-
-      data: orderData,
-
-      orderId,
-
-      orderNumber,
-
-      paymentUrl: checkoutUrl,
-
-      checkoutUrl
-
-    });
-
+    res.json({ success: true, intentURL, checkoutUrl, orderId });
 
   } catch (err) {
-
-    console.error('=== PAYMENT CREATION FAILED ===', err.message);
-
-    res.status(500).json({
-
-      success: false,
-
-      message: 'Payment Initiation Failed',
-
-      error: err.message,
-
-      details: 'Check server logs for more info'
-
-    });
-
-  }
-
-});
-router.post('/driver/update-profile', async (req, res) => {
-  try {
-    const { phone, name, photo } = req.body;
-    // Database me realtime name aur photo update kar rahe hain
-    await pool.query(
-      `UPDATE auth.vehicle_drivers vd
-       SET full_name = $1, profile_photo_url = $2
-       FROM auth.users u
-       WHERE vd.user_id = u.id AND u.mobile_number = $3`,
-      [name, photo, phone]
-    );
-    res.json({ success: true, message: 'Real-time DB Updated!' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'DB Error' });
+    console.error('Create order error:', err);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
