@@ -279,9 +279,9 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
     // Help
     if (lowerMsg.includes('help') || lowerMsg.includes('मदद') || lowerMsg.includes('क्या कर सकते हो')) {
       if (isOwner) {
-        return `🤖 मैं आपकी मदद कर सकता हूँ:\n\n• "आज का collection कितना है?"\n• "किस driver ने payment नहीं दी?"\n• "कितने drivers हैं?"\n• "कितने vehicles हैं?"\n\n• "What is today's collection?"\n• "Which drivers haven't paid?"\n• "How many drivers?"\n• "How many vehicles?"`;
+        return `Chat मैं आपकी मदद कर सकता हूँ:\n\n• "आज का collection कितना है?"\n• "किस driver ने payment नहीं दी?"\n• "कितने drivers हैं?"\n• "कितने vehicles हैं?"\n\n• "What is today's collection?"\n• "Which drivers haven't paid?"\n• "How many drivers?"\n• "How many vehicles?"`;
       } else {
-        return `🤖 मैं आपकी मदद कर सकता हूँ:\n\n• "मेरा बकाया कितना है?"\n• "वॉलेट में कितना है?"\n• "क्या मैंने आज pay किया?"\n• "मेरी गाड़ी कौन सी है?"\n\n• "What is my pending dues?"\n• "Wallet balance?"\n• "Did I pay today?"\n• "My vehicle details?"`;
+        return `Chat मैं आपकी मदद कर सकता हूँ:\n\n• "मेरा बकाया कितना है?"\n• "वॉलेट में कितना है?"\n• "क्या मैंने आज pay किया?"\n• "मेरी गाड़ी कौन सी है?"\n\n• "What is my pending dues?"\n• "Wallet balance?"\n• "Did I pay today?"\n• "My vehicle details?"`;
       }
     }
 

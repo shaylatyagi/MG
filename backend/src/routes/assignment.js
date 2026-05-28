@@ -109,11 +109,12 @@ router.post('/assign-with-rent', async (req, res) => {
     );
     
     // Create notification for driver (with proper column names)
-    await client.query(
-      `INSERT INTO notifications (user_id, user_type, title, message, type, is_read, created_at)
-       VALUES ($1, 'driver', 'New Vehicle Assigned', $2, 'assignment', false, NOW())`,
-      [driverId, `You have been assigned vehicle with ${rentType} rent of ₹${rentAmount}`]
-    );
+    // Insert notification without user_id foreign key
+await client.query(
+  `INSERT INTO notifications (user_type, title, message, type, is_read, created_at)
+   VALUES ('driver', 'New Vehicle Assigned', $1, 'assignment', false, NOW())`,
+  [`Driver ${driverId} assigned vehicle with ${rentType} rent of ₹${rentAmount}`]
+);
     
     await client.query('COMMIT');
     
