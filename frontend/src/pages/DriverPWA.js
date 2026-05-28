@@ -65,6 +65,36 @@ export default function DriverPWA() {
 
   // Profile
   const [profEdit, setProfEdit] = useState(false);
+  // Add this state
+const [assignedVehicle, setAssignedVehicle] = useState(null);
+
+// Add this useEffect to fetch assigned vehicle
+useEffect(() => {
+  const fetchDriverVehicle = async () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const driverPhone = user.phone;
+    
+    if (driverPhone) {
+      try {
+        const response = await fetch(`${API}/api/payment/driver/profile?phone=${driverPhone}`);
+        const data = await response.json();
+        console.log('Driver vehicle data:', data);
+        
+        if (data && data.vehicle_number) {
+          setAssignedVehicle({
+            number: data.vehicle_number,
+            model: data.vehicle_model,
+            dailyRent: data.vehicle_daily_rent
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching driver vehicle:', err);
+      }
+    }
+  };
+  
+  fetchDriverVehicle();
+}, []);
   const [prof, setProf] = useState({ name: '', phone: '' });
 
   useEffect(() => {
@@ -722,6 +752,31 @@ const AccountTab = () => {
             </div>
           </div>
         )}
+        {/* Assigned Vehicle Card */}
+{assignedVehicle && (
+  <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
+    <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+          <Truck size={16} className="text-amber-600" />
+        </div>
+        <div>
+          <p className="font-black text-slate-800">{assignedVehicle.number}</p>
+          <p className="text-[10px] text-slate-400">{assignedVehicle.model}</p>
+        </div>
+      </div>
+      <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-green-100 text-green-700">
+        ASSIGNED
+      </span>
+    </div>
+    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+      <div>
+        <p className="text-[10px] text-slate-400">Daily Rent</p>
+        <p className="text-sm font-black text-emerald-600">₹{assignedVehicle.dailyRent}/day</p>
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );
