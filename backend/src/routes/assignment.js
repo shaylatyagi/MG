@@ -54,19 +54,32 @@ router.get('/unassigned/drivers', async (req, res) => {
   }
 });
 
-// Assign vehicle to driver with rent type
+// Assign vehicle to driver with rent type - COMPLETE FIXED VERSION
 router.post('/assign-with-rent', async (req, res) => {
   const client = await pool.connect();
   try {
     const { vehicleId, driverId, rentType, rentAmount, dailyRent } = req.body;
     
-    console.log('Assign request:', { vehicleId, driverId, rentType, rentAmount, dailyRent });
+    console.log('=== ASSIGNMENT REQUEST ===');
+    console.log('vehicleId:', vehicleId, 'type:', typeof vehicleId);
+    console.log('driverId:', driverId, 'type:', typeof driverId);
+    console.log('rentType:', rentType);
+    console.log('rentAmount:', rentAmount);
+    console.log('dailyRent:', dailyRent);
+    
+    // Validate inputs
+    if (!vehicleId || !driverId || !rentType || !rentAmount) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: vehicleId, driverId, rentType, rentAmount' 
+      });
+    }
     
     await client.query('BEGIN');
     
     // Check if vehicle exists and is available
     const vehicleCheck = await client.query(
-      `SELECT id, driver_id FROM vehicles WHERE id = $1 FOR UPDATE`,
+      `SELECT id, driver_id, vehicle_number FROM vehicles WHERE id = $1 FOR UPDATE`,
       [vehicleId]
     );
     
@@ -96,10 +109,19 @@ router.post('/assign-with-rent', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Driver already has a vehicle' });
     }
     
+    // Calculate daily rent if not provided
+    let finalDailyRent = dailyRent;
+    if (!finalDailyRent) {
+      if (rentType === 'DAILY') finalDailyRent = rentAmount;
+      else if (rentType === 'WEEKLY') finalDailyRent = rentAmount / 7;
+      else if (rentType === 'MONTHLY') finalDailyRent = rentAmount / 30;
+      finalDailyRent = Math.round(finalDailyRent);
+    }
+    
     // Update vehicle
     await client.query(
       `UPDATE vehicles SET driver_id = $1, rent_type = $2, rent_amount = $3, daily_rent = $4 WHERE id = $5`,
-      [driverId, rentType, rentAmount, dailyRent, vehicleId]
+      [driverId, rentType, rentAmount, finalDailyRent, vehicleId]
     );
     
     // Update driver
@@ -108,14 +130,6 @@ router.post('/assign-with-rent', async (req, res) => {
       [vehicleId, rentType, rentAmount, driverId]
     );
     
-    // Create notification for driver (with proper column names)
-    // Insert notification without user_id foreign key
-await client.query(
-  `INSERT INTO notifications (user_type, title, message, type, is_read, created_at)
-   VALUES ('driver', 'New Vehicle Assigned', $1, 'assignment', false, NOW())`,
-  [`Driver ${driverId} assigned vehicle with ${rentType} rent of ₹${rentAmount}`]
-);
-    
     await client.query('COMMIT');
     
     res.json({ 
@@ -123,10 +137,15 @@ await client.query(
       message: 'Vehicle assigned successfully',
       driverName: driverCheck.rows[0].full_name
     });
+    
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Assignment error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Assignment error DETAILS:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      details: error.stack 
+    });
   } finally {
     client.release();
   }

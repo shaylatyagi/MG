@@ -1110,12 +1110,12 @@ if (status === 'SUCCESS' && localOrder.rows[0].transaction_status !== 'SUCCESS')
     // 2. SEND NOTIFICATION TO DRIVER
     // ============================================
     await pool.query(
-      `INSERT INTO public.notifications (user_id, user_type, title, message, metadata, created_at)
-       VALUES ($1, 'DRIVER', '✅ Payment Successful', 
-               'Your payment of ₹${amount} has been received successfully.',
-               $2, NOW())`,
-      [driverUserId, JSON.stringify({ amount, status: 'SUCCESS', type: 'payment' })]
-    );
+  `INSERT INTO public.notifications (driver_id, user_type, title, message, metadata, created_at)
+   VALUES ($1, 'DRIVER', '✅ Payment Successful', 
+           'Your payment of ₹${amount} has been received successfully.',
+           $2, NOW())`,
+  [driverUserId, JSON.stringify({ amount, status: 'SUCCESS', type: 'payment' })]
+);
     
     console.log(`📢 Notification sent to DRIVER ${driverPhone}`);
     
@@ -1296,13 +1296,27 @@ router.get('/owner/notifications', async (req, res) => {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
     
-    const result = await pool.query(
-      `SELECT id, title, message, is_read, created_at, metadata
-       FROM public.notifications
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT 50`,
+    // First get owner_code
+    const ownerResult = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id = $1',
       [ownerId]
+    );
+    
+    if (ownerResult.rows.length === 0) {
+      return res.json([]);
+    }
+    
+    const ownerCode = ownerResult.rows[0].owner_code;
+    
+    // Get notifications for drivers under this owner
+    const result = await pool.query(
+      `SELECT n.id, n.title, n.message, n.is_read, n.created_at, n.metadata, d.full_name as driver_name
+       FROM public.notifications n
+       LEFT JOIN public.drivers d ON d.id = n.driver_id
+       WHERE d.owner_code = $1 OR n.user_type = 'OWNER'
+       ORDER BY n.created_at DESC
+       LIMIT 50`,
+      [ownerCode]
     );
     
     res.json(result.rows);
@@ -1315,13 +1329,19 @@ router.get('/owner/notifications', async (req, res) => {
 // MARK notifications as read
 router.put('/notifications/mark-read', async (req, res) => {
   try {
-    const { userId } = req.query;
-    if (!userId) return res.status(400).json({ message: 'User ID required' });
+    const { driverId, ownerId } = req.query;
     
-    await pool.query(
-      'UPDATE public.notifications SET is_read = TRUE WHERE user_id = $1',
-      [userId]
-    );
+    if (driverId) {
+      await pool.query(
+        'UPDATE public.notifications SET is_read = TRUE WHERE driver_id = $1',
+        [driverId]
+      );
+    } else if (ownerId) {
+      await pool.query(
+        'UPDATE public.notifications SET is_read = TRUE WHERE user_type = $1',
+        ['OWNER']
+      );
+    }
     
     res.json({ success: true });
   } catch (err) {

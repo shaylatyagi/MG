@@ -294,11 +294,18 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
   try {
     const token = localStorage.getItem('token');
     
+    // Ensure IDs are numbers
+    const vehicleIdNum = parseInt(vehicleId);
+    const driverIdNum = parseInt(driverId);
+    const rentAmountNum = parseFloat(customRent);
+    
+    console.log('Sending assignment:', { vehicleIdNum, driverIdNum, rentType, rentAmountNum });
+    
     // Calculate rent based on type
     let dailyRent = 0;
-    if (rentType === 'DAILY') dailyRent = customRent;
-    else if (rentType === 'WEEKLY') dailyRent = customRent / 7;
-    else if (rentType === 'MONTHLY') dailyRent = customRent / 30;
+    if (rentType === 'DAILY') dailyRent = rentAmountNum;
+    else if (rentType === 'WEEKLY') dailyRent = rentAmountNum / 7;
+    else if (rentType === 'MONTHLY') dailyRent = rentAmountNum / 30;
     
     const response = await fetch(`${API}/api/assignment/assign-with-rent`, {
       method: 'POST',
@@ -307,30 +314,30 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
-        vehicleId,
-        driverId,
-        rentType,
-        rentAmount: customRent,
+        vehicleId: vehicleIdNum,
+        driverId: driverIdNum,
+        rentType: rentType,
+        rentAmount: rentAmountNum,
         dailyRent: Math.round(dailyRent)
       })
     });
     
     const data = await response.json();
+    console.log('Assignment response:', data);
     
     if (data.success) {
       alert(`✅ Vehicle assigned to ${data.driverName} with ${rentType} rent of ₹${customRent}`);
       setShowVehicleDetailModal(false);
       setSelectedVehicleDetails(null);
       // Refresh all data
-      fetchAllData();
-      fetchUnassignedData();
-      // Send notification to driver (backend will handle)
+      await fetchAllData();
+      await fetchUnassignedData();
     } else {
       alert(data.error || 'Assignment failed');
     }
   } catch (err) {
     console.error('Assign error:', err);
-    alert('Network error');
+    alert('Network error: ' + err.message);
   } finally {
     setAssigning(false);
   }
