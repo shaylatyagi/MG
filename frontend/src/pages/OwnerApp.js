@@ -82,7 +82,6 @@ const [selectedDriverId, setSelectedDriverId] = useState('');
     return u.id || 1;
   };
 
-  // OwnerDashboard.js - Update fetchAllData function
 // Add these states at the top with other states
 
 // Add this function to fetch available drivers
@@ -163,16 +162,21 @@ const fetchAllData = useCallback(async () => {
     ]);
     
     if (vehiclesRes.ok) {
-      const vehiclesData = await vehiclesRes.json();
-      console.log('Vehicles:', vehiclesData);
-      setVehicles(vehiclesData);
-    }
+  const vehiclesData = await vehiclesRes.json();
+  console.log('Vehicles raw:', vehiclesData);
+  const vehiclesList = Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData.vehicles || vehiclesData.data || []);
+  console.log('Vehicles list:', vehiclesList);
+  setVehicles(vehiclesList);
+}
     
     if (driversRes.ok) {
-      const data = await driversRes.json();
-      console.log('Drivers:', data);
-      setDrivers(data.drivers || []);
-    }
+  const data = await driversRes.json();
+  console.log('Drivers raw:', data);
+  // Handle both array and object response
+  const driversList = Array.isArray(data) ? data : (data.drivers || []);
+  console.log('Drivers list:', driversList);
+  setDrivers(driversList);
+}
     
     if (statsRes.ok) {
       const data = await statsRes.json();

@@ -26,6 +26,8 @@ app.use('/payment', paymentRoutes);
 app.use('/api/owner', ownerRoutes);
 const adminRoutes = require('./src/routes/admin');
 app.use('/api/admin', adminRoutes);
+const assignmentRoutes = require('./src/routes/assignment');
+app.use('/api/assignment', assignmentRoutes);
 // Check Health
 app.get('/', (req, res) => {
   res.json({ 

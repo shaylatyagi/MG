@@ -620,6 +620,40 @@ router.get('/owner/transactions', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Add to payment.js
+
+// GET all drivers list (for login screen)
+router.get('/drivers/list', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, full_name, mobile_number, driver_code, 
+              (SELECT vehicle_number FROM public.vehicles WHERE driver_id = drivers.id LIMIT 1) as vehicle_number
+       FROM public.drivers 
+       WHERE status = 'ACTIVE'
+       ORDER BY full_name`
+    );
+    res.json({ drivers: result.rows });
+  } catch (err) {
+    console.error('Error fetching drivers:', err);
+    res.json({ drivers: [] });
+  }
+});
+
+// GET all owners list (for login screen)
+router.get('/owners/list', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, full_name, mobile_number, owner_code
+       FROM public.owners 
+       WHERE status = 'ACTIVE'
+       ORDER BY full_name`
+    );
+    res.json({ owners: result.rows });
+  } catch (err) {
+    console.error('Error fetching owners:', err);
+    res.json({ owners: [] });
+  }
+});
 router.get('/owner/drivers/list', async (req, res) => {
   try {
     const { ownerId } = req.query;
