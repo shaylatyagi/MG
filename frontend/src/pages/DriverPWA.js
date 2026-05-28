@@ -1,7 +1,7 @@
 // frontend/src/pages/DriverPWA.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Truck,Wifi,Edit, Battery, Bell, BellRing, Home, CircleUser, Wallet,
+  User,Truck,Wifi,Edit, Battery, Bell, BellRing, Home, CircleUser, Wallet,
   CreditCard, Eye, EyeOff, Copy, X, Send, CheckCircle, Clock,
   AlertTriangle, MessageCircle, ShieldAlert, FileText, Camera, LogOut,
   Receipt, Trophy, Star, PackageCheck, PlusCircle, ArrowDownLeft,
