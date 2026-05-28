@@ -21,8 +21,9 @@ const paymentRoutes = require('./src/routes/payment');
 const ownerRoutes = require('./src/routes/owner');
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
-app.use('/api', paymentRoutes);
-app.use('/payment', paymentRoutes); 
+app.use('/api/payment', paymentRoutes);  // Add this line
+// In index.js
+app.use('/payment', paymentRoutes);  // This will make /payment/create-order work
 app.use('/api/owner', ownerRoutes);
 const adminRoutes = require('./src/routes/admin');
 app.use('/api/admin', adminRoutes);
