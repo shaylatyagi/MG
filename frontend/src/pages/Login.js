@@ -19,7 +19,8 @@ export default function Login() {
 
   const fetchDrivers = async () => {
     try {
-      const response = await fetch(`${API}/api/drivers/list`);
+      // Try this endpoint instead
+const response = await fetch(`${API}/api/payment/drivers/list`);
       const data = await response.json();
       console.log('Drivers API response:', data);
       
