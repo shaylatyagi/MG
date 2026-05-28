@@ -22,6 +22,7 @@ export default function DriverPWA() {
   return titles[tab] || 'MobilityGrid';
 };
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('dashboard'); // Add this
   const [tab, setTab] = useState('home'); // Changed from 'home' to 'account'
   const [historyFrom, setHistoryFrom] = useState('tab');
   const [lang, setLang] = useState('en');
@@ -557,18 +558,6 @@ const AccountTab = () => {
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="font-black text-slate-800">{telemetry.vehicleModel || 'Fleet Vehicle'}</h4>
-            <span className="text-[10px] font-mono text-slate-400">Plate: {telemetry.vehicleNumber || 'Not Assigned'}</span>
-          </div>
-          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${telemetry.vehicleNumber && telemetry.vehicleNumber !== 'Not Assigned' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-            {telemetry.vehicleNumber && telemetry.vehicleNumber !== 'Not Assigned' ? 'Linked' : 'Unassigned'}
-          </span>
-        </div>
-      </div>
-
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-50 flex justify-between items-center">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Recent Transactions</h3>
@@ -680,21 +669,30 @@ const AccountTab = () => {
           </div>
           <button onClick={() => setShowSOS(true)} className="bg-white text-red-700 text-[9px] font-black px-3 py-1.5 rounded-lg">Trigger SOS</button>
         </div>
-
-        {/* BOTTOM NAV - 3 tabs only */}
-        <div className="shrink-0 h-16 bg-white border-t border-slate-200 flex justify-around items-center z-50">
-          {[
-            { id: 'home', Icon: Home, label: 'Dashboard' },
-            { id: 'wallet', Icon: Wallet, label: 'Wallet' },
-            { id: 'account', Icon: CircleUser, label: 'Account' },
-          ].map(({ id, Icon, label }) => (
-            <button key={id} onClick={() => { setHistoryFrom('tab'); setTab(id); }}
-              className={`flex flex-col items-center gap-1 transition-all px-2 ${tab === id ? 'text-blue-600 -translate-y-0.5' : 'text-slate-400'}`}>
-              <Icon size={tab === id ? 22 : 20} />
-              <span className="text-[9px] font-black tracking-wide">{label}</span>
-            </button>
-          ))}
-        </div>
+{/* Bottom Navigation - Fixed */}
+<div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50">
+  {[
+    { id: 'dashboard', Icon: Home, label: 'Dashboard' },
+    { id: 'wallet', Icon: Wallet, label: 'Wallet' },
+    { id: 'account', Icon: User, label: 'Account' },
+  ].map(({ id, Icon, label }) => (
+    <button
+      key={id}
+      onClick={() => {
+        setActiveTab(id);
+        if (id === 'dashboard') setTab('home');
+        if (id === 'wallet') setTab('wallet');
+        if (id === 'account') setTab('account');
+      }}
+      className={`flex flex-col items-center justify-center gap-0.5 transition-all ${
+        activeTab === id ? 'text-blue-600' : 'text-slate-400'
+      }`}
+    >
+      <Icon size={20} />
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
+  ))}
+</div>
         {showChatbot && (
   <Chatbot 
     userRole="DRIVER"
@@ -748,26 +746,31 @@ const AccountTab = () => {
           </div>
         )}
         {/* Assigned Vehicle Card */}
+{/* Assigned Vehicle Card - Fixed Layout */}
 {assignedVehicle && (
   <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
-    <div className="flex items-center justify-between mb-2">
+    <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-          <Truck size={16} className="text-amber-600" />
+        <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+          <span className="text-2xl">🚛</span>
         </div>
         <div>
-          <p className="font-black text-slate-800">{assignedVehicle.number}</p>
-          <p className="text-[10px] text-slate-400">{assignedVehicle.model}</p>
+          <p className="font-black text-slate-800 text-lg">{assignedVehicle.number}</p>
+          <p className="text-sm text-slate-500">{assignedVehicle.model}</p>
         </div>
       </div>
-      <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-green-100 text-green-700">
+      <span className="px-3 py-1 rounded-full text-xs font-black bg-green-100 text-green-700">
         ASSIGNED
       </span>
     </div>
-    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+    <div className="flex justify-between items-center pt-3 border-t border-slate-100">
       <div>
-        <p className="text-[10px] text-slate-400">Daily Rent</p>
-        <p className="text-sm font-black text-emerald-600">₹{assignedVehicle.dailyRent}/day</p>
+        <p className="text-xs text-slate-400">Daily Rent</p>
+        <p className="text-xl font-black text-emerald-600">₹{assignedVehicle.dailyRent}/<span className="text-sm">day</span></p>
+      </div>
+      <div className="text-right">
+        <p className="text-xs text-slate-400">Status</p>
+        <p className="text-sm font-black text-green-600">ACTIVE</p>
       </div>
     </div>
   </div>
