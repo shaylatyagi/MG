@@ -1,12 +1,10 @@
-// backend/src/routes/assignment.js
-import express from 'express';
-import pool from '../config/db.js';
-import { authMiddleware } from '../middleware/auth.js';
+const express = require('express');
+const pool = require('../config/db');
 
 const router = express.Router();
 
 // Get unassigned drivers (for owner dashboard top section)
-router.get('/unassigned/drivers', authMiddleware, async (req, res) => {
+router.get('/unassigned/drivers', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, full_name, mobile_number, driver_code, wallet_balance 
@@ -17,13 +15,13 @@ router.get('/unassigned/drivers', authMiddleware, async (req, res) => {
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    console.error('Error fetching unassigned drivers:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // Get unassigned vehicles (for owner dashboard top section)
-router.get('/unassigned/vehicles', authMiddleware, async (req, res) => {
+router.get('/unassigned/vehicles', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, vehicle_number, vehicle_model, daily_rent, status 
@@ -34,15 +32,14 @@ router.get('/unassigned/vehicles', authMiddleware, async (req, res) => {
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    console.error('Error fetching unassigned vehicles:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // Assign vehicle to driver
-router.post('/assign', authMiddleware, async (req, res) => {
+router.post('/assign', async (req, res) => {
   const client = await pool.connect();
-  
   try {
     const { driverId, vehicleId } = req.body;
     
@@ -87,15 +84,15 @@ router.post('/assign', authMiddleware, async (req, res) => {
     res.json({ success: true, message: 'Vehicle assigned successfully' });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error(error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    console.error('Assignment error:', error);
+    res.status(500).json({ success: false, error: error.message });
   } finally {
     client.release();
   }
 });
 
 // Get transaction history
-router.get('/transactions', authMiddleware, async (req, res) => {
+router.get('/transactions', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT t.*, d.full_name as driver_name, v.vehicle_number
@@ -107,13 +104,13 @@ router.get('/transactions', authMiddleware, async (req, res) => {
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    console.error('Error fetching transactions:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Create transaction (payment collection)
-router.post('/transactions', authMiddleware, async (req, res) => {
+// Create new transaction (payment collection)
+router.post('/transactions', async (req, res) => {
   try {
     const { driverId, amount, type, paymentMode, orderId } = req.body;
     
@@ -132,9 +129,9 @@ router.post('/transactions', authMiddleware, async (req, res) => {
     
     res.json({ success: true, data: result.rows[0] });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    console.error('Error creating transaction:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-export default router;
+module.exports = router;
