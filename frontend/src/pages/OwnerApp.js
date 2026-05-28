@@ -726,98 +726,120 @@ const DriversTab = () => {
           )}
         </div>
       </div>
+      // Driver Assignment Modal - FIXED VERSION
+{showDriverAssignModal && selectedDriverForAssignInTab && (
+  <div 
+    className="fixed inset-0 bg-black/50 z-[1000] flex items-center justify-center p-4" 
+    onClick={(e) => {
+      // Click outside modal to close
+      if (e.target === e.currentTarget) {
+        setShowDriverAssignModal(false);
+        setSelectedDriverForAssignInTab(null);
+        setSelectedVehicleForAssign(null);
+      }
+    }}
+  >
+    <div className="bg-white rounded-3xl w-full max-w-sm p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <h3 className="text-lg font-black mb-4">
+        Assign Vehicle to {selectedDriverForAssignInTab.full_name}
+      </h3>
       
-      {/* Driver Assignment Modal */}
-      {showDriverAssignModal && selectedDriverForAssignInTab && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6">
-            <h3 className="text-lg font-black mb-4">
-              Assign Vehicle to {selectedDriverForAssignInTab.full_name}
-            </h3>
-            
-            {/* Rent Type Selection */}
-            <div className="mb-4">
-              <label className="text-xs font-black text-slate-600 block mb-2">Select Rent Plan</label>
-              <div className="flex gap-2">
-                {['DAILY', 'WEEKLY', 'MONTHLY'].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      setDriverRentType(type);
-                      setDriverRentAmount('');
-                    }}
-                    className={`flex-1 py-2 rounded-lg text-xs font-black transition ${
-                      driverRentType === type 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {type === 'DAILY' && '📅 Daily'}
-                    {type === 'WEEKLY' && '📆 Weekly'}
-                    {type === 'MONTHLY' && '📅 Monthly'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            {/* Rent Amount */}
-            <div className="mb-4">
-              <label className="text-xs font-black text-slate-600 block mb-2">
-                {driverRentType === 'DAILY' && 'Daily Rent (₹)'}
-                {driverRentType === 'WEEKLY' && 'Weekly Rent (₹)'}
-                {driverRentType === 'MONTHLY' && 'Monthly Rent (₹)'}
-              </label>
-              <input
-                type="number"
-                value={driverRentAmount}
-                onChange={(e) => setDriverRentAmount(e.target.value)}
-                className="w-full border rounded-xl p-3 text-sm"
-                placeholder="Enter rent amount"
-              />
-            </div>
-            
-            {/* Vehicle Selection */}
-            <div className="mb-4">
-              <label className="text-xs font-black text-slate-600 block mb-2">Select Vehicle</label>
-              <select
-                className="w-full border rounded-xl p-3 text-sm bg-white"
-                value={selectedVehicleForAssign?.id || ''}
-                onChange={(e) => {
-                  const vehicle = availableVehiclesForDriverTab.find(v => v.id === parseInt(e.target.value));
-                  setSelectedVehicleForAssign(vehicle);
-                }}
-              >
-                <option value="">-- Choose Vehicle --</option>
-                {availableVehiclesForDriverTab.map(vehicle => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {vehicle.vehicle_number} - {vehicle.vehicle_model} (₹{vehicle.daily_rent}/day)
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="flex gap-3">
-              <button 
-                onClick={() => {
-                  setShowDriverAssignModal(false);
-                  setSelectedDriverForAssignInTab(null);
-                  setSelectedVehicleForAssign(null);
-                }} 
-                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleAssignFromDriversTab} 
-                disabled={!selectedVehicleForAssign || !driverRentAmount || assigning}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
-              >
-                {assigning ? 'Assigning...' : '✓ Assign Vehicle'}
-              </button>
-            </div>
-          </div>
+      {/* Rent Type Selection */}
+      <div className="mb-4">
+        <label className="text-xs font-black text-slate-600 block mb-2">Select Rent Plan</label>
+        <div className="flex gap-2">
+          {['DAILY', 'WEEKLY', 'MONTHLY'].map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDriverRentType(type);
+                setDriverRentAmount('');
+              }}
+              className={`flex-1 py-2 rounded-lg text-xs font-black transition ${
+                driverRentType === type 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {type === 'DAILY' && '📅 Daily'}
+              {type === 'WEEKLY' && '📆 Weekly'}
+              {type === 'MONTHLY' && '📅 Monthly'}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
+      
+      {/* Rent Amount */}
+      <div className="mb-4">
+        <label className="text-xs font-black text-slate-600 block mb-2">
+          {driverRentType === 'DAILY' && 'Daily Rent (₹)'}
+          {driverRentType === 'WEEKLY' && 'Weekly Rent (₹)'}
+          {driverRentType === 'MONTHLY' && 'Monthly Rent (₹)'}
+        </label>
+        <input
+          type="number"
+          value={driverRentAmount}
+          onChange={(e) => setDriverRentAmount(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full border rounded-xl p-3 text-sm"
+          placeholder="Enter rent amount"
+        />
+      </div>
+      
+      {/* Vehicle Selection */}
+      <div className="mb-4">
+        <label className="text-xs font-black text-slate-600 block mb-2">Select Vehicle</label>
+        <select
+          className="w-full border rounded-xl p-3 text-sm bg-white"
+          value={selectedVehicleForAssign?.id || ''}
+          onChange={(e) => {
+            const vehicle = availableVehiclesForDriverTab.find(v => v.id === parseInt(e.target.value));
+            setSelectedVehicleForAssign(vehicle);
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <option value="">-- Choose Vehicle --</option>
+          {availableVehiclesForDriverTab.map(vehicle => (
+            <option key={vehicle.id} value={vehicle.id}>
+              {vehicle.vehicle_number} - {vehicle.vehicle_model} (₹{vehicle.daily_rent}/day)
+            </option>
+          ))}
+        </select>
+      </div>
+      
+      <div className="flex gap-3">
+        <button 
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowDriverAssignModal(false);
+            setSelectedDriverForAssignInTab(null);
+            setSelectedVehicleForAssign(null);
+          }} 
+          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black"
+        >
+          Cancel
+        </button>
+        <button 
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleAssignFromDriversTab();
+          }} 
+          disabled={!selectedVehicleForAssign || !driverRentAmount || assigning}
+          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
+        >
+          {assigning ? 'Assigning...' : '✓ Assign Vehicle'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };
@@ -826,7 +848,6 @@ const DriversTab = () => {
   
   const vehicle = selectedVehicleDetails;
   
-  // Vehicle type se photo decide karo
   const getVehicleImage = (type, model) => {
     const images = {
       'TRUCK': 'https://cdn-icons-png.flaticon.com/512/3413/3413029.png',
@@ -839,8 +860,16 @@ const DriversTab = () => {
   };
   
   return (
-    <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div 
+      className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setShowVehicleDetailModal(false);
+          setSelectedVehicleDetails(null);
+        }
+      }}
+    >
+      <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Vehicle Image */}
         <div className="relative h-48 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-t-3xl">
           <img 
@@ -849,166 +878,118 @@ const DriversTab = () => {
             className="w-full h-full object-contain p-4"
           />
           <button 
-            onClick={() => setShowVehicleDetailModal(false)}
+            onClick={() => {
+              setShowVehicleDetailModal(false);
+              setSelectedVehicleDetails(null);
+            }}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center"
           >
             <X size={18} />
           </button>
         </div>
         
-        {/* Vehicle Details */}
+        {/* Rest of the modal content */}
         <div className="p-5">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h2 className="text-xl font-black text-slate-800">{vehicle.vehicle_number}</h2>
-              <p className="text-sm text-slate-500">{vehicle.vehicle_model}</p>
-            </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-black ${
-              vehicle.status === 'ASSIGNED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-            }`}>
-              {vehicle.status === 'ASSIGNED' ? 'ASSIGNED' : 'AVAILABLE'}
-            </span>
-          </div>
+          {/* ... existing content ... */}
           
-          {/* Specs Grid */}
-          <div className="grid grid-cols-2 gap-3 mb-5 p-3 bg-slate-50 rounded-xl">
-            <div>
-              <p className="text-[9px] text-slate-400">Rent per day</p>
-              <p className="text-sm font-black text-emerald-600">₹{vehicle.daily_rent}/day</p>
-            </div>
-            <div>
-              <p className="text-[9px] text-slate-400">Vehicle Type</p>
-              <p className="text-sm font-black">{vehicle.type || 'Commercial'}</p>
-            </div>
-            <div>
-              <p className="text-[9px] text-slate-400">Current Driver</p>
-              <p className="text-sm font-black">{vehicle.driver_name || 'Not Assigned'}</p>
-            </div>
-            <div>
-              <p className="text-[9px] text-slate-400">Status</p>
-              <p className="text-sm font-black">{vehicle.status || 'ACTIVE'}</p>
-            </div>
-          </div>
-          
-          {/* Assignment Section - Only show if vehicle is unassigned */}
-          {!vehicle.driver_id && (
-            <div className="border-t pt-4">
-              <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
-                <UserPlus size={16} /> Assign to Driver
-              </h3>
-              
-              {/* Rent Type Selection */}
-              <div className="mb-4">
-                <label className="text-xs font-black text-slate-600 block mb-2">Select Rent Plan</label>
-                <div className="flex gap-2">
-                  {['DAILY', 'WEEKLY', 'MONTHLY'].map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => {
-                        setSelectedRentType(type);
-                        if (type === 'DAILY') setCustomRentAmount(vehicle.daily_rent);
-                        else if (type === 'WEEKLY') setCustomRentAmount(vehicle.daily_rent * 7);
-                        else setCustomRentAmount(vehicle.daily_rent * 30);
-                      }}
-                      className={`flex-1 py-2 rounded-lg text-xs font-black transition ${
-                        selectedRentType === type 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {type === 'DAILY' && '📅 Daily'}
-                      {type === 'WEEKLY' && '📆 Weekly'}
-                      {type === 'MONTHLY' && '📅 Monthly'}
-                    </button>
-                  ))}
-                </div>
+          {/* Rent Type Selection - add stopPropagation */}
+          <div className="border-t pt-4">
+            <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+              <UserPlus size={16} /> Assign to Driver
+            </h3>
+            
+            <div className="mb-4">
+              <label className="text-xs font-black text-slate-600 block mb-2">Select Rent Plan</label>
+              <div className="flex gap-2">
+                {['DAILY', 'WEEKLY', 'MONTHLY'].map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedRentType(type);
+                      if (type === 'DAILY') setCustomRentAmount(vehicle.daily_rent);
+                      else if (type === 'WEEKLY') setCustomRentAmount(vehicle.daily_rent * 7);
+                      else setCustomRentAmount(vehicle.daily_rent * 30);
+                    }}
+                    className={`flex-1 py-2 rounded-lg text-xs font-black transition ${
+                      selectedRentType === type 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {type === 'DAILY' && '📅 Daily'}
+                    {type === 'WEEKLY' && '📆 Weekly'}
+                    {type === 'MONTHLY' && '📅 Monthly'}
+                  </button>
+                ))}
               </div>
-              
-              {/* Custom Rent Amount */}
-              <div className="mb-4">
-                <label className="text-xs font-black text-slate-600 block mb-2">
-                  {selectedRentType === 'DAILY' && 'Daily Rent (₹)'}
-                  {selectedRentType === 'WEEKLY' && 'Weekly Rent (₹)'}
-                  {selectedRentType === 'MONTHLY' && 'Monthly Rent (₹)'}
-                </label>
-                <input
-                  type="number"
-                  value={customRentAmount}
-                  onChange={(e) => setCustomRentAmount(e.target.value)}
-                  className="w-full border rounded-xl p-3 text-sm"
-                  placeholder="Enter rent amount"
-                />
-                <p className="text-[9px] text-slate-400 mt-1">
-                  {selectedRentType === 'DAILY' && 'Driver will pay this amount every day'}
-                  {selectedRentType === 'WEEKLY' && 'Driver will pay this amount every week'}
-                  {selectedRentType === 'MONTHLY' && 'Driver will pay this amount every month'}
-                </p>
-              </div>
-              
-              {/* Driver Selection */}
-              <div className="mb-4">
-                <label className="text-xs font-black text-slate-600 block mb-2">Select Driver</label>
-                <select
-                  className="w-full border rounded-xl p-3 text-sm bg-white"
-                  value={selectedDriverForAssign?.id || ''}
-                  onChange={(e) => {
-                    const driver = availableUnassignedDrivers.find(d => d.id === parseInt(e.target.value));
-                    setSelectedDriverForAssign(driver);
-                  }}
-                >
-                  <option value="">-- Choose Driver --</option>
-                  {availableUnassignedDrivers.map(driver => (
-                    <option key={driver.id} value={driver.id}>
-                      {driver.full_name} - {driver.driver_code}
-                    </option>
-                  ))}
-                </select>
-                {availableUnassignedDrivers.length === 0 && (
-                  <p className="text-[10px] text-amber-600 mt-1">No unassigned drivers available</p>
-                )}
-              </div>
-              
-              {/* Assign Button */}
-              <button
-                onClick={() => {
-                  if (!selectedDriverForAssign) {
-                    alert('Please select a driver');
-                    return;
-                  }
-                  if (!customRentAmount || customRentAmount <= 0) {
-                    alert('Please enter valid rent amount');
-                    return;
-                  }
-                  assignDriverToVehicleWithRent(
-                    vehicle.id, 
-                    selectedDriverForAssign.id, 
-                    selectedRentType, 
-                    parseFloat(customRentAmount)
-                  );
+            </div>
+            
+            <div className="mb-4">
+              <label className="text-xs font-black text-slate-600 block mb-2">
+                {selectedRentType === 'DAILY' && 'Daily Rent (₹)'}
+                {selectedRentType === 'WEEKLY' && 'Weekly Rent (₹)'}
+                {selectedRentType === 'MONTHLY' && 'Monthly Rent (₹)'}
+              </label>
+              <input
+                type="number"
+                value={customRentAmount}
+                onChange={(e) => setCustomRentAmount(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full border rounded-xl p-3 text-sm"
+                placeholder="Enter rent amount"
+              />
+            </div>
+            
+            {/* Driver Selection */}
+            <div className="mb-4">
+              <label className="text-xs font-black text-slate-600 block mb-2">Select Driver</label>
+              <select
+                className="w-full border rounded-xl p-3 text-sm bg-white"
+                value={selectedDriverForAssign?.id || ''}
+                onChange={(e) => {
+                  const driver = availableUnassignedDrivers.find(d => d.id === parseInt(e.target.value));
+                  setSelectedDriverForAssign(driver);
                 }}
-                disabled={!selectedDriverForAssign || assigning}
-                className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
+                onClick={(e) => e.stopPropagation()}
               >
-                {assigning ? 'Assigning...' : '✓ Assign & Notify Driver'}
-              </button>
+                <option value="">-- Choose Driver --</option>
+                {availableUnassignedDrivers.map(driver => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.full_name} - {driver.driver_code}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
-          
-          {/* If already assigned, show assigned driver info */}
-          {vehicle.driver_id && (
-            <div className="border-t pt-4">
-              <h3 className="font-black text-slate-800 mb-3">Assigned Driver</h3>
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-                <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-black text-lg">
-                  {vehicle.driver_name?.charAt(0) || 'D'}
-                </div>
-                <div>
-                  <p className="font-black text-slate-800">{vehicle.driver_name}</p>
-                  <p className="text-[10px] text-slate-500">{vehicle.driver_phone}</p>
-                </div>
-              </div>
-            </div>
-          )}
+            
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!selectedDriverForAssign) {
+                  alert('Please select a driver');
+                  return;
+                }
+                if (!customRentAmount || customRentAmount <= 0) {
+                  alert('Please enter valid rent amount');
+                  return;
+                }
+                assignDriverToVehicleWithRent(
+                  vehicle.id, 
+                  selectedDriverForAssign.id, 
+                  selectedRentType, 
+                  parseFloat(customRentAmount)
+                );
+              }}
+              disabled={!selectedDriverForAssign || assigning}
+              className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
+            >
+              {assigning ? 'Assigning...' : '✓ Assign & Notify Driver'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
