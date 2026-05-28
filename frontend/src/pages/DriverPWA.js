@@ -73,7 +73,7 @@ const [assignedVehicle, setAssignedVehicle] = useState(null);
 useEffect(() => {
   const fetchDriverVehicle = async () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const driverPhone = user.phone;
+    const driverPhone = user.phone || user.phone_number || user.mobile_number;
     
     if (driverPhone) {
       try {
@@ -313,6 +313,7 @@ useEffect(() => {
   const goToWalletFromTransaction = () => {
     setHistoryFrom('transaction');
     setTab('wallet');
+    setActiveTab('wallet');
   };
 
   const statusBadge = (s) => {
@@ -413,60 +414,6 @@ const AccountTab = () => {
         )}
       </div>
 
-      {/* RENT SUMMARY */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Wallet size={14} /> Rent Summary
-        </h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-slate-50 rounded-xl p-3 text-center">
-            <p className="text-[10px] text-slate-400">Today's Dues</p>
-            <p className="text-xl font-black text-amber-600">₹{dues}</p>
-          </div>
-          <div className="bg-slate-50 rounded-xl p-3 text-center">
-            <p className="text-[10px] text-slate-400">Total Paid</p>
-            <p className="text-xl font-black text-emerald-600">₹{totalPaid}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* TRANSACTIONS SECTION */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-2">
-            <History size={14} /> Recent Transactions
-          </h3>
-          <button 
-            onClick={() => { setTab('wallet'); setActiveTab('wallet'); }} 
-            className="text-[10px] text-blue-600 font-black"
-          >
-            View All →
-          </button>
-        </div>
-        
-        {payments.length === 0 ? (
-          <div className="text-center py-6 text-slate-400 text-xs">
-            No transactions yet
-          </div>
-        ) : (
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {payments.slice(0, 5).map((p, i) => (
-              <div key={i} className="flex justify-between items-center py-2 border-b border-slate-100">
-                <div>
-                  <p className="text-xs font-semibold text-slate-800">{p.type}</p>
-                  <p className="text-[9px] text-slate-400">{p.date}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-emerald-600">₹{p.amount}</p>
-                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
-                    {p.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* KYC Documents Section */}
       <div className="space-y-3">
@@ -701,8 +648,8 @@ const AccountTab = () => {
 
   // Main Render
   return (
-    <div className="h-[100dvh] w-full bg-slate-200 flex justify-center overflow-hidden font-sans">
-      <div className="w-full max-w-[412px] bg-slate-50 h-full flex flex-col shadow-2xl relative overflow-hidden">
+    <div className="h-screen w-screen bg-slate-200 flex items-center justify-center overflow-hidden font-sans">
+      <div className="w-full max-w-[412px] bg-slate-50 h-full sm:max-h-[840px] flex flex-col shadow-2xl relative overflow-hidden sm:rounded-[36px] sm:border sm:border-slate-300">
 
         {/* STATUS BAR */}
 <div className="bg-slate-950 text-white text-[11px] px-4 py-2 flex justify-between shrink-0 z-50">
@@ -759,9 +706,19 @@ const AccountTab = () => {
             <div className="max-h-64 overflow-y-auto divide-y">
               {notifs.length === 0 ? <div className="p-5 text-center text-xs text-slate-400">No notifications</div>
                 : notifs.slice(0, 10).map((n, i) => (
-                  <div key={i} className={`px-4 py-3 ${!n.is_read ? 'bg-blue-50/40' : ''}`}>
+                  <div key={i}
+                    className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                    onClick={() => {
+                      setNotifs(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
+                      setUnread(prev => Math.max(0, prev - 1));
+                      setShowNotif(false);
+                      setTab('wallet');
+                      setActiveTab('wallet');
+                    }}
+                  >
                     <p className="text-xs font-black text-slate-800">{n.title}</p>
                     <p className="text-[10px] text-slate-500">{n.message}</p>
+                    {!n.is_read && <p className="text-[9px] text-blue-500 font-black mt-0.5">Tap to view →</p>}
                   </div>
                 ))}
             </div>
@@ -863,36 +820,6 @@ const AccountTab = () => {
             </div>
           </div>
         )}
-        {/* Assigned Vehicle Card */}
-{/* Assigned Vehicle Card - Fixed Layout */}
-{assignedVehicle && (
-  <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-4">
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-          <span className="text-2xl">🚛</span>
-        </div>
-        <div>
-          <p className="font-black text-slate-800 text-lg">{assignedVehicle.number}</p>
-          <p className="text-sm text-slate-500">{assignedVehicle.model}</p>
-        </div>
-      </div>
-      <span className="px-3 py-1 rounded-full text-xs font-black bg-green-100 text-green-700">
-        ASSIGNED
-      </span>
-    </div>
-    <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-      <div>
-        <p className="text-xs text-slate-400">Daily Rent</p>
-        <p className="text-xl font-black text-emerald-600">₹{assignedVehicle.dailyRent}/<span className="text-sm">day</span></p>
-      </div>
-      <div className="text-right">
-        <p className="text-xs text-slate-400">Status</p>
-        <p className="text-sm font-black text-green-600">ACTIVE</p>
-      </div>
-    </div>
-  </div>
-)}
       </div>
     </div>
   );

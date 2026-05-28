@@ -10,7 +10,7 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [userData, setUserData] = useState(null);
+  const [data,setUserData] = useState(null);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
   const isOwner = userRole === 'OWNER';
@@ -37,57 +37,55 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
 
   // Fetch user data based on role
   const fetchUserData = async () => {
-    try {
-      const H = { Authorization: `Bearer ${token}` };
-      
-      if (isOwner) {
-        // Fetch owner data
-        const [statsRes, vehiclesRes, driversRes, ordersRes] = await Promise.all([
-          fetch(`${API}/api/payment/owner/stats?ownerId=${userId}`, { headers: H }),
-          fetch(`${API}/api/payment/owner/vehicles?ownerId=${userId}`, { headers: H }),
-          fetch(`${API}/api/payment/owner/drivers/list?ownerId=${userId}`, { headers: H }),
-          fetch(`${API}/api/payment/my-transactions?phone=${userPhone}`, { headers: H })
-        ]);
-        
-        const stats = await statsRes.json();
-        const vehicles = await vehiclesRes.json();
-        const driversData = await driversRes.json();
-        const orders = await ordersRes.json();
-        
-        setUserData({
-          totalVehicles: stats.total_vehicles || 0,
-          totalDrivers: stats.total_drivers || 0,
-          todayCollection: stats.total_earnings || 0,
-          vehicles: vehicles || [],
-          drivers: driversData.drivers || [],
-          orders: orders || []
-        });
-      } else {
-        // Fetch driver data
-        const [profileRes, duesRes, txRes] = await Promise.all([
-          fetch(`${API}/api/payment/driver/profile?phone=${userPhone}`, { headers: H }),
-          fetch(`${API}/api/payment/driver/dues?phone=${userPhone}`, { headers: H }),
-          fetch(`${API}/api/payment/my-transactions?phone=${userPhone}`, { headers: H })
-        ]);
-        
-        const profile = await profileRes.json();
-        const dues = await duesRes.json();
-        const transactions = await txRes.json();
-        
-        setUserData({
-          name: profile.full_name || profile.name || 'Driver',
-          vehicleNumber: profile.vehicle_number || 'Not Assigned',
-          walletBalance: profile.wallet_balance || 0,
-          dailyRent: dues.daily_rent || 850,
-          todayDues: dues.dues || 0,
-          paidToday: dues.paid_today || 0,
-          transactions: transactions || []
-        });
-      }
-    } catch (err) {
-      console.error('Error fetching user data:', err);
+  try {
+    const H = { Authorization: `Bearer ${token}` };
+    let freshData = {};
+    
+    if (isOwner) {
+      const [statsRes, vehiclesRes, driversRes, ordersRes] = await Promise.all([
+        fetch(`${API}/api/payment/owner/stats?ownerId=${userId}`, { headers: H }),
+        fetch(`${API}/api/payment/owner/vehicles?ownerId=${userId}`, { headers: H }),
+        fetch(`${API}/api/payment/owner/drivers/list?ownerId=${userId}`, { headers: H }),
+        fetch(`${API}/api/payment/owner/transactions?ownerId=${userId}`, { headers: H })
+      ]);
+      const stats = await statsRes.json();
+      const vehicles = await vehiclesRes.json();
+      const driversData = await driversRes.json();
+      const orders = await ordersRes.json();
+      freshData = {
+        totalVehicles: stats.total_vehicles || 0,
+        totalDrivers: stats.total_drivers || 0,
+        todayCollection: stats.total_earnings || 0,
+        vehicles: Array.isArray(vehicles) ? vehicles : [],
+        drivers: driversData.drivers || [],
+        orders: Array.isArray(orders) ? orders : []
+      };
+    } else {
+      const [profileRes, duesRes, txRes] = await Promise.all([
+        fetch(`${API}/api/payment/driver/profile?phone=${userPhone}`, { headers: H }),
+        fetch(`${API}/api/payment/driver/dues?phone=${userPhone}`, { headers: H }),
+        fetch(`${API}/api/payment/my-transactions?phone=${userPhone}`, { headers: H })
+      ]);
+      const profile = await profileRes.json();
+      const dues = await duesRes.json();
+      const transactions = await txRes.json();
+      freshData = {
+        name: profile.full_name || profile.name || 'Driver',
+        vehicleNumber: profile.vehicle_number || 'Not Assigned',
+        walletBalance: profile.wallet_balance || 0,
+        dailyRent: dues.daily_rent || 850,
+        todayDues: dues.dues || 0,
+        paidToday: dues.paid_today || 0,
+        transactions: Array.isArray(transactions) ? transactions : []
+      };
     }
-  };
+    setUserData(freshData);
+    return freshData; // ← YE ADD KARO
+  } catch (err) {
+    console.error('Error fetching user data:', err);
+    return null;
+  }
+};
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -166,10 +164,10 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
   // Process intent based on role
   const processIntent = async (userMessage) => {
     const lowerMsg = userMessage.toLowerCase();
-    await fetchUserData();
+    const data = await fetchUserData();
     
-    if (!userData) {
-      return "एक मिनट, मैं आपका डाटा लोड कर रहा हूँ।\n\nOne moment, loading your data...";
+    if (!data) {
+      return "डेटा लोड नहीं हो पाया। कृपया दोबारा कोशिश करें।";
     }
 
     // ========== OWNER INTENTS ==========
@@ -177,15 +175,15 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       // Today's collection
       if (lowerMsg.includes('collection') || lowerMsg.includes('earning') || lowerMsg.includes('कलेक्शन') || 
           lowerMsg.includes('कमाई') || lowerMsg.includes('today') && (lowerMsg.includes('kitna') || lowerMsg.includes('how much'))) {
-        return `💰 आज का कुल collection ₹${userData.todayCollection.toLocaleString('en-IN')} है।\n\n💰 Today's total collection is ₹${userData.todayCollection.toLocaleString('en-IN')}.`;
+        return `💰 आज का कुल collection ₹${data.todayCollection.toLocaleString('en-IN')} है।\n\n💰 Today's total collection is ₹${data.todayCollection.toLocaleString('en-IN')}.`;
       }
 
       // Which drivers haven't paid?
       if ((lowerMsg.includes('not paid') || lowerMsg.includes('didn\'t pay') || lowerMsg.includes('नहीं दिया') || lowerMsg.includes('pending')) && 
           (lowerMsg.includes('driver') || lowerMsg.includes('ड्राइवर'))) {
         const notPaidDrivers = [];
-        for (const driver of userData.drivers) {
-          const paid = hasDriverPaidToday(driver.mobile_number, userData.orders);
+        for (const driver of data.drivers) {
+          const paid = hasDriverPaidToday(driver.mobile_number, data.orders);
           if (!paid) {
             notPaidDrivers.push(`${driver.full_name} (${driver.mobile_number})`);
           }
@@ -199,19 +197,19 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
 
       // Total drivers
       if (lowerMsg.includes('how many drivers') || lowerMsg.includes('kitne driver') || lowerMsg.includes('total drivers')) {
-        return `👥 आपके पास कुल ${userData.totalDrivers} drivers हैं।\n\n👥 You have a total of ${userData.totalDrivers} drivers.`;
+        return `👥 आपके पास कुल ${data.totalDrivers} drivers हैं।\n\n👥 You have a total of ${data.totalDrivers} drivers.`;
       }
 
       // Total vehicles
       if (lowerMsg.includes('how many vehicles') || lowerMsg.includes('kitne vehicles') || lowerMsg.includes('total vehicles') || lowerMsg.includes('fleet')) {
-        return `🚛 आपके पास कुल ${userData.totalVehicles} vehicles हैं।\n\n🚛 You have a total of ${userData.totalVehicles} vehicles.`;
+        return `🚛 आपके पास कुल ${data.totalVehicles} vehicles हैं।\n\n🚛 You have a total of ${data.totalVehicles} vehicles.`;
       }
 
       // Driver who paid today
       if (lowerMsg.includes('who paid') || lowerMsg.includes('किसने दिया') || (lowerMsg.includes('paid') && lowerMsg.includes('today'))) {
         const paidDrivers = [];
-        for (const driver of userData.drivers) {
-          const paid = hasDriverPaidToday(driver.mobile_number, userData.orders);
+        for (const driver of data.drivers) {
+          const paid = hasDriverPaidToday(driver.mobile_number, data.orders);
           if (paid) {
             paidDrivers.push(`${driver.full_name} (${driver.mobile_number})`);
           }
@@ -228,40 +226,40 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
     else {
       // Today's due
       if (lowerMsg.includes('बकाया') || lowerMsg.includes('due') || lowerMsg.includes('कितना देना') || lowerMsg.includes('pending')) {
-        if (userData.todayDues <= 0) {
+        if (data.todayDues <= 0) {
           return "🎉 बधाई हो! आपका आज का कोई बकाया नहीं है।\n\n🎉 Congratulations! You have no pending dues today.";
         } else {
-          return `🚨 आपका आज का बकाया ₹${userData.todayDues} है।\n\n🚨 Your pending dues today are ₹${userData.todayDues}.`;
+          return `🚨 आपका आज का बकाया ₹${data.todayDues} है।\n\n🚨 Your pending dues today are ₹${data.todayDues}.`;
         }
       }
 
       // Wallet balance
       if (lowerMsg.includes('वॉलेट') || lowerMsg.includes('wallet') || lowerMsg.includes('balance') || lowerMsg.includes('बैलेंस')) {
-        return `💰 आपके wallet में ₹${userData.walletBalance} का balance है।\n\n💰 Your wallet balance is ₹${userData.walletBalance}.`;
+        return `💰 आपके wallet में ₹${data.walletBalance} का balance है।\n\n💰 Your wallet balance is ₹${data.walletBalance}.`;
       }
 
       // Did I pay today?
       if (lowerMsg.includes('pay kiya') || lowerMsg.includes('paid') || lowerMsg.includes('भुगतान किया') || lowerMsg.includes('किराया दिया')) {
-        const paid = userData.paidToday > 0;
+        const paid = data.paidToday > 0;
         if (paid) {
           return "✅ हाँ, आपने आज का किराया दे दिया है। शुक्रिया!\n\n✅ Yes, you have paid today's rent. Thank you!";
         } else {
-          return `❌ नहीं, आपने आज का किराया नहीं दिया है। आपका बकाया ₹${userData.todayDues} है।\n\n❌ No, you haven't paid today's rent yet. Your pending dues are ₹${userData.todayDues}.`;
+          return `❌ नहीं, आपने आज का किराया नहीं दिया है। आपका बकाया ₹${data.todayDues} है।\n\n❌ No, you haven't paid today's rent yet. Your pending dues are ₹${data.todayDues}.`;
         }
       }
 
       // Vehicle details
       if (lowerMsg.includes('गाड़ी') || lowerMsg.includes('vehicle') || lowerMsg.includes('वाहन')) {
-        if (userData.vehicleNumber === 'Not Assigned') {
+        if (data.vehicleNumber === 'Not Assigned') {
           return "🚨 आपको अभी कोई गाड़ी assign नहीं की गई है।\n\n🚨 No vehicle has been assigned to you yet.";
         } else {
-          return `🚛 आपकी गाड़ी: ${userData.vehicleNumber}, दैनिक किराया: ₹${userData.dailyRent}\n\n🚛 Your vehicle: ${userData.vehicleNumber}, Daily rent: ₹${userData.dailyRent}`;
+          return `🚛 आपकी गाड़ी: ${data.vehicleNumber}, दैनिक किराया: ₹${data.dailyRent}\n\n🚛 Your vehicle: ${data.vehicleNumber}, Daily rent: ₹${data.dailyRent}`;
         }
       }
 
       // Daily rent
       if (lowerMsg.includes('किराया') || lowerMsg.includes('rent') || lowerMsg.includes('daily rent')) {
-        return `📅 आपका दैनिक किराया ₹${userData.dailyRent} है।\n\n📅 Your daily rent is ₹${userData.dailyRent}.`;
+        return `📅 आपका दैनिक किराया ₹${data.dailyRent} है।\n\n📅 Your daily rent is ₹${data.dailyRent}.`;
       }
     }
 
@@ -270,9 +268,9 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
     // Greeting
     if (lowerMsg.includes('नमस्ते') || lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('हैलो')) {
       if (isOwner) {
-        return `नमस्ते! आज का collection ₹${userData.todayCollection} है। ${userData.totalDrivers} drivers में से कितने ने payment दी है? मैं बता सकता हूँ।\n\nHello! Today's collection is ₹${userData.todayCollection}. I can tell you how many drivers have paid.`;
+        return `नमस्ते! आज का collection ₹${data.todayCollection} है। ${data.totalDrivers} drivers में से कितने ने payment दी है? मैं बता सकता हूँ।\n\nHello! Today's collection is ₹${data.todayCollection}. I can tell you how many drivers have paid.`;
       } else {
-        return `नमस्ते! आपका आज का बकाया ₹${userData.todayDues} है। वॉलेट में ₹${userData.walletBalance} है।\n\nHello! Your pending dues today are ₹${userData.todayDues}. Wallet balance is ₹${userData.walletBalance}.`;
+        return `नमस्ते! आपका आज का बकाया ₹${data.todayDues} है। वॉलेट में ₹${data.walletBalance} है।\n\nHello! Your pending dues today are ₹${data.todayDues}. Wallet balance is ₹${data.walletBalance}.`;
       }
     }
 
@@ -290,7 +288,17 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       return "आपका स्वागत है! 😊 क्या मैं और मदद कर सकता हूँ?\n\nYou're welcome! 😊 Can I help you with anything else?";
     }
 
-    return `मुझे समझ नहीं आया "${userMessage}".\n\nकृपया "help" या "मदद" लिखें देखने के लिए क्या पूछ सकते हैं।\n\nI didn't understand "${userMessage}".\n\nPlease type "help" to see what I can do.`;
+    try {
+  const aiRes = await fetch(`${API}/api/payment/chatbot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message: userMessage, context: data })
+  });
+  const aiData = await aiRes.json();
+  return aiData.reply;
+} catch {
+  return `मुझे समझ नहीं आया। "help" लिखें।\n\nI didn't understand. Type "help".`;
+}
   };
 
   const handleUserMessage = async (message) => {
@@ -349,19 +357,19 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
         </div>
 
         {/* Quick Stats */}
-        {userData && (
+        {data && (
           <div className={`px-4 py-2 bg-slate-100 border-b flex justify-around ${isOwner ? '' : ''}`}>
             {isOwner ? (
               <>
-                <div className="text-center"><IndianRupee size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{userData.todayCollection}</p><p className="text-[7px] text-slate-400">Collection</p></div>
-                <div className="text-center"><Users size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{userData.totalDrivers}</p><p className="text-[7px] text-slate-400">Drivers</p></div>
-                <div className="text-center"><Truck size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{userData.totalVehicles}</p><p className="text-[7px] text-slate-400">Vehicles</p></div>
+                <div className="text-center"><IndianRupee size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{data.todayCollection}</p><p className="text-[7px] text-slate-400">Collection</p></div>
+                <div className="text-center"><Users size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.totalDrivers}</p><p className="text-[7px] text-slate-400">Drivers</p></div>
+                <div className="text-center"><Truck size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.totalVehicles}</p><p className="text-[7px] text-slate-400">Vehicles</p></div>
               </>
             ) : (
               <>
-                <div className="text-center"><Wallet size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{userData.walletBalance}</p><p className="text-[7px] text-slate-400">Wallet</p></div>
-                <div className="text-center"><CreditCard size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{userData.todayDues}</p><p className="text-[7px] text-slate-400">Due Today</p></div>
-                <div className="text-center"><Truck size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{userData.vehicleNumber === 'Not Assigned' ? '—' : '✓'}</p><p className="text-[7px] text-slate-400">Vehicle</p></div>
+                <div className="text-center"><Wallet size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{data.walletBalance}</p><p className="text-[7px] text-slate-400">Wallet</p></div>
+                <div className="text-center"><CreditCard size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{data.todayDues}</p><p className="text-[7px] text-slate-400">Due Today</p></div>
+                <div className="text-center"><Truck size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.vehicleNumber === 'Not Assigned' ? '—' : '✓'}</p><p className="text-[7px] text-slate-400">Vehicle</p></div>
               </>
             )}
           </div>
