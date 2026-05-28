@@ -620,13 +620,10 @@ router.get('/owner/transactions', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// Add to payment.js
-
-// GET all drivers list (for login screen)
-// GET all drivers list (for login screen) - FIXED
+// GET all active drivers for login screen - NO HARDCODE, ONLY DATABASE
 router.get('/drivers/list', async (req, res) => {
   try {
-    console.log('📋 Fetching all active drivers...');
+    console.log('📋 Fetching all active drivers from database...');
     
     const result = await pool.query(
       `SELECT 
@@ -634,27 +631,36 @@ router.get('/drivers/list', async (req, res) => {
          d.full_name, 
          d.mobile_number, 
          d.driver_code,
-         d.wallet_balance,
-         COALESCE(v.vehicle_number, 'Not Assigned') as assigned_vehicle
+         COALESCE(d.wallet_balance, 0) as wallet_balance,
+         d.status
        FROM public.drivers d
-       LEFT JOIN public.vehicles v ON v.driver_id = d.id
        WHERE d.status = 'ACTIVE'
        ORDER BY d.full_name`
     );
     
-    console.log(`✅ Found ${result.rows.length} active drivers`);
+    console.log(`✅ Found ${result.rows.length} active drivers in database`);
+    
+    if (result.rows.length === 0) {
+      console.log('⚠️ No active drivers found in database');
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No active drivers found in database',
+        drivers: [] 
+      });
+    }
     
     res.json({ 
       success: true, 
       drivers: result.rows,
       count: result.rows.length
     });
+    
   } catch (err) {
     console.error('Error fetching drivers:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to fetch drivers',
-      error: err.message 
+      message: 'Database error: ' + err.message,
+      drivers: [] 
     });
   }
 });
