@@ -93,15 +93,23 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
+      recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'hi-IN';
 
       recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText(transcript);
-        handleUserMessage(transcript);
-        setIsListening(false);
-      };
+  let interim = '';
+  let final = '';
+  for (let i = event.resultIndex; i < event.results.length; i++) {
+    const t = event.results[i][0].transcript;
+    if (event.results[i].isFinal) final += t;
+    else interim += t;
+  }
+  setInputText(final || interim);
+  if (final) {
+    handleUserMessage(final);
+    setIsListening(false);
+  }
+};
 
       recognitionRef.current.onerror = () => {
         setIsListening(false);
@@ -116,26 +124,39 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
   const speak = (text) => {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const clean = text
-    .replace(/[\u0900-\u097F\s]+/g, ' ')
-    .replace(/[^\x00-\x7F]/g, '')
+
+  const speakable = text
+    .replace(/[💰🚨✅❌⚠️🎉👥🚛📅🏢📭💵]/gu, '')
+    .replace(/₹(\S+)/g, '$1 rupees')
+    .replace(/\n+/g, '. ')
     .trim();
-  if (!clean) return;
+
+  if (!speakable) return;
   setIsSpeaking(true);
-  const u = new SpeechSynthesisUtterance(clean);
-  const voices = window.speechSynthesis.getVoices();
-  const female = voices.find(v =>
-    (v.name.toLowerCase().includes('female') || v.name.includes('Heera') || 
-     v.name.includes('Priya') || v.name.includes('Zira')) &&
-    (v.lang.startsWith('en') || v.lang.startsWith('hi'))
-  ) || voices.find(v => v.lang === 'en-IN');
-  if (female) u.voice = female;
-  u.lang = 'en-IN';
-  u.rate = 0.82;
-  u.pitch = 1.4;
-  u.onend = () => setIsSpeaking(false);
-  u.onerror = () => setIsSpeaking(false);
-  window.speechSynthesis.speak(u);
+
+  const doSpeak = () => {
+    const voices = window.speechSynthesis.getVoices();
+    const female = voices.find(v =>
+      (v.name.includes('Heera') || v.name.includes('Priya') ||
+       v.name.toLowerCase().includes('female')) &&
+      (v.lang.startsWith('hi') || v.lang.startsWith('en'))
+    ) || voices.find(v => v.lang === 'en-IN');
+
+    const u = new SpeechSynthesisUtterance(speakable);
+    if (female) u.voice = female;
+    u.lang = /[\u0900-\u097F]/.test(speakable) ? 'hi-IN' : 'en-IN';
+    u.rate = 0.85;
+    u.pitch = 1.3;
+    u.onend = () => setIsSpeaking(false);
+    u.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(u);
+  };
+
+  if (window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true });
+  } else {
+    doSpeak();
+  }
 };
 
   const stopSpeaking = () => {
@@ -172,103 +193,108 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
     );
   };
   const processIntent = async (userMessage) => {
-  const lowerMsg = userMessage.toLowerCase();
+  const lowerMsg = userMessage.toLowerCase()
+    .replace(/[?।!]/g, '')
+    .trim();
   const data = await fetchUserData();
   if (!data) return "डेटा लोड नहीं हो पाया। दोबारा कोशिश करें।";
 
   if (isOwner) {
-    // Collection query
-    if (lowerMsg.includes('collection') || lowerMsg.includes('kitna aaya') || 
-        lowerMsg.includes('earnings') || lowerMsg.includes('कमाई') || lowerMsg.includes('कलेक्शन')) {
+
+    // --- COLLECTION ---
+    if (lowerMsg.match(/collection|kitna aaya|earning|kamai|aaya|received|kitna hua|total/)) {
       return `💰 आज का कुल collection ₹${data.todayCollection.toLocaleString('en-IN')} है।`;
     }
 
-    // Payment status / who paid / who didn't
-    if (lowerMsg.includes('status') || lowerMsg.includes('स्टेटस') ||
-        lowerMsg.includes('payment') || lowerMsg.includes('paid') ||
-        lowerMsg.includes('diya') || lowerMsg.includes('nahi') ||
-        lowerMsg.includes('किसने') || lowerMsg.includes('kaun')) {
-      const paidList = [], notPaidList = [];
-      for (const driver of (data.drivers || [])) {
-        const paid = hasDriverPaidToday(driver.mobile_number, data.orders);
-        if (paid) paidList.push(driver.full_name);
-        else notPaidList.push(driver.full_name);
+    // --- WHO PAID ---
+    if (lowerMsg.match(/paid|pay kiya|de diya|diya|kisne diya|who paid|payment de|kiya kya|kiya hai/)) {
+      const paid = [], notPaid = [];
+      for (const d of (data.drivers || [])) {
+        hasDriverPaidToday(d.mobile_number, data.orders)
+          ? paid.push(d.full_name)
+          : notPaid.push(d.full_name);
       }
-      return `✅ Paid (${paidList.length}): ${paidList.join(', ') || 'कोई नहीं'}\n\n❌ Nahi diya (${notPaidList.length}): ${notPaidList.join(', ') || 'कोई नहीं'}`;
+      return `✅ Payment di (${paid.length}):\n${paid.join(', ') || 'कोई नहीं'}\n\n❌ Nahi di (${notPaid.length}):\n${notPaid.join(', ') || 'कोई नहीं'}`;
     }
 
-    // Total drivers
-    if (lowerMsg.includes('kitne driver') || lowerMsg.includes('total driver') || lowerMsg.includes('drivers')) {
-      return `👥 कुल ${data.totalDrivers} drivers हैं।`;
+    // --- WHO HASN'T PAID ---
+    if (lowerMsg.match(/nahi diya|nhi diya|pending|nahi ki|due|baaki|outstanding|nahi pay/)) {
+      const notPaid = (data.drivers || [])
+        .filter(d => !hasDriverPaidToday(d.mobile_number, data.orders))
+        .map(d => d.full_name);
+      return notPaid.length === 0
+        ? `🎉 सभी drivers ने आज payment कर दी है!`
+        : `❌ इन drivers ने payment नहीं दी:\n${notPaid.join('\n')}`;
     }
 
-    // Total vehicles / fleet
-    if (lowerMsg.includes('vehicle') || lowerMsg.includes('fleet') || lowerMsg.includes('gaadi')) {
-      return `🚛 कुल ${data.totalVehicles} vehicles हैं।`;
-    }
-
-    // Individual driver check — "abdul ne diya kya", "rajesh ka status"
+    // --- INDIVIDUAL DRIVER ---
     const namedDriver = (data.drivers || []).find(d => {
       const parts = (d.full_name || '').toLowerCase().split(' ');
-      return parts.some(part => part.length > 2 && lowerMsg.includes(part));
+      return parts.some(p => p.length > 2 && lowerMsg.includes(p));
     });
     if (namedDriver) {
       const paid = hasDriverPaidToday(namedDriver.mobile_number, data.orders);
-      const vehicle = namedDriver.vehicle_number || 'assign nahi';
-      return `${namedDriver.full_name}: ${paid ? '✅ आज payment कर दी है' : '❌ आज payment नहीं की'}\nVehicle: ${vehicle}\nWallet: ₹${namedDriver.wallet_balance || 0}`;
+      const veh = namedDriver.vehicle_number || 'assign nahi';
+      return `👤 ${namedDriver.full_name}\n${paid ? '✅ आज payment कर दी है' : '❌ आज payment नहीं की'}\n🚛 Vehicle: ${veh}\n💰 Wallet: ₹${namedDriver.wallet_balance || 0}`;
     }
 
-    // Greeting
-    if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('नमस्ते') || lowerMsg.includes('haan')) {
-      const notPaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders)).length;
-      return `नमस्ते! आज ₹${data.todayCollection.toLocaleString('en-IN')} collection हुआ। ${notPaid} drivers ने अभी payment नहीं दी।`;
+    // --- VEHICLE DETAILS ---
+    if (lowerMsg.match(/vehicle|gaadi|fleet|gadi|vahaan/)) {
+      if (lowerMsg.match(/detail|batao|list|kaun|info|dikhao|kya|kaisi/)) {
+        const list = (data.vehicles || []).map(v =>
+          `${v.vehicle_number} → ${v.driver_name || 'Unassigned'}`
+        ).join('\n');
+        return `🚛 Fleet (${data.totalVehicles} vehicles):\n${list}`;
+      }
+      return `🚛 कुल ${data.totalVehicles} vehicles हैं।`;
     }
 
-    // Help
-    if (lowerMsg.includes('help') || lowerMsg.includes('मदद')) {
-      return `मैं इन सवालों का जवाब दे सकता हूँ:\n• "आज कितना collection हुआ?"\n• "Abdul ne pay kar diya kya?"\n• "Driver payment status"\n• "Kitne vehicles hain?"`;
+    // --- DRIVER COUNT ---
+    if (lowerMsg.match(/driver|kitne log|staff|team/)) {
+      return `👥 कुल ${data.totalDrivers} drivers हैं।`;
     }
-  }
 
-  else {
-    // Driver intents
-    if (lowerMsg.includes('bakaya') || lowerMsg.includes('due') || lowerMsg.includes('kitna dena')) {
-      return data.todayDues <= 0
-        ? `🎉 आपका कोई बकाया नहीं है।`
-        : `🚨 आपका बकाया ₹${data.todayDues} है।`;
+    // --- SUMMARY ---
+    if (lowerMsg.match(/summary|report|status|update|sab|overall|aaj ka/)) {
+      const paid = (data.drivers || []).filter(d => hasDriverPaidToday(d.mobile_number, data.orders)).length;
+      return `📊 आज का Summary:\n💰 Collection: ₹${data.todayCollection.toLocaleString('en-IN')}\n✅ Paid: ${paid}/${data.totalDrivers} drivers\n🚛 Fleet: ${data.totalVehicles} vehicles`;
     }
-    if (lowerMsg.includes('wallet') || lowerMsg.includes('balance') || lowerMsg.includes('paisa')) {
-      return `💰 आपके wallet में ₹${data.walletBalance} है।`;
+
+    // --- GREETING ---
+    if (lowerMsg.match(/hello|hi|haan|namaste|hey|kya hal|kaise/)) {
+      const unpaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders)).length;
+      return `नमस्ते! 👋\n💰 Collection: ₹${data.todayCollection.toLocaleString('en-IN')}\n❌ ${unpaid} drivers ने अभी payment नहीं दी`;
     }
-    if (lowerMsg.includes('pay') || lowerMsg.includes('diya') || lowerMsg.includes('bhugtan')) {
-      return data.paidToday > 0
-        ? `✅ हाँ, आपने आज का किराया दे दिया है।`
-        : `❌ नहीं, आपने अभी payment नहीं की। बकाया: ₹${data.todayDues}`;
-    }
-    if (lowerMsg.includes('vehicle') || lowerMsg.includes('gaadi')) {
+
+  } else {
+    // DRIVER
+    if (lowerMsg.match(/bakaya|due|kitna dena|pending|outstanding/))
+      return data.todayDues <= 0 ? `🎉 कोई बकाया नहीं!` : `🚨 बकाया: ₹${data.todayDues}`;
+    if (lowerMsg.match(/wallet|balance|paisa|kitna hai/))
+      return `💰 Wallet: ₹${data.walletBalance}`;
+    if (lowerMsg.match(/pay kiya|diya|bhugtan|paid|de diya/))
+      return data.paidToday > 0 ? `✅ हाँ, आज pay कर दिया।` : `❌ नहीं, बकाया ₹${data.todayDues}`;
+    if (lowerMsg.match(/vehicle|gaadi/))
       return data.vehicleNumber === 'Not Assigned'
         ? `🚨 कोई vehicle assign नहीं है।`
-        : `🚛 आपकी vehicle: ${data.vehicleNumber}, किराया: ₹${data.dailyRent}/day`;
-    }
-    if (lowerMsg.includes('rent') || lowerMsg.includes('kiraya')) {
-      return `📅 आपका daily किराया ₹${data.dailyRent} है।`;
-    }
-    if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('नमस्ते')) {
+        : `🚛 ${data.vehicleNumber} — ₹${data.dailyRent}/day`;
+    if (lowerMsg.match(/kiraya|rent/))
+      return `📅 Daily rent: ₹${data.dailyRent}`;
+    if (lowerMsg.match(/hello|hi|namaste|haan/))
       return `नमस्ते! बकाया: ₹${data.todayDues} | Wallet: ₹${data.walletBalance}`;
-    }
   }
 
-  // AI fallback for unknown queries
+  // GEMINI FALLBACK
   try {
-    const aiRes = await fetch(`${API}/api/payment/chatbot`, {
+    const res = await fetch(`${API}/api/payment/chatbot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ message: userMessage, context: data })
     });
-    const aiData = await aiRes.json();
-    return aiData.reply || 'समझ नहीं आया। "help" type करें।';
+    const d = await res.json();
+    return d.reply || d.message || `मैं यह नहीं समझ पाया। "summary" बोलें।`;
   } catch {
-    return 'समझ नहीं आया। "help" type करें।';
+    return `मैं यह नहीं समझ पाया। "summary" बोलें पूरी जानकारी के लिए।`;
   }
 };
 

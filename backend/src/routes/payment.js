@@ -271,26 +271,25 @@ router.post('/owner/vehicles', async (req, res) => {
 router.post('/chatbot', async (req, res) => {
   try {
     const { message, context } = req.body;
+    if (!message) return res.json({ reply: 'समझ नहीं आया।' });
 
-    const driverSummary = (context.drivers || []).map(d => {
-      const paid = (context.orders || []).some(o =>
+    const driverSummary = (context?.drivers || []).map(d => {
+      const paid = (context?.orders || []).some(o =>
         o.payer_mobile === d.mobile_number &&
         o.transaction_status === 'SUCCESS' &&
         new Date(o.order_completion_date).toDateString() === new Date().toDateString()
       );
-      return `${d.full_name}: ${paid ? 'PAID' : 'NOT PAID'}, Vehicle: ${d.vehicle_number || 'N/A'}`;
-    }).join('\n');
+      return `${d.full_name}: ${paid ? 'PAID' : 'NOT PAID'}`;
+    }).join(', ');
 
-    const prompt = `Tu MobilityGrid fleet assistant hai. Real data:
-Aaj collection: ₹${context.todayCollection || 0}
-Drivers:\n${driverSummary}
+    const prompt = `Tu MobilityGrid fleet assistant hai. Aaj ka data:
+Collection: Rs.${context?.todayCollection || 0}
+Drivers: ${driverSummary || 'No data'}
+User question: ${message}
+2 lines mein Hindi mein jawab de.`;
 
-User ka sawaal: ${message}
-
-Sirf Hindi mein jawab de. 2-3 lines max. Sirf fleet/payment related sawaalon ka jawab de.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -300,10 +299,16 @@ Sirf Hindi mein jawab de. 2-3 lines max. Sirf fleet/payment related sawaalon ka 
       }
     );
 
-    const d = await response.json();
-    const reply = d.candidates?.[0]?.content?.parts?.[0]?.text || 'समझ नहीं आया।';
+    const geminiData = await geminiRes.json();
+    console.log('Gemini raw:', JSON.stringify(geminiData));
+
+    const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
+      || geminiData?.error?.message
+      || 'समझ नहीं आया।';
+
     res.json({ reply });
   } catch (err) {
+    console.error('Chatbot error:', err);
     res.json({ reply: 'समझ नहीं आया।' });
   }
 });
