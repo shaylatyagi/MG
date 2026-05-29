@@ -181,6 +181,62 @@ router.get('/driver/telemetry', async (req, res) => {
     res.json({ vehicleNumber: 'MH-12-QX-4019', battery: 92, driven: 45, wallet: 0 });
   }
 });
+// Add damage record
+router.post('/owner/damage-record', async (req, res) => {
+  try {
+    const { vehicleId, driverId, ownerId, damageType, description, amount, recoveryMethod } = req.body;
+    
+    await pool.query(
+      `INSERT INTO public.damage_records 
+        (vehicle_id, driver_id, owner_id, damage_type, description, damage_amount, recovery_method)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [vehicleId, driverId||null, ownerId, damageType||'OTHER', description, amount||0, recoveryMethod||'LEDGER']
+    );
+
+    // Agar LEDGER method hai toh driver ledger mein entry bhi daalo
+    if (recoveryMethod === 'LEDGER' && driverId && amount > 0) {
+      await pool.query(
+        `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description)
+         VALUES ($1,$2,'DAMAGE_CHARGE',$3,$4)`,
+        [driverId, ownerId, amount, description || 'Vehicle damage charge']
+      );
+    }
+
+    res.json({ success: true, message: 'Damage recorded!' });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get damage history for vehicle
+router.get('/owner/damage-records/:vehicleId', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT dr.*, d.full_name as driver_name
+       FROM public.damage_records dr
+       LEFT JOIN public.drivers d ON d.id = dr.driver_id
+       WHERE dr.vehicle_id = $1
+       ORDER BY dr.created_at DESC`,
+      [req.params.vehicleId]
+    );
+    res.json(result.rows);
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update damage status
+router.put('/owner/damage-record/:id/resolve', async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE public.damage_records SET status='RESOLVED' WHERE id=$1`,
+      [req.params.id]
+    );
+    res.json({ success: true });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router.post('/owner/vehicles', async (req, res) => {
   try {
     const { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id } = req.body;
@@ -526,6 +582,52 @@ router.get('/owner/by-phone', async (req, res) => {
     
   } catch (err) {
     console.error('Owner by phone error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+router.get('/owner/vehicle-stats/:vehicleId', async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    
+    const vehicle = await pool.query(
+      `SELECT v.*, d.mobile_number as driver_phone
+       FROM public.vehicles v
+       LEFT JOIN public.drivers d ON d.id = v.driver_id
+       WHERE v.id = $1`, [vehicleId]
+    );
+    
+    const v = vehicle.rows[0];
+    if (!v) return res.status(404).json({ error: 'Not found' });
+
+    // Total revenue collected
+    const revenue = await pool.query(
+      `SELECT COALESCE(SUM(order_amount), 0) as total,
+              COUNT(*) as payment_count
+       FROM public.ms_orders
+       WHERE payer_mobile = $1 AND transaction_status = 'SUCCESS'`,
+      [v.driver_phone]
+    );
+
+    // Days since assigned
+    const assignedDays = v.created_at 
+      ? Math.floor((new Date() - new Date(v.created_at)) / (1000*60*60*24)) 
+      : 0;
+
+    const totalRevenue = parseFloat(revenue.rows[0].total);
+    const expectedRevenue = assignedDays * parseFloat(v.daily_rent || 0);
+    const roi = expectedRevenue > 0 
+      ? Math.round((totalRevenue / expectedRevenue) * 100) 
+      : 0;
+
+    res.json({
+      total_revenue: totalRevenue,
+      payment_count: parseInt(revenue.rows[0].payment_count),
+      assigned_days: assignedDays,
+      expected_revenue: expectedRevenue,
+      roi_percent: roi,
+      utilization: roi > 100 ? 100 : roi
+    });
+  } catch(err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -1173,44 +1275,81 @@ router.get('/my-transactions', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch transactions' });
   }
 });
-// ====================================
-// Backend payment.js - Add this endpoint
 router.get('/driver/profile', async (req, res) => {
   try {
     const { phone } = req.query;
-    console.log('Fetching driver profile for phone:', phone);
-    
-    if (!phone) {
-      return res.status(400).json({ message: 'Phone required' });
-    }
-    
+    if (!phone) return res.status(400).json({ message: 'Phone required' });
+
     const result = await pool.query(
       `SELECT 
-         d.id,
-         d.full_name as name,
-         d.mobile_number as phone,
-         d.driver_code,
-         d.wallet_balance,
-         d.status,
-         v.id as vehicle_id,
-         v.vehicle_number,
-         v.vehicle_model,
-         v.daily_rent as vehicle_daily_rent,
-         v.status as vehicle_status
+         d.id, d.full_name as name, d.mobile_number as phone,
+         d.driver_code, d.wallet_balance, d.status, d.advance_balance,
+         v.id as vehicle_id, v.vehicle_number, v.vehicle_model,
+         v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,
+         v.created_at as assigned_since
        FROM public.drivers d
        LEFT JOIN public.vehicles v ON v.driver_id = d.id
-       WHERE d.mobile_number = $1`,
-      [phone]
+       WHERE d.mobile_number = $1`, [phone]
     );
-    
-    console.log('Driver found:', result.rows.length);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Driver not found' });
+
+    if (!result.rows[0]) return res.status(404).json({ message: 'Driver not found' });
+    const p = result.rows[0];
+
+    let amount_paid_today = 0;
+    let total_outstanding = 0;
+
+    if (p.vehicle_number && p.vehicle_daily_rent) {
+      const dailyRent = parseFloat(p.vehicle_daily_rent);
+      
+      // ✅ Total paid ever (all successful payments)
+      const totalPaidRes = await pool.query(
+        `SELECT COALESCE(SUM(order_amount), 0) as total
+         FROM public.ms_orders
+         WHERE payer_mobile = $1 AND transaction_status = 'SUCCESS'`,
+        [phone]
+      );
+      const totalPaid = parseFloat(totalPaidRes.rows[0].total);
+
+      // ✅ Days since vehicle assigned
+      const assignedSince = p.assigned_since ? new Date(p.assigned_since) : new Date();
+      const today = new Date();
+      const daysDiff = Math.max(1, Math.floor((today - assignedSince) / (1000*60*60*24)));
+      // ✅ Security deposit daily recovery
+const securityDeposit = parseFloat(p.security_deposit || 0);
+const ADJUSTMENT_DAYS = 100; // 100 days mein recover
+const dailyDepositRecovery = securityDeposit > 0 
+  ? Math.round(securityDeposit / ADJUSTMENT_DAYS) 
+  : 0;
+
+// ✅ Total rent charged = (daily rent + daily deposit recovery) * days
+const effectiveDailyCharge = dailyRent + dailyDepositRecovery;
+const totalCharged = daysDiff * effectiveDailyCharge;
+
+      // ✅ Advance balance deduct karo
+      const advance = parseFloat(p.advance_balance || 0);
+
+      // ✅ Outstanding = charged - paid - advance
+      total_outstanding = Math.max(0, totalCharged - totalPaid - advance);
+
+      // Today's paid (for display)
+      const todayPaidRes = await pool.query(
+        `SELECT COALESCE(SUM(order_amount), 0) as total
+         FROM public.ms_orders
+         WHERE payer_mobile = $1 AND transaction_status = 'SUCCESS'
+         AND DATE(order_completion_date) = CURRENT_DATE`,
+        [phone]
+      );
+      amount_paid_today = parseFloat(todayPaidRes.rows[0].total);
     }
-    
-    res.json(result.rows[0]);
-    
+    res.json({
+  ...p,
+  amount_paid_today,
+  total_outstanding,
+  current_dues: total_outstanding,
+  daily_deposit_recovery: dailyDepositRecovery,  // ✅ Frontend ko dikhao
+  effective_daily_charge: effectiveDailyCharge
+});
+
   } catch (err) {
     console.error('Driver profile error:', err);
     res.status(500).json({ message: 'Failed' });
@@ -1767,5 +1906,65 @@ router.get('/driver/notifications', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) { res.json([]); }
+});
+// ─── DAILY RENT SCHEDULER ────────────────────────────────────
+const generateDailyRentEntries = async () => {
+  try {
+    console.log('🔄 Generating daily rent entries...');
+    
+    const drivers = await pool.query(`
+      SELECT d.id, d.full_name, v.daily_rent, v.vehicle_number
+      FROM public.drivers d
+      JOIN public.vehicles v ON v.driver_id = d.id
+      WHERE d.status = 'ACTIVE' AND v.status = 'ASSIGNED'
+    `);
+
+    let count = 0;
+    for (const driver of drivers.rows) {
+      const existing = await pool.query(`
+        SELECT id FROM public.driver_ledger
+        WHERE driver_id = $1 
+        AND entry_type = 'RENT_CHARGE'
+        AND DATE(created_at) = CURRENT_DATE
+      `, [driver.id]);
+
+      if (existing.rows.length === 0) {
+        await pool.query(`
+          INSERT INTO public.driver_ledger 
+            (driver_id, entry_type, amount, description, created_by)
+          VALUES ($1, 'RENT_CHARGE', $2, $3, 'SYSTEM')
+        `, [
+          driver.id,
+          parseFloat(driver.daily_rent),
+          `Daily rent - ${driver.vehicle_number} - ${new Date().toLocaleDateString('en-IN')}`
+        ]);
+        count++;
+      }
+    }
+
+    console.log(`✅ Daily rent generated for ${count} drivers`);
+  } catch(err) {
+    console.error('Daily rent error:', err.message);
+  }
+};
+
+// Midnight pe chalao
+const scheduleDailyRent = () => {
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0);
+  const ms = midnight - new Date();
+  setTimeout(() => {
+    generateDailyRentEntries();
+    setInterval(generateDailyRentEntries, 24*60*60*1000);
+  }, ms);
+  console.log(`⏰ Daily rent scheduler set`);
+};
+
+scheduleDailyRent();
+
+// Manual trigger for testing
+router.post('/admin/generate-daily-rent', async (req, res) => {
+  await generateDailyRentEntries();
+  res.json({ success: true, message: 'Done!' });
 });
 module.exports = router;

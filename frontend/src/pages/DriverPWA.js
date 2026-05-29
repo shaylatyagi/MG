@@ -222,14 +222,23 @@ useEffect(() => {
         }
       }
       if (prR.ok) {
-        const p = await prR.json();
-        setWallet(parseFloat(p.wallet_balance || 0));
-        const rent = parseFloat(p.vehicle_daily_rent || p.daily_rent || 0);
-        const paid = parseFloat(p.amount_paid_today || 0);
-        const d = p.vehicle_number ? Math.max(0, rent - paid) : 0;
-        setDues(d); setPayAmt(d > 0 ? d : 0);
-        setTelemetry({ vehicleNumber: p.vehicle_number || 'Not Assigned', vehicleModel: p.vehicle_model || '', dailyRent: rent });
-      } else {
+  const p = await prR.json();
+  setWallet(parseFloat(p.wallet_balance || 0));
+  
+  // ✅ Use total_outstanding for accurate dues
+  const d = p.vehicle_number 
+    ? parseFloat(p.total_outstanding || p.current_dues || 0)
+    : 0;
+  
+  setDues(d); 
+  setPayAmt(d > 0 ? d : 0);
+  setTelemetry({ 
+  vehicleNumber: p.vehicle_number || 'Not Assigned', 
+  vehicleModel: p.vehicle_model || '', 
+  dailyRent: parseFloat(p.vehicle_daily_rent || 0),
+  dailyDepositRecovery: parseFloat(p.daily_deposit_recovery || 0)
+});
+}else {
         const dR = await fetch(`${API}/api/payment/driver/dues?phone=${ph}`, { headers: H });
         if (dR.ok) { const d = await dR.json(); setDues(d.dues || 0); setPayAmt(d.daily_rent || 0); setTelemetry(p => ({ ...p, vehicleNumber: d.vehicle_number || 'Not Assigned', dailyRent: d.daily_rent || 0 })); }
       }
@@ -474,11 +483,21 @@ const AccountTab = () => {
           <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-black">
             {driverName.charAt(0).toUpperCase()}
           </div>
-          <div>
-            <h2 className="text-xl font-black">{driverName}</h2>
-            <p className="text-sm opacity-90">{driverPhone}</p>
-            <p className="text-xs opacity-75">Driver Code: {driverCode}</p>
-          </div>
+          // Profile header div ke andar, name ke neeche
+<h2 className="text-xl font-black">{driverName}</h2>
+<p className="text-sm opacity-90">{driverPhone}</p>
+<p className="text-xs opacity-75">Driver Code: {driverCode}</p>
+
+{/* ✅ ADD THIS — Active/Inactive status */}
+<div className="mt-2">
+  <span className={`px-3 py-1 rounded-full text-xs font-black ${
+    assignedVehicle 
+      ? 'bg-green-500 text-white' 
+      : 'bg-slate-500/50 text-white/80'
+  }`}>
+    {assignedVehicle ? '🟢 ACTIVE' : '⚫ INACTIVE'}
+  </span>
+</div>
         </div>
       </div>
 
@@ -717,6 +736,14 @@ const AccountTab = () => {
             {dues > 0 ? t.duesPending : t.settled}
           </span>
         </div>
+        {/* Security Deposit Recovery info */}
+{telemetry.dailyDepositRecovery > 0 && (
+  <div className="bg-amber-50 border border-amber-100 rounded-xl p-2 mt-2">
+    <p className="text-[9px] text-amber-600 font-black">
+      🔒 Includes ₹{telemetry.dailyDepositRecovery}/day security deposit recovery
+    </p>
+  </div>
+)}
         <div className="relative">
           <span className="absolute left-4 top-2.5 font-black text-slate-400 text-xl">₹</span>
           <input type="number" value={payAmt} onChange={e => setPayAmt(Number(e.target.value))}

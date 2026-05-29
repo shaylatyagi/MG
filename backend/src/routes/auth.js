@@ -29,7 +29,18 @@ router.post('/verify-otp', async (req, res) => {
     res.status(500).json({ message: 'Verification failed' });
   }
 });
-
+router.put('/owner/vehicles/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    await pool.query(
+      `UPDATE public.vehicles SET operational_status = $1 WHERE id = $2`,
+      [status, req.params.id]
+    );
+    res.json({ success: true });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // 3. Update Profile (Protected Route)
 router.put('/update-profile', verifyToken, async (req, res) => {
   const { name } = req.body;

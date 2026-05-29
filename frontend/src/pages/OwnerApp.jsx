@@ -1444,234 +1444,305 @@ const DriversTab = () => {
     </div>
   );
 };
-  const VehicleDetailModal = () => {
+const VehicleDetailModal = () => {
+  const [damages, setDamages] = useState([]);
+const [showDamageForm, setShowDamageForm] = useState(false);
+const [damageForm, setDamageForm] = useState({ 
+  type:'ACCIDENT', amount:'', desc:'', recovery:'LEDGER' 
+});
+
+useEffect(() => {
+  if (selectedVehicleDetails?.id) {
+    fetch(`${API}/api/payment/owner/damage-records/${selectedVehicleDetails.id}`, {
+      headers: { Authorization: `Bearer ${token()}` }
+    }).then(r=>r.json()).then(setDamages).catch(()=>{});
+  }
+}, [selectedVehicleDetails?.id]);
+
+const addDamage = async () => {
+  if (!damageForm.amount) return alert('Amount required');
+  const res = await fetch(`${API}/api/payment/owner/damage-record`, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization:`Bearer ${token()}` },
+    body: JSON.stringify({
+      vehicleId: selectedVehicleDetails.id,
+      driverId: selectedVehicleDetails.driver_id || null,
+      ownerId: ownerId(),
+      damageType: damageForm.type,
+      description: damageForm.desc,
+      amount: parseFloat(damageForm.amount),
+      recoveryMethod: damageForm.recovery
+    })
+  });
+  const d = await res.json();
+  if (d.success) {
+    alert('✅ Damage recorded!');
+    setShowDamageForm(false);
+    setDamageForm({ type:'ACCIDENT', amount:'', desc:'', recovery:'LEDGER' });
+    // Refresh damages
+    fetch(`${API}/api/payment/owner/damage-records/${selectedVehicleDetails.id}`,{
+      headers:{Authorization:`Bearer ${token()}`}
+    }).then(r=>r.json()).then(setDamages).catch(()=>{});
+  }
+};
+  // ✅ Hooks PEHLE — early return se pehle
+  const [vStats, setVStats] = useState(null);
+
+  useEffect(() => {
+    if (selectedVehicleDetails?.id) {
+      fetch(`${API}/api/payment/owner/vehicle-stats/${selectedVehicleDetails.id}`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      }).then(r => r.json()).then(setVStats).catch(() => {});
+    }
+  }, [selectedVehicleDetails?.id]);
+
+  // ✅ Early return BAAD MEIN
   if (!selectedVehicleDetails) return null;
-  
   const vehicle = selectedVehicleDetails;
-  
-  const getVehicleImage = (type, model) => {
+
+  const getVehicleImage = (type) => {
     const images = {
       'TRUCK': 'https://cdn-icons-png.flaticon.com/512/3413/3413029.png',
       'CAR': 'https://cdn-icons-png.flaticon.com/512/3413/3413028.png',
       'BUS': 'https://cdn-icons-png.flaticon.com/512/3413/3413030.png',
-      'TEMP TRAVELLER': 'https://cdn-icons-png.flaticon.com/512/3413/3413031.png',
       'AUTO': 'https://cdn-icons-png.flaticon.com/512/3413/3413032.png'
     };
     return images[type] || images['TRUCK'];
   };
-  
+
   return (
-    <div 
-      className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 overflow-y-auto"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          setShowVehicleDetailModal(false);
-          setSelectedVehicleDetails(null);
-        }
-      }}
-    >
-      <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        {/* Vehicle Image */}
+    <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 overflow-y-auto"
+      onClick={(e) => { if(e.target===e.currentTarget){ setShowVehicleDetailModal(false); setSelectedVehicleDetails(null); } }}>
+      <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+        
+        {/* Image Header */}
         <div className="relative h-48 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-t-3xl">
-          <img 
-            src={getVehicleImage(vehicle.type || 'TRUCK', vehicle.vehicle_model)}
-            alt={vehicle.vehicle_model}
-            className="w-full h-full object-contain p-4"
-          />
-          <button 
-            onClick={() => {
-              setShowVehicleDetailModal(false);
-              setSelectedVehicleDetails(null);
-            }}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center"
-          >
+          <img src={getVehicleImage(vehicle.vehicle_type||'TRUCK')} alt={vehicle.vehicle_model}
+            className="w-full h-full object-contain p-4" />
+          <button onClick={()=>{setShowVehicleDetailModal(false);setSelectedVehicleDetails(null);}}
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center">
             <X size={18} />
           </button>
         </div>
-        {/* Vehicle Compliance Info */}
-<div className="mb-5">
-  <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
-    <Shield size={18} /> Compliance & Docs
-  </h3>
-  <div className="space-y-2">
-    {vehicle.chassis_number && (
-      <div className="flex justify-between items-center py-2 border-b border-slate-100">
-        <span className="text-sm text-slate-500">🔩 Chassis No.</span>
-        <span className="text-sm font-black font-mono">{vehicle.chassis_number}</span>
-      </div>
-    )}
-    <div className="flex justify-between items-center py-2 border-b border-slate-100">
-      <span className="text-sm text-slate-500">🛡️ Insurance Expiry</span>
-      {vehicle.insurance_expiry ? (
-        <span className={`text-sm font-black ${
-          new Date(vehicle.insurance_expiry) < new Date() 
-            ? 'text-red-600' : 
-          new Date(vehicle.insurance_expiry) < new Date(Date.now() + 30*24*60*60*1000)
-            ? 'text-amber-600' : 'text-emerald-600'
-        }`}>
-          {new Date(vehicle.insurance_expiry).toLocaleDateString('en-IN')}
-          {new Date(vehicle.insurance_expiry) < new Date() && ' ⚠️ EXPIRED'}
-          {new Date(vehicle.insurance_expiry) > new Date() && 
-           new Date(vehicle.insurance_expiry) < new Date(Date.now() + 30*24*60*60*1000) && 
-           ' ⚠️ Expiring Soon'}
-        </span>
-      ) : (
-        <span className="text-sm text-slate-400">Not added</span>
-      )}
-    </div>
-    <div className="flex justify-between items-center py-2">
-      <span className="text-sm text-slate-500">📋 Fitness Expiry</span>
-      {vehicle.fitness_expiry ? (
-        <span className={`text-sm font-black ${
-          new Date(vehicle.fitness_expiry) < new Date() 
-            ? 'text-red-600' : 'text-emerald-600'
-        }`}>
-          {new Date(vehicle.fitness_expiry).toLocaleDateString('en-IN')}
-          {new Date(vehicle.fitness_expiry) < new Date() && ' ⚠️ EXPIRED'}
-        </span>
-      ) : (
-        <span className="text-sm text-slate-400">Not added</span>
-      )}
-    </div>
-  </div>
-</div>
-        {/* Rest of the modal content */}
+
         <div className="p-5">
+          {/* ✅ Compliance */}
+          <div className="mb-5">
+            <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+              <Shield size={18}/> Compliance & Docs
+            </h3>
+            <div className="space-y-2">
+              {vehicle.chassis_number && (
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-sm text-slate-500">🔩 Chassis No.</span>
+                  <span className="text-sm font-black font-mono">{vehicle.chassis_number}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                <span className="text-sm text-slate-500">🛡️ Insurance Expiry</span>
+                {vehicle.insurance_expiry ? (
+                  <span className={`text-sm font-black ${
+                    new Date(vehicle.insurance_expiry) < new Date() ? 'text-red-600' :
+                    new Date(vehicle.insurance_expiry) < new Date(Date.now()+30*24*60*60*1000) ? 'text-amber-600' : 'text-emerald-600'
+                  }`}>
+                    {new Date(vehicle.insurance_expiry).toLocaleDateString('en-IN')}
+                    {new Date(vehicle.insurance_expiry) < new Date() && ' ⚠️ EXPIRED'}
+                  </span>
+                ) : <span className="text-sm text-slate-400">Not added</span>}
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-slate-500">📋 Fitness Expiry</span>
+                {vehicle.fitness_expiry ? (
+                  <span className={`text-sm font-black ${new Date(vehicle.fitness_expiry)<new Date()?'text-red-600':'text-emerald-600'}`}>
+                    {new Date(vehicle.fitness_expiry).toLocaleDateString('en-IN')}
+                    {new Date(vehicle.fitness_expiry)<new Date()&&' ⚠️ EXPIRED'}
+                  </span>
+                ) : <span className="text-sm text-slate-400">Not added</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* ✅ Financial Intelligence */}
+          {vStats && (
+            <div className="mb-5">
+              <h3 className="font-black text-slate-800 mb-3">📈 Financial Intelligence</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                  <p className="text-[9px] text-emerald-600 font-bold uppercase">Total Revenue</p>
+                  <p className="text-base font-black text-emerald-700">₹{vStats.total_revenue.toLocaleString('en-IN')}</p>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-3 text-center">
+                  <p className="text-[9px] text-blue-600 font-bold uppercase">Payments</p>
+                  <p className="text-base font-black text-blue-700">{vStats.payment_count}</p>
+                </div>
+                <div className="bg-amber-50 rounded-xl p-3 text-center">
+                  <p className="text-[9px] text-amber-600 font-bold uppercase">Days Assigned</p>
+                  <p className="text-base font-black text-amber-700">{vStats.assigned_days}</p>
+                </div>
+                <div className={`rounded-xl p-3 text-center ${vStats.roi_percent>=80?'bg-emerald-50':vStats.roi_percent>=50?'bg-amber-50':'bg-red-50'}`}>
+                  <p className={`text-[9px] font-bold uppercase ${vStats.roi_percent>=80?'text-emerald-600':vStats.roi_percent>=50?'text-amber-600':'text-red-600'}`}>Collection Rate</p>
+                  <p className={`text-base font-black ${vStats.roi_percent>=80?'text-emerald-700':vStats.roi_percent>=50?'text-amber-700':'text-red-700'}`}>{vStats.roi_percent}%</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-[9px] text-slate-400 mb-1">
+                  <span>Collection Efficiency</span><span>{vStats.roi_percent}%</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${vStats.roi_percent>=80?'bg-emerald-500':vStats.roi_percent>=50?'bg-amber-500':'bg-red-500'}`}
+                    style={{width:`${Math.min(vStats.roi_percent,100)}%`}}/>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ✅ Operational Status */}
+          <div className="mb-4">
+            <label className="text-xs font-black text-slate-600 block mb-2">Operational Status</label>
+            <select className="w-full border rounded-xl p-3 text-sm bg-white"
+              value={vehicle.operational_status||'ACTIVE'}
+              onChange={async(e)=>{
+                await fetch(`${API}/api/payment/owner/vehicles/${vehicle.id}/status`,{
+                  method:'PUT',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token()}`},
+                  body:JSON.stringify({status:e.target.value})
+                });
+                fetchAllData();
+              }}>
+              <option value="ACTIVE">✅ Active</option>
+              <option value="MAINTENANCE">🔧 Under Maintenance</option>
+              <option value="ACCIDENT">🚨 Accident Case</option>
+              <option value="RECOVERY">💰 Recovery Required</option>
+              <option value="INACTIVE">⏸ Inactive</option>
+            </select>
+          </div>
+          {/* DAMAGE RECORDS */}
+<div className="mb-5">
+  <div className="flex justify-between items-center mb-3">
+    <h3 className="font-black text-slate-800">🚨 Damage Records</h3>
+    <button onClick={()=>setShowDamageForm(!showDamageForm)}
+      className="text-xs font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-xl">
+      + Add
+    </button>
+  </div>
+
+  {showDamageForm && (
+    <div className="bg-red-50 rounded-xl p-3 mb-3 space-y-2">
+      <select value={damageForm.type} onChange={e=>setDamageForm({...damageForm,type:e.target.value})}
+        className="w-full border rounded-xl p-2 text-sm bg-white">
+        <option value="ACCIDENT">🚗 Accident</option>
+        <option value="TYRE">🔄 Tyre Damage</option>
+        <option value="SCRATCH">🔧 Scratch/Dent</option>
+        <option value="ENGINE">⚙️ Engine Issue</option>
+        <option value="OTHER">📋 Other</option>
+      </select>
+      <input type="number" placeholder="Amount (₹)" value={damageForm.amount}
+        onChange={e=>setDamageForm({...damageForm,amount:e.target.value})}
+        className="w-full border rounded-xl p-2 text-sm"/>
+      <input placeholder="Description" value={damageForm.desc}
+        onChange={e=>setDamageForm({...damageForm,desc:e.target.value})}
+        className="w-full border rounded-xl p-2 text-sm"/>
+      <select value={damageForm.recovery} onChange={e=>setDamageForm({...damageForm,recovery:e.target.value})}
+        className="w-full border rounded-xl p-2 text-sm bg-white">
+        <option value="LEDGER">📋 Add to Driver Ledger</option>
+        <option value="DEPOSIT">🔒 Deduct from Deposit</option>
+        <option value="DRIVER_PAID">💵 Driver Paid Directly</option>
+      </select>
+      <div className="flex gap-2">
+        <button onClick={()=>setShowDamageForm(false)}
+          className="flex-1 py-2 bg-slate-100 rounded-xl text-xs font-black">Cancel</button>
+        <button onClick={addDamage}
+          className="flex-1 py-2 bg-red-600 text-white rounded-xl text-xs font-black">Record</button>
+      </div>
+    </div>
+  )}
+
+  {damages.length === 0 ? (
+    <p className="text-xs text-slate-400 text-center py-2">No damage records</p>
+  ) : (
+    <div className="space-y-2">
+      {damages.map((d,i)=>(
+        <div key={i} className={`rounded-xl p-3 border ${d.status==='RESOLVED'?'bg-slate-50 border-slate-200':'bg-red-50 border-red-200'}`}>
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-black text-slate-800">{d.damage_type} — ₹{parseFloat(d.damage_amount).toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">{d.description}</p>
+              <p className="text-[9px] text-slate-400">{new Date(d.incident_date).toLocaleDateString('en-IN')} · {d.driver_name||'No driver'}</p>
+            </div>
+            {d.status==='OPEN' && (
+              <button onClick={async()=>{
+                await fetch(`${API}/api/payment/owner/damage-record/${d.id}/resolve`,{
+                  method:'PUT',headers:{Authorization:`Bearer ${token()}`}
+                });
+                setDamages(prev=>prev.map((x,j)=>j===i?{...x,status:'RESOLVED'}:x));
+              }} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                ✓ Resolve
+              </button>
+            )}
+            {d.status==='RESOLVED' && <span className="text-[9px] text-emerald-600 font-black">✅ Resolved</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+          {/* ✅ Driver Assignment */}
           <div className="border-t pt-4">
             {vehicle.driver_id ? (
-              // Already assigned — show current driver + unassign button
               <div className="space-y-3">
-                <h3 className="font-black text-slate-800 flex items-center gap-2">
-                  <Users size={16} /> Assigned Driver
-                </h3>
+                <h3 className="font-black text-slate-800 flex items-center gap-2"><Users size={16}/> Assigned Driver</h3>
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                   <p className="font-black text-slate-800 text-lg">{vehicle.driver_name}</p>
                   <p className="text-xs text-slate-500 font-mono mt-1">{vehicle.driver_phone}</p>
-                  <div className="mt-2 pt-2 border-t border-emerald-200 space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Rent Breakdown</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        {label:'Daily',  val: vehicle.daily_rent * 1},
-                        {label:'Weekly', val: vehicle.daily_rent * 7},
-                        {label:'Monthly',val: vehicle.daily_rent * 30},
-                        {label:'Annual', val: vehicle.daily_rent * 365},
-                      ].map(({label,val})=>(
-                        <div key={label} className="bg-white rounded-xl p-2 text-center border border-emerald-100">
-                          <p className="text-[9px] text-slate-400 font-bold">{label}</p>
-                          <p className="text-sm font-black text-slate-800">₹{(val||0).toLocaleString('en-IN')}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex justify-between items-center pt-1">
-                      <span className="text-[10px] text-slate-400">Contract</span>
-                      <span className="text-[10px] font-black text-emerald-600">● Active / Ongoing</span>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-emerald-200">
+                    {[{label:'Daily',val:vehicle.daily_rent},{label:'Weekly',val:vehicle.daily_rent*7},{label:'Monthly',val:vehicle.daily_rent*30},{label:'Annual',val:vehicle.daily_rent*365}].map(({label,val})=>(
+                      <div key={label} className="bg-white rounded-xl p-2 text-center border border-emerald-100">
+                        <p className="text-[9px] text-slate-400 font-bold">{label}</p>
+                        <p className="text-sm font-black text-slate-800">₹{(val||0).toLocaleString('en-IN')}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleUnassign(vehicle.id)}
-                  className="w-full py-3 bg-red-50 text-red-600 rounded-xl text-sm font-black border border-red-200 hover:bg-red-100 transition"
-                >
+                <button onClick={()=>handleUnassign(vehicle.id)}
+                  className="w-full py-3 bg-red-50 text-red-600 rounded-xl text-sm font-black border border-red-200">
                   🔗 Remove Driver Assignment
                 </button>
               </div>
             ) : (
-              // Not assigned — show assignment form
               <>
-                <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
-                  <UserPlus size={16} /> Assign to Driver
-                </h3>
-            
-            <div className="mb-4">
-              <label className="text-xs font-black text-slate-600 block mb-2">Select Rent Plan</label>
-              <div className="flex gap-2">
-                {['DAILY', 'WEEKLY', 'MONTHLY'].map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setSelectedRentType(type);
-                      if (type === 'DAILY') setCustomRentAmount(vehicle.daily_rent);
-                      else if (type === 'WEEKLY') setCustomRentAmount(vehicle.daily_rent * 7);
-                      else setCustomRentAmount(vehicle.daily_rent * 30);
-                    }}
-                    className={`flex-1 py-2 rounded-lg text-xs font-black transition ${
-                      selectedRentType === type 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {type === 'DAILY' && '📅 Daily'}
-                    {type === 'WEEKLY' && '📆 Weekly'}
-                    {type === 'MONTHLY' && '📅 Monthly'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="mb-4">
-              <label className="text-xs font-black text-slate-600 block mb-2">
-                {selectedRentType === 'DAILY' && 'Daily Rent (₹)'}
-                {selectedRentType === 'WEEKLY' && 'Weekly Rent (₹)'}
-                {selectedRentType === 'MONTHLY' && 'Monthly Rent (₹)'}
-              </label>
-              <input
-  type="number"
-  defaultValue={customRentAmount}
-  onBlur={(e) => setCustomRentAmount(e.target.value)}
-  className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500"
-  placeholder="Enter rent amount"
-/>
-            </div>
-            
-            {/* Driver Selection */}
-            <div className="mb-4">
-              <label className="text-xs font-black text-slate-600 block mb-2">Select Driver</label>
-              <select
-                className="w-full border rounded-xl p-3 text-sm bg-white"
-                value={selectedDriverForAssign?.id || ''}
-                onChange={(e) => {
-                  const driver = availableUnassignedDrivers.find(d => d.id === parseInt(e.target.value));
-                  setSelectedDriverForAssign(driver);
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <option value="">-- Choose Driver --</option>
-                {availableUnassignedDrivers.map(driver => (
-                  <option key={driver.id} value={driver.id}>
-                    {driver.full_name} - {driver.driver_code}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!selectedDriverForAssign) {
-                  alert('Please select a driver');
-                  return;
-                }
-                if (!customRentAmount || customRentAmount <= 0) {
-                  alert('Please enter valid rent amount');
-                  return;
-                }
-                assignDriverToVehicleWithRent(
-                  vehicle.id, 
-                  selectedDriverForAssign.id, 
-                  selectedRentType, 
-                  parseFloat(customRentAmount)
-                );
-              }}
-              disabled={!selectedDriverForAssign || assigning}
-              className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
-            >
-              {assigning ? 'Assigning...' : '✓ Assign & Notify Driver'}
-            </button>
+                <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2"><UserPlus size={16}/> Assign to Driver</h3>
+                <div className="mb-4">
+                  <label className="text-xs font-black text-slate-600 block mb-2">Select Rent Plan</label>
+                  <div className="flex gap-2">
+                    {['DAILY','WEEKLY','MONTHLY'].map(type=>(
+                      <button key={type} type="button"
+                        onClick={e=>{e.stopPropagation();setSelectedRentType(type);
+                          if(type==='DAILY')setCustomRentAmount(vehicle.daily_rent);
+                          else if(type==='WEEKLY')setCustomRentAmount(vehicle.daily_rent*7);
+                          else setCustomRentAmount(vehicle.daily_rent*30);}}
+                        className={`flex-1 py-2 rounded-lg text-xs font-black ${selectedRentType===type?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>
+                        {type==='DAILY'?'📅 Daily':type==='WEEKLY'?'📆 Weekly':'📅 Monthly'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <input type="number" defaultValue={customRentAmount} onBlur={e=>setCustomRentAmount(e.target.value)}
+                  className="w-full border rounded-xl p-3 text-sm mb-4" placeholder="Enter rent amount"/>
+                <select className="w-full border rounded-xl p-3 text-sm bg-white mb-4"
+                  value={selectedDriverForAssign?.id||''}
+                  onChange={e=>{const d=availableUnassignedDrivers.find(d=>d.id===parseInt(e.target.value));setSelectedDriverForAssign(d);}}>
+                  <option value="">-- Choose Driver --</option>
+                  {availableUnassignedDrivers.map(d=><option key={d.id} value={d.id}>{d.full_name} - {d.driver_code}</option>)}
+                </select>
+                <button type="button"
+                  onClick={e=>{e.stopPropagation();
+                    if(!selectedDriverForAssign)return alert('Select a driver');
+                    if(!customRentAmount||customRentAmount<=0)return alert('Enter valid rent');
+                    assignDriverToVehicleWithRent(vehicle.id,selectedDriverForAssign.id,selectedRentType,parseFloat(customRentAmount));}}
+                  disabled={!selectedDriverForAssign||assigning}
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
+                  {assigning?'Assigning...':'✓ Assign & Notify Driver'}
+                </button>
               </>
             )}
           </div>
@@ -1732,6 +1803,19 @@ const VehiclesTab = () => {
               ₹{vehicle.daily_rent}/day
             </span>
           </div>
+          {/* Operational Status Badge */}
+{vehicle.operational_status && vehicle.operational_status !== 'ACTIVE' && (
+  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+    vehicle.operational_status === 'MAINTENANCE' ? 'bg-amber-100 text-amber-700' :
+    vehicle.operational_status === 'ACCIDENT'    ? 'bg-red-100 text-red-700' :
+    vehicle.operational_status === 'RECOVERY'    ? 'bg-orange-100 text-orange-700' :
+    'bg-slate-100 text-slate-500'
+  }`}>
+    {vehicle.operational_status === 'MAINTENANCE' ? '🔧 Maintenance' :
+     vehicle.operational_status === 'ACCIDENT'    ? '🚨 Accident' :
+     vehicle.operational_status === 'RECOVERY'    ? '💰 Recovery' : '⏸ Inactive'}
+  </span>
+)}
           
           {/* Assigned Driver Info */}
           <div className="flex justify-between items-center pt-2 border-t border-slate-100">
