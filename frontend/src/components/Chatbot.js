@@ -236,13 +236,94 @@ if (msg.match(/notification|notify|remind|bhejo|send|याद|भेजो/)) {
     return `❌ Notification service unavailable.`;
   }
 }
+// ASSIGN DRIVER TO VEHICLE
+if (msg.match(/assign|de do|dedo|lagao|dal do|vehicle de|gaadi de|attach|jod do/)) {
+  const freeDrivers = (data.drivers || []).filter(d => !data.vehicles.some(v => v.driver_id === d.id));
+  const freeVehicles = (data.vehicles || []).filter(v => !v.driver_id);
+
+  // Driver dhundo message mein
+  const driver = freeDrivers.find(d => {
+    const parts = (d.full_name || '').toLowerCase().split(' ');
+    return parts.some(p => p.length > 2 && msg.includes(p));
+  });
+
+  // Vehicle dhundo message mein
+  const vehicle = freeVehicles.find(v =>
+    msg.includes(v.vehicle_number.toLowerCase())
+  );
+
+  // Rent nikalo
+  const rentMatch = msg.match(/(\d{2,5})/);
+  const rentAmount = rentMatch ? parseInt(rentMatch[1]) : null;
+
+  if (driver && vehicle && rentAmount) {
+    try {
+      const tkn = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/assignment/assign-with-rent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+        body: JSON.stringify({
+          vehicleId: vehicle.id,
+          driverId: driver.id,
+          rentType: 'DAILY',
+          rentAmount: rentAmount,
+          dailyRent: rentAmount
+        })
+      });
+      const result = await res.json();
+      return result.success
+        ? `✅ Done! ${vehicle.vehicle_number} → ${driver.full_name} @ ₹${rentAmount}/day\nDB updated!`
+        : `❌ Failed: ${result.error}`;
+    } catch {
+      return `❌ Network error.`;
+    }
+  }
+
+  // Missing info — guide karo
+  if (!driver && !vehicle) {
+    return `Driver aur vehicle dono specify karein.\n\nFree drivers: ${freeDrivers.map(d => d.full_name).join(', ')}\nFree vehicles: ${freeVehicles.map(v => v.vehicle_number).join(', ')}`;
+  }
+  if (!driver) return `Konsa driver? Free hain:\n${freeDrivers.map(d => d.full_name).join('\n')}`;
+  if (!vehicle) return `Konsa vehicle? Free hain:\n${freeVehicles.map(v => v.vehicle_number).join('\n')}`;
+  if (!rentAmount) return `${driver.full_name} ko ${vehicle.vehicle_number} — rent kitna? (e.g. "300 rupaye daily")`;
+}
+
+// UNASSIGN
+if (msg.match(/wapas lo|hata do|remove|unassign|free karo|chhod do/)) {
+  const namedForUnassign = (data.drivers || []).find(d => {
+    const parts = (d.full_name || '').toLowerCase().split(' ');
+    return parts.some(p => p.length > 2 && msg.includes(p));
+  });
+  const vehForUnassign = namedForUnassign
+    ? (data.vehicles || []).find(v => v.driver_id === namedForUnassign.id)
+    : (data.vehicles || []).find(v => msg.includes(v.vehicle_number.toLowerCase()));
+
+  if (vehForUnassign) {
+    try {
+      const tkn = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/assignment/unassign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+        body: JSON.stringify({ vehicleId: vehForUnassign.id })
+      });
+      const result = await res.json();
+      return result.success
+        ? `✅ ${vehForUnassign.vehicle_number} unassigned! Vehicle free hai ab.`
+        : `❌ Failed: ${result.error}`;
+    } catch {
+      return `❌ Network error.`;
+    }
+  }
+  return `Kiska vehicle free karna hai? Driver naam ya vehicle number bolein.`;
+}
     // Vehicles
     if (msg.match(/vehicle|gaadi|fleet|gadi|assigned|rent|किराया|गाड़ी/)) {
   const assigned = (data.vehicles || []).filter(v => v.driver_id);
 const free = (data.vehicles || []).filter(v => !v.driver_id);
-const list = assigned.map(v => 
+const vehicleList = assigned.map(v => 
   `${v.driver_name || 'Unknown'} → ${v.vehicle_number} @ ₹${v.daily_rent}/day`
 ).join('\n');
+return `🚛 Assigned (${assigned.length}):\n${vehicleList || 'कोई नहीं'}\n\n⚠️ Free (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
   const list = assigned.map(v => `${v.driver_name} → ${v.vehicle_number} @ ₹${v.daily_rent}/day`).join('\n');
   return `🚛 Assigned (${assigned.length}):\n${list || 'कोई नहीं'}\n\n⚠️ Free (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
 }
