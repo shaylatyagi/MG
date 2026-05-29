@@ -213,7 +213,15 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
         hasDriverPaidToday(d.mobile_number, data.orders) ? paid.push(d.full_name) : notPaid.push(d.full_name);
       return `✅ Paid (${paid.length}): ${paid.join(', ') || 'कोई नहीं'}\n❌ Nahi diya (${notPaid.length}): ${notPaid.join(', ') || 'कोई नहीं'}`;
     }
-
+    // Drivers without vehicle
+    if (msg.match(/vehicle|gaadi/) && msg.match(/nahi|nahin|nhi|free|without/)) {
+      const noVehicle = (data.drivers || []).filter(d =>
+        !(data.vehicles || []).some(v => v.driver_id === d.id)
+      );
+      return noVehicle.length === 0
+        ? `✅ सभी drivers को vehicle assigned है!`
+        : `🚫 Vehicle नहीं है (${noVehicle.length}):\n${noVehicle.map(d => d.full_name).join('\n')}`;
+    }
     // Who hasn't paid
     if (msg.match(/nahi|nhi|pending|due|baaki|outstanding|नहीं|बाकी/)) {
       const notPaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders)).map(d => d.full_name);
@@ -290,10 +298,9 @@ if (msg.match(/assign|de do|dedo|lagao|dal do|vehicle de|gaadi de|attach|jod do/
 
 // UNASSIGN
 if (msg.match(/wapas lo|hata do|remove|unassign|free karo|chhod do/)) {
-  const namedForUnassign = (data.drivers || []).find(d => {
-    const parts = (d.full_name || '').toLowerCase().split(' ');
-    return parts.some(p => p.length > 2 && msg.includes(p));
-  });
+  const namedForUnassign = (data.drivers || [])
+    .map(d => ({ d, score: (d.full_name||'').toLowerCase().split(' ').filter(p => p.length > 2 && msg.includes(p)).length }))
+    .filter(x => x.score > 0).sort((a,b) => b.score - a.score)[0]?.d;
   const vehForUnassign = namedForUnassign
     ? (data.vehicles || []).find(v => v.driver_id === namedForUnassign.id)
     : (data.vehicles || []).find(v => msg.includes(v.vehicle_number.toLowerCase()));
@@ -339,9 +346,9 @@ return `🚛 Assigned (${assigned.length}):\n${vehicleList || 'कोई नह�
     }
 
     // Individual driver
-    const named = (data.drivers || []).find(d =>
-      (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p))
-    );
+    const named = (data.drivers || [])
+      .map(d => ({ d, score: (d.full_name||'').toLowerCase().split(' ').filter(p => p.length > 2 && msg.includes(p)).length }))
+      .filter(x => x.score > 0).sort((a,b) => b.score - a.score)[0]?.d;
     if (named) {
       const paid = hasDriverPaidToday(named.mobile_number, data.orders);
       const veh = (data.vehicles || []).find(v => v.driver_id === named.id);
