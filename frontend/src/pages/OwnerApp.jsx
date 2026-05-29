@@ -1254,8 +1254,8 @@ const DriversTab = () => {
           ) : (
             filteredDrivers.map((driver, i) => {
               // Check if driver has assigned vehicle
-              const hasVehicle = vehicles.some(v => Number(v.driver_id) === Number(driver.id));
-const assignedVehicle = vehicles.find(v => Number(v.driver_id) === Number(driver.id));
+              const hasVehicle = driver.vehicle_id != null;
+const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicle_id));
               
               return (
                 <div key={i} className={`p-4 transition ${hasVehicle ? 'cursor-pointer hover:bg-slate-50' : ''}`}
