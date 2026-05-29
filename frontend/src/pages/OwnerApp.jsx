@@ -2363,87 +2363,106 @@ const ProfileTab = () => (
   </div>
 )}
 {showAddDriver && (
-  <div className="fixed inset-0 bg-black/50 z-[100] flex items-end justify-center">
-    <div className="bg-white rounded-t-3xl w-full p-5 max-h-[85vh] overflow-y-auto">
+  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-sm p-6 max-h-[85vh] overflow-y-auto">
+      <h3 className="text-lg font-black mb-4">Add Driver</h3>
       
-      <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"/>
-      <h3 className="text-base font-black mb-4">Add Driver</h3>
-
-      {/* REQUIRED */}
-      <input placeholder="Full Name *" 
-        className="w-full border rounded-xl p-3 mb-2 text-sm"
+      <input placeholder="Full Name (Letters only)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm"
         value={newDriver.name} 
         onChange={e => setNewDriver({...newDriver, name: e.target.value})} />
       
-      <input placeholder="Phone Number * (10 digits)" 
-        className="w-full border rounded-xl p-3 mb-2 text-sm"
+      <input placeholder="Phone Number (10 digits)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm"
         value={newDriver.phone} 
-        onChange={e => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g,'').slice(0,10)})} />
+        onChange={e => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g, '').slice(0,10)})} />
+      
+      <input placeholder="Email (optional)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm"
+        value={newDriver.email} 
+        onChange={e => setNewDriver({...newDriver, email: e.target.value})} />
 
-      {/* OPTIONAL — collapsible */}
-      <details className="mb-2">
-        <summary className="text-xs font-black text-blue-600 cursor-pointer py-2">
-          + More Details (optional)
-        </summary>
-        <div className="space-y-2 mt-2">
-          <input placeholder="Email" 
-            className="w-full border rounded-xl p-3 text-sm"
-            value={newDriver.email}
-            onChange={e => setNewDriver({...newDriver, email: e.target.value})} />
-          
-          <div className="relative">
-            <span className="absolute left-3 top-3 text-slate-400 text-sm">₹</span>
-            <input type="number" placeholder="Security Deposit"
-              className="w-full border rounded-xl p-3 pl-7 text-sm"
-              value={newDriver.securityDeposit || ''}
-              onChange={e => setNewDriver({...newDriver, securityDeposit: e.target.value})} />
-          </div>
+      {/* ✅ NEW: Security Deposit */}
+      <div className="relative mb-3">
+        <span className="absolute left-3 top-3 text-slate-400 text-sm font-black">₹</span>
+        <input 
+          type="number" 
+          placeholder="Security Deposit (optional)"
+          className="w-full border rounded-xl p-3 pl-7 text-sm"
+          value={newDriver.securityDeposit || ''}
+          onChange={e => setNewDriver({...newDriver, securityDeposit: e.target.value})} 
+        />
+      </div>
+      {/* DOB */}
+<div className="mb-3">
+  <label className="text-[10px] font-black text-slate-500 block mb-1">Date of Birth</label>
+  <input 
+    type="date" 
+    className="w-full border rounded-xl p-3 text-sm bg-white"
+    value={newDriver.dob}
+    onChange={e => setNewDriver({...newDriver, dob: e.target.value})} 
+  />
+</div>
 
-          <input type="date" 
-            className="w-full border rounded-xl p-3 text-sm bg-white"
-            value={newDriver.dob}
-            onChange={e => setNewDriver({...newDriver, dob: e.target.value})} />
+{/* Emergency Contact */}
+<div className="grid grid-cols-2 gap-2 mb-3">
+  <input 
+    placeholder="Emergency Contact Name"
+    className="border rounded-xl p-3 text-sm"
+    value={newDriver.emergencyName}
+    onChange={e => setNewDriver({...newDriver, emergencyName: e.target.value})} 
+  />
+  <input 
+    placeholder="Emergency Phone"
+    className="border rounded-xl p-3 text-sm"
+    value={newDriver.emergencyPhone}
+    onChange={e => setNewDriver({...newDriver, emergencyPhone: e.target.value.replace(/\D/g,'').slice(0,10)})} 
+  />
+</div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <input placeholder="Emergency Name"
-              className="border rounded-xl p-3 text-sm"
-              value={newDriver.emergencyName}
-              onChange={e => setNewDriver({...newDriver, emergencyName: e.target.value})} />
-            <input placeholder="Emergency Phone"
-              className="border rounded-xl p-3 text-sm"
-              value={newDriver.emergencyPhone}
-              onChange={e => setNewDriver({...newDriver, emergencyPhone: e.target.value.replace(/\D/g,'').slice(0,10)})} />
-          </div>
+{/* License */}
+<div className="grid grid-cols-2 gap-2 mb-3">
+  <input 
+    placeholder="License Number"
+    className="border rounded-xl p-3 text-sm uppercase font-mono"
+    value={newDriver.licenseNumber}
+    onChange={e => setNewDriver({...newDriver, licenseNumber: e.target.value.toUpperCase()})} 
+  />
+  <div>
+    <label className="text-[10px] font-black text-slate-500 block mb-1">License Expiry</label>
+    <input 
+      type="date"
+      className="w-full border rounded-xl p-3 text-sm bg-white"
+      value={newDriver.licenseExpiry}
+      onChange={e => setNewDriver({...newDriver, licenseExpiry: e.target.value})} 
+    />
+  </div>
+</div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <input placeholder="License No."
-              className="border rounded-xl p-3 text-sm uppercase font-mono"
-              value={newDriver.licenseNumber}
-              onChange={e => setNewDriver({...newDriver, licenseNumber: e.target.value.toUpperCase()})} />
-            <input type="date"
-              className="border rounded-xl p-3 text-sm bg-white"
-              value={newDriver.licenseExpiry}
-              onChange={e => setNewDriver({...newDriver, licenseExpiry: e.target.value})} />
-          </div>
-        </div>
-      </details>
-
-      <select className="w-full border rounded-xl p-3 mb-3 text-sm bg-white"
+      {/* ✅ FIXED: Select separate kiya */}
+      <select
+        className="w-full border rounded-xl p-3 mb-4 text-sm bg-white"
         value={newDriver.vehicleId || ''}
-        onChange={e => setNewDriver({...newDriver, vehicleId: e.target.value})}>
+        onChange={e => setNewDriver({...newDriver, vehicleId: e.target.value})}
+      >
         <option value="">-- Assign Vehicle (Optional) --</option>
         {vehicles.filter(v => !v.driver_id).map(v => (
           <option key={v.id} value={v.id}>
-            {v.vehicle_number} — {v.vehicle_model}
+            {v.vehicle_number} — {v.vehicle_model} (₹{v.daily_rent}/day)
           </option>
         ))}
       </select>
 
+      {/* ✅ FIXED: Buttons apne row mein */}
       <div className="flex gap-3">
         <button onClick={() => setShowAddDriver(false)} 
-          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
+          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">
+          Cancel
+        </button>
         <button onClick={addDriver} 
-          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Add</button>
+          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">
+          Add
+        </button>
       </div>
     </div>
   </div>
