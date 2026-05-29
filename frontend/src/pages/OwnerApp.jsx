@@ -648,13 +648,13 @@ const fetchAllData = useCallback(async () => {
     
     console.log('Fetching data for owner ID:', oId);
     
-    const [vehiclesRes, driversRes, statsRes, notifRes] = await Promise.all([
-      fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
-      fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}`, { headers: H }),
-      fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
-      fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H }),
-      fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H })
-    ]);
+    const [vehiclesRes, driversRes, statsRes, notifRes, ledgerRes] = await Promise.all([
+  fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
+  fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}`, { headers: H }),
+  fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
+  fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H }),
+  fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H })  // ← ADD
+]);
     
     if (vehiclesRes.ok) {
   const vehiclesData = await vehiclesRes.json();
