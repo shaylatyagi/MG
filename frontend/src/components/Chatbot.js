@@ -10,10 +10,14 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
   const storageKey = `mg_chat_${userRole}`;
 const [messages, setMessages] = useState(() => {
   try {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) return JSON.parse(saved);
+    const key = `mg_chat_${userRole}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
   } catch {}
-  return persistedMessages?.length > 0 ? persistedMessages : [];
+  return [];
 });
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -39,7 +43,13 @@ const [messages, setMessages] = useState(() => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
+  useEffect(() => {
+  if (messages.length > 0) {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(messages.slice(-50)));
+    } catch {}
+  }
+}, [messages]);
   // Fetch user data based on role
   const fetchUserData = async () => {
   try {
@@ -185,7 +195,6 @@ const [messages, setMessages] = useState(() => {
   const addMessage = (role, content) => {
   setMessages(prev => {
     const updated = [...prev, { role, content }];
-    try { localStorage.setItem(storageKey, JSON.stringify(updated.slice(-50))); } catch {}
     if (onMessagesUpdate) onMessagesUpdate(updated);
     return updated;
   });
@@ -341,8 +350,6 @@ const vehicleList = assigned.map(v =>
   `${v.driver_name || 'Unknown'} → ${v.vehicle_number} @ ₹${v.daily_rent}/day`
 ).join('\n');
 return `🚛 Assigned (${assigned.length}):\n${vehicleList || 'कोई नहीं'}\n\n⚠️ Free (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
-  const list = assigned.map(v => `${v.driver_name} → ${v.vehicle_number} @ ₹${v.daily_rent}/day`).join('\n');
-  return `🚛 Assigned (${assigned.length}):\n${list || 'कोई नहीं'}\n\n⚠️ Free (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
 }
 
     // Drivers
@@ -429,7 +436,7 @@ const res = await fetch(`${API}/api/payment/chatbot`, {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-white">
+    <div className="absolute inset-0 z-[200] flex flex-col bg-white">
   <div className="w-full h-full flex flex-col">
         {/* Header */}
         <div className={`p-4 rounded-t-3xl flex items-center justify-between ${isOwner ? 'bg-gradient-to-r from-blue-600 to-indigo-700' : 'bg-gradient-to-r from-green-600 to-emerald-700'} text-white`}>
