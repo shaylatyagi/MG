@@ -201,14 +201,18 @@ router.post('/owner/vehicles', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vehicle number already exists' });
     }
     
-    // Insert vehicle
     const result = await pool.query(
-      `INSERT INTO public.vehicles 
-       (vehicle_number, vehicle_model, daily_rent, owner_id, driver_id, status, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       RETURNING id, vehicle_number, vehicle_model, daily_rent, driver_id`,
-      [vehicle_number, vehicle_model || 'Standard', daily_rent || 850, parseInt(owner_id), driver_id || null, driver_id ? 'ASSIGNED' : 'AVAILABLE']
-    );
+  `INSERT INTO public.vehicles 
+    (vehicle_number, vehicle_model, daily_rent, owner_id, driver_id, status, 
+     vehicle_type, insurance_expiry, fitness_expiry, chassis_number, created_at)
+   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+   RETURNING id, vehicle_number`,
+  [vehicle_number, vehicle_model||'Standard', daily_rent||850, 
+   parseInt(owner_id), driver_id||null, 
+   driver_id?'ASSIGNED':'AVAILABLE',
+   vehicle_type||null,
+   insurance_expiry||null, fitness_expiry||null, chassis_number||null]
+);
     
     // If driver assigned, update driver's assigned_vehicle_id
     if (driver_id) {
@@ -585,10 +589,16 @@ router.post('/owner/add-driver', async (req, res) => {
     const driverCode = 'DRV' + Date.now().toString().slice(-6);
 
     const result = await pool.query(
-      `INSERT INTO public.drivers (full_name, mobile_number, owner_code, driver_code, wallet_balance, status)
-       VALUES ($1, $2, 'OWN701951', $3, 0, 'ACTIVE') RETURNING id, driver_code`,
-      [full_name, mobile_number, driverCode]
-    );
+  `INSERT INTO public.drivers 
+    (full_name, mobile_number, owner_code, driver_code, wallet_balance, status,
+     date_of_birth, emergency_contact_name, emergency_contact_number,
+     driving_license_number, driving_license_expiry, security_deposit)
+   VALUES ($1,$2,'OWN701951',$3,0,'ACTIVE',$4,$5,$6,$7,$8,$9) 
+   RETURNING id, driver_code`,
+  [full_name, mobile_number, driverCode,
+   date_of_birth||null, emergency_contact_name||null, emergency_contact_number||null,
+   driving_license_number||null, driving_license_expiry||null, security_deposit||0]
+);
 
     res.json({ success: true, message: '✅ Driver added!', driver_code: result.rows[0].driver_code });
   } catch (err) {
@@ -714,11 +724,13 @@ router.get('/owner/stats', async (req, res) => {
     );
     
     const earnings = await pool.query(
-      `SELECT COALESCE(SUM(order_amount), 0) as total 
-       FROM public.ms_orders 
-       WHERE payer_mobile = '9876542345' AND transaction_status = 'SUCCESS'`,
-      []
-    );
+  `SELECT COALESCE(SUM(order_amount), 0) as total 
+   FROM public.ms_orders mo
+   JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+   WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+   AND mo.transaction_status = 'SUCCESS'`,
+  [parseInt(ownerId)]
+);
     
     res.json({
       total_vehicles: parseInt(vehicles.rows[0].count || 0),
@@ -841,7 +853,53 @@ router.post('/create-order', async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+router.get('/owner/driver-statement', async (req, res) => {
+  try {
+    const { driverId } = req.query;
 
+    const driver = await pool.query(
+      `SELECT full_name, mobile_number FROM public.drivers WHERE id = $1`,
+      [driverId]
+    );
+    if (!driver.rows[0]) return res.status(404).json({ error: 'Driver not found' });
+    
+    const phone = driver.rows[0].mobile_number;
+
+    // Transactions
+    const txns = await pool.query(`
+      SELECT 
+        order_initiation_date as date,
+        'Rent Payment' as type,
+        order_amount as amount,
+        COALESCE(payment_mode, 'UPI') as mode,
+        transaction_status as status,
+        order_number as reference
+      FROM public.ms_orders 
+      WHERE payer_mobile = $1
+      ORDER BY order_initiation_date DESC
+    `, [phone]);
+
+    // Ledger entries
+    const ledger = await pool.query(`
+      SELECT 
+        created_at as date,
+        entry_type as type,
+        amount,
+        COALESCE(description, '') as description
+      FROM public.driver_ledger
+      WHERE driver_id = $1
+      ORDER BY created_at DESC
+    `, [driverId]);
+
+    res.json({
+      driver_name: driver.rows[0].full_name,
+      transactions: txns.rows,
+      ledger_entries: ledger.rows
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router.get('/driver-details', async (req, res) => {
 
   try {

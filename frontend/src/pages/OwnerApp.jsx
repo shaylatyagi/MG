@@ -23,6 +23,37 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [entryAmount, setEntryAmount] = useState('');
   const [entryDesc, setEntryDesc] = useState('');
 
+  const downloadCSV = async (driver) => {
+    try {
+      const res = await fetch(
+        `${API}/api/payment/owner/driver-statement?driverId=${driver.id}`,
+        { headers: { Authorization: `Bearer ${tokenVal}` } }
+      );
+      const data = await res.json();
+      const rows = [
+        ['Date', 'Type', 'Amount (₹)', 'Mode', 'Status', 'Reference'],
+        ...data.transactions.map(t => [
+          new Date(t.date).toLocaleDateString('en-IN'),
+          t.type, t.amount, t.mode, t.status, t.reference
+        ]),
+        ...data.ledger_entries.map(l => [
+          new Date(l.date).toLocaleDateString('en-IN'),
+          l.type, l.amount, 'LEDGER', 'RECORDED', l.description
+        ])
+      ];
+      const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${data.driver_name}_statement.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch(e) { alert('Download failed: ' + e.message); }
+  };
+
   const fetchLedger = () => {
     fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${ownerIdVal}`, {
       headers: { Authorization: `Bearer ${tokenVal}` }
@@ -31,7 +62,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
 
   useEffect(() => {
     fetchLedger();
-    const interval = setInterval(fetchLedger, 30000); // real-time
+    const interval = setInterval(fetchLedger, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -59,8 +90,11 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div className="px-4 py-3 border-b bg-slate-50">
-        <h3 className="text-[10px] font-black text-slate-400 uppercase">Driver-wise Ledger</h3>
+      <div className="px-4 py-3 border-b bg-slate-50 flex justify-between items-center">
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+          Driver-wise Ledger
+        </h3>
+        <span className="text-[9px] text-slate-400">{ledgerData.length} drivers</span>
       </div>
 
       <div className="divide-y">
@@ -69,9 +103,9 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
         )}
         {ledgerData.map((d, i) => (
           <div key={i}>
-            {/* COLLAPSED ROW — click to expand */}
+            {/* ─── COLLAPSED ROW ─── */}
             <div
-              className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-50"
+              className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition"
               onClick={() => setExpandedDriver(expandedDriver === d.id ? null : d.id)}
             >
               <div className="flex items-center gap-2">
@@ -80,56 +114,119 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
                 </div>
                 <div>
                   <p className="text-xs font-black text-slate-800">{d.full_name}</p>
-                  <p className="text-[9px] text-slate-400">{d.vehicle_number} • ₹{d.daily_rent}/day</p>
+                  <p className="text-[9px] text-slate-400">
+                    {d.vehicle_number} · ₹{d.daily_rent}/day
+                  </p>
                 </div>
               </div>
+
+              {/* ✅ RIGHT SIDE — Total collection + badges */}
               <div className="flex items-center gap-2">
-                {parseFloat(d.pending) > 0 && (
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                    ₹{parseFloat(d.pending).toLocaleString('en-IN')} due
-                  </span>
-                )}
-                {parseFloat(d.advance) > 0 && (
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                    ₹{parseFloat(d.advance).toLocaleString('en-IN')} adv
-                  </span>
-                )}
-                <span className="text-slate-400 text-xs">{expandedDriver === d.id ? '▲' : '▼'}</span>
+                {/* Total collection always visible */}
+                <div className="text-right mr-1">
+                  <p className="text-[8px] text-slate-400">Collection</p>
+                  <p className="text-xs font-black text-emerald-600">
+                    ₹{parseFloat(d.total_paid || 0).toLocaleString('en-IN')}
+                  </p>
+                </div>
+                {/* Net position badge */}
+{(() => {
+  const net = parseFloat(d.pending||0) - parseFloat(d.advance||0);
+  if (net > 0) return (
+    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+      ₹{net.toLocaleString('en-IN')} due
+    </span>
+  );
+  if (net < 0) return (
+    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+      ₹{Math.abs(net).toLocaleString('en-IN')} credit
+    </span>
+  );
+  return <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Settled ✅</span>;
+})()}
+                <span className="text-slate-400 text-xs ml-1">
+                  {expandedDriver === d.id ? '▲' : '▼'}
+                </span>
               </div>
             </div>
 
-            {/* EXPANDED — only when selected */}
+            {/* ─── EXPANDED SECTION ─── */}
             {expandedDriver === d.id && (
-              <div className="px-4 pb-3 bg-slate-50 border-t border-slate-100">
+              <div className="px-4 pb-4 bg-slate-50 border-t border-slate-100">
+                {/* 3 col grid */}
                 <div className="grid grid-cols-3 gap-2 text-center mt-3 mb-3">
-                  <div className="bg-emerald-50 rounded-lg p-2">
-                    <p className="text-[8px] text-emerald-600 font-bold">PAID</p>
-                    <p className="text-xs font-black text-emerald-700">₹{parseFloat(d.total_paid||0).toLocaleString('en-IN')}</p>
+                  <div className="bg-emerald-50 rounded-xl p-2">
+                    <p className="text-[8px] text-emerald-600 font-bold uppercase">Paid</p>
+                    <p className="text-sm font-black text-emerald-700">
+                      ₹{parseFloat(d.total_paid || 0).toLocaleString('en-IN')}
+                    </p>
                   </div>
-                  <div className={`rounded-lg p-2 ${parseFloat(d.pending)>0?'bg-red-50':'bg-slate-100'}`}>
-                    <p className="text-[8px] font-bold" style={{color:parseFloat(d.pending)>0?'#b91c1c':'#64748b'}}>PENDING</p>
-                    <p className="text-xs font-black" style={{color:parseFloat(d.pending)>0?'#b91c1c':'#334155'}}>₹{parseFloat(d.pending||0).toLocaleString('en-IN')}</p>
+                  <div className={`rounded-xl p-2 ${parseFloat(d.pending) > 0 ? 'bg-red-50' : 'bg-slate-100'}`}>
+                    <p className={`text-[8px] font-bold uppercase ${parseFloat(d.pending) > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                      Pending
+                    </p>
+                    <p className={`text-sm font-black ${parseFloat(d.pending) > 0 ? 'text-red-700' : 'text-slate-400'}`}>
+                      ₹{parseFloat(d.pending || 0).toLocaleString('en-IN')}
+                    </p>
                   </div>
-                  <div className={`rounded-lg p-2 ${parseFloat(d.advance)>0?'bg-purple-50':'bg-slate-100'}`}>
-                    <p className="text-[8px] font-bold" style={{color:parseFloat(d.advance)>0?'#7c3aed':'#64748b'}}>ADVANCE</p>
-                    <p className="text-xs font-black" style={{color:parseFloat(d.advance)>0?'#7c3aed':'#334155'}}>₹{parseFloat(d.advance||0).toLocaleString('en-IN')}</p>
+                  <div className={`rounded-xl p-2 ${parseFloat(d.advance) > 0 ? 'bg-purple-50' : 'bg-slate-100'}`}>
+                    <p className={`text-[8px] font-bold uppercase ${parseFloat(d.advance) > 0 ? 'text-purple-600' : 'text-slate-400'}`}>
+                      Advance
+                    </p>
+                    <p className={`text-sm font-black ${parseFloat(d.advance) > 0 ? 'text-purple-700' : 'text-slate-400'}`}>
+                      ₹{parseFloat(d.advance || 0).toLocaleString('en-IN')}
+                    </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => { setSelectedEntryDriver(d); setShowEntryModal(true); }}
-                  className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-black"
-                >
-                  + Add Entry
-                </button>
+                {/* NET BALANCE BANNER */}
+{(() => {
+  const net = parseFloat(d.pending||0) - parseFloat(d.advance||0);
+  if (net > 0) return (
+    <div className="bg-red-50 border border-red-100 rounded-xl p-2.5 mb-3 flex justify-between items-center">
+      <span className="text-xs font-black text-red-700">⚠️ Net Outstanding</span>
+      <span className="text-sm font-black text-red-700">₹{net.toLocaleString('en-IN')}</span>
+    </div>
+  );
+  if (net < 0) return (
+    <div className="bg-purple-50 border border-purple-100 rounded-xl p-2.5 mb-3 flex justify-between items-center">
+      <span className="text-xs font-black text-purple-700">✅ Net Credit</span>
+      <span className="text-sm font-black text-purple-700">₹{Math.abs(net).toLocaleString('en-IN')}</span>
+    </div>
+  );
+  return (
+    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 mb-3 text-center">
+      <span className="text-xs font-black text-emerald-700">✅ Account Settled</span>
+    </div>
+  );
+})()}
+
+                {/* ✅ FIXED: Single button row, correct variable d */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setSelectedEntryDriver(d); setShowEntryModal(true); }}
+                    className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-black"
+                  >
+                    + Add Entry
+                  </button>
+                  <button
+                    onClick={() => downloadCSV(d)}
+                    className="py-2 px-4 bg-slate-100 text-slate-700 rounded-xl text-xs font-black flex items-center gap-1"
+                  >
+                    📥 CSV
+                  </button>
+                </div>
               </div>
             )}
           </div>
         ))}
       </div>
 
+      {/* Entry Modal */}
       {showEntryModal && selectedDriver && (
-        <div className="fixed inset-0 bg-black/50 z-[500] flex items-center justify-center p-4"
-          onClick={e => { if(e.target===e.currentTarget) setShowEntryModal(false); }}>
+        <div
+          className="fixed inset-0 bg-black/50 z-[500] flex items-center justify-center p-4"
+          onClick={e => { if (e.target === e.currentTarget) setShowEntryModal(false); }}
+        >
           <div className="bg-white rounded-3xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
             <h3 className="font-black text-lg mb-1">Add Entry</h3>
             <p className="text-sm text-slate-500 mb-4">{selectedDriver.full_name}</p>
@@ -137,7 +234,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
             <select value={entryType} onChange={e => setEntryType(e.target.value)}
               className="w-full border rounded-xl p-3 mb-3 text-sm bg-white">
               <option value="ADVANCE_CREDIT">💰 Advance Credit (driver overpaid)</option>
-              <option value="REPAIR_CREDIT">🔧 Repair Compensation (driver paid from pocket)</option>
+              <option value="REPAIR_CREDIT">🔧 Repair Compensation</option>
               <option value="DAMAGE_CHARGE">⚠️ Damage Charge</option>
               <option value="PENALTY">🚫 Penalty</option>
               <option value="REFUND">↩️ Refund to Driver</option>
@@ -279,8 +376,16 @@ const [assigning, setAssigning] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState(null);
   
   // Form states
-  const [newVehicle, setNewVehicle] = useState({ number: '', model: '', rent: 850 });
-  const [newDriver, setNewDriver] = useState({ name: '', phone: '', email: '' });
+  const [newVehicle, setNewVehicle] = useState({ 
+  number: '', model: '', type: 'EV', rent: 850,
+  insuranceExpiry: '', fitnessExpiry: '', chassisNumber: ''
+});
+  const [newDriver, setNewDriver] = useState({ 
+  name: '', phone: '', email: '', 
+  vehicleId: '', securityDeposit: 0,
+  dob: '', emergencyName: '', emergencyPhone: '',
+  licenseNumber: '', licenseExpiry: ''
+});
 
   useEffect(() => {
     const tick = () => {
@@ -466,6 +571,60 @@ const DriverDetailsModal = () => {
               </div>
             </div>
           </div>
+          {/* KYC & Additional Info */}
+<div className="mb-5">
+  <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+    <FileCheck2 size={18} /> KYC & Details
+  </h3>
+  <div className="space-y-2">
+    {driver.date_of_birth && (
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-sm text-slate-500">📅 Date of Birth</span>
+        <span className="text-sm font-black">
+          {new Date(driver.date_of_birth).toLocaleDateString('en-IN')}
+        </span>
+      </div>
+    )}
+    {driver.driving_license_number && (
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-sm text-slate-500">🪪 License No.</span>
+        <span className="text-sm font-black font-mono">{driver.driving_license_number}</span>
+      </div>
+    )}
+    {driver.driving_license_expiry && (
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-sm text-slate-500">📅 License Expiry</span>
+        <span className={`text-sm font-black ${
+          new Date(driver.driving_license_expiry) < new Date() 
+            ? 'text-red-600' : 'text-emerald-600'
+        }`}>
+          {new Date(driver.driving_license_expiry).toLocaleDateString('en-IN')}
+          {new Date(driver.driving_license_expiry) < new Date() && ' ⚠️ EXPIRED'}
+        </span>
+      </div>
+    )}
+    {driver.emergency_contact_name && (
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-sm text-slate-500">🆘 Emergency Contact</span>
+        <div className="text-right">
+          <p className="text-sm font-black">{driver.emergency_contact_name}</p>
+          <p className="text-[10px] text-slate-400 font-mono">{driver.emergency_contact_number}</p>
+        </div>
+      </div>
+    )}
+    {driver.security_deposit > 0 && (
+      <div className="flex justify-between items-center py-2">
+        <span className="text-sm text-slate-500">🔒 Security Deposit</span>
+        <span className="text-sm font-black text-amber-600">
+          ₹{parseFloat(driver.security_deposit).toLocaleString('en-IN')}
+        </span>
+      </div>
+    )}
+    {!driver.date_of_birth && !driver.driving_license_number && !driver.emergency_contact_name && (
+      <p className="text-xs text-slate-400 text-center py-2">No additional details added yet</p>
+    )}
+  </div>
+</div>
           
           <button
             onClick={() => {
@@ -528,12 +687,16 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
-        vehicleId: vehicleIdNum,
-        driverId: driverIdNum,
-        rentType: rentType,
-        rentAmount: rentAmountNum,
-        dailyRent: Math.round(dailyRent)
-      })
+  vehicle_number: newVehicle.number,
+  vehicle_model: newVehicle.model,
+  vehicle_type: newVehicle.type,
+  daily_rent: newVehicle.rent,
+  rent_type: rentType,
+  owner_id: ownerId(),
+  insurance_expiry: newVehicle.insuranceExpiry || null,
+  fitness_expiry: newVehicle.fitnessExpiry || null,
+  chassis_number: newVehicle.chassisNumber || null
+})
     });
     
     const data = await response.json();
@@ -681,8 +844,8 @@ const fetchAllData = useCallback(async () => {
   if (ledgerRes.ok) {
     const ledgerData = await ledgerRes.json();
     totalPending = ledgerData.reduce((sum, d) => 
-      sum + (parseFloat(d.pending_amount) || 0), 0
-    );
+  sum + (parseFloat(d.pending) || 0), 0
+);
   }
 
   setStats({
@@ -814,10 +977,16 @@ return () => clearInterval(interval);
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
         body: JSON.stringify({
-          full_name: newDriver.name,
-          mobile_number: newDriver.phone,
-          owner_id: ownerId()
-        })
+  full_name: newDriver.name,
+  mobile_number: newDriver.phone,
+  owner_id: ownerId(),
+  date_of_birth: newDriver.dob || null,
+  emergency_contact_name: newDriver.emergencyName || null,
+  emergency_contact_number: newDriver.emergencyPhone || null,
+  driving_license_number: newDriver.licenseNumber || null,
+  driving_license_expiry: newDriver.licenseExpiry || null,
+  security_deposit: parseFloat(newDriver.securityDeposit) || 0
+})
       });
       const data = await response.json();
       if (data.success) {
@@ -1319,7 +1488,53 @@ const DriversTab = () => {
             <X size={18} />
           </button>
         </div>
-        
+        {/* Vehicle Compliance Info */}
+<div className="mb-5">
+  <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+    <Shield size={18} /> Compliance & Docs
+  </h3>
+  <div className="space-y-2">
+    {vehicle.chassis_number && (
+      <div className="flex justify-between items-center py-2 border-b border-slate-100">
+        <span className="text-sm text-slate-500">🔩 Chassis No.</span>
+        <span className="text-sm font-black font-mono">{vehicle.chassis_number}</span>
+      </div>
+    )}
+    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+      <span className="text-sm text-slate-500">🛡️ Insurance Expiry</span>
+      {vehicle.insurance_expiry ? (
+        <span className={`text-sm font-black ${
+          new Date(vehicle.insurance_expiry) < new Date() 
+            ? 'text-red-600' : 
+          new Date(vehicle.insurance_expiry) < new Date(Date.now() + 30*24*60*60*1000)
+            ? 'text-amber-600' : 'text-emerald-600'
+        }`}>
+          {new Date(vehicle.insurance_expiry).toLocaleDateString('en-IN')}
+          {new Date(vehicle.insurance_expiry) < new Date() && ' ⚠️ EXPIRED'}
+          {new Date(vehicle.insurance_expiry) > new Date() && 
+           new Date(vehicle.insurance_expiry) < new Date(Date.now() + 30*24*60*60*1000) && 
+           ' ⚠️ Expiring Soon'}
+        </span>
+      ) : (
+        <span className="text-sm text-slate-400">Not added</span>
+      )}
+    </div>
+    <div className="flex justify-between items-center py-2">
+      <span className="text-sm text-slate-500">📋 Fitness Expiry</span>
+      {vehicle.fitness_expiry ? (
+        <span className={`text-sm font-black ${
+          new Date(vehicle.fitness_expiry) < new Date() 
+            ? 'text-red-600' : 'text-emerald-600'
+        }`}>
+          {new Date(vehicle.fitness_expiry).toLocaleDateString('en-IN')}
+          {new Date(vehicle.fitness_expiry) < new Date() && ' ⚠️ EXPIRED'}
+        </span>
+      ) : (
+        <span className="text-sm text-slate-400">Not added</span>
+      )}
+    </div>
+  </div>
+</div>
         {/* Rest of the modal content */}
         <div className="p-5">
           <div className="border-t pt-4">
@@ -1469,6 +1684,18 @@ const DriversTab = () => {
   // VEHICLES TAB
   // VEHICLES TAB - FIXED STATUS
 const VehiclesTab = () => {
+  const getVehicleIcon = (v) => {
+  const t = (v.vehicle_type || v.vehicle_model || '').toLowerCase();
+  if (t.includes('ev') || t.includes('treo') || t.includes('electric')) 
+    return { bg: 'bg-green-100', icon: '⚡' };
+  if (t.includes('bike') || t.includes('activa') || t.includes('shine') || t.includes('2w')) 
+    return { bg: 'bg-purple-100', icon: '🛵' };
+  if (t.includes('auto') || t.includes('3w') || t.includes('bajaj re')) 
+    return { bg: 'bg-orange-100', icon: '🛺' };
+  if (t.includes('truck') || t.includes('ace') || t.includes('tempo')) 
+    return { bg: 'bg-red-100', icon: '🚛' };
+  return { bg: 'bg-amber-100', icon: '🚗' };
+};
   const sorted = [...vehicles].sort((a,b) => (a.driver_id ? 1 : -1) - (b.driver_id ? 1 : -1));
   return (
   <div className="space-y-3 pb-4">
@@ -1493,9 +1720,9 @@ const VehiclesTab = () => {
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                <Truck size={16} className="text-amber-600" />
-              </div>
+              <div className={`w-10 h-10 rounded-xl ${getVehicleIcon(vehicle).bg} flex items-center justify-center text-lg`}>
+  {getVehicleIcon(vehicle).icon}
+</div>
               <div>
                 <p className="font-black text-slate-800">{vehicle.vehicle_number}</p>
                 <p className="text-[10px] text-slate-400">{vehicle.vehicle_model}</p>
@@ -2059,6 +2286,35 @@ const ProfileTab = () => (
           <option value="MONTHLY">📅 Monthly Rent</option>
         </select>
       </div>
+      {/* Insurance + Fitness */}
+<div className="grid grid-cols-2 gap-2 mb-3">
+  <div>
+    <label className="text-[10px] font-black text-slate-500 block mb-1">🛡️ Insurance Expiry</label>
+    <input 
+      type="date"
+      className="w-full border rounded-xl p-3 text-sm bg-white"
+      value={newVehicle.insuranceExpiry || ''}
+      onChange={e => setNewVehicle({...newVehicle, insuranceExpiry: e.target.value})}
+    />
+  </div>
+  <div>
+    <label className="text-[10px] font-black text-slate-500 block mb-1">📋 Fitness Expiry</label>
+    <input 
+      type="date"
+      className="w-full border rounded-xl p-3 text-sm bg-white"
+      value={newVehicle.fitnessExpiry || ''}
+      onChange={e => setNewVehicle({...newVehicle, fitnessExpiry: e.target.value})}
+    />
+  </div>
+</div>
+
+{/* Chassis Number */}
+<input
+  placeholder="Chassis Number (optional)"
+  className="w-full border rounded-xl p-3 mb-3 text-sm uppercase font-mono"
+  value={newVehicle.chassisNumber || ''}
+  onChange={e => setNewVehicle({...newVehicle, chassisNumber: e.target.value.toUpperCase()})}
+/>
       
       {/* Daily/Weekly/Monthly Rent Amount */}
       <div className="mb-3">
@@ -2106,37 +2362,111 @@ const ProfileTab = () => (
     </div>
   </div>
 )}
+{showAddDriver && (
+  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-sm p-6 max-h-[85vh] overflow-y-auto">
+      <h3 className="text-lg font-black mb-4">Add Driver</h3>
+      
+      <input placeholder="Full Name (Letters only)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm"
+        value={newDriver.name} 
+        onChange={e => setNewDriver({...newDriver, name: e.target.value})} />
+      
+      <input placeholder="Phone Number (10 digits)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm"
+        value={newDriver.phone} 
+        onChange={e => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g, '').slice(0,10)})} />
+      
+      <input placeholder="Email (optional)" 
+        className="w-full border rounded-xl p-3 mb-3 text-sm"
+        value={newDriver.email} 
+        onChange={e => setNewDriver({...newDriver, email: e.target.value})} />
 
-        {/* Add Driver Modal */}
-        {showAddDriver && (
-          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl w-full max-w-sm p-6 max-h-[85vh] overflow-y-auto">
-              <h3 className="text-lg font-black mb-4">Add Driver</h3>
-              <input placeholder="Full Name (Letters only)" className="w-full border rounded-xl p-3 mb-3 text-sm"
-                value={newDriver.name} onChange={e => setNewDriver({...newDriver, name: e.target.value})} />
-              <input placeholder="Phone Number (10 digits)" className="w-full border rounded-xl p-3 mb-3 text-sm"
-                value={newDriver.phone} onChange={e => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g, '').slice(0,10)})} />
-              <input placeholder="Email (optional)" className="w-full border rounded-xl p-3 mb-4 text-sm"
-                value={newDriver.email} onChange={e => setNewDriver({...newDriver, email: e.target.value})} />
-              <div className="flex gap-3">
-                <select
-  className="w-full border rounded-xl p-3 mb-4 text-sm bg-white"
-  value={newDriver.vehicleId || ''}
-  onChange={e => setNewDriver({...newDriver, vehicleId: e.target.value})}
->
-  <option value="">-- Assign Vehicle (Optional) --</option>
-  {vehicles.filter(v => !v.driver_id).map(v => (
-    <option key={v.id} value={v.id}>
-      {v.vehicle_number} — {v.vehicle_model} (₹{v.daily_rent}/day)
-    </option>
-  ))}
-</select>
-                <button onClick={() => setShowAddDriver(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
-                <button onClick={addDriver} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Add</button>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* ✅ NEW: Security Deposit */}
+      <div className="relative mb-3">
+        <span className="absolute left-3 top-3 text-slate-400 text-sm font-black">₹</span>
+        <input 
+          type="number" 
+          placeholder="Security Deposit (optional)"
+          className="w-full border rounded-xl p-3 pl-7 text-sm"
+          value={newDriver.securityDeposit || ''}
+          onChange={e => setNewDriver({...newDriver, securityDeposit: e.target.value})} 
+        />
+      </div>
+      {/* DOB */}
+<div className="mb-3">
+  <label className="text-[10px] font-black text-slate-500 block mb-1">Date of Birth</label>
+  <input 
+    type="date" 
+    className="w-full border rounded-xl p-3 text-sm bg-white"
+    value={newDriver.dob}
+    onChange={e => setNewDriver({...newDriver, dob: e.target.value})} 
+  />
+</div>
+
+{/* Emergency Contact */}
+<div className="grid grid-cols-2 gap-2 mb-3">
+  <input 
+    placeholder="Emergency Contact Name"
+    className="border rounded-xl p-3 text-sm"
+    value={newDriver.emergencyName}
+    onChange={e => setNewDriver({...newDriver, emergencyName: e.target.value})} 
+  />
+  <input 
+    placeholder="Emergency Phone"
+    className="border rounded-xl p-3 text-sm"
+    value={newDriver.emergencyPhone}
+    onChange={e => setNewDriver({...newDriver, emergencyPhone: e.target.value.replace(/\D/g,'').slice(0,10)})} 
+  />
+</div>
+
+{/* License */}
+<div className="grid grid-cols-2 gap-2 mb-3">
+  <input 
+    placeholder="License Number"
+    className="border rounded-xl p-3 text-sm uppercase font-mono"
+    value={newDriver.licenseNumber}
+    onChange={e => setNewDriver({...newDriver, licenseNumber: e.target.value.toUpperCase()})} 
+  />
+  <div>
+    <label className="text-[10px] font-black text-slate-500 block mb-1">License Expiry</label>
+    <input 
+      type="date"
+      className="w-full border rounded-xl p-3 text-sm bg-white"
+      value={newDriver.licenseExpiry}
+      onChange={e => setNewDriver({...newDriver, licenseExpiry: e.target.value})} 
+    />
+  </div>
+</div>
+
+      {/* ✅ FIXED: Select separate kiya */}
+      <select
+        className="w-full border rounded-xl p-3 mb-4 text-sm bg-white"
+        value={newDriver.vehicleId || ''}
+        onChange={e => setNewDriver({...newDriver, vehicleId: e.target.value})}
+      >
+        <option value="">-- Assign Vehicle (Optional) --</option>
+        {vehicles.filter(v => !v.driver_id).map(v => (
+          <option key={v.id} value={v.id}>
+            {v.vehicle_number} — {v.vehicle_model} (₹{v.daily_rent}/day)
+          </option>
+        ))}
+      </select>
+
+      {/* ✅ FIXED: Buttons apne row mein */}
+      <div className="flex gap-3">
+        <button onClick={() => setShowAddDriver(false)} 
+          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">
+          Cancel
+        </button>
+        <button onClick={addDriver} 
+          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">
+          Add
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         {showVehicleDetailModal && <VehicleDetailModal />}
 {showDriverDetailsModal && <DriverDetailsModal />}
 {showCashModal && cashDriver && (
