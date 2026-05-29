@@ -483,7 +483,6 @@ const AccountTab = () => {
           <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-black">
             {driverName.charAt(0).toUpperCase()}
           </div>
-          // Profile header div ke andar, name ke neeche
 <h2 className="text-xl font-black">{driverName}</h2>
 <p className="text-sm opacity-90">{driverPhone}</p>
 <p className="text-xs opacity-75">Driver Code: {driverCode}</p>
