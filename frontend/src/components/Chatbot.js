@@ -94,7 +94,7 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'hi-IN';
+      recognitionRef.current.lang = 'en-IN';
 
       recognitionRef.current.onresult = (event) => {
   let interim = '';
@@ -125,12 +125,9 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
 
-  // Sirf emojis hatao, Hindi rakho
   const speakable = text
-    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-    .replace(/[✅❌⚠️💰🚛👤📊🎉]/g, '')
-    .replace(/₹/g, 'rupaye ')
-    .replace(/\n/g, ', ')
+    .replace(/[^\x00-\x7F\u0900-\u097F\s]/g, '') // emojis, ₹ etc. hata
+    .replace(/\n+/g, '. ')
     .trim();
 
   if (!speakable) return;
@@ -138,23 +135,19 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
 
   const doSpeak = () => {
     const voices = window.speechSynthesis.getVoices();
-
-    // Hindi female voice dhundo
-    const hindiF = voices.find(v => v.lang === 'hi-IN' &&
-      (v.name.includes('Female') || v.name.includes('female') || v.name.includes('Lekha') || v.name.includes('Aditi')));
-
-    // English female fallback
-    const engF = voices.find(v =>
-      v.name.includes('Heera') || v.name.includes('Priya') ||
-      (v.lang === 'en-IN' && v.name.toLowerCase().includes('female'))
-    ) || voices.find(v => v.lang === 'en-IN');
+    const best = 
+      voices.find(v => v.name === 'Google हिन्दी') ||
+      voices.find(v => v.name.includes('Lekha')) ||
+      voices.find(v => v.name.includes('Heera')) ||
+      voices.find(v => v.lang === 'hi-IN') ||
+      voices.find(v => v.lang === 'en-IN');
 
     const u = new SpeechSynthesisUtterance(speakable);
-    const voice = hindiF || engF;
-    if (voice) u.voice = voice;
-    u.lang = 'hi-IN';
-    u.rate = 0.85;
-    u.pitch = 1.2;
+    if (best) u.voice = best;
+    u.lang = /[\u0900-\u097F]/.test(speakable) ? 'hi-IN' : 'en-IN';
+    u.rate = 0.88;
+    u.pitch = 1.0;
+    u.volume = 1.0;
     u.onend = () => setIsSpeaking(false);
     u.onerror = () => setIsSpeaking(false);
     window.speechSynthesis.speak(u);
