@@ -1485,7 +1485,7 @@ const ProfileTab = () => (
 );
 
   return (
-    <div className="min-h-screen bg-slate-200 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-200 flex items-start justify-center">
       <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, minHeight:'100dvh'}}>
         {/* Status Bar */}
         <div className="bg-slate-900 text-white text-[11px] px-4 py-2 flex justify-between">
