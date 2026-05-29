@@ -278,22 +278,32 @@ useEffect(() => {
     const d = await r.json();
     console.log('Payment response:', d);
 
-    // ✅ Seedha checkout URL use karo — no intent decode
+    // ✅ STEP 1: Vinay Sir ka method — upiQrLink se intent nikalo
+    const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
+    if (qrLink) {
+      try {
+        const qrUrl = new URL(qrLink);
+        const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
+        if (intentLink && intentLink.startsWith('upi://')) {
+          window.location.href = intentLink;
+          return; // ✅ UPI app seedha khulega
+        }
+      } catch (e) { console.error('QR decode error:', e); }
+    }
+
+    // ✅ STEP 2: Fallback — checkout URL
     const url = d?.checkoutUrl 
               || d?.data?.checkoutUrl 
               || d?.intentURL 
-              || d?.data?.intentURL
-              || d?.data?.data?.checkoutUrl;
+              || d?.data?.intentURL;
 
     if (url) { 
       window.location.href = url; 
     } else { 
-      console.log('No URL found:', d);
-      alert('Payment gateway error: ' + (d?.message || 'No URL returned'));
+      alert('Payment error: ' + (d?.message || 'No URL'));
       setShowPaying(false); 
     }
   } catch (e) { 
-    console.error(e); 
     alert('Network error: ' + e.message); 
     setShowPaying(false); 
   }
