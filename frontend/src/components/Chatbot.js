@@ -24,12 +24,15 @@ const [messages, setMessages] = useState(() => {
 
   // Initialize welcome message
     useEffect(() => {
-  if (!persistedMessages || persistedMessages.length === 0) {
-    const welcome = isOwner
-      ? 'नमस्ते! Main aapka Fleet Assistant hoon. 🏢\n\nCollection, driver status, vehicle assignment — kuch bhi poochein!'
-      : 'नमस्ते! Main aapka Driver Assistant hoon. 🚛\n\nBakaya, wallet, vehicle — kuch bhi poochein!';
-    setMessages([{ role: 'bot', content: welcome }]);
-  }
+  setMessages(prev => {
+    if (prev.length === 0) {
+      const welcome = isOwner
+        ? 'नमस्ते! Main aapka Fleet Assistant hoon. 🏢\n\nCollection, driver status, vehicle assignment — kuch bhi poochein!'
+        : 'नमस्ते! Main aapka Driver Assistant hoon. 🚛\n\nBakaya, wallet, vehicle — kuch bhi poochein!';
+      return [{ role: 'bot', content: welcome }];
+    }
+    return prev;
+  });
   fetchUserData();
 }, []);
 
@@ -426,8 +429,8 @@ const res = await fetch(`${API}/api/payment/chatbot`, {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-md h-[600px] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-2">
+      <div className="bg-white rounded-3xl w-full max-w-md h-[min(600px,85vh)] flex flex-col shadow-2xl">
         {/* Header */}
         <div className={`p-4 rounded-t-3xl flex items-center justify-between ${isOwner ? 'bg-gradient-to-r from-blue-600 to-indigo-700' : 'bg-gradient-to-r from-green-600 to-emerald-700'} text-white`}>
           <div className="flex items-center gap-3">
