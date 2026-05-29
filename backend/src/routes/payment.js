@@ -316,6 +316,141 @@ RULES: Respond in same language as user (Hindi/English/Hinglish). Max 3 lines. U
     res.json({ reply: 'Service unavailable.' });
   }
 });
+// Driver-wise ledger summary
+router.get('/owner/driver-ledger', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    const result = await pool.query(`
+      SELECT 
+        d.id, d.full_name, d.mobile_number, d.advance_balance, d.security_deposit,
+        v.vehicle_number, v.daily_rent,
+        COALESCE(SUM(CASE WHEN dl.entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT') THEN dl.amount ELSE 0 END), 0) as total_paid,
+        COALESCE(SUM(CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY') THEN dl.amount ELSE 0 END), 0) as total_charged,
+        COALESCE(d.advance_balance, 0) as advance
+      FROM public.drivers d
+      LEFT JOIN public.vehicles v ON v.driver_id = d.id
+      LEFT JOIN public.driver_ledger dl ON dl.driver_id = d.id
+      WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+      GROUP BY d.id, d.full_name, d.mobile_number, d.advance_balance, d.security_deposit, v.vehicle_number, v.daily_rent
+      ORDER BY d.full_name
+    `, [ownerId]);
+    
+    const drivers = result.rows.map(d => ({
+      ...d,
+      pending: Math.max(0, parseFloat(d.total_charged) - parseFloat(d.total_paid)),
+      overpaid: Math.max(0, parseFloat(d.total_paid) - parseFloat(d.total_charged))
+    }));
+    
+    res.json(drivers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router.post('/owner/ledger-entry', async (req, res) => {
+  try {
+    const { driverId, ownerId, entryType, amount, description } = req.body;
+
+    // Verify driver belongs to this owner
+    const ownerRes = await pool.query(
+      `SELECT owner_code FROM public.owners WHERE id = $1`, [ownerId]
+    );
+    const ownerCode = ownerRes.rows[0]?.owner_code;
+
+    const driverCheck = await pool.query(
+      `SELECT id FROM public.drivers WHERE id = $1 AND owner_code = $2`,
+      [driverId, ownerCode]
+    );
+    if (!driverCheck.rows[0]) 
+      return res.status(403).json({ error: 'Driver does not belong to this owner' });
+
+    // Entry insert karo
+    await pool.query(
+      `INSERT INTO public.driver_ledger 
+       (driver_id, owner_id, entry_type, amount, description, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'OWNER')`,
+      [driverId, ownerId, entryType, amount, description || '']
+    );
+
+    // Advance ya repair credit hone pe driver balance update
+    if (['ADVANCE_CREDIT', 'REPAIR_CREDIT', 'REFUND'].includes(entryType)) {
+      await pool.query(
+        `UPDATE public.drivers SET advance_balance = COALESCE(advance_balance, 0) + $1 WHERE id = $2`,
+        [amount, driverId]
+      );
+    }
+    // Damage ya penalty pe advance se deduct karo pehle
+    if (['DAMAGE_CHARGE', 'PENALTY'].includes(entryType)) {
+      await pool.query(
+        `UPDATE public.drivers 
+         SET advance_balance = GREATEST(0, COALESCE(advance_balance, 0) - $1) 
+         WHERE id = $2`,
+        [amount, driverId]
+      );
+    }
+
+    res.json({ success: true, message: 'Entry recorded' });
+  } catch (err) {
+    console.error('Ledger entry error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+router.get('/owner/driver-ledger', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+
+    // Step 1: Owner ka code fetch karo
+    const ownerRes = await pool.query(
+      `SELECT owner_code FROM public.owners WHERE id = $1`, [ownerId]
+    );
+    const ownerCode = ownerRes.rows[0]?.owner_code;
+    if (!ownerCode) return res.status(404).json({ error: 'Owner not found' });
+
+    // Step 2: Is owner_code se linked drivers + unka ledger
+    const result = await pool.query(`
+      SELECT 
+        d.id,
+        d.full_name,
+        d.mobile_number,
+        d.advance_balance,
+        d.security_deposit,
+        v.vehicle_number,
+        v.daily_rent,
+        COALESCE(SUM(
+          CASE WHEN dl.entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') 
+          THEN dl.amount ELSE 0 END
+        ), 0) AS total_paid,
+        COALESCE(SUM(
+          CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY') 
+          THEN dl.amount ELSE 0 END
+        ), 0) AS total_charged
+      FROM public.drivers d
+      LEFT JOIN public.vehicles v ON v.driver_id = d.id
+      LEFT JOIN public.driver_ledger dl ON dl.driver_id = d.id
+      WHERE d.owner_code = $1 AND d.status = 'ACTIVE'
+      GROUP BY d.id, d.full_name, d.mobile_number, d.advance_balance, 
+               d.security_deposit, v.vehicle_number, v.daily_rent
+      ORDER BY d.full_name
+    `, [ownerCode]);  // ← ownerCode directly use ho raha hai
+
+    const drivers = result.rows.map(d => ({
+      id: d.id,
+      full_name: d.full_name,
+      mobile_number: d.mobile_number,
+      vehicle_number: d.vehicle_number || 'Not Assigned',
+      daily_rent: parseFloat(d.daily_rent || 0),
+      total_paid: parseFloat(d.total_paid || 0),
+      total_charged: parseFloat(d.total_charged || 0),
+      pending: Math.max(0, parseFloat(d.total_charged) - parseFloat(d.total_paid)),
+      advance: parseFloat(d.advance_balance || 0),
+      security_deposit: parseFloat(d.security_deposit || 0)
+    }));
+
+    res.json(drivers);
+  } catch (err) {
+    console.error('Driver ledger error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 router.post('/owner/notify-unpaid', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
