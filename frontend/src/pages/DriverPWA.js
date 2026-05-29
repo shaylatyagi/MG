@@ -29,6 +29,8 @@ export default function DriverPWA() {
   const [lang, setLang] = useState('en');
   const T = {
   en: {
+    driverTerminal:'Driver Terminal', balanceTx:'Balance & Transactions', 
+profileKyc:'Profile & KYC', logout:'Logout',
     assignedVehicle:'Assigned Vehicle', active:'ACTIVE',
 dailyRent:'Daily Rent', assignedSince:'Assigned Since',
 noVehicle:'No vehicle assigned', contactOwner:'Contact your owner to assign a vehicle',
@@ -47,6 +49,8 @@ noTxLabel:'No transactions yet.', lifetime:'Lifetime',
     triggerSos: 'Trigger SOS'
   },
   hi: {
+    driverTerminal:'ड्राइवर टर्मिनल', balanceTx:'बैलेंस और लेनदेन',
+profileKyc:'प्रोफ़ाइल और KYC', logout:'लॉगआउट',
     assignedVehicle:'असाइन वाहन', active:'सक्रिय',
 dailyRent:'दैनिक किराया', assignedSince:'असाइन तिथि',
 noVehicle:'कोई वाहन असाइन नहीं', contactOwner:'वाहन के लिए मालिक से संपर्क करें',
@@ -54,7 +58,7 @@ verifiedDocs:'सत्यापित दस्तावेज़', paymentSumm
 availableFloat:'उपलब्ध एडवांस फ्लोट', addFloat2:'फ्लोट जोड़ें',
 requestPayout2:'पेआउट अनुरोध', totalPaidLabel:'कुल भुगतान',
 outstandingLabel:'बकाया', txHistoryLabel:'लेनदेन इतिहास',
-noTxLabel:'अभी कोई लेनदेन नहीं।', lifetime2:'आजीवन',
+noTxLabel:'अभी कोई लेनदेन नहीं।', lifetime:'आजीवन',
     outstanding: 'आज का बकाया', duesPending: 'बकाया है',
     settled: 'खाता सेटल', pay: 'PayYantra से भुगतान करें',
     recent: 'हाल के लेनदेन', viewAll: 'सभी देखें →',
@@ -244,18 +248,6 @@ useEffect(() => {
     setUnread(0); setNotifs(p => p.map(n => ({ ...n, is_read: true })));
     try { await fetch(`${API}/api/payment/notifications/mark-read?userId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch (_) { }
   };
-  // Vinay Sir's method - upiQrLink decode karo
-const qrLink = d?.data?.upiQrLink;
-if (qrLink) {
-  try {
-    const qrUrl = new URL(qrLink);
-    const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
-    if (intentLink && intentLink.startsWith('upi://')) {
-      window.location.href = intentLink;
-      return;
-    }
-  } catch (e) { console.error('QR decode:', e); }
-}
   const pay = async () => {
     setShowPaying(true);
     try {
