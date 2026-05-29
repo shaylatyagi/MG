@@ -238,8 +238,11 @@ if (msg.match(/notification|notify|remind|bhejo|send|याद|भेजो/)) {
 }
     // Vehicles
     if (msg.match(/vehicle|gaadi|fleet|gadi|assigned|rent|किराया|गाड़ी/)) {
-  const assigned = (data.vehicles || []).filter(v => v.driver_name);
-  const free = (data.vehicles || []).filter(v => !v.driver_name);
+  const assigned = (data.vehicles || []).filter(v => v.driver_id);
+const free = (data.vehicles || []).filter(v => !v.driver_id);
+const list = assigned.map(v => 
+  `${v.driver_name || 'Unknown'} → ${v.vehicle_number} @ ₹${v.daily_rent}/day`
+).join('\n');
   const list = assigned.map(v => `${v.driver_name} → ${v.vehicle_number} @ ₹${v.daily_rent}/day`).join('\n');
   return `🚛 Assigned (${assigned.length}):\n${list || 'कोई नहीं'}\n\n⚠️ Free (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
 }
