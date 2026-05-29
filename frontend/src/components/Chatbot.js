@@ -351,7 +351,8 @@ const vehicleList = assigned.map(v =>
 ).join('\n');
 return `🚛 Assigned (${assigned.length}):\n${vehicleList || 'कोई नहीं'}\n\n⚠️ Free (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
 }
-
+if (msg.match(/rent|kiraya|किराया|kitna dena|daily/))
+  return `📅 Daily rent: ₹${data.dailyRent}/day`;
     // Drivers
     if (msg.match(/driver|kitne log|team|ड्राइवर|कितने/))
       return `👥 कुल ${data.totalDrivers} drivers हैं।`;

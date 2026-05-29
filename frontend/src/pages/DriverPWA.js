@@ -29,12 +29,12 @@ export default function DriverPWA() {
   const [lang, setLang] = useState('en');
   const T = {
   en: {
-    outstanding: "{t.outstanding}", duesPending: '{t.duesPending}',
-    settled: '{t.settled}', pay: '{t.pay}',
-    recent: '{t.recent}', viewAll: '{t.viewAll}',
-    noTx: '{t.noTx}', wallet: '{t.wallet}',
-    totalPaid: '{t.totalPaid}', outstanding2: '{t.outstanding2}',
-    txHistory: '{t.txHistory}', emergency: 'Emergency Support',
+    outstanding: "Today's Outstanding", duesPending: 'Dues Pending',
+    settled: 'Account Settled', pay: 'Pay via PayYantra',
+    recent: 'Recent Transactions', viewAll: 'View All →',
+    noTx: 'No transactions yet', wallet: 'Available Advance Float',
+    totalPaid: 'Total Paid', outstanding2: 'Outstanding',
+    txHistory: 'Transaction History', emergency: 'Emergency Support',
     triggerSos: 'Trigger SOS'
   },
   hi: {
@@ -629,11 +629,11 @@ const AccountTab = () => {
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Today's Outstanding</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{t.outstanding}</span>
             <h2 className="text-3xl font-black font-mono text-slate-900 mt-0.5 tracking-tight">₹{dues.toLocaleString('en-IN')}.00</h2>
           </div>
           <span className={`px-2 py-1 text-[9px] font-black uppercase tracking-wider rounded-md font-mono border ${dues > 0 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-            {dues > 0 ? 'Dues Pending' : 'Account Settled'}
+            {dues > 0 ? t.duesPending : t.settled}
           </span>
         </div>
         <div className="relative">
@@ -642,14 +642,14 @@ const AccountTab = () => {
             className="w-full border-2 border-slate-200 rounded-xl p-3 pl-9 text-xl font-black font-mono focus:outline-none focus:border-blue-600 bg-slate-50 text-slate-800" />
         </div>
         <button onClick={pay} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black p-4 rounded-xl shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 text-xs uppercase tracking-wider transition-all active:scale-95">
-          <CreditCard size={16} /> Pay Balance via PayYantra
+          <CreditCard size={16} /> {t.pay}
         </button>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-50 flex justify-between items-center">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Recent Transactions</h3>
-          <button onClick={() => goToWalletFromTransaction()} className="text-[10px] text-blue-600 font-black">View All →</button>
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t.recent}</h3>
+<button onClick={() => goToWalletFromTransaction()} className="text-[10px] text-blue-600 font-black">{t.viewAll}</button>
         </div>
         <div className="divide-y">
           {payments.slice(0, 3).map((p, i) => (
@@ -767,9 +767,9 @@ const AccountTab = () => {
         <div className="absolute left-0 right-0 bg-gradient-to-r from-red-600 to-orange-600 text-white px-4 py-2 flex items-center justify-between z-40" style={{ bottom: '64px' }}>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center animate-pulse"><ShieldAlert size={13} /></div>
-            <span className="text-[10px] font-black tracking-wide">Emergency Support</span>
-          </div>
-          <button onClick={() => setShowSOS(true)} className="bg-white text-red-700 text-[9px] font-black px-3 py-1.5 rounded-lg">Trigger SOS</button>
+            <span className="text-[10px] font-black tracking-wide">{t.emergency}</span>
+<button onClick={() => setShowSOS(true)} className="bg-white text-red-700 text-[9px] font-black px-3 py-1.5 rounded-lg">{t.triggerSos}</button>
+        </div>
         </div>
 {/* Bottom Navigation - Fixed */}
 <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50">

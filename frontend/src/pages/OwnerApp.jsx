@@ -17,6 +17,7 @@ const API = 'https://mg-qw5s.onrender.com';
 
 export default function OwnerDashboard() {
   const [chatMessages, setChatMessages] = useState([]);
+  const [lang, setLang] = useState('en');
   const [horizon, setHorizon] = useState('today');
 const [ledger, setLedger] = useState({ received: 0, outstanding: 0 });
   const [showCashModal, setShowCashModal] = useState(false);
@@ -1501,6 +1502,10 @@ const ProfileTab = () => (
           </div>
           <div className="flex items-center gap-2">
             {/* NOTIFICATION BELL */}
+            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+  <button onClick={() => setLang('en')} className={`px-2 py-1 text-[10px] font-black rounded-lg transition ${lang==='en'?'bg-white text-blue-600 shadow-sm':'text-slate-400'}`}>EN</button>
+  <button onClick={() => setLang('hi')} className={`px-2 py-1 text-[10px] font-black rounded-lg transition ${lang==='hi'?'bg-white text-blue-600 shadow-sm':'text-slate-400'}`}>हिं</button>
+</div>
             <button 
   onClick={() => setShowChatbot(true)} 
   className="p-2 rounded-xl bg-purple-100 hover:bg-purple-200 transition"
