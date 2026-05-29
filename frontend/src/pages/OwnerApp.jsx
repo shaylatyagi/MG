@@ -266,7 +266,7 @@ const [assigning, setAssigning] = useState(false);
       setTime(`${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`);
     };
     tick();
-    const id = setInterval(tick, 30000);
+    const id = setInterval(tick, 300000);//every 5 minutes
     return () => clearInterval(id);
   }, []);
 
@@ -723,8 +723,8 @@ useEffect(() => {
     };
     
     pollNotifications();
-    const interval = setInterval(pollNotifications, 10000);
-    return () => clearInterval(interval);
+const interval = setInterval(pollNotifications, 60000);//60 seconds
+return () => clearInterval(interval);
   }, [unreadCount]);
 
   const logout = () => {
