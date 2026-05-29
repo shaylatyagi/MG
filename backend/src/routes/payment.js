@@ -768,8 +768,11 @@ router.post('/create-order', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Amount and phone required' });
     }
 
-    // Step 1: Token lo
-    const tokenRes = await fetch('https://payin-api.payyantra.com/api/auth/token', {
+    // ✅ FIX 1: .env se URL lo, hardcode mat karo
+    const BASE = process.env.PAYYANTRA_BASE_URL || 'https://payin-api-uat.payyantra.com';
+
+    // Step 1: Token
+    const tokenRes = await fetch(`${BASE}/api/auth/token`, {
       method: 'POST',
       headers: {
         'x-client-id': process.env.PAYYANTRA_CLIENT_ID,
@@ -778,24 +781,18 @@ router.post('/create-order', async (req, res) => {
       }
     });
     const tokenData = await tokenRes.json();
-    const token = tokenData.token || tokenData.data?.token || tokenData.access_token || tokenData.data?.access_token;
+    const token = tokenData.token || tokenData.data?.token 
+                || tokenData.access_token || tokenData.data?.access_token;
     
     if (!token) {
       return res.status(500).json({ success: false, message: 'Token failed', raw: tokenData });
     }
 
-    // ⭐ NEW FIX: Step 2: Database me PENDING order save karo ⭐
-    const orderId = `MG${Date.now()}`;
-    const orderNumber = `ORD-${Date.now()}`; // Generate friendly order number
+    const orderId     = `MG${Date.now()}`;
+    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
 
-    await pool.query(
-      `INSERT INTO ms_orders (order_id, order_number, order_amount, currency, payer_name, payer_mobile, transaction_status, order_initiation_date)
-       VALUES ($1, $2, $3, 'INR', $4, $5, 'PENDING', NOW())`,
-      [orderId, orderNumber, parseFloat(amount), customerName || 'Driver', customerPhone]
-    );
-
-    // Step 3: Order banao PayYantra pe
-    const orderRes = await fetch('https://payin-api.payyantra.com/api/merchant/orders', {
+    // Step 2: PayYantra pe order banao PEHLE
+    const orderRes = await fetch(`${BASE}/api/merchant/orders`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -806,28 +803,45 @@ router.post('/create-order', async (req, res) => {
         customerName: customerName || 'Driver',
         customerPhone: customerPhone,
         customerEmail: customerEmail || 'driver@mobilitygrid.com',
-        orderId: orderId, // Ye wahi orderId hai jo DB me save hua
-        // ⭐ FIX: Return to PaymentResult page, NOT dashboard directly ⭐
-        returnUrl: `https://mg-sandy.vercel.app/payment-result?orderId=${orderNumber}`, 
+        orderId: orderId,
+        returnUrl: `https://mg-sandy.vercel.app/payment-result?orderId=${orderId}`,
         notifyUrl: 'https://mg-qw5s.onrender.com/api/payment/webhook'
       })
     });
 
     const orderData = await orderRes.json();
-    const intentURL = orderData?.intentURL || orderData?.data?.intentURL;
-    const checkoutUrl = orderData?.checkoutUrl || orderData?.data?.checkoutUrl || orderData?.data?.data?.checkoutUrl;
 
-    if (!intentURL && !checkoutUrl) {
-      return res.status(500).json({ success: false, message: 'No URL in response', raw: orderData });
+    // ✅ FIX 2: Agar PayYantra se response nahi aaya toh error do, mock mat banao
+    const intentURL   = orderData?.intentURL   || orderData?.data?.intentURL;
+    const checkoutUrl = orderData?.checkoutUrl || orderData?.data?.checkoutUrl;
+    const upiQrLink   = orderData?.data?.upiQrLink;
+    const pgTxnId     = orderData?.data?.transactionId || orderData?.transactionId;
+
+    if (!intentURL && !checkoutUrl && !upiQrLink) {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'PayYantra se koi URL nahi aaya',
+        raw: orderData   // ← yahan se exactly dekh kya aa raha hai
+      });
     }
+
+    // ✅ FIX 3: DB mein pg_transaction_id bhi save karo
+    await pool.query(
+      `INSERT INTO ms_orders 
+        (order_id, order_number, order_amount, currency, payer_name, 
+         payer_mobile, transaction_status, pg_transaction_id, order_initiation_date)
+       VALUES ($1, $2, $3, 'INR', $4, $5, 'PENDING', $6, NOW())`,
+      [orderId, orderNumber, parseFloat(amount), 
+       customerName || 'Driver', customerPhone, pgTxnId || null]
+    );
 
     res.json({
       success: true,
-      upiQrLink: orderData.data?.upiQrLink,
-      intentURL: intentURL,
-      checkoutUrl: checkoutUrl,
-      orderId: orderId,
-      transactionId: orderData.data?.transactionId,
+      upiQrLink,
+      intentURL,
+      checkoutUrl,
+      orderId,
+      transactionId: pgTxnId,
       data: orderData.data
     });
 

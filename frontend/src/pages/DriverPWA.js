@@ -248,6 +248,7 @@ useEffect(() => {
     setUnread(0); setNotifs(p => p.map(n => ({ ...n, is_read: true })));
     try { await fetch(`${API}/api/payment/notifications/mark-read?userId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch (_) { }
   };
+  // 1. UPDATED RENT PAY FUNCTION
   const pay = async () => {
     setShowPaying(true);
     try {
@@ -255,33 +256,45 @@ useEffect(() => {
       const r = await fetch(`${API}/api/payment/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-        body: JSON.stringify({ amount: payAmt || dues || 850, customerName: u.name || 'Driver', customerPhone: ph, customerEmail: u.email || 'driver@mg.com' })
+        // ⭐ ADDED purpose: 'RENT'
+        body: JSON.stringify({ amount: payAmt || dues || 850, customerName: u.name || 'Driver', customerPhone: ph, customerEmail: u.email || 'driver@mg.com', purpose: 'RENT' })
       });
       const d = await r.json();
-      // Method 1: upiQrLink se intent decode karo (Vinay Sir ka method)
-const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
-if (qrLink) {
-  try {
-    const qrUrl = new URL(qrLink);
-    const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
-    if (intentLink && intentLink.startsWith('upi://')) {
-      window.location.href = intentLink;
-      return;
-    }
-  } catch (e) {
-    console.error('QR decode error:', e);
-  }
-}
+      const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
+      if (qrLink) {
+        try {
+          const qrUrl = new URL(qrLink);
+          const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
+          if (intentLink && intentLink.startsWith('upi://')) {
+            window.location.href = intentLink;
+            return;
+          }
+        } catch (e) { console.error('QR decode error:', e); }
+      }
+      const url = d?.intentURL || d?.data?.intentURL || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
+      if (url) { window.location.href = url; } 
+      else { alert('Payment gateway error. Try again.'); setShowPaying(false); }
+    } catch (e) { console.error(e); alert('Network error.'); setShowPaying(false); }
+  };
 
-// Method 2: Direct intentURL (fallback)
-const url = d?.intentURL || d?.data?.intentURL 
-  || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
-if (url) {
-  window.location.href = url;
-} else {
-  alert('Payment gateway error. Try again.');
-  setShowPaying(false);
-}
+  // 2. NEW WALLET ADD FUNCTION
+  const addFloat = async () => {
+    const amt = prompt("Enter amount to add to Wallet (₹):");
+    if (!amt || isNaN(amt) || Number(amt) <= 0) return;
+
+    setShowPaying(true);
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}'); const ph = phone();
+      const r = await fetch(`${API}/api/payment/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+        // ⭐ ADDED purpose: 'WALLET'
+        body: JSON.stringify({ amount: Number(amt), customerName: u.name || 'Driver', customerPhone: ph, customerEmail: u.email || 'driver@mg.com', purpose: 'WALLET' })
+      });
+      const d = await r.json();
+      const url = d?.intentURL || d?.data?.intentURL || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
+      if (url) { window.location.href = url; } 
+      else { alert('Payment gateway error. Try again.'); setShowPaying(false); }
     } catch (e) { console.error(e); alert('Network error.'); setShowPaying(false); }
   };
 
@@ -610,9 +623,10 @@ const AccountTab = () => {
           </div>
         </div>
         <div className="flex gap-2 pt-1">
-          <button onClick={() => alert('Top-up gateway activated...')} className="flex-1 bg-white/20 hover:bg-white/30 text-white text-[11px] font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
-            <PlusCircle size={13} /> {t.addFloat2}
-          </button>
+          {/* Change this line in your WalletTab */}
+<button onClick={addFloat} className="flex-1 bg-white/20 hover:bg-white/30 text-white text-[11px] font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
+  <PlusCircle size={13} /> {t.addFloat2}
+</button>
           <button onClick={() => alert('Withdrawal queued...')} className="flex-1 bg-emerald-950/40 hover:bg-emerald-950/60 text-emerald-100 text-[11px] font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
             <ArrowDownLeft size={13} /> {t.requestPayout2}
           </button>
