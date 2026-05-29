@@ -257,87 +257,85 @@ useEffect(() => {
     setUnread(0); setNotifs(p => p.map(n => ({ ...n, is_read: true })));
     try { await fetch(`${API}/api/payment/notifications/mark-read?userId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch (_) { }
   };
-  // 1. UPDATED RENT PAY FUNCTION
   const pay = async () => {
-    setShowPaying(true);
-    try {
-      const u = JSON.parse(localStorage.getItem('user') || '{}'); const ph = phone();
-      const r = await fetch(`${API}/api/payment/create-order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-        // ⭐ ADDED purpose: 'RENT'
-        body: JSON.stringify({ amount: payAmt || dues || 850, customerName: u.name || 'Driver', customerPhone: ph, customerEmail: u.email || 'driver@mg.com', purpose: 'RENT' })
-      });
-      const d = await r.json();
-      const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
-      if (qrLink) {
-        try {
-          const qrUrl = new URL(qrLink);
-          const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
-          if (intentLink && intentLink.startsWith('upi://')) {
-            window.location.href = intentLink;
-            return;
-          }
-        } catch (e) { console.error('QR decode error:', e); }
-      }
-      //const url = d?.intentURL || d?.data?.intentURL || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
-      const url = d?.intentURL || d?.data?.intentURL || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
-if (url) { window.location.href = url; } 
-else { 
-  console.log('❌ Full response:', JSON.stringify(d)); // ← ADD THIS
-  alert('Error: ' + (d?.message || d?.raw?.message || 'No URL returned'));
-  setShowPaying(false); 
-}
-      if (url) { window.location.href = url; } 
-      else { alert('Payment gateway error. Try again.'); setShowPaying(false); }
-    } catch (e) { console.error(e); alert('Network error.'); setShowPaying(false); }
-  };
+  setShowPaying(true);
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const ph = phone();
+    
+    const r = await fetch(`${API}/api/payment/create-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+      body: JSON.stringify({ 
+        amount: payAmt || dues || 850, 
+        customerName: u.name || 'Driver', 
+        customerPhone: ph, 
+        customerEmail: u.email || 'driver@mg.com',
+        purpose: 'RENT' 
+      })
+    });
+    
+    const d = await r.json();
+    console.log('Payment response:', d);
 
-  const addFloat = async () => {
-    const amt = prompt("Enter amount to add to Wallet (₹):");
-    if (!amt || isNaN(amt) || Number(amt) <= 0) return;
+    // ✅ Seedha checkout URL use karo — no intent decode
+    const url = d?.checkoutUrl 
+              || d?.data?.checkoutUrl 
+              || d?.intentURL 
+              || d?.data?.intentURL
+              || d?.data?.data?.checkoutUrl;
 
-    setShowPaying(true);
-    try {
-      const u = JSON.parse(localStorage.getItem('user') || '{}'); 
-      const ph = phone();
-      
-      const r = await fetch(`${API}/api/payment/create-order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-        body: JSON.stringify({ amount: Number(amt), customerName: u.name || 'Driver', customerPhone: ph, customerEmail: u.email || 'driver@mg.com', purpose: 'WALLET' })
-      });
-      const d = await r.json();
-
-      // ⭐ FIX: Yahan add kiya hai Vinay Sir wala QR decode logic ⭐
-      const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
-      if (qrLink) {
-        try {
-          const qrUrl = new URL(qrLink);
-          const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
-          if (intentLink && intentLink.startsWith('upi://')) {
-            window.location.href = intentLink;
-            return; // Redirect ho gaya, aage ka code nahi chalega
-          }
-        } catch (e) {
-          console.error('QR decode error:', e);
-        }
-      }
-
-      // Agar direct intent URL mil jaye (fallback)
-      const url = d?.intentURL || d?.data?.intentURL || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
-      if (url) { 
-        window.location.href = url; 
-      } else { 
-        alert('Payment gateway error. Try again.'); 
-        setShowPaying(false); 
-      }
-    } catch (e) { 
-      console.error(e); 
-      alert('Network error.'); 
+    if (url) { 
+      window.location.href = url; 
+    } else { 
+      console.log('No URL found:', d);
+      alert('Payment gateway error: ' + (d?.message || 'No URL returned'));
       setShowPaying(false); 
     }
-  };
+  } catch (e) { 
+    console.error(e); 
+    alert('Network error: ' + e.message); 
+    setShowPaying(false); 
+  }
+};
+const addFloat = async () => {
+  const amt = prompt("Enter amount to add to Wallet (₹):");
+  if (!amt || isNaN(amt) || Number(amt) <= 0) return;
+
+  setShowPaying(true);
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    const ph = phone();
+    
+    const r = await fetch(`${API}/api/payment/create-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+      body: JSON.stringify({ 
+        amount: Number(amt), 
+        customerName: u.name || 'Driver', 
+        customerPhone: ph, 
+        customerEmail: u.email || 'driver@mg.com', 
+        purpose: 'WALLET' 
+      })
+    });
+    const d = await r.json();
+
+    const url = d?.checkoutUrl 
+              || d?.data?.checkoutUrl 
+              || d?.intentURL 
+              || d?.data?.intentURL;
+              
+    if (url) { 
+      window.location.href = url; 
+    } else { 
+      alert('Payment gateway error. Try again.'); 
+      setShowPaying(false); 
+    }
+  } catch (e) { 
+    alert('Network error.'); 
+    setShowPaying(false); 
+  }
+};
 
   const sendChat = () => {
     if (!chatInput.trim()) return;

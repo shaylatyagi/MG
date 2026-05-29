@@ -940,15 +940,16 @@ router.post('/create-order', async (req, res) => {
        customerName || 'Driver', customerPhone, pgTxnId || null]
     );
 
-    res.json({
-      success: true,
-      upiQrLink,
-      intentURL,
-      checkoutUrl,
-      orderId,
-      transactionId: pgTxnId,
-      data: orderData.data
-    });
+    // Response mein ye sab fields return karo
+res.json({
+  success: true,
+  checkoutUrl: orderData?.data?.checkoutUrl || orderData?.checkoutUrl,
+  intentURL: orderData?.data?.intentURL || orderData?.intentURL,
+  upiQrLink: orderData?.data?.upiQrLink,
+  orderId,
+  transactionId: pgTxnId,
+  data: orderData.data
+});
 
   } catch (err) {
     console.error('Create order error:', err);
