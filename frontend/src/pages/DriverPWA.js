@@ -244,7 +244,18 @@ useEffect(() => {
     setUnread(0); setNotifs(p => p.map(n => ({ ...n, is_read: true })));
     try { await fetch(`${API}/api/payment/notifications/mark-read?userId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch (_) { }
   };
-
+  // Vinay Sir's method - upiQrLink decode karo
+const qrLink = d?.data?.upiQrLink;
+if (qrLink) {
+  try {
+    const qrUrl = new URL(qrLink);
+    const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
+    if (intentLink && intentLink.startsWith('upi://')) {
+      window.location.href = intentLink;
+      return;
+    }
+  } catch (e) { console.error('QR decode:', e); }
+}
   const pay = async () => {
     setShowPaying(true);
     try {
