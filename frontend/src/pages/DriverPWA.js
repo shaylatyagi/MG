@@ -255,14 +255,30 @@ useEffect(() => {
         body: JSON.stringify({ amount: payAmt || dues || 850, customerName: u.name || 'Driver', customerPhone: ph, customerEmail: u.email || 'driver@mg.com' })
       });
       const d = await r.json();
-      const url = d?.intentURL || d?.data?.intentURL 
-         || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
-      if (url) {
-        window.location.href = url;
-      } else {
-        alert('Payment gateway error. Try again.');
-        setShowPaying(false);
-      }
+      // Method 1: upiQrLink se intent decode karo (Vinay Sir ka method)
+const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
+if (qrLink) {
+  try {
+    const qrUrl = new URL(qrLink);
+    const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
+    if (intentLink && intentLink.startsWith('upi://')) {
+      window.location.href = intentLink;
+      return;
+    }
+  } catch (e) {
+    console.error('QR decode error:', e);
+  }
+}
+
+// Method 2: Direct intentURL (fallback)
+const url = d?.intentURL || d?.data?.intentURL 
+  || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
+if (url) {
+  window.location.href = url;
+} else {
+  alert('Payment gateway error. Try again.');
+  setShowPaying(false);
+}
     } catch (e) { console.error(e); alert('Network error.'); setShowPaying(false); }
   };
 
