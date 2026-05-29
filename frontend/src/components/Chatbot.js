@@ -7,7 +7,14 @@ const API = 'https://mg-qw5s.onrender.com';
 export default function Chatbot({ userRole, userId, userPhone, token, onClose, persistedMessages, onMessagesUpdate}) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [messages, setMessages] = useState(persistedMessages?.length > 0 ? persistedMessages : []);
+  const storageKey = `mg_chat_${userRole}_${userId || userPhone}`;
+const [messages, setMessages] = useState(() => {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return persistedMessages?.length > 0 ? persistedMessages : [];
+});
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [data,setUserData] = useState(null);
@@ -172,10 +179,10 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
       addMessage('bot', 'Speech recognition is not supported in your browser. Please type your question.');
     }
   };
-
   const addMessage = (role, content) => {
   setMessages(prev => {
     const updated = [...prev, { role, content }];
+    try { localStorage.setItem(storageKey, JSON.stringify(updated.slice(-50))); } catch {}
     if (onMessagesUpdate) onMessagesUpdate(updated);
     return updated;
   });
