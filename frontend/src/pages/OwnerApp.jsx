@@ -16,6 +16,7 @@ import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah
 const API = 'https://mg-qw5s.onrender.com';
 
 export default function OwnerDashboard() {
+  const [chatMessages, setChatMessages] = useState([]);
   const [horizon, setHorizon] = useState('today');
 const [ledger, setLedger] = useState({ received: 0, outstanding: 0 });
   const [showCashModal, setShowCashModal] = useState(false);
@@ -1758,12 +1759,14 @@ const ProfileTab = () => (
         </div>
         {showChatbot && (
   <Chatbot 
-    userRole="OWNER"
-    userId={ownerId()}
-    userPhone="9876542345"
-    token={token()}
-    onClose={() => setShowChatbot(false)}
-  />
+  userRole="OWNER"
+  userId={ownerId()}
+  userPhone="9876542345"
+  token={token()}
+  onClose={() => setShowChatbot(false)}
+  persistedMessages={chatMessages}
+  onMessagesUpdate={setChatMessages}
+/>
 )}
         {/* Chat Modal */}
         {showChat && selectedDriver && (

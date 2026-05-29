@@ -298,13 +298,14 @@ RULES: Respond in same language as user (Hindi/English/Hinglish). Max 3 lines. U
         'X-Title': 'MobilityGrid'
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-8b-instruct:free',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        max_tokens: 150
-      })
+  model: 'meta-llama/llama-3.1-8b-instruct:free',
+  messages: [
+    { role: 'system', content: systemPrompt },
+    ...history.slice(-6),  // ← last 6 messages
+    { role: 'user', content: message }
+  ],
+  max_tokens: 150
+})
     });
 
     const aiData = await aiRes.json();
@@ -313,6 +314,33 @@ RULES: Respond in same language as user (Hindi/English/Hinglish). Max 3 lines. U
   } catch (err) {
     console.error('Chatbot error:', err.message);
     res.json({ reply: 'Service unavailable.' });
+  }
+});
+router.post('/owner/notify-unpaid', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const paidResult = await pool.query(
+      `SELECT DISTINCT payer_mobile FROM ms_orders 
+       WHERE transaction_status='SUCCESS' AND DATE(order_completion_date)=CURRENT_DATE`
+    );
+    const paidPhones = paidResult.rows.map(r => r.payer_mobile);
+    const unpaidDrivers = await pool.query(
+      `SELECT id, full_name, mobile_number FROM public.drivers 
+       WHERE status='ACTIVE' AND mobile_number != ALL($1::text[])`,
+      [paidPhones]
+    );
+    let count = 0;
+    for (const driver of unpaidDrivers.rows) {
+      await pool.query(
+        `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+         VALUES ($1, 'DRIVER', '⏰ Payment Reminder', 'Aaj ka rent abhi baaki hai. Please pay now.', NOW())`,
+        [driver.id]
+      ).catch(() => {});
+      count++;
+    }
+    res.json({ success: true, message: `${count} drivers ko notification bheja gaya.`, count });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 router.post('/owner/cash-payment', async (req, res) => {

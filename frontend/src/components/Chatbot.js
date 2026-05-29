@@ -4,10 +4,10 @@ import { Mic, MicOff, X, Send, Volume2, VolumeX, Loader, Wallet, CreditCard, Bel
 
 const API = 'https://mg-qw5s.onrender.com';
 
-export default function Chatbot({ userRole, userId, userPhone, token, onClose }) {
+export default function Chatbot({ userRole, userId, userPhone, token, onClose, persistedMessages, onMessagesUpdate}) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(persistedMessages?.length > 0 ? persistedMessages : []);
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [data,setUserData] = useState(null);
@@ -17,18 +17,15 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
 
   // Initialize welcome message
   useEffect(() => {
-    if (isOwner) {
-      setMessages([{
-        role: 'bot',
-        content: 'नमस्ते! Main aapka Fleet Assistant hoon. 🏢\n\nमैं आपकी मदद कर सकता हूँ:\n• आज का कितना collection हुआ?\n• किस driver ने payment नहीं दी?\n• कितने drivers active हैं?\n• कितने vehicles हैं?\n\nI can help you with:\n• Today\'s collection\n• Driver payment status\n• Fleet statistics\n• Vehicle details\n\nJust speak or type your question! 🎤'
-      }]);
-    } else {
-      setMessages([{
-        role: 'bot',
-        content: 'नमस्ते! Main aapka Driver Assistant hoon. 🚛\n\nमैं आपकी मदद कर सकता हूँ:\n• मेरा बकाया कितना है?\n• मेरे wallet में कितना balance है?\n• क्या मैंने आज payment दी?\n• मेरी vehicle कौन सी है?\n\nI can help you with:\n• Today\'s pending dues\n• Wallet balance\n• Payment status\n• Vehicle details\n\nJust speak or type your question! 🎤'
-      }]);
-    }
-    fetchUserData();
+    useEffect(() => {
+  if (!persistedMessages || persistedMessages.length === 0) {
+    const welcome = isOwner
+      ? 'नमस्ते! Main aapka Fleet Assistant hoon. 🏢\n\nCollection, driver status, vehicle assignment — kuch bhi poochein!'
+      : 'नमस्ते! Main aapka Driver Assistant hoon. 🚛\n\nBakaya, wallet, vehicle — kuch bhi poochein!';
+    setMessages([{ role: 'bot', content: welcome }]);
+  }
+  fetchUserData();
+}, []);
   }, []);
 
   useEffect(() => {
@@ -179,8 +176,12 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
   };
 
   const addMessage = (role, content) => {
-    setMessages(prev => [...prev, { role, content }]);
-  };
+  setMessages(prev => {
+    const updated = [...prev, { role, content }];
+    if (onMessagesUpdate) onMessagesUpdate(updated);
+    return updated;
+  });
+};
 
   // Check if driver paid today
   const hasDriverPaidToday = (driverPhone, orders) => {
@@ -198,8 +199,14 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
 
   if (isOwner) {
     // Collection
-    if (msg.match(/collection|kitna|aaya|earning|kamai|received|total|paise|paisa|कलेक्शन|कमाई|इलेक्शन/))
-      return `💰 आज का collection ₹${data.todayCollection.toLocaleString('en-IN')} है।`;
+    if (msg.match(/collection|kitna|aaya|earning|kamai|received|total|पैसे|इलेक्शन/)) {
+  const today = new Date().toDateString();
+  const todayEarnings = (data.orders || [])
+    .filter(o => o.transaction_status === 'SUCCESS' && 
+      new Date(o.order_completion_date).toDateString() === today)
+    .reduce((sum, o) => sum + parseFloat(o.order_amount || 0), 0);
+  return `💰 आज का collection: ₹${todayEarnings.toLocaleString('en-IN')}\n📊 Total (lifetime): ₹${data.todayCollection.toLocaleString('en-IN')}`;
+}
 
     // Who paid
     if (msg.match(/paid|pay|diya|de diya|kiya|kisne|who|किसने|दिया|पेमेंट/))  {
@@ -214,12 +221,30 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       const notPaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders)).map(d => d.full_name);
       return notPaid.length === 0 ? `🎉 सभी ने payment कर दी!` : `❌ Pending:\n${notPaid.join('\n')}`;
     }
-
+    // Notification bhejo
+if (msg.match(/notification|notify|remind|bhejo|send|याद|भेजो/)) {
+  try {
+    const notifRes = await fetch(`${API}/api/payment/owner/notify-unpaid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    });
+    const notifData = await notifRes.json();
+    const today = new Date().toDateString();
+    const unpaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders));
+    return notifData.success
+      ? `✅ ${notifData.count} drivers ko payment reminder bheja gaya:\n${unpaid.map(d => d.full_name).join(', ')}`
+      : `❌ Notification send nahi ho paya.`;
+  } catch {
+    return `❌ Notification service unavailable.`;
+  }
+}
     // Vehicles
-    if (msg.match(/vehicle|gaadi|fleet|gadi|व्हीकल|गाड़ी/)) {
-      const assigned = (data.vehicles || []).filter(v => v.driver_name);
-      return `🚛 Total: ${data.totalVehicles} | Assigned: ${assigned.length} | Free: ${data.totalVehicles - assigned.length}`;
-    }
+    if (msg.match(/vehicle|gaadi|fleet|gadi|assigned|rent|किराया|गाड़ी/)) {
+  const assigned = (data.vehicles || []).filter(v => v.driver_name);
+  const free = (data.vehicles || []).filter(v => !v.driver_name);
+  const list = assigned.map(v => `${v.driver_name} → ${v.vehicle_number} @ ₹${v.daily_rent}/day`).join('\n');
+  return `🚛 Assigned (${assigned.length}):\n${list || 'कोई नहीं'}\n\n⚠️ Free (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
+}
 
     // Drivers
     if (msg.match(/driver|kitne log|team|ड्राइवर|कितने/))
@@ -257,6 +282,16 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
 
   // OpenRouter fallback
   try {
+    const recentHistory = messages.slice(-6).map(m => ({
+  role: m.role === 'user' ? 'user' : 'assistant',
+  content: m.content
+}));
+
+body: JSON.stringify({
+  message: userMessage,
+  context: data,
+  history: recentHistory  // ← ADD
+})
     const res = await fetch(`${API}/api/payment/chatbot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

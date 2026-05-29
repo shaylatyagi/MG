@@ -13,6 +13,7 @@ const API = 'https://mg-qw5s.onrender.com';
 const KYC_API = 'https://mg-qw5s.onrender.com';
 
 export default function DriverPWA() {
+  const [chatMessages, setChatMessages] = useState([]);
   const getHeaderTitle = (tab) => {
   const titles = {
     'home': 'Dashboard',
@@ -796,12 +797,13 @@ const AccountTab = () => {
 </div>
         {showChatbot && (
   <Chatbot 
-    userRole="DRIVER"
-    userId={null}
-    userPhone={phone()}
-    token={tk()}
-    onClose={() => setShowChatbot(false)}
-  />
+  userRole="DRIVER"
+  userPhone={phone()}
+  token={tk()}
+  onClose={() => setShowChatbot(false)}
+  persistedMessages={chatMessages}
+  onMessagesUpdate={setChatMessages}
+/>
 )}
         {/* CHAT MODAL */}
 
