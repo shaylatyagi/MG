@@ -18,6 +18,55 @@ const API = 'https://mg-qw5s.onrender.com';
 export default function OwnerDashboard() {
   const [chatMessages, setChatMessages] = useState([]);
   const [lang, setLang] = useState('en');
+  const T = {
+  en: {
+    navHome:'Home', navDrivers:'Drivers', navFleet:'Fleet', navPayments:'Payments', navProfile:'Profile',
+    portal:'OWNER PORTAL', title:'Fleet Manager', sub:'Command Center',
+    ledger:'ECOSYSTEM YIELD LEDGER', received:'RECEIVED', outstanding:'OUTSTANDING',
+    escrow:'Virtual Escrow Connected', calcToday:'Calculated for Today',
+    fleet:'TOTAL FLEET', drivers:'ACTIVE DRIVERS', collection:'TOTAL COLLECTION', pending:'PENDING DUES',
+    addVehicle:'Add Vehicle', addVehicleSub:'Register new fleet',
+    addDriver:'Add Driver', addDriverSub:'Onboard new driver',
+    recentDrivers:'Recent Drivers', viewAll:'View All →',
+    search:'Search by name or phone...', addNewDriver:'Add New Driver',
+    assigned:'ASSIGNED', unassigned:'UNASSIGNED', available:'AVAILABLE',
+    notAssigned:'Not Assigned', assignedDriver:'Assigned Driver',
+    txHistory:'Transaction History', cashPaid:'Cash Payments Recorded',
+    noTx:'No transactions yet', totalCol:'Total Collection',
+    notifications:'Notifications', noNotif:'No notifications',
+    cancel:'Cancel', add:'Add', logout:'Logout',
+    phone:'Phone', email:'Email', address:'Address',
+    editProfile:'Edit Profile', businessName:'Business Name',
+    addNewVehicle:'Add New Vehicle', vehicleNum:'Vehicle Number (e.g. MH01AB1234)',
+    model:'Model (e.g. Tata Ace)', dailyRent:'Daily Rent (₹/day)',
+    assignDriverOpt:'Assign Driver (Optional)',
+    emergency:'Emergency', assignVehicle:'Assign Vehicle',
+  },
+  hi: {
+    navHome:'होम', navDrivers:'ड्राइवर', navFleet:'फ्लीट', navPayments:'भुगतान', navProfile:'प्रोफ़ाइल',
+    portal:'मालिक पोर्टल', title:'फ्लीट मैनेजर', sub:'कमांड सेंटर',
+    ledger:'इकोसिस्टम यील्ड लेजर', received:'प्राप्त', outstanding:'बकाया',
+    escrow:'वर्चुअल एस्क्रो जुड़ा', calcToday:'आज के लिए गणना',
+    fleet:'कुल वाहन', drivers:'सक्रिय ड्राइवर', collection:'कुल संग्रह', pending:'लंबित बकाया',
+    addVehicle:'वाहन जोड़ें', addVehicleSub:'नया वाहन पंजीकृत करें',
+    addDriver:'ड्राइवर जोड़ें', addDriverSub:'नया ड्राइवर जोड़ें',
+    recentDrivers:'हाल के ड्राइवर', viewAll:'सभी देखें →',
+    search:'नाम या फोन से खोजें...', addNewDriver:'नया ड्राइवर जोड़ें',
+    assigned:'असाइन', unassigned:'असाइन नहीं', available:'उपलब्ध',
+    notAssigned:'असाइन नहीं', assignedDriver:'ड्राइवर',
+    txHistory:'लेनदेन इतिहास', cashPaid:'नकद भुगतान दर्ज',
+    noTx:'अभी कोई लेनदेन नहीं', totalCol:'कुल संग्रह',
+    notifications:'सूचनाएं', noNotif:'कोई सूचना नहीं',
+    cancel:'रद्द करें', add:'जोड़ें', logout:'लॉगआउट',
+    phone:'फोन', email:'ईमेल', address:'पता',
+    editProfile:'प्रोफ़ाइल संपादित करें', businessName:'व्यापार नाम',
+    addNewVehicle:'नया वाहन जोड़ें', vehicleNum:'वाहन नंबर (जैसे MH01AB1234)',
+    model:'मॉडल (जैसे Tata Ace)', dailyRent:'दैनिक किराया (₹/दिन)',
+    assignDriverOpt:'ड्राइवर असाइन करें (वैकल्पिक)',
+    emergency:'आपातकाल', assignVehicle:'वाहन असाइन करें',
+  }
+};
+const t = T[lang];
   const [horizon, setHorizon] = useState('today');
 const [ledger, setLedger] = useState({ received: 0, outstanding: 0 });
   const [showCashModal, setShowCashModal] = useState(false);
@@ -637,16 +686,10 @@ useEffect(() => {
   });
 
   // Dynamic header title
-  const getHeaderTitle = () => {
-    const titles = {
-      'home': 'Fleet Manager',
-      'drivers': 'Drivers',
-      'vehicles': 'Vehicles',
-      'payments': 'Payments',
-      'profile': 'Profile'
-    };
-    return titles[activeTab] || 'MobilityGrid';
-  };
+  const getHeaderTitle = () => ({
+  home: t.title, drivers: t.drivers, vehicles: t.fleet,
+  payments: t.collection, profile: t.editProfile
+})[activeTab] || 'MobilityGrid';
 
   const getHeaderSubtitle = () => {
     const subtitles = {
@@ -684,7 +727,7 @@ useEffect(() => {
     {/* Yield Ledger — YAHAN ADD KARO */}
     <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ecosystem Yield Ledger</span>
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.ledger}</span>
         <select value={horizon} onChange={e=>setHorizon(e.target.value)}
           className="bg-slate-100 px-2 py-1 rounded text-[11px] font-bold text-slate-700 outline-none border border-slate-200">
           <option value="today">Today (Live)</option>
@@ -696,44 +739,44 @@ useEffect(() => {
       </div>
       <div className="grid grid-cols-2 gap-3 text-center">
   <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
-    <span className="text-[9px] text-emerald-600 font-bold uppercase block">Received</span>
+    <span className="text-[9px] text-emerald-600 font-bold uppercase block">{t.received}</span>
     <b className="text-base font-mono font-bold text-emerald-700 block mt-1">₹{ledger.received.toLocaleString('en-IN')}</b>
   </div>
   <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
-    <span className="text-[9px] text-amber-600 font-bold uppercase block">Outstanding</span>
+    <span className="text-[9px] text-amber-600 font-bold uppercase block">{t.outstanding}</span>
     <b className="text-base font-mono font-bold text-amber-700 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
   </div>
 </div>
       <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
         <span className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"/>Virtual Escrow Connected</span>
-        <span className="font-bold">Calculated for Today</span>
+        <span className="font-bold">{t.calcToday}</span>
       </div>
     </div>
 
     <div className="grid grid-cols-2 gap-3">
 
-        <StatCard title="TOTAL FLEET" value={stats.totalVehicles} icon={Truck} color="bg-blue-600" />
-        <StatCard title="ACTIVE DRIVERS" value={stats.totalDrivers} icon={Users} color="bg-emerald-600" />
-        <StatCard title="TOTAL COLLECTION" value={stats.todayCollection} icon={Wallet} color="bg-amber-600" isMoney/>
-        <StatCard title="PENDING DUES" value={stats.pendingDues} icon={AlertCircle} color="bg-red-600" trend="down" isMoney/>
+        <StatCard title={t.fleet} value={stats.totalVehicles} icon={Truck} color="bg-blue-600" />
+        <StatCard title={t.drivers} value={stats.totalDrivers} icon={Users} color="bg-emerald-600" />
+        <StatCard title={t.collection} value={stats.todayCollection} icon={Wallet} color="bg-amber-600" isMoney/>
+        <StatCard title={t.pending} value={stats.pendingDues} icon={AlertCircle} color="bg-red-600" trend="down" isMoney/>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => setShowAddVehicle(true)} className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-4 text-white text-left">
           <Truck size={20} className="mb-2 opacity-80" />
-          <p className="text-xs font-black">Add Vehicle</p>
-          <p className="text-[9px] opacity-70">Register new fleet</p>
+          <p className="text-xs font-black">{t.addVehicle}</p>
+          <p className="text-[9px] opacity-70">{t.addVehicleSub}</p>
         </button>
         <button onClick={() => setShowAddDriver(true)} className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-4 text-white text-left">
           <UserPlus size={20} className="mb-2 opacity-80" />
-          <p className="text-xs font-black">Add Driver</p>
-          <p className="text-[9px] opacity-70">Onboard new driver</p>
+          <p className="text-xs font-black">{t.addDriver}</p>
+          <p className="text-[9px] opacity-70">{t.addDriverSub}</p>
         </button>
       </div>
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Recent Drivers</h3>
-          <button onClick={() => setActiveTab('drivers')} className="text-[10px] text-blue-600 font-black">View All →</button>
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t.recentDrivers}</h3>
+          <button onClick={() => setActiveTab('drivers')} className="text-[10px] text-blue-600 font-black">{t.viewAll}</button>
         </div>
         <div className="divide-y">
           {drivers.slice(0, 5).map((driver, i) => (
@@ -856,7 +899,7 @@ const DriversTab = () => {
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
-          placeholder="Search by name or phone..."
+          placeholder={t.search}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
@@ -869,7 +912,7 @@ const DriversTab = () => {
       </div>
       
       <button onClick={() => setShowAddDriver(true)} className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
-        <UserPlus size={16} /> Add New Driver
+        <UserPlus size={16} /> {t.addNewDriver}
       </button>
       
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -910,7 +953,7 @@ const DriversTab = () => {
                       <span className={`text-[9px] font-black px-2 py-1 rounded-full ${
                         hasVehicle ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {hasVehicle ? 'ASSIGNED' : 'UNASSIGNED'}
+                        {hasVehicle ? t.assigned : t.unassigned}
                       </span>
                       {!hasVehicle && (
                         <button 
@@ -1305,9 +1348,9 @@ const VehiclesTab = () => {
           {/* Assigned Driver Info */}
           <div className="flex justify-between items-center pt-2 border-t border-slate-100">
             <div>
-              <p className="text-[10px] text-slate-400">Assigned Driver</p>
+              <p className="text-[10px] text-slate-400">{t.assignedDriver}</p>
               <p className="text-xs font-black text-slate-800">
-                {vehicle.driver_name || 'Not Assigned'}
+                {vehicle.driver_name || t.notAssigned}
               </p>
               {vehicle.driver_phone && (
                 <p className="text-[9px] text-slate-400 font-mono">{vehicle.driver_phone}</p>
@@ -1319,7 +1362,7 @@ const VehiclesTab = () => {
                 ? 'bg-green-100 text-green-700' 
                 : 'bg-amber-100 text-amber-700'
             }`}>
-              {vehicle.driver_id ? 'ASSIGNED' : 'AVAILABLE'}
+              {vehicle.driver_id ? t.assigned : t.available}
             </span>
           </div>
         </div>
@@ -1365,7 +1408,7 @@ const PaymentsTab = () => {
       
       {/* Total Banner */}
       <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-5 text-white">
-        <p className="text-[10px] font-black opacity-80">Total Collection</p>
+        <p className="text-[10px] font-black opacity-80">{t.totalCol}</p>
         <p className="text-3xl font-black">₹{stats.todayCollection.toLocaleString('en-IN')}</p>
         <p className="text-[10px] opacity-70 mt-1">Last 30 days</p>
       </div>
@@ -1373,13 +1416,13 @@ const PaymentsTab = () => {
       {/* Live Transaction History — mat chedo, simple rakho */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase">Transaction History</h3>
+          <h3 className="text-[10px] font-black text-slate-400 uppercase">{t.txHistory}</h3>
         </div>
         <div className="divide-y max-h-96 overflow-y-auto">
           {loadingTx ? (
             <div className="p-8 text-center text-slate-400 text-xs">Loading...</div>
           ) : liveTx.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-xs">No transactions yet</div>
+            <div className="p-8 text-center text-slate-400 text-xs">{t.noTx}</div>
           ) : (
             liveTx.map((tx, i) => (
               <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
@@ -1406,7 +1449,7 @@ const PaymentsTab = () => {
       {cashTx.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="px-4 py-3 border-b bg-emerald-50">
-            <h3 className="text-[10px] font-black text-emerald-700 uppercase">💵 Cash Payments Recorded</h3>
+            <h3 className="text-[10px] font-black text-emerald-700 uppercase">💵 {t.cashPaid}</h3>
           </div>
           <div className="divide-y max-h-64 overflow-y-auto">
             {cashTx.map((tx, i) => (
@@ -1447,11 +1490,11 @@ const ProfileTab = () => (
     
     <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
-        <span className="text-xs text-slate-500 flex items-center gap-2"><Phone size={12} /> Phone</span>
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Phone size={12} /> {t.phone}</span>
         <span className="text-xs font-black font-mono">{owner?.mobile_number || '9876542345'}</span>
       </div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
-        <span className="text-xs text-slate-500 flex items-center gap-2"><Mail size={12} /> Email</span>
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Mail size={12} /> {t.email}</span>
         <span className="text-xs font-black">{owner?.email || 'rajesh@mobilitygrid.com'}</span>
         <button className="text-[9px] text-blue-600">Edit</button>
       </div>
@@ -1464,23 +1507,23 @@ const ProfileTab = () => (
         <span className="text-xs font-black">{stats.totalDrivers} Drivers</span>
       </div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
-        <span className="text-xs text-slate-500 flex items-center gap-2"><Building size={12} /> Business Name</span>
+        <span className="text-xs text-slate-500 flex items-center gap-2"><Building size={12} /> {t.businessName}</span>
         <span className="text-xs font-black">{owner?.business_name || 'MobilityGrid Fleet Services'}</span>
         <button className="text-[9px] text-blue-600">Edit</button>
       </div>
       <div className="flex justify-between items-center py-2">
-        <span className="text-xs text-slate-500 flex items-center gap-2"><MapPin size={12} /> Address</span>
+        <span className="text-xs text-slate-500 flex items-center gap-2"><MapPin size={12} /> {t.address}</span>
         <span className="text-xs font-black text-right">{owner?.address || 'Mumbai, Maharashtra'}</span>
         <button className="text-[9px] text-blue-600">Edit</button>
       </div>
     </div>
     
     <button className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
-      <Edit2 size={14} /> Edit Profile
+      <Edit2 size={14} /> {t.editProfile}
     </button>
     
     <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2 border border-red-100">
-      <LogOut size={14} /> Logout
+      <LogOut size={14} /> {t.logout}
     </button>
   </div>
 );
@@ -1490,7 +1533,7 @@ const ProfileTab = () => (
       <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, minHeight:'100dvh'}}>
         {/* Status Bar */}
         <div className="bg-slate-900 text-white text-[11px] px-4 py-2 flex justify-between">
-          <span className="text-emerald-400 font-black text-[10px] tracking-widest">OWNER PORTAL</span>
+          <span className="text-emerald-400 font-black text-[10px] tracking-widest">{t.portal}</span>
           <span>{time}</span>
         </div>
 
@@ -1688,14 +1731,14 @@ const ProfileTab = () => (
 )}
         {/* Notification Panel */}
         {showNotif && (
-          <div className="absolute top-[88px] left-3 right-3 sm:left-auto sm:right-3 sm:w-72 bg-white rounded-2xl shadow-2xl border z-50">
+          <div className="absolute top-[88px] left-3 right-3 sm:left-auto sm:right-3 sm:w-72 bg-white rounded-2xl shadow-2xl border z-[100]">
             <div className="px-4 py-2 border-b flex justify-between items-center">
-              <span className="text-[10px] font-black">Notifications</span>
+              <span className="text-[10px] font-black">{t.notifications}</span>
               <button onClick={() => setShowNotif(false)}><X size={14} /></button>
             </div>
             <div className="max-h-64 overflow-y-auto">
               {notifications.length === 0 ? (
-                <div className="p-4 text-center text-slate-400 text-xs">No notifications</div>
+                <div className="p-4 text-center text-slate-400 text-xs">{t.noNotif}</div>
               ) : (
                 notifications.map((n, i) => (
                   <div key={i}
@@ -1743,11 +1786,11 @@ const ProfileTab = () => (
         {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.04)]">
           {[
-            { id: 'home', Icon: Home, label: 'Home' },
-            { id: 'drivers', Icon: Users, label: 'Drivers' },
-            { id: 'vehicles', Icon: Truck, label: 'Fleet' },
-            { id: 'payments', Icon: Wallet, label: 'Payments' },
-            { id: 'profile', Icon: Settings, label: 'Profile' },
+            { id: 'home', Icon: Home, label: t.navHome },
+{ id: 'drivers', Icon: Users, label: t.navDrivers },
+{ id: 'vehicles', Icon: Truck, label: t.navFleet },
+{ id: 'payments', Icon: Wallet, label: t.navPayments },
+{ id: 'profile', Icon: Settings, label: t.navProfile },
           ].map(({ id, Icon, label }) => (
             <button
               key={id}
