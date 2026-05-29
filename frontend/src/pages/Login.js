@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Truck, Building2, Shield, Phone, Send, ArrowRight } from 'lucide-react';
 
-const API = 'https://bdf8-49-36-177-201.ngrok-free.app'
-//'https://mg-qw5s.onrender.com'; 
+const API ='https://mg-qw5s.onrender.com'; 
 
 export default function Login() {
   const navigate = useNavigate();
