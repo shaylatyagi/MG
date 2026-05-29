@@ -7,7 +7,7 @@ const API = 'https://mg-qw5s.onrender.com';
 export default function Chatbot({ userRole, userId, userPhone, token, onClose, persistedMessages, onMessagesUpdate}) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const storageKey = `mg_chat_${userRole}_${userId || userPhone}`;
+  const storageKey = `mg_chat_${userRole}`;
 const [messages, setMessages] = useState(() => {
   try {
     const saved = localStorage.getItem(storageKey);
@@ -429,8 +429,8 @@ const res = await fetch(`${API}/api/payment/chatbot`, {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-2">
-      <div className="bg-white rounded-3xl w-full max-w-md h-[min(600px,85vh)] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-[200] flex flex-col bg-white">
+  <div className="w-full h-full flex flex-col">
         {/* Header */}
         <div className={`p-4 rounded-t-3xl flex items-center justify-between ${isOwner ? 'bg-gradient-to-r from-blue-600 to-indigo-700' : 'bg-gradient-to-r from-green-600 to-emerald-700'} text-white`}>
           <div className="flex items-center gap-3">
