@@ -1531,11 +1531,13 @@ const ProfileTab = () => (
   return (
     <div className="min-h-screen bg-slate-200 flex items-start justify-center">
       <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, minHeight:'100dvh'}}>
-        {/* Status Bar */}
-        <div className="bg-slate-900 text-white text-[11px] px-4 py-2 flex justify-between">
-          <span className="text-emerald-400 font-black text-[10px] tracking-widest">{t.portal}</span>
-          <span>{time}</span>
-        </div>
+        <div className="bg-slate-900 text-white text-[11px] px-4 py-2 flex justify-between items-center">
+  <div className="flex flex-col">
+    <span className="text-emerald-400 font-black text-[10px] tracking-widest">{t.portal}</span>
+    <span className="text-slate-500 text-[8px] font-mono">v1.0.0 · May 29, 2026</span>
+  </div>
+  <span>{time}</span>
+</div>
 
         {/* Header with ALL BUTTONS - Notification Bell, Logout, Search (in drivers tab only) */}
         <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shadow-sm">

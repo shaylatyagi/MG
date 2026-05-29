@@ -29,6 +29,15 @@ export default function DriverPWA() {
   const [lang, setLang] = useState('en');
   const T = {
   en: {
+    assignedVehicle:'Assigned Vehicle', active:'ACTIVE',
+dailyRent:'Daily Rent', assignedSince:'Assigned Since',
+noVehicle:'No vehicle assigned', contactOwner:'Contact your owner to assign a vehicle',
+verifiedDocs:'Verified Documents', paymentSummary2:'Payment Summary',
+availableFloat:'Available Advance Float'
+, addFloat2:'Add Float',
+requestPayout2:'Request Payout', totalPaidLabel:'Total Paid',
+outstandingLabel:'Outstanding', txHistoryLabel:'Transaction History',
+noTxLabel:'No transactions yet.', lifetime:'Lifetime',
     outstanding: "Today's Outstanding", duesPending: 'Dues Pending',
     settled: 'Account Settled', pay: 'Pay via PayYantra',
     recent: 'Recent Transactions', viewAll: 'View All →',
@@ -38,6 +47,14 @@ export default function DriverPWA() {
     triggerSos: 'Trigger SOS'
   },
   hi: {
+    assignedVehicle:'असाइन वाहन', active:'सक्रिय',
+dailyRent:'दैनिक किराया', assignedSince:'असाइन तिथि',
+noVehicle:'कोई वाहन असाइन नहीं', contactOwner:'वाहन के लिए मालिक से संपर्क करें',
+verifiedDocs:'सत्यापित दस्तावेज़', paymentSummary2:'भुगतान सारांश',
+availableFloat:'उपलब्ध एडवांस फ्लोट', addFloat2:'फ्लोट जोड़ें',
+requestPayout2:'पेआउट अनुरोध', totalPaidLabel:'कुल भुगतान',
+outstandingLabel:'बकाया', txHistoryLabel:'लेनदेन इतिहास',
+noTxLabel:'अभी कोई लेनदेन नहीं।', lifetime2:'आजीवन',
     outstanding: 'आज का बकाया', duesPending: 'बकाया है',
     settled: 'खाता सेटल', pay: 'PayYantra से भुगतान करें',
     recent: 'हाल के लेनदेन', viewAll: 'सभी देखें →',
@@ -404,7 +421,7 @@ const AccountTab = () => {
       {/* ASSIGNED VEHICLE DETAILS */}
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
         <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Truck size={14} /> Assigned Vehicle
+          <Truck size={14} /> {t.assignedVehicle}
         </h3>
         
         {assignedVehicle ? (
@@ -415,24 +432,24 @@ const AccountTab = () => {
                 <p className="text-sm text-slate-500">{assignedVehicle.model}</p>
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-black bg-green-100 text-green-700">
-                ACTIVE
+                {t.active}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
               <div>
-                <p className="text-[10px] text-slate-400">Daily Rent</p>
+                <p className="text-[10px] text-slate-400">{t.dailyRent}</p>
                 <p className="text-base font-black text-emerald-600">₹{assignedVehicle.dailyRent}/day</p>
               </div>
               <div>
-                <p className="text-[10px] text-slate-400">Assigned Since</p>
+                <p className="text-[10px] text-slate-400">{t.assignedSince}</p>
                 <p className="text-sm font-black">{new Date().toLocaleDateString()}</p>
               </div>
             </div>
           </div>
         ) : (
           <div className="bg-amber-50 rounded-xl p-4 text-center">
-            <p className="text-amber-600 font-medium">No vehicle assigned</p>
-            <p className="text-xs text-amber-500 mt-1">Contact your owner to assign a vehicle</p>
+            <p className="text-amber-600 font-medium">{t.noVehicle}</p>
+            <p className="text-xs text-amber-500 mt-1">{t.contactOwner}</p>
           </div>
         )}
       </div>
@@ -441,7 +458,7 @@ const AccountTab = () => {
       {/* KYC Documents Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Verified Documents</h3>
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">{t.verifiedDocs}</h3>
           <span className="text-[9px] text-blue-600 font-black">API Setu Connected</span>
         </div>
 
@@ -549,7 +566,7 @@ const AccountTab = () => {
       </div>
 
       <button onClick={logout} className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-black py-4 rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 border border-red-100 mt-2">
-        <LogOut size={14} /> Logout
+        <LogOut size={14} /> {t.logout}
       </button>
     </div>
   );
@@ -575,27 +592,26 @@ const AccountTab = () => {
         </div>
         <div className="flex gap-2 pt-1">
           <button onClick={() => alert('Top-up gateway activated...')} className="flex-1 bg-white/20 hover:bg-white/30 text-white text-[11px] font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
-            <PlusCircle size={13} /> Add Float
+            <PlusCircle size={13} /> {t.addFloat2}
           </button>
           <button onClick={() => alert('Withdrawal queued...')} className="flex-1 bg-emerald-950/40 hover:bg-emerald-950/60 text-emerald-100 text-[11px] font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
-            <ArrowDownLeft size={13} /> Request Payout
+            <ArrowDownLeft size={13} /> {t.requestPayout2}
           </button>
         </div>
       </div>
-
       {/* Total Paid Summary */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Payment Summary</span>
-          <span className="text-[10px] font-black text-emerald-600">Lifetime</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t.paymentSummary2}</span>
+          <span className="text-[10px] font-black text-emerald-600">{t.lifetime}</span>
         </div>
         <div className="grid grid-cols-2 gap-3 text-center">
           <div className="bg-slate-50 rounded-xl p-2">
-            <p className="text-[9px] text-slate-400">Total Paid</p>
+            <p className="text-[9px] text-slate-400">{t.totalPaidLabel}</p>
             <p className="text-lg font-black text-emerald-600">₹{totalPaid.toLocaleString('en-IN')}</p>
           </div>
           <div className="bg-slate-50 rounded-xl p-2">
-            <p className="text-[9px] text-slate-400">Outstanding</p>
+            <p className="text-[9px] text-slate-400">{t.outstandingLabel}</p>
             <p className="text-lg font-black text-amber-600">₹{dues.toLocaleString('en-IN')}</p>
           </div>
         </div>
@@ -603,10 +619,10 @@ const AccountTab = () => {
 
       {/* Transaction History */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Transaction History</span>
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">{t.txHistoryLabel}</span>
         <div className="space-y-2 text-xs max-h-64 overflow-y-auto pr-1">
           {payments.length === 0 ? (
-            <p className="text-[11px] italic text-slate-400 text-center py-4">No transactions yet.</p>
+            <p className="text-[11px] italic text-slate-400 text-center py-4">{t.noTxLabel}</p>
           ) : (
             payments.map((p, i) => (
               <div key={i} onClick={() => { setSelTxn(p); setShowReceipt(true); }} className="flex items-center justify-between border-b border-slate-50 pb-2 cursor-pointer hover:bg-slate-50 p-2 rounded-lg">
@@ -684,13 +700,16 @@ const AccountTab = () => {
 {/* HEADER - WITH ALL BUTTONS */}
 <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0 shadow-sm z-40">
   <div className="flex items-center gap-2.5">
-    <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-600/20">MG</div>
+    <div className="flex flex-col items-center">
+  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-600/20">MG</div>
+  <span className="text-[8px] text-slate-400 font-mono mt-0.5">v1.0.0</span>
+</div>
     <div>
       <span className="font-black text-slate-800 text-sm tracking-tight block">{getHeaderTitle(tab)}</span>
       <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest -mt-0.5 block">
-        {tab === 'home' && 'Driver Terminal'}
-        {tab === 'wallet' && 'Balance & Transactions'}
-        {tab === 'account' && 'Profile & KYC'}
+        {tab === 'home' && t.driverTerminal}
+{tab === 'wallet' && t.balanceTx}
+{tab === 'account' && t.profileKyc}
       </span>
     </div>
   </div>
