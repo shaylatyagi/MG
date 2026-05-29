@@ -585,7 +585,7 @@ const addVehicle = async () => {
     if (response.ok && data.success) {
       alert('✅ Vehicle added successfully!');
       setShowAddVehicle(false);
-      setNewVehicle({ number: '', model: '', rent: 850 });
+      setNewVehicle({ number: '', model: '', type: 'EV', rent: 850 });
       setSelectedDriverId('');
       fetchAllData(); // Refresh vehicles list
     } else {
@@ -652,7 +652,8 @@ const fetchAllData = useCallback(async () => {
       fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
       fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}`, { headers: H }),
       fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
-      fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H })
+      fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H }),
+      fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H })
     ]);
     
     if (vehiclesRes.ok) {
@@ -673,14 +674,24 @@ const fetchAllData = useCallback(async () => {
 }
     
     if (statsRes.ok) {
-      const data = await statsRes.json();
-      setStats({
-        totalVehicles: data.total_vehicles || 0,
-        totalDrivers: data.total_drivers || 0,
-        todayCollection: data.total_earnings || 0,
-        pendingDues: 0
-      });
-    }
+  const data = await statsRes.json();
+  
+  // Pending dues ledger se calculate karo
+  let totalPending = 0;
+  if (ledgerRes.ok) {
+    const ledgerData = await ledgerRes.json();
+    totalPending = ledgerData.reduce((sum, d) => 
+      sum + (parseFloat(d.pending_amount) || 0), 0
+    );
+  }
+
+  setStats({
+    totalVehicles: data.total_vehicles || 0,
+    totalDrivers: data.total_drivers || 0,
+    todayCollection: data.total_earnings || 0,
+    pendingDues: totalPending  // ← real data
+  });
+}
     
     if (notifRes.ok) {
       const notifs = await notifRes.json();

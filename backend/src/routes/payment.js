@@ -290,36 +290,6 @@ RULES: Respond in same language as user (Hindi/English/Hinglish). Max 3 lines. U
     res.json({ reply: 'Service unavailable.' });
   }
 });
-// Driver-wise ledger summary
-router.get('/owner/driver-ledger', async (req, res) => {
-  try {
-    const { ownerId } = req.query;
-    const result = await pool.query(`
-      SELECT 
-        d.id, d.full_name, d.mobile_number, d.advance_balance, d.security_deposit,
-        v.vehicle_number, v.daily_rent,
-        COALESCE(SUM(CASE WHEN dl.entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT') THEN dl.amount ELSE 0 END), 0) as total_paid,
-        COALESCE(SUM(CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY') THEN dl.amount ELSE 0 END), 0) as total_charged,
-        COALESCE(d.advance_balance, 0) as advance
-      FROM public.drivers d
-      LEFT JOIN public.vehicles v ON v.driver_id = d.id
-      LEFT JOIN public.driver_ledger dl ON dl.driver_id = d.id
-      WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-      GROUP BY d.id, d.full_name, d.mobile_number, d.advance_balance, d.security_deposit, v.vehicle_number, v.daily_rent
-      ORDER BY d.full_name
-    `, [ownerId]);
-    
-    const drivers = result.rows.map(d => ({
-      ...d,
-      pending: Math.max(0, parseFloat(d.total_charged) - parseFloat(d.total_paid)),
-      overpaid: Math.max(0, parseFloat(d.total_paid) - parseFloat(d.total_charged))
-    }));
-    
-    res.json(drivers);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 router.post('/owner/ledger-entry', async (req, res) => {
   try {
     const { driverId, ownerId, entryType, amount, description } = req.body;
@@ -763,15 +733,17 @@ router.get('/owner/stats', async (req, res) => {
 router.post('/create-order', async (req, res) => {
   try {
     const { amount, customerName, customerPhone, customerEmail } = req.body;
-
     if (!amount || !customerPhone) {
       return res.status(400).json({ success: false, message: 'Amount and phone required' });
     }
 
-    // ✅ FIX 1: .env se URL lo, hardcode mat karo
     const BASE = process.env.PAYYANTRA_BASE_URL || 'https://payin-api-uat.payyantra.com';
+    
+    // ✅ DEBUG LOG — Render mein dikheга
+    console.log('🔑 Using PayYantra BASE:', BASE);
+    console.log('🔑 CLIENT_ID:', process.env.PAYYANTRA_CLIENT_ID ? '✅' : '❌ MISSING');
 
-    // Step 1: Token
+    // ✅ FIX: json() ki jagah text() use karo pehle
     const tokenRes = await fetch(`${BASE}/api/auth/token`, {
       method: 'POST',
       headers: {
@@ -780,14 +752,33 @@ router.post('/create-order', async (req, res) => {
         'Content-Type': 'application/json'
       }
     });
-    const tokenData = await tokenRes.json();
+
+    const tokenText = await tokenRes.text();
+    console.log('📡 Token API status:', tokenRes.status);
+    console.log('📡 Token API response:', tokenText);
+
+    let tokenData;
+    try {
+      tokenData = JSON.parse(tokenText);
+    } catch(e) {
+      return res.status(500).json({ 
+        success: false, 
+        message: `PayYantra token API invalid response`,
+        status: tokenRes.status,
+        raw: tokenText.substring(0, 200)
+      });
+    }
+
     const token = tokenData.token || tokenData.data?.token 
                 || tokenData.access_token || tokenData.data?.access_token;
     
     if (!token) {
-      return res.status(500).json({ success: false, message: 'Token failed', raw: tokenData });
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Token nahi mila', 
+        raw: tokenData 
+      });
     }
-
     const orderId     = `MG${Date.now()}`;
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
 

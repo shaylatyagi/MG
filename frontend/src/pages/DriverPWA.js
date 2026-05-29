@@ -271,31 +271,63 @@ useEffect(() => {
           }
         } catch (e) { console.error('QR decode error:', e); }
       }
+      //const url = d?.intentURL || d?.data?.intentURL || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
       const url = d?.intentURL || d?.data?.intentURL || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
+if (url) { window.location.href = url; } 
+else { 
+  console.log('❌ Full response:', JSON.stringify(d)); // ← ADD THIS
+  alert('Error: ' + (d?.message || d?.raw?.message || 'No URL returned'));
+  setShowPaying(false); 
+}
       if (url) { window.location.href = url; } 
       else { alert('Payment gateway error. Try again.'); setShowPaying(false); }
     } catch (e) { console.error(e); alert('Network error.'); setShowPaying(false); }
   };
 
-  // 2. NEW WALLET ADD FUNCTION
   const addFloat = async () => {
     const amt = prompt("Enter amount to add to Wallet (₹):");
     if (!amt || isNaN(amt) || Number(amt) <= 0) return;
 
     setShowPaying(true);
     try {
-      const u = JSON.parse(localStorage.getItem('user') || '{}'); const ph = phone();
+      const u = JSON.parse(localStorage.getItem('user') || '{}'); 
+      const ph = phone();
+      
       const r = await fetch(`${API}/api/payment/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-        // ⭐ ADDED purpose: 'WALLET'
         body: JSON.stringify({ amount: Number(amt), customerName: u.name || 'Driver', customerPhone: ph, customerEmail: u.email || 'driver@mg.com', purpose: 'WALLET' })
       });
       const d = await r.json();
+
+      // ⭐ FIX: Yahan add kiya hai Vinay Sir wala QR decode logic ⭐
+      const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
+      if (qrLink) {
+        try {
+          const qrUrl = new URL(qrLink);
+          const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent"));
+          if (intentLink && intentLink.startsWith('upi://')) {
+            window.location.href = intentLink;
+            return; // Redirect ho gaya, aage ka code nahi chalega
+          }
+        } catch (e) {
+          console.error('QR decode error:', e);
+        }
+      }
+
+      // Agar direct intent URL mil jaye (fallback)
       const url = d?.intentURL || d?.data?.intentURL || d?.data?.data?.checkoutUrl || d?.checkoutUrl;
-      if (url) { window.location.href = url; } 
-      else { alert('Payment gateway error. Try again.'); setShowPaying(false); }
-    } catch (e) { console.error(e); alert('Network error.'); setShowPaying(false); }
+      if (url) { 
+        window.location.href = url; 
+      } else { 
+        alert('Payment gateway error. Try again.'); 
+        setShowPaying(false); 
+      }
+    } catch (e) { 
+      console.error(e); 
+      alert('Network error.'); 
+      setShowPaying(false); 
+    }
   };
 
   const sendChat = () => {
