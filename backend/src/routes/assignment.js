@@ -11,7 +11,7 @@ router.get('/available/vehicles', async (req, res) => {
       `SELECT id, vehicle_number, vehicle_model, daily_rent 
        FROM vehicles 
        WHERE driver_id IS NULL 
-       AND status = 'ACTIVE'
+AND status IN ('ACTIVE', 'AVAILABLE')
        ORDER BY vehicle_number`
     );
     res.json({ success: true, data: result.rows });
@@ -49,7 +49,7 @@ router.get('/available/drivers', async (req, res) => {
       `SELECT id, full_name, mobile_number, driver_code 
        FROM drivers 
        WHERE assigned_vehicle_id IS NULL 
-       AND status = 'ACTIVE'
+AND status IN ('ACTIVE', 'AVAILABLE')
        ORDER BY full_name`
     );
     res.json({ success: true, data: result.rows });
@@ -64,7 +64,7 @@ router.get('/unassigned/drivers', async (req, res) => {
       `SELECT id, full_name, mobile_number, driver_code, wallet_balance 
        FROM drivers 
        WHERE assigned_vehicle_id IS NULL 
-       AND status = 'ACTIVE'
+AND status IN ('ACTIVE', 'AVAILABLE')
        ORDER BY full_name`
     );
     res.json({ success: true, data: result.rows });

@@ -361,8 +361,23 @@ router.post('/owner/ledger-entry', async (req, res) => {
         [amount, driverId]
       );
     }
+    // Notification bhejo driver ko
+const entryMessages = {
+  'ADVANCE_CREDIT': `Owner ne ₹${amount} advance credit diya.`,
+  'REPAIR_CREDIT': `₹${amount} repair compensation credited.`,
+  'DAMAGE_CHARGE': `₹${amount} damage charge lagaya gaya.`,
+  'PENALTY': `₹${amount} penalty lagayi gayi.`,
+  'REFUND': `₹${amount} refund kiya gaya.`,
+  'DEPOSIT_CHARGE': `Security deposit se ₹${amount} deduct hua.`,
+};
 
-    res.json({ success: true, message: 'Entry recorded' });
+await pool.query(
+  `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+   VALUES ($1, 'DRIVER', '📋 Ledger Update', $2, NOW())`,
+  [driverId, entryMessages[entryType] || `Ledger entry: ₹${amount}`]
+).catch(() => {});
+
+res.json({ success: true, message: 'Entry recorded' });
   } catch (err) {
     console.error('Ledger entry error:', err);
     res.status(500).json({ error: err.message });
@@ -763,15 +778,23 @@ router.post('/create-order', async (req, res) => {
       }
     });
     const tokenData = await tokenRes.json();
-    console.log('Token response:', JSON.stringify(tokenData));
-
     const token = tokenData.token || tokenData.data?.token || tokenData.access_token || tokenData.data?.access_token;
+    
     if (!token) {
       return res.status(500).json({ success: false, message: 'Token failed', raw: tokenData });
     }
 
-    // Step 2: Order banao
+    // ⭐ NEW FIX: Step 2: Database me PENDING order save karo ⭐
     const orderId = `MG${Date.now()}`;
+    const orderNumber = `ORD-${Date.now()}`; // Generate friendly order number
+
+    await pool.query(
+      `INSERT INTO ms_orders (order_id, order_number, order_amount, currency, payer_name, payer_mobile, transaction_status, order_initiation_date)
+       VALUES ($1, $2, $3, 'INR', $4, $5, 'PENDING', NOW())`,
+      [orderId, orderNumber, parseFloat(amount), customerName || 'Driver', customerPhone]
+    );
+
+    // Step 3: Order banao PayYantra pe
     const orderRes = await fetch('https://payin-api.payyantra.com/api/merchant/orders', {
       method: 'POST',
       headers: {
@@ -783,15 +806,14 @@ router.post('/create-order', async (req, res) => {
         customerName: customerName || 'Driver',
         customerPhone: customerPhone,
         customerEmail: customerEmail || 'driver@mobilitygrid.com',
-        orderId: orderId,
-        returnUrl: 'https://mg-sandy.vercel.app/driver/dashboard?refresh=true',
+        orderId: orderId, // Ye wahi orderId hai jo DB me save hua
+        // ⭐ FIX: Return to PaymentResult page, NOT dashboard directly ⭐
+        returnUrl: `https://mg-sandy.vercel.app/payment-result?orderId=${orderNumber}`, 
         notifyUrl: 'https://mg-qw5s.onrender.com/api/payment/webhook'
       })
     });
 
     const orderData = await orderRes.json();
-    console.log('Order response:', JSON.stringify(orderData));
-
     const intentURL = orderData?.intentURL || orderData?.data?.intentURL;
     const checkoutUrl = orderData?.checkoutUrl || orderData?.data?.checkoutUrl || orderData?.data?.data?.checkoutUrl;
 
@@ -800,14 +822,14 @@ router.post('/create-order', async (req, res) => {
     }
 
     res.json({
-  success: true,
-  upiQrLink: orderData.data?.upiQrLink,      // ← YE ADD KARO
-  intentURL: orderData.data?.intentURL,
-  checkoutUrl: orderData.data?.checkoutUrl,
-  orderId: orderData.data?.orderId,
-  transactionId: orderData.data?.transactionId,
-  data: orderData.data                        // full data bhi rakho
-});
+      success: true,
+      upiQrLink: orderData.data?.upiQrLink,
+      intentURL: intentURL,
+      checkoutUrl: checkoutUrl,
+      orderId: orderId,
+      transactionId: orderData.data?.transactionId,
+      data: orderData.data
+    });
 
   } catch (err) {
     console.error('Create order error:', err);

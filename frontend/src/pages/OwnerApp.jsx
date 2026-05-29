@@ -16,16 +16,23 @@ import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah
 const API = 'https://mg-qw5s.onrender.com';
 const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [ledgerData, setLedgerData] = useState([]);
+  const [expandedDriver, setExpandedDriver] = useState(null);
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [selectedDriver, setSelectedEntryDriver] = useState(null);
   const [entryType, setEntryType] = useState('ADVANCE_CREDIT');
   const [entryAmount, setEntryAmount] = useState('');
   const [entryDesc, setEntryDesc] = useState('');
 
-  useEffect(() => {
+  const fetchLedger = () => {
     fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${ownerIdVal}`, {
       headers: { Authorization: `Bearer ${tokenVal}` }
     }).then(r => r.json()).then(setLedgerData).catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchLedger();
+    const interval = setInterval(fetchLedger, 30000); // real-time
+    return () => clearInterval(interval);
   }, []);
 
   const addEntry = async () => {
@@ -46,85 +53,102 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
       alert('✅ Entry recorded!');
       setShowEntryModal(false);
       setEntryAmount(''); setEntryDesc('');
-      // Refresh
-      fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${ownerIdVal}`, {
-        headers: { Authorization: `Bearer ${tokenVal}` }
-      }).then(r => r.json()).then(setLedgerData);
-    }
+      fetchLedger();
+    } else alert(d.error || 'Failed');
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div className="px-4 py-3 border-b bg-slate-50 flex justify-between items-center">
+      <div className="px-4 py-3 border-b bg-slate-50">
         <h3 className="text-[10px] font-black text-slate-400 uppercase">Driver-wise Ledger</h3>
       </div>
+
       <div className="divide-y">
+        {ledgerData.length === 0 && (
+          <div className="p-6 text-center text-slate-400 text-xs">No ledger data yet</div>
+        )}
         {ledgerData.map((d, i) => (
-          <div key={i} className="px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
+          <div key={i}>
+            {/* COLLAPSED ROW — click to expand */}
+            <div
+              className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-50"
+              onClick={() => setExpandedDriver(expandedDriver === d.id ? null : d.id)}
+            >
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 font-black text-sm">
                   {d.full_name?.charAt(0)}
                 </div>
                 <div>
                   <p className="text-xs font-black text-slate-800">{d.full_name}</p>
-                  <p className="text-[9px] text-slate-400">{d.vehicle_number || 'No vehicle'} • ₹{d.daily_rent || 0}/day</p>
+                  <p className="text-[9px] text-slate-400">{d.vehicle_number} • ₹{d.daily_rent}/day</p>
                 </div>
               </div>
-              <button
-                onClick={() => { setSelectedEntryDriver(d); setShowEntryModal(true); }}
-                className="p-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black"
-              >
-                + Entry
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-emerald-50 rounded-lg p-2">
-                <p className="text-[8px] text-emerald-600 font-bold">PAID</p>
-                <p className="text-xs font-black text-emerald-700">₹{parseFloat(d.total_paid || 0).toLocaleString('en-IN')}</p>
-              </div>
-              <div className={`rounded-lg p-2 ${parseFloat(d.pending) > 0 ? 'bg-red-50' : 'bg-slate-50'}`}>
-                <p className="text-[8px] font-bold" style={{color: parseFloat(d.pending) > 0 ? '#b91c1c' : '#64748b'}}>PENDING</p>
-                <p className="text-xs font-black" style={{color: parseFloat(d.pending) > 0 ? '#b91c1c' : '#334155'}}>₹{parseFloat(d.pending || 0).toLocaleString('en-IN')}</p>
-              </div>
-              <div className={`rounded-lg p-2 ${parseFloat(d.advance) > 0 ? 'bg-purple-50' : 'bg-slate-50'}`}>
-                <p className="text-[8px] font-bold" style={{color: parseFloat(d.advance) > 0 ? '#7c3aed' : '#64748b'}}>ADVANCE</p>
-                <p className="text-xs font-black" style={{color: parseFloat(d.advance) > 0 ? '#7c3aed' : '#334155'}}>₹{parseFloat(d.advance || 0).toLocaleString('en-IN')}</p>
+              <div className="flex items-center gap-2">
+                {parseFloat(d.pending) > 0 && (
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                    ₹{parseFloat(d.pending).toLocaleString('en-IN')} due
+                  </span>
+                )}
+                {parseFloat(d.advance) > 0 && (
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                    ₹{parseFloat(d.advance).toLocaleString('en-IN')} adv
+                  </span>
+                )}
+                <span className="text-slate-400 text-xs">{expandedDriver === d.id ? '▲' : '▼'}</span>
               </div>
             </div>
+
+            {/* EXPANDED — only when selected */}
+            {expandedDriver === d.id && (
+              <div className="px-4 pb-3 bg-slate-50 border-t border-slate-100">
+                <div className="grid grid-cols-3 gap-2 text-center mt-3 mb-3">
+                  <div className="bg-emerald-50 rounded-lg p-2">
+                    <p className="text-[8px] text-emerald-600 font-bold">PAID</p>
+                    <p className="text-xs font-black text-emerald-700">₹{parseFloat(d.total_paid||0).toLocaleString('en-IN')}</p>
+                  </div>
+                  <div className={`rounded-lg p-2 ${parseFloat(d.pending)>0?'bg-red-50':'bg-slate-100'}`}>
+                    <p className="text-[8px] font-bold" style={{color:parseFloat(d.pending)>0?'#b91c1c':'#64748b'}}>PENDING</p>
+                    <p className="text-xs font-black" style={{color:parseFloat(d.pending)>0?'#b91c1c':'#334155'}}>₹{parseFloat(d.pending||0).toLocaleString('en-IN')}</p>
+                  </div>
+                  <div className={`rounded-lg p-2 ${parseFloat(d.advance)>0?'bg-purple-50':'bg-slate-100'}`}>
+                    <p className="text-[8px] font-bold" style={{color:parseFloat(d.advance)>0?'#7c3aed':'#64748b'}}>ADVANCE</p>
+                    <p className="text-xs font-black" style={{color:parseFloat(d.advance)>0?'#7c3aed':'#334155'}}>₹{parseFloat(d.advance||0).toLocaleString('en-IN')}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setSelectedEntryDriver(d); setShowEntryModal(true); }}
+                  className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-black"
+                >
+                  + Add Entry
+                </button>
+              </div>
+            )}
           </div>
         ))}
-        {ledgerData.length === 0 && (
-          <div className="p-6 text-center text-slate-400 text-xs">No ledger data yet</div>
-        )}
       </div>
 
-      {/* Entry Modal */}
       {showEntryModal && selectedDriver && (
-        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6">
+        <div className="fixed inset-0 bg-black/50 z-[500] flex items-center justify-center p-4"
+          onClick={e => { if(e.target===e.currentTarget) setShowEntryModal(false); }}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
             <h3 className="font-black text-lg mb-1">Add Entry</h3>
             <p className="text-sm text-slate-500 mb-4">{selectedDriver.full_name}</p>
-
             <label className="text-xs font-black text-slate-600 block mb-2">Entry Type</label>
             <select value={entryType} onChange={e => setEntryType(e.target.value)}
               className="w-full border rounded-xl p-3 mb-3 text-sm bg-white">
               <option value="ADVANCE_CREDIT">💰 Advance Credit (driver overpaid)</option>
               <option value="REPAIR_CREDIT">🔧 Repair Compensation (driver paid from pocket)</option>
-              <option value="DAMAGE_CHARGE">⚠️ Damage Charge (deduct from driver)</option>
+              <option value="DAMAGE_CHARGE">⚠️ Damage Charge</option>
               <option value="PENALTY">🚫 Penalty</option>
               <option value="REFUND">↩️ Refund to Driver</option>
               <option value="DEPOSIT_CHARGE">🔒 Security Deposit Charge</option>
             </select>
-
             <input type="number" placeholder="Amount (₹)" value={entryAmount}
               onChange={e => setEntryAmount(e.target.value)}
               className="w-full border rounded-xl p-3 mb-3 text-sm" />
-
             <input type="text" placeholder="Description (optional)" value={entryDesc}
               onChange={e => setEntryDesc(e.target.value)}
               className="w-full border rounded-xl p-3 mb-4 text-sm" />
-
             <div className="flex gap-3">
               <button onClick={() => setShowEntryModal(false)}
                 className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
