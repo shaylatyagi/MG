@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, X, Send, Volume2, VolumeX, Loader, Wallet, CreditCard, Bell, Truck, Users, IndianRupee } from 'lucide-react';
 
-const API = 'https://mg-qw5s.onrender.com';
+const API = 'https://bdf8-49-36-177-201.ngrok-free.app'
+//'https://mg-qw5s.onrender.com';
 
 export default function Chatbot({ userRole, userId, userPhone, token, onClose, persistedMessages, onMessagesUpdate}) {
   const [isListening, setIsListening] = useState(false);

@@ -956,6 +956,11 @@ res.json({
     res.status(500).json({ success: false, message: err.message });
   }
 });
+router.get('/my-ip', async (req, res) => {
+  const r = await fetch('https://api.ipify.org?format=json');
+  const d = await r.json();
+  res.json({ server_ip: d.ip });
+});
 router.get('/owner/driver-statement', async (req, res) => {
   try {
     const { driverId } = req.query;
