@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah "Chatbot"
 const API = 'https://mg-qw5s.onrender.com';
-const DriverLedgerSection = () => {
+const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [ledgerData, setLedgerData] = useState([]);
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [selectedDriver, setSelectedEntryDriver] = useState(null);
@@ -23,8 +23,8 @@ const DriverLedgerSection = () => {
   const [entryDesc, setEntryDesc] = useState('');
 
   useEffect(() => {
-    fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${ownerId()}`, {
-      headers: { Authorization: `Bearer ${token()}` }
+    fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${ownerIdVal}`, {
+      headers: { Authorization: `Bearer ${tokenVal}` }
     }).then(r => r.json()).then(setLedgerData).catch(() => {});
   }, []);
 
@@ -32,10 +32,10 @@ const DriverLedgerSection = () => {
     if (!entryAmount || parseFloat(entryAmount) <= 0) return alert('Amount daalen');
     const res = await fetch(`${API}/api/payment/owner/ledger-entry`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenVal}` },
       body: JSON.stringify({
         driverId: selectedDriver.id,
-        ownerId: ownerId(),
+        ownerId: ownerIdVal,
         entryType,
         amount: parseFloat(entryAmount),
         description: entryDesc
@@ -47,8 +47,8 @@ const DriverLedgerSection = () => {
       setShowEntryModal(false);
       setEntryAmount(''); setEntryDesc('');
       // Refresh
-      fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${ownerId()}`, {
-        headers: { Authorization: `Bearer ${token()}` }
+      fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${ownerIdVal}`, {
+        headers: { Authorization: `Bearer ${tokenVal}` }
       }).then(r => r.json()).then(setLedgerData);
     }
   };
@@ -552,7 +552,7 @@ const addVehicle = async () => {
   vehicle_type: newVehicle.type,
   daily_rent: newVehicle.rent,
   rent_type: rentType,
-  owner_id: ownerId()
+  owner_id: ownerId()   // ← function use karo
 })
     });
     
