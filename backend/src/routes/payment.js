@@ -271,8 +271,9 @@ router.post('/owner/vehicles', async (req, res) => {
 router.post('/chatbot', async (req, res) => {
   try {
     const { message, context } = req.body;
-    const today = new Date().toDateString();
+    if (!message?.trim()) return res.json({ reply: 'Kuch poochein.' });
 
+    const today = new Date().toDateString();
     const driversInfo = (context?.drivers || []).map(d => {
       const paid = (context?.orders || []).some(o =>
         o.payer_mobile === d.mobile_number &&
@@ -284,45 +285,33 @@ router.post('/chatbot', async (req, res) => {
     }).join('\n');
 
     const systemPrompt = `You are a fleet management assistant for MobilityGrid EV platform.
+LIVE DATA: Collection today: Rs.${context?.todayCollection || 0}, Drivers: ${context?.totalDrivers || 0}, Vehicles: ${context?.totalVehicles || 0}
+DRIVER STATUS:\n${driversInfo}
+RULES: Respond in same language as user (Hindi/English/Hinglish). Max 3 lines. Use exact names and numbers.`;
 
-LIVE FLEET DATA:
-Total collection today: Rs.${context?.todayCollection || 0}
-Total drivers: ${context?.totalDrivers || 0}
-Total vehicles: ${context?.totalVehicles || 0}
+    const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://mg-sandy.vercel.app',
+        'X-Title': 'MobilityGrid'
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-3.1-8b-instruct:free',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        max_tokens: 150
+      })
+    });
 
-DRIVER DETAILS:
-${driversInfo}
-
-RULES:
-- Respond in the SAME language the user speaks (Hindi, Punjabi, English, Hinglish - anything)
-- Keep response under 3 lines
-- Be specific with names and numbers from the data above
-- Sound like a helpful assistant, not a robot`;
-
-    const groqRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-    'Content-Type': 'application/json',
-    'HTTP-Referer': 'https://mg-sandy.vercel.app',
-    'X-Title': 'MobilityGrid'
-  },
-  body: JSON.stringify({
-    model: 'meta-llama/llama-3.1-8b-instruct:free',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: message }
-    ],
-    max_tokens: 150
-  })
-});
-
-const chatData = await groqRes.json();
-const reply = chatData.choices?.[0]?.message?.content || 'Samajh nahi aaya.';
-const reply = d.choices?.[0]?.message?.content || 'Samajh nahi aaya.';
-res.json({ reply: reply.trim() });
+    const aiData = await aiRes.json();
+    const reply = aiData.choices?.[0]?.message?.content || 'Samajh nahi aaya.';
+    res.json({ reply: reply.trim() });
   } catch (err) {
-    console.error('Chatbot error:', err);
+    console.error('Chatbot error:', err.message);
     res.json({ reply: 'Service unavailable.' });
   }
 });
