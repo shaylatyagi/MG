@@ -317,17 +317,10 @@ RULES:
   })
 });
 
-const d = await groqRes.json();
+const chatData = await groqRes.json();
+const reply = chatData.choices?.[0]?.message?.content || 'Samajh nahi aaya.';
 const reply = d.choices?.[0]?.message?.content || 'Samajh nahi aaya.';
 res.json({ reply: reply.trim() });
-
-    const d = await geminiRes.json();
-    const reply = d?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!reply) {
-      console.error('Gemini failed:', JSON.stringify(d));
-      return res.json({ reply: 'Service unavailable.' });
-    }
-    res.json({ reply: reply.trim() });
   } catch (err) {
     console.error('Chatbot error:', err);
     res.json({ reply: 'Service unavailable.' });
