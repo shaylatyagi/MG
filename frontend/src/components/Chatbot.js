@@ -125,10 +125,12 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
 
+  // Sirf emojis hatao, Hindi rakho
   const speakable = text
-    .replace(/[💰🚨✅❌⚠️🎉👥🚛📅🏢📭💵]/gu, '')
-    .replace(/₹(\S+)/g, '$1 rupees')
-    .replace(/\n+/g, '. ')
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+    .replace(/[✅❌⚠️💰🚛👤📊🎉]/g, '')
+    .replace(/₹/g, 'rupaye ')
+    .replace(/\n/g, ', ')
     .trim();
 
   if (!speakable) return;
@@ -136,27 +138,31 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
 
   const doSpeak = () => {
     const voices = window.speechSynthesis.getVoices();
-    const female = voices.find(v =>
-      (v.name.includes('Heera') || v.name.includes('Priya') ||
-       v.name.toLowerCase().includes('female')) &&
-      (v.lang.startsWith('hi') || v.lang.startsWith('en'))
+
+    // Hindi female voice dhundo
+    const hindiF = voices.find(v => v.lang === 'hi-IN' &&
+      (v.name.includes('Female') || v.name.includes('female') || v.name.includes('Lekha') || v.name.includes('Aditi')));
+
+    // English female fallback
+    const engF = voices.find(v =>
+      v.name.includes('Heera') || v.name.includes('Priya') ||
+      (v.lang === 'en-IN' && v.name.toLowerCase().includes('female'))
     ) || voices.find(v => v.lang === 'en-IN');
 
     const u = new SpeechSynthesisUtterance(speakable);
-    if (female) u.voice = female;
-    u.lang = /[\u0900-\u097F]/.test(speakable) ? 'hi-IN' : 'en-IN';
+    const voice = hindiF || engF;
+    if (voice) u.voice = voice;
+    u.lang = 'hi-IN';
     u.rate = 0.85;
-    u.pitch = 1.3;
+    u.pitch = 1.2;
     u.onend = () => setIsSpeaking(false);
     u.onerror = () => setIsSpeaking(false);
     window.speechSynthesis.speak(u);
   };
 
-  if (window.speechSynthesis.getVoices().length === 0) {
-    window.speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true });
-  } else {
-    doSpeak();
-  }
+  window.speechSynthesis.getVoices().length === 0
+    ? window.speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true })
+    : doSpeak();
 };
 
   const stopSpeaking = () => {
@@ -240,14 +246,13 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
 
     // --- VEHICLE DETAILS ---
     if (lowerMsg.match(/vehicle|gaadi|fleet|gadi|vahaan/)) {
-      if (lowerMsg.match(/detail|batao|list|kaun|info|dikhao|kya|kaisi/)) {
-        const list = (data.vehicles || []).map(v =>
-          `${v.vehicle_number} → ${v.driver_name || 'Unassigned'}`
-        ).join('\n');
-        return `🚛 Fleet (${data.totalVehicles} vehicles):\n${list}`;
-      }
-      return `🚛 कुल ${data.totalVehicles} vehicles हैं।`;
-    }
+  if (lowerMsg.match(/detail|batao|list|kaun|info|dikhao|assigned|assign|kis|kisko/)) {
+    const assigned = (data.vehicles || []).filter(v => v.driver_name);
+    const unassigned = (data.vehicles || []).filter(v => !v.driver_name);
+    return `🚛 Assigned (${assigned.length}):\n${assigned.map(v => `${v.driver_name} → ${v.vehicle_number}`).join('\n')}\n\n⚠️ Unassigned (${unassigned.length}):\n${unassigned.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
+  }
+  return `🚛 कुल ${data.totalVehicles} vehicles, ${(data.vehicles||[]).filter(v=>v.driver_name).length} assigned हैं।`;
+}
 
     // --- DRIVER COUNT ---
     if (lowerMsg.match(/driver|kitne log|staff|team/)) {

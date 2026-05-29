@@ -271,44 +271,54 @@ router.post('/owner/vehicles', async (req, res) => {
 router.post('/chatbot', async (req, res) => {
   try {
     const { message, context } = req.body;
-    if (!message) return res.json({ reply: 'समझ नहीं आया।' });
+    if (!message?.trim()) return res.json({ reply: 'कुछ पूछें।' });
 
-    const driverSummary = (context?.drivers || []).map(d => {
+    const today = new Date().toDateString();
+
+    const driversInfo = (context?.drivers || []).map(d => {
       const paid = (context?.orders || []).some(o =>
         o.payer_mobile === d.mobile_number &&
         o.transaction_status === 'SUCCESS' &&
-        new Date(o.order_completion_date).toDateString() === new Date().toDateString()
+        new Date(o.order_completion_date).toDateString() === today
       );
-      return `${d.full_name}: ${paid ? 'PAID' : 'NOT PAID'}`;
-    }).join(', ');
+      const vehicle = (context?.vehicles || []).find(v => v.driver_id === d.id);
+      return `${d.full_name}: ${paid ? 'PAID today' : 'NOT paid today'}, Vehicle: ${vehicle?.vehicle_number || 'Not assigned'}, Wallet: Rs.${d.wallet_balance || 0}`;
+    }).join('\n');
 
-    const prompt = `Tu MobilityGrid fleet assistant hai. Aaj ka data:
-Collection: Rs.${context?.todayCollection || 0}
-Drivers: ${driverSummary || 'No data'}
-User question: ${message}
-2 lines mein Hindi mein jawab de.`;
+    const prompt = `Tu MobilityGrid EV fleet ka Hindi assistant hai.
+
+Real-time fleet data:
+- Aaj ka total collection: Rs.${context?.todayCollection || 0}
+- Total drivers: ${context?.totalDrivers || 0}
+- Total vehicles: ${context?.totalVehicles || 0}
+
+Har driver ki details:
+${driversInfo}
+
+Owner ka sawaal: "${message}"
+
+Rules:
+- Sirf Hindi mein jawab de
+- 3 lines se zyada mat
+- Numbers rupees mein likho
+- Agar koi driver ka naam poocha toh uski specific detail batao
+- Friendly aur professional tone`;
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       }
     );
 
-    const geminiData = await geminiRes.json();
-    console.log('Gemini raw:', JSON.stringify(geminiData));
-
-    const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text
-      || geminiData?.error?.message
-      || 'समझ नहीं आया।';
-
-    res.json({ reply });
+    const d = await geminiRes.json();
+    console.log('Gemini:', JSON.stringify(d).slice(0, 200));
+    const reply = d?.candidates?.[0]?.content?.parts?.[0]?.text || 'समझ नहीं आया।';
+    res.json({ reply: reply.trim() });
   } catch (err) {
-    console.error('Chatbot error:', err);
+    console.error('Chatbot error:', err.message);
     res.json({ reply: 'समझ नहीं आया।' });
   }
 });
