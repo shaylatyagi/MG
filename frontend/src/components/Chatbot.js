@@ -16,7 +16,6 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
   const isOwner = userRole === 'OWNER';
 
   // Initialize welcome message
-  useEffect(() => {
     useEffect(() => {
   if (!persistedMessages || persistedMessages.length === 0) {
     const welcome = isOwner
@@ -26,7 +25,6 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
   }
   fetchUserData();
 }, []);
-  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -286,17 +284,11 @@ if (msg.match(/notification|notify|remind|bhejo|send|याद|भेजो/)) {
   role: m.role === 'user' ? 'user' : 'assistant',
   content: m.content
 }));
-
-body: JSON.stringify({
-  message: userMessage,
-  context: data,
-  history: recentHistory  // ← ADD
-})
-    const res = await fetch(`${API}/api/payment/chatbot`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ message: userMessage, context: data })
-    });
+const res = await fetch(`${API}/api/payment/chatbot`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  body: JSON.stringify({ message: userMessage, context: data, history: recentHistory })
+});
     const d = await res.json();
     return d.reply || d.message || `"summary" type karein poori jankari ke liye.`;
   } catch {
