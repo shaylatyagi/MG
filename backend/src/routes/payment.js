@@ -271,8 +271,6 @@ router.post('/owner/vehicles', async (req, res) => {
 router.post('/chatbot', async (req, res) => {
   try {
     const { message, context } = req.body;
-    if (!message?.trim()) return res.json({ reply: 'कुछ पूछें।' });
-
     const today = new Date().toDateString();
 
     const driversInfo = (context?.drivers || []).map(d => {
@@ -282,44 +280,57 @@ router.post('/chatbot', async (req, res) => {
         new Date(o.order_completion_date).toDateString() === today
       );
       const vehicle = (context?.vehicles || []).find(v => v.driver_id === d.id);
-      return `${d.full_name}: ${paid ? 'PAID today' : 'NOT paid today'}, Vehicle: ${vehicle?.vehicle_number || 'Not assigned'}, Wallet: Rs.${d.wallet_balance || 0}`;
+      return `${d.full_name}: ${paid ? 'PAID' : 'NOT PAID'}, Vehicle: ${vehicle?.vehicle_number || 'unassigned'}, Wallet: Rs.${d.wallet_balance || 0}`;
     }).join('\n');
 
-    const prompt = `Tu MobilityGrid EV fleet ka Hindi assistant hai.
+    const systemPrompt = `You are a fleet management assistant for MobilityGrid EV platform.
 
-Real-time fleet data:
-- Aaj ka total collection: Rs.${context?.todayCollection || 0}
-- Total drivers: ${context?.totalDrivers || 0}
-- Total vehicles: ${context?.totalVehicles || 0}
+LIVE FLEET DATA:
+Total collection today: Rs.${context?.todayCollection || 0}
+Total drivers: ${context?.totalDrivers || 0}
+Total vehicles: ${context?.totalVehicles || 0}
 
-Har driver ki details:
+DRIVER DETAILS:
 ${driversInfo}
 
-Owner ka sawaal: "${message}"
+RULES:
+- Respond in the SAME language the user speaks (Hindi, Punjabi, English, Hinglish - anything)
+- Keep response under 3 lines
+- Be specific with names and numbers from the data above
+- Sound like a helpful assistant, not a robot`;
 
-Rules:
-- Sirf Hindi mein jawab de
-- 3 lines se zyada mat
-- Numbers rupees mein likho
-- Agar koi driver ka naam poocha toh uski specific detail batao
-- Friendly aur professional tone`;
+    const groqRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer': 'https://mg-sandy.vercel.app',
+    'X-Title': 'MobilityGrid'
+  },
+  body: JSON.stringify({
+    model: 'meta-llama/llama-3.1-8b-instruct:free',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message }
+    ],
+    max_tokens: 150
+  })
+});
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      }
-    );
+const d = await groqRes.json();
+const reply = d.choices?.[0]?.message?.content || 'Samajh nahi aaya.';
+res.json({ reply: reply.trim() });
 
     const d = await geminiRes.json();
-    console.log('Gemini:', JSON.stringify(d).slice(0, 200));
-    const reply = d?.candidates?.[0]?.content?.parts?.[0]?.text || 'समझ नहीं आया।';
+    const reply = d?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!reply) {
+      console.error('Gemini failed:', JSON.stringify(d));
+      return res.json({ reply: 'Service unavailable.' });
+    }
     res.json({ reply: reply.trim() });
   } catch (err) {
-    console.error('Chatbot error:', err.message);
-    res.json({ reply: 'समझ नहीं आया।' });
+    console.error('Chatbot error:', err);
+    res.json({ reply: 'Service unavailable.' });
   }
 });
 router.post('/owner/cash-payment', async (req, res) => {

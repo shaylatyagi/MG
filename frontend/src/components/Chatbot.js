@@ -199,97 +199,9 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
     );
   };
   const processIntent = async (userMessage) => {
-  const lowerMsg = userMessage.toLowerCase()
-    .replace(/[?।!]/g, '')
-    .trim();
   const data = await fetchUserData();
-  if (!data) return "डेटा लोड नहीं हो पाया। दोबारा कोशिश करें।";
+  if (!data) return "Data load nahi hua. Dobara try karein.";
 
-  if (isOwner) {
-
-    // --- COLLECTION ---
-    if (lowerMsg.match(/collection|kitna aaya|earning|kamai|aaya|received|kitna hua|total/)) {
-      return `💰 आज का कुल collection ₹${data.todayCollection.toLocaleString('en-IN')} है।`;
-    }
-
-    // --- WHO PAID ---
-    if (lowerMsg.match(/paid|pay kiya|de diya|diya|kisne diya|who paid|payment de|kiya kya|kiya hai/)) {
-      const paid = [], notPaid = [];
-      for (const d of (data.drivers || [])) {
-        hasDriverPaidToday(d.mobile_number, data.orders)
-          ? paid.push(d.full_name)
-          : notPaid.push(d.full_name);
-      }
-      return `✅ Payment di (${paid.length}):\n${paid.join(', ') || 'कोई नहीं'}\n\n❌ Nahi di (${notPaid.length}):\n${notPaid.join(', ') || 'कोई नहीं'}`;
-    }
-
-    // --- WHO HASN'T PAID ---
-    if (lowerMsg.match(/nahi diya|nhi diya|pending|nahi ki|due|baaki|outstanding|nahi pay/)) {
-      const notPaid = (data.drivers || [])
-        .filter(d => !hasDriverPaidToday(d.mobile_number, data.orders))
-        .map(d => d.full_name);
-      return notPaid.length === 0
-        ? `🎉 सभी drivers ने आज payment कर दी है!`
-        : `❌ इन drivers ने payment नहीं दी:\n${notPaid.join('\n')}`;
-    }
-
-    // --- INDIVIDUAL DRIVER ---
-    const namedDriver = (data.drivers || []).find(d => {
-      const parts = (d.full_name || '').toLowerCase().split(' ');
-      return parts.some(p => p.length > 2 && lowerMsg.includes(p));
-    });
-    if (namedDriver) {
-      const paid = hasDriverPaidToday(namedDriver.mobile_number, data.orders);
-      const veh = namedDriver.vehicle_number || 'assign nahi';
-      return `👤 ${namedDriver.full_name}\n${paid ? '✅ आज payment कर दी है' : '❌ आज payment नहीं की'}\n🚛 Vehicle: ${veh}\n💰 Wallet: ₹${namedDriver.wallet_balance || 0}`;
-    }
-
-    // --- VEHICLE DETAILS ---
-    if (lowerMsg.match(/vehicle|gaadi|fleet|gadi|vahaan/)) {
-  if (lowerMsg.match(/detail|batao|list|kaun|info|dikhao|assigned|assign|kis|kisko/)) {
-    const assigned = (data.vehicles || []).filter(v => v.driver_name);
-    const unassigned = (data.vehicles || []).filter(v => !v.driver_name);
-    return `🚛 Assigned (${assigned.length}):\n${assigned.map(v => `${v.driver_name} → ${v.vehicle_number}`).join('\n')}\n\n⚠️ Unassigned (${unassigned.length}):\n${unassigned.map(v => v.vehicle_number).join(', ') || 'कोई नहीं'}`;
-  }
-  return `🚛 कुल ${data.totalVehicles} vehicles, ${(data.vehicles||[]).filter(v=>v.driver_name).length} assigned हैं।`;
-}
-
-    // --- DRIVER COUNT ---
-    if (lowerMsg.match(/driver|kitne log|staff|team/)) {
-      return `👥 कुल ${data.totalDrivers} drivers हैं।`;
-    }
-
-    // --- SUMMARY ---
-    if (lowerMsg.match(/summary|report|status|update|sab|overall|aaj ka/)) {
-      const paid = (data.drivers || []).filter(d => hasDriverPaidToday(d.mobile_number, data.orders)).length;
-      return `📊 आज का Summary:\n💰 Collection: ₹${data.todayCollection.toLocaleString('en-IN')}\n✅ Paid: ${paid}/${data.totalDrivers} drivers\n🚛 Fleet: ${data.totalVehicles} vehicles`;
-    }
-
-    // --- GREETING ---
-    if (lowerMsg.match(/hello|hi|haan|namaste|hey|kya hal|kaise/)) {
-      const unpaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders)).length;
-      return `नमस्ते! 👋\n💰 Collection: ₹${data.todayCollection.toLocaleString('en-IN')}\n❌ ${unpaid} drivers ने अभी payment नहीं दी`;
-    }
-
-  } else {
-    // DRIVER
-    if (lowerMsg.match(/bakaya|due|kitna dena|pending|outstanding/))
-      return data.todayDues <= 0 ? `🎉 कोई बकाया नहीं!` : `🚨 बकाया: ₹${data.todayDues}`;
-    if (lowerMsg.match(/wallet|balance|paisa|kitna hai/))
-      return `💰 Wallet: ₹${data.walletBalance}`;
-    if (lowerMsg.match(/pay kiya|diya|bhugtan|paid|de diya/))
-      return data.paidToday > 0 ? `✅ हाँ, आज pay कर दिया।` : `❌ नहीं, बकाया ₹${data.todayDues}`;
-    if (lowerMsg.match(/vehicle|gaadi/))
-      return data.vehicleNumber === 'Not Assigned'
-        ? `🚨 कोई vehicle assign नहीं है।`
-        : `🚛 ${data.vehicleNumber} — ₹${data.dailyRent}/day`;
-    if (lowerMsg.match(/kiraya|rent/))
-      return `📅 Daily rent: ₹${data.dailyRent}`;
-    if (lowerMsg.match(/hello|hi|namaste|haan/))
-      return `नमस्ते! बकाया: ₹${data.todayDues} | Wallet: ₹${data.walletBalance}`;
-  }
-
-  // GEMINI FALLBACK
   try {
     const res = await fetch(`${API}/api/payment/chatbot`, {
       method: 'POST',
@@ -297,9 +209,9 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       body: JSON.stringify({ message: userMessage, context: data })
     });
     const d = await res.json();
-    return d.reply || d.message || `मैं यह नहीं समझ पाया। "summary" बोलें।`;
+    return d.reply || "Samajh nahi aaya.";
   } catch {
-    return `मैं यह नहीं समझ पाया। "summary" बोलें पूरी जानकारी के लिए।`;
+    return "Service unavailable. Please try again.";
   }
 };
 
