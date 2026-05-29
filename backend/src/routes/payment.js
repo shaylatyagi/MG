@@ -181,32 +181,6 @@ router.get('/driver/telemetry', async (req, res) => {
     res.json({ vehicleNumber: 'MH-12-QX-4019', battery: 92, driven: 45, wallet: 0 });
   }
 });
-
-// GET DRIVER NOTIFICATIONS
-router.get('/driver/notifications', async (req, res) => {
-  try {
-    const { phone } = req.query;
-    if (!phone) return res.status(400).json({ message: 'Phone number required' });
-    
-    const result = await pool.query(
-      `SELECT n.* FROM auth.notifications n
-       JOIN auth.users u ON u.id = n.user_id
-       WHERE u.mobile_number = $1 AND n.user_type = 'DRIVER'
-       ORDER BY n.created_at DESC LIMIT 50`,
-      [phone]
-    );
-    
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Notifications error:', err);
-    res.json([]);
-  }
-});
-
-// ============================================
-// ADD VEHICLE - Fixed for your table
-// ============================================
-// Backend - Add Vehicle with driver assignment
 router.post('/owner/vehicles', async (req, res) => {
   try {
     const { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id } = req.body;
@@ -301,7 +275,7 @@ RULES: Respond in same language as user (Hindi/English/Hinglish). Max 3 lines. U
   model: 'meta-llama/llama-3.1-8b-instruct:free',
   messages: [
     { role: 'system', content: systemPrompt },
-    ...history.slice(-6),  // ← last 6 messages
+    ...(req.body?.history || []).slice(-6),
     { role: 'user', content: message }
   ],
   max_tokens: 150
@@ -771,46 +745,6 @@ router.get('/owner/stats', async (req, res) => {
     res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0 });
   }
 });
-
-// ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
-// backend/src/routes/payment.js me replace kar
-// ====================== PAYMENT RESULT ROUTE (Sabse Upar Rakh Do) ======================
-// backend/src/routes/payment.js me replace kar
-router.get('/order/:orderId', async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const cleanId = orderId ? orderId.trim() : '';
-    
-    // STEP 1: Pehle ID se dhoondhne ki koshish karo
-    let order = await pool.query(
-      `SELECT * FROM ms_orders 
-       WHERE order_number ILIKE $1 
-          OR order_id::text ILIKE $1 
-          OR pg_transaction_id ILIKE $1`, 
-      [`%${cleanId}%`]
-    );
-    
-    // STEP 2: THE LIFESAVER (NO FAKE DATA)
-    // Agar ID matching fail hui (jaise abhi format mismatch se ho rahi thi), 
-    // toh seedha DB se LATEST payment utha lo!
-    if (order.rows.length === 0) {
-      order = await pool.query(
-        `SELECT * FROM ms_orders ORDER BY order_initiation_date DESC LIMIT 1`
-      );
-    }
-    
-    // Agar poora database hi khali ho tabhi 404 aayega
-    if (order.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Database is empty' });
-    }
-    
-    // 100% REAL DATABASE ROW
-    res.json({ success: true, data: order.rows[0] });
-  } catch (err) {
-    console.error('DB Fetch Error:', err.message);
-    res.status(500).json({ success: false, message: `DB Crash: ${err.message}` });
-  }
-});
 router.post('/create-order', async (req, res) => {
   try {
     const { amount, customerName, customerPhone, customerEmail } = req.body;
@@ -865,7 +799,15 @@ router.post('/create-order', async (req, res) => {
       return res.status(500).json({ success: false, message: 'No URL in response', raw: orderData });
     }
 
-    res.json({ success: true, intentURL, checkoutUrl, orderId });
+    res.json({
+  success: true,
+  upiQrLink: orderData.data?.upiQrLink,      // ← YE ADD KARO
+  intentURL: orderData.data?.intentURL,
+  checkoutUrl: orderData.data?.checkoutUrl,
+  orderId: orderData.data?.orderId,
+  transactionId: orderData.data?.transactionId,
+  data: orderData.data                        // full data bhi rakho
+});
 
   } catch (err) {
     console.error('Create order error:', err);
