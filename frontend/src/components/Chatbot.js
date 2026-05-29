@@ -436,8 +436,7 @@ const res = await fetch(`${API}/api/payment/chatbot`, {
   };
 
   return (
-    <div className="absolute inset-0 z-[200] flex flex-col bg-white">
-  <div className="w-full h-full flex flex-col">
+    <div className="fixed inset-0 z-[200] flex flex-col bg-white" style={{maxWidth:412, margin:'0 auto', left:0, right:0}}>
         {/* Header */}
         <div className={`p-4 rounded-t-3xl flex items-center justify-between ${isOwner ? 'bg-gradient-to-r from-blue-600 to-indigo-700' : 'bg-gradient-to-r from-green-600 to-emerald-700'} text-white`}>
           <div className="flex items-center gap-3">
@@ -499,7 +498,7 @@ const res = await fetch(`${API}/api/payment/chatbot`, {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 border-t bg-white rounded-b-3xl">
+        <div className="p-4 border-t bg-white rounded-b-3xl flex-shrink-0">
           <div className="flex gap-2">
             <button onClick={startListening} disabled={isListening} className={`p-3 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-slate-600 hover:bg-blue-100'}`}>
               {isListening ? <MicOff size={20} /> : <Mic size={20} />}
@@ -514,6 +513,5 @@ const res = await fetch(`${API}/api/payment/chatbot`, {
           </div>
         </div>
       </div>
-    </div>
   );
 }
