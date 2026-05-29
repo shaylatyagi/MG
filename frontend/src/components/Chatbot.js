@@ -192,9 +192,70 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
     );
   };
   const processIntent = async (userMessage) => {
+  const msg = userMessage.toLowerCase().trim();
   const data = await fetchUserData();
-  if (!data) return "Data load nahi hua. Dobara try karein.";
+  if (!data) return "Data load nahi hua.";
 
+  if (isOwner) {
+    // Collection
+    if (msg.match(/collection|kitna|aaya|earning|kamai|received|total|paise|paisa|कलेक्शन|कमाई|इलेक्शन/))
+      return `💰 आज का collection ₹${data.todayCollection.toLocaleString('en-IN')} है।`;
+
+    // Who paid
+    if (msg.match(/paid|pay|diya|de diya|kiya|kisne|who|किसने|दिया|पेमेंट/))  {
+      const paid = [], notPaid = [];
+      for (const d of (data.drivers || []))
+        hasDriverPaidToday(d.mobile_number, data.orders) ? paid.push(d.full_name) : notPaid.push(d.full_name);
+      return `✅ Paid (${paid.length}): ${paid.join(', ') || 'कोई नहीं'}\n❌ Nahi diya (${notPaid.length}): ${notPaid.join(', ') || 'कोई नहीं'}`;
+    }
+
+    // Who hasn't paid
+    if (msg.match(/nahi|nhi|pending|due|baaki|outstanding|नहीं|बाकी/)) {
+      const notPaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders)).map(d => d.full_name);
+      return notPaid.length === 0 ? `🎉 सभी ने payment कर दी!` : `❌ Pending:\n${notPaid.join('\n')}`;
+    }
+
+    // Vehicles
+    if (msg.match(/vehicle|gaadi|fleet|gadi|व्हीकल|गाड़ी/)) {
+      const assigned = (data.vehicles || []).filter(v => v.driver_name);
+      return `🚛 Total: ${data.totalVehicles} | Assigned: ${assigned.length} | Free: ${data.totalVehicles - assigned.length}`;
+    }
+
+    // Drivers
+    if (msg.match(/driver|kitne log|team|ड्राइवर|कितने/))
+      return `👥 कुल ${data.totalDrivers} drivers हैं।`;
+
+    // Summary
+    if (msg.match(/summary|sab|batao|update|report|status|बताओ|सब/)) {
+      const paid = (data.drivers || []).filter(d => hasDriverPaidToday(d.mobile_number, data.orders)).length;
+      return `📊 Collection: ₹${data.todayCollection.toLocaleString('en-IN')}\n✅ Paid: ${paid}/${data.totalDrivers}\n🚛 Fleet: ${data.totalVehicles}`;
+    }
+
+    // Individual driver
+    const named = (data.drivers || []).find(d =>
+      (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p))
+    );
+    if (named) {
+      const paid = hasDriverPaidToday(named.mobile_number, data.orders);
+      const veh = (data.vehicles || []).find(v => v.driver_id === named.id);
+      return `👤 ${named.full_name}\n${paid ? '✅ Paid today' : '❌ Not paid'}\n🚛 ${veh?.vehicle_number || 'No vehicle'}\n💰 ₹${named.wallet_balance || 0}`;
+    }
+
+    // Hello
+    if (msg.match(/hello|hi|namaste|hey|haan|नमस्ते/)) {
+      const unpaid = (data.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, data.orders)).length;
+      return `नमस्ते! 💰 ₹${data.todayCollection.toLocaleString('en-IN')} collected. ❌ ${unpaid} drivers pending.`;
+    }
+
+  } else {
+    if (msg.match(/bakaya|due|kitna dena|pending|बकाया/)) return data.todayDues <= 0 ? `🎉 कोई बकाया नहीं!` : `🚨 ₹${data.todayDues} बकाया है।`;
+    if (msg.match(/wallet|balance|paisa|वॉलेट/)) return `💰 Wallet: ₹${data.walletBalance}`;
+    if (msg.match(/pay|diya|paid|दिया/)) return data.paidToday > 0 ? `✅ हाँ, आज pay कर दिया।` : `❌ नहीं, बकाया ₹${data.todayDues}`;
+    if (msg.match(/vehicle|gaadi|गाड़ी/)) return data.vehicleNumber === 'Not Assigned' ? `🚨 Vehicle assign नहीं।` : `🚛 ${data.vehicleNumber} — ₹${data.dailyRent}/day`;
+    if (msg.match(/hello|hi|namaste|नमस्ते/)) return `नमस्ते! बकाया: ₹${data.todayDues} | Wallet: ₹${data.walletBalance}`;
+  }
+
+  // OpenRouter fallback
   try {
     const res = await fetch(`${API}/api/payment/chatbot`, {
       method: 'POST',
@@ -202,9 +263,9 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose })
       body: JSON.stringify({ message: userMessage, context: data })
     });
     const d = await res.json();
-    return d.reply || "Samajh nahi aaya.";
+    return d.reply || d.message || `"summary" type karein poori jankari ke liye.`;
   } catch {
-    return "Service unavailable. Please try again.";
+    return `"summary" type karein poori jankari ke liye.`;
   }
 };
 
