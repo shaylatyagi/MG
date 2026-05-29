@@ -909,7 +909,7 @@ router.post('/create-order', async (req, res) => {
         customerPhone: customerPhone,
         customerEmail: customerEmail || 'driver@mobilitygrid.com',
         orderId: orderId,
-        returnUrl: `https://mg-sandy.vercel.app/payment-result?orderId=${orderId}`,
+        returnUrl: `https://mg-sandy.vercel.app/driver?status=success&orderId=${orderId}`,
         notifyUrl: 'https://mg-qw5s.onrender.com/api/payment/webhook'
       })
     });

@@ -249,9 +249,13 @@ useEffect(() => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    if (p.get('refresh') === 'true' || p.get('status') === 'success') { fetchAll(); window.history.replaceState(null, '', window.location.pathname); }
-  }, [user]);
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('status') === 'success' || p.get('refresh') === 'true') { 
+    setShowPaying(false); // ← ADD
+    fetchAll(); 
+    window.history.replaceState(null, '', window.location.pathname); 
+  }
+}, [user]);
 
   const markRead = async () => {
     setUnread(0); setNotifs(p => p.map(n => ({ ...n, is_read: true })));
