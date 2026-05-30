@@ -15,7 +15,7 @@ const KYC_API = 'https://mg-qw5s.onrender.com';
 export default function DriverPWA() {
   // ─── CHAT STATE ───
 const [showOwnerChat, setShowOwnerChat] = useState(false);
-
+const [chatMessages, setChatMessages] = useState([]);
 const [chatMsgs, setChatMsgs] = useState([]);
 const [chatUnread, setChatUnread] = useState(0);
 
