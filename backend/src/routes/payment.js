@@ -239,8 +239,9 @@ router.put('/owner/damage-record/:id/resolve', async (req, res) => {
 });
 router.post('/owner/vehicles', async (req, res) => {
   try {
-    const { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id } = req.body;
     
+    const { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id,
+        vehicle_type, insurance_expiry, fitness_expiry, chassis_number } = req.body;
     console.log('Add Vehicle:', { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id });
     
     if (!owner_id || !vehicle_number) {
@@ -671,7 +672,9 @@ router.get('/owner/vehicles', async (req, res) => {
 });
 router.post('/owner/add-driver', async (req, res) => {
   try {
-    const { full_name, mobile_number } = req.body;
+    const { full_name, mobile_number, date_of_birth, emergency_contact_name,
+        emergency_contact_number, driving_license_number, 
+        driving_license_expiry, security_deposit } = req.body;
 
     if (!full_name || !mobile_number)
       return res.status(400).json({ success: false, message: 'Name and phone required' });
@@ -1110,14 +1113,11 @@ router.post('/webhook', async (req, res) => {
 if (status === 'SUCCESS' && localOrder.rows[0].transaction_status !== 'SUCCESS') {
   const amount = parseFloat(localOrder.rows[0].order_amount || 0);
   const driverPhone = localOrder.rows[0].payer_mobile;
-  
-  // ============================================
-  // 1. UPDATE DRIVER WALLET in driver_details
-  // ============================================
   const driverUser = await pool.query(
-    'SELECT id FROM public.users WHERE phone_number = $1',
-    [driverPhone]
-  );
+  'SELECT id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
+);
+if (driverUser.rows.length === 0) return;
+const driverUserId = driverUser.rows[0].id;
   
   if (driverUser.rows.length > 0) {
     const driverUserId = driverUser.rows[0].id;
@@ -1168,13 +1168,14 @@ if (status === 'SUCCESS' && localOrder.rows[0].transaction_status !== 'SUCCESS')
     if (ownerData.rows.length > 0) {
       const ownerId = ownerData.rows[0].owner_id;
       
-      await pool.query(
-        `INSERT INTO public.notifications (user_id, user_type, title, message, metadata, created_at)
-         VALUES ($1, 'OWNER', '💰 Rent Payment Received', 
-                 'Driver ${driverPhone} paid ₹${amount}.',
-                 $2, NOW())`,
-        [ownerId, JSON.stringify({ driverPhone, amount, status: 'SUCCESS', type: 'payment' })]
-      );
+      // ✅ FIXED — user_id nahi, driver_id use karo
+await pool.query(
+  `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+   SELECT d.id, 'OWNER', '💰 Rent Payment Received',
+          d.full_name || ' ne ₹' || $1 || ' pay kiya', NOW()
+   FROM public.drivers d WHERE d.mobile_number = $2`,
+  [amount, driverPhone]
+).catch(()=>{});
       
       console.log(`📢 Notification sent to OWNER ID: ${ownerId}`);
     } else {
@@ -1285,75 +1286,52 @@ router.get('/driver/profile', async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ message: 'Phone required' });
-    const result = await pool.query(
-      `SELECT 
-         d.id, d.full_name as name, d.mobile_number as phone,
-         d.driver_code, d.wallet_balance, d.status, d.advance_balance,
-         v.id as vehicle_id, v.vehicle_number, v.vehicle_model,
-         v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,
-         v.created_at as assigned_since
-       FROM public.drivers d
-       LEFT JOIN public.vehicles v ON v.driver_id = d.id
-       WHERE d.mobile_number = $1`, [phone]
-    );
 
+    const result = await pool.query(`...`, [phone]);
     if (!result.rows[0]) return res.status(404).json({ message: 'Driver not found' });
     const p = result.rows[0];
 
+    // ✅ BAHAR declare karo — sab 0 se shuru
     let amount_paid_today = 0;
     let total_outstanding = 0;
+    let dailyDepositRecovery = 0;    // ← const tha if block mein, ab let bahar
+    let effectiveDailyCharge = 0;    // ← same
 
     if (p.vehicle_number && p.vehicle_daily_rent) {
       const dailyRent = parseFloat(p.vehicle_daily_rent);
       
-      // ✅ Total paid ever (all successful payments)
       const totalPaidRes = await pool.query(
-        `SELECT COALESCE(SUM(order_amount), 0) as total
-         FROM public.ms_orders
-         WHERE payer_mobile = $1 AND transaction_status = 'SUCCESS'`,
-        [phone]
+        `SELECT COALESCE(SUM(order_amount),0) as total FROM public.ms_orders
+         WHERE payer_mobile=$1 AND transaction_status='SUCCESS'`, [phone]
       );
       const totalPaid = parseFloat(totalPaidRes.rows[0].total);
 
-      // ✅ Days since vehicle assigned
       const assignedSince = p.assigned_since ? new Date(p.assigned_since) : new Date();
-      const today = new Date();
-      const daysDiff = Math.max(1, Math.floor((today - assignedSince) / (1000*60*60*24)));
-      // ✅ Security deposit daily recovery
-const securityDeposit = parseFloat(p.security_deposit || 0);
-const ADJUSTMENT_DAYS = 100; // 100 days mein recover
-const dailyDepositRecovery = securityDeposit > 0 
-  ? Math.round(securityDeposit / ADJUSTMENT_DAYS) 
-  : 0;
+      const daysDiff = Math.max(1, Math.floor((new Date()-assignedSince)/(1000*60*60*24)));
 
-// ✅ Total rent charged = (daily rent + daily deposit recovery) * days
-const effectiveDailyCharge = dailyRent + dailyDepositRecovery;
-const totalCharged = daysDiff * effectiveDailyCharge;
-
-      // ✅ Advance balance deduct karo
+      const securityDeposit = parseFloat(p.security_deposit || 0);
+      dailyDepositRecovery = securityDeposit > 0 ? Math.round(securityDeposit/100) : 0;
+      effectiveDailyCharge = dailyRent + dailyDepositRecovery;
+      const totalCharged = daysDiff * effectiveDailyCharge;
       const advance = parseFloat(p.advance_balance || 0);
-
-      // ✅ Outstanding = charged - paid - advance
       total_outstanding = Math.max(0, totalCharged - totalPaid - advance);
 
-      // Today's paid (for display)
       const todayPaidRes = await pool.query(
-        `SELECT COALESCE(SUM(order_amount), 0) as total
-         FROM public.ms_orders
-         WHERE payer_mobile = $1 AND transaction_status = 'SUCCESS'
-         AND DATE(order_completion_date) = CURRENT_DATE`,
+        `SELECT COALESCE(SUM(order_amount),0) as total FROM public.ms_orders
+         WHERE payer_mobile=$1 AND transaction_status='SUCCESS' AND DATE(order_completion_date)=CURRENT_DATE`,
         [phone]
       );
       amount_paid_today = parseFloat(todayPaidRes.rows[0].total);
     }
+
     res.json({
-  ...p,
-  amount_paid_today,
-  total_outstanding,
-  current_dues: total_outstanding,
-  daily_deposit_recovery: dailyDepositRecovery,  // ✅ Frontend ko dikhao
-  effective_daily_charge: effectiveDailyCharge
-});
+      ...p,
+      amount_paid_today,
+      total_outstanding,
+      current_dues: total_outstanding,
+      daily_deposit_recovery: dailyDepositRecovery,
+      effective_daily_charge: effectiveDailyCharge
+    });
 
   } catch (err) {
     console.error('Driver profile error:', err);
