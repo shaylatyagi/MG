@@ -1536,17 +1536,17 @@ router.get('/owner/notifications', async (req, res) => {
     const ownerCode = ownerResult.rows[0].owner_code;
     
     // Get notifications for drivers under this owner
-    const result = await pool.query(
-      `SELECT n.id, n.title, n.message, n.is_read, n.created_at, n.metadata, d.full_name as driver_name
-       FROM public.notifications n
-       LEFT JOIN public.drivers d ON d.id = n.driver_id
-       WHERE d.owner_code = $1 OR n.user_type = 'OWNER'
-       ORDER BY n.created_at DESC
-       LIMIT 50`,
-      [ownerCode]
-    );
-    
-    res.json(result.rows);
+    const notifResult = await pool.query(
+  `SELECT n.id, n.title, n.message, n.is_read, n.created_at, n.metadata, d.full_name as driver_name
+   FROM public.notifications n
+   LEFT JOIN public.drivers d ON d.id = n.driver_id
+   WHERE (d.owner_code = $1 OR n.user_type = 'OWNER')
+   AND n.user_type != 'DRIVER'
+   ORDER BY n.created_at DESC
+   LIMIT 50`,
+  [ownerCode]
+);
+res.json(notifResult.rows);
   } catch (err) {
     console.error('Owner notifications error:', err);
     res.json([]);
