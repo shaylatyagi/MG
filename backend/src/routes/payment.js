@@ -1116,12 +1116,10 @@ if (status === 'SUCCESS' && localOrder.rows[0].transaction_status !== 'SUCCESS')
   const driverUser = await pool.query(
   'SELECT id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
 );
-if (driverUser.rows.length === 0) return;
-const driverUserId = driverUser.rows[0].id;
-  
-  if (driverUser.rows.length > 0) {
-    const driverUserId = driverUser.rows[0].id;
-    
+if (driverUser.rows.length === 0) {
+  console.log('Driver not found for phone:', driverPhone);
+} else {
+  const driverUserId = driverUser.rows[0].id;    
     // Update driver_details
     await pool.query(
       `UPDATE public.driver_details 
@@ -1287,7 +1285,19 @@ router.get('/driver/profile', async (req, res) => {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ message: 'Phone required' });
 
-    const result = await pool.query(`...`, [phone]);
+    const result = await pool.query(
+  `SELECT 
+     d.id, d.full_name as name, d.mobile_number as phone,
+     d.driver_code, d.wallet_balance, d.status, d.advance_balance,
+     d.security_deposit,
+     v.id as vehicle_id, v.vehicle_number, v.vehicle_model,
+     v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,
+     v.created_at as assigned_since
+   FROM public.drivers d
+   LEFT JOIN public.vehicles v ON v.driver_id = d.id
+   WHERE d.mobile_number = $1`,
+  [phone]
+);
     if (!result.rows[0]) return res.status(404).json({ message: 'Driver not found' });
     const p = result.rows[0];
 
