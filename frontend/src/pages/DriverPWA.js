@@ -13,7 +13,51 @@ const API ='https://mg-qw5s.onrender.com';
 const KYC_API = 'https://mg-qw5s.onrender.com';
 
 export default function DriverPWA() {
-  const [chatMessages, setChatMessages] = useState([]);
+  // ─── CHAT STATE ───
+const [showOwnerChat, setShowOwnerChat] = useState(false);
+
+const [chatMsgs, setChatMsgs] = useState([]);
+const [chatUnread, setChatUnread] = useState(0);
+
+// Chat fetch
+const fetchChat = async () => {
+  const ph = phone();
+  if (!ph) return;
+  const res = await fetch(
+    `${API}/api/payment/chat/messages?driverPhone=${ph}&ownerId=1`,
+    { headers: { Authorization: `Bearer ${tk()}` } }
+  );
+  if (res.ok) {
+    const data = await res.json();
+    setChatMsgs(data);
+  }
+};
+
+useEffect(() => {
+  if (!user) return;
+  fetchChat();
+  const interval = setInterval(fetchChat, 5000); // 5 sec polling
+  return () => clearInterval(interval);
+}, [user]);
+
+// Send chat message
+const sendChatMessage = async () => {
+  if (!chatInput.trim()) return;
+  const msg = chatInput.trim();
+  setChatInput('');
+  
+  await fetch(`${API}/api/payment/chat/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+    body: JSON.stringify({
+      driverPhone: phone(),
+      message: msg,
+      senderType: 'DRIVER',
+      ownerId: 1
+    })
+  });
+  fetchChat();
+};
   const getHeaderTitle = (tab) => {
   const titles = {
     'home': 'Dashboard',
@@ -358,11 +402,37 @@ const addFloat = async () => {
     setChatInput('');
   };
 
-  const sendSOS = async () => {
-    setSosSent(true);
-    await fetch(`${API}/api/payment/driver/sos`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` }, body: JSON.stringify({ phone: phone(), message: sosMsg || 'SOS' }) }).catch(() => { });
-    setTimeout(() => { setShowSOS(false); setSosSent(false); setSosMsg(''); }, 2500);
-  };
+ const sendSOS = async () => {
+  setSosSent(true);
+  
+  // ✅ Location lo
+  let locationUrl = '';
+  try {
+    const pos = await new Promise((resolve, reject) => 
+      navigator.geolocation.getCurrentPosition(resolve, reject, {timeout:5000})
+    );
+    const {latitude, longitude} = pos.coords;
+    locationUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
+  } catch(e) {}
+
+  try {
+    await fetch(`${API}/api/payment/driver/sos`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', Authorization:`Bearer ${tk()}`},
+      body: JSON.stringify({ 
+        phone: phone(), 
+        message: `${sosMsg || 'Emergency! Madad chahiye.'}\n${locationUrl ? `📍 Location: ${locationUrl}` : 'Location unavailable'}`
+      })
+    });
+  } catch(e) { console.error(e); }
+  
+  // ✅ 2 sec baad SOS close → chat auto open
+  setTimeout(() => { 
+    setShowSOS(false); setSosMsg(''); setSosSent(false);
+    setShowOwnerChat(true);  // ← chat auto khulega
+    fetchChat();
+  }, 2000);
+};
 
   const claimRewards = () => {
     if (rewards <= 0) return alert('No unclaimed rewards.');
@@ -886,13 +956,27 @@ const AccountTab = () => {
         </div>
 
         {/* SOS BAR */}
-        <div className="absolute left-0 right-0 bg-gradient-to-r from-red-600 to-orange-600 text-white px-4 py-2 flex items-center justify-between z-40" style={{ bottom: '64px' }}>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center animate-pulse"><ShieldAlert size={13} /></div>
-            <span className="text-[10px] font-black tracking-wide">{t.emergency}</span>
-<button onClick={() => setShowSOS(true)} className="bg-white text-red-700 text-[9px] font-black px-3 py-1.5 rounded-lg">{t.triggerSos}</button>
-        </div>
-        </div>
+        {/* SOS BAR */}
+<div className="absolute left-0 right-0 bg-gradient-to-r from-red-600 to-orange-600 text-white px-4 py-2 flex items-center justify-between z-40" style={{bottom:'64px'}}>
+  <div className="flex items-center gap-2">
+    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center animate-pulse">
+      <ShieldAlert size={13}/>
+    </div>
+    <span className="text-[10px] font-black tracking-wide">{t.emergency}</span>
+  </div>
+  <div className="flex gap-2">
+    {/* ✅ Chat button */}
+    <button 
+      onClick={() => { setShowOwnerChat(true); fetchChat(); }}
+      className="bg-white/20 text-white text-[9px] font-black px-3 py-1.5 rounded-lg flex items-center gap-1"
+    >
+      <MessageCircle size={11}/> Chat
+    </button>
+    <button onClick={() => setShowSOS(true)} className="bg-white text-red-700 text-[9px] font-black px-3 py-1.5 rounded-lg">
+      {t.triggerSos}
+    </button>
+  </div>
+</div>
 {/* Bottom Navigation - Fixed */}
 <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50">
   {[
@@ -927,24 +1011,48 @@ const AccountTab = () => {
   onMessagesUpdate={setChatMessages}
 />
 )}
-        {/* CHAT MODAL */}
+{showSOS && (
+  <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-sm p-6">
+      
+      {/* ✅ BACK BUTTON */}
+      <button 
+        onClick={() => { setShowSOS(false); setSosMsg(''); setSosSent(false); }}
+        className="flex items-center gap-1 text-slate-500 text-sm mb-4"
+      >
+        <ChevronLeft size={16} /> Back
+      </button>
 
-        {/* SOS MODAL, PAYMENT MODAL, RECEIPT MODAL remain same */}
-        {showSOS && (
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl w-full max-w-sm p-6">
-              {sosSent ? (
-                <div className="text-center"><CheckCircle size={48} className="text-emerald-600 mx-auto mb-3" /><h3 className="text-lg font-black">SOS Sent!</h3></div>
-              ) : (
-                <>
-                  <h3 className="text-lg font-black mb-4">Send SOS Alert</h3>
-                  <textarea value={sosMsg} onChange={e => setSosMsg(e.target.value)} placeholder="Describe incident..." rows={3} className="w-full border rounded-xl p-3 text-xs" />
-                  <button onClick={sendSOS} className="w-full mt-4 bg-red-600 text-white font-black py-3 rounded-xl">Send SOS</button>
-                </>
-              )}
-            </div>
+      {sosSent ? (
+        <div className="text-center">
+          <CheckCircle size={48} className="text-emerald-600 mx-auto mb-3" />
+          <h3 className="text-lg font-black">SOS Sent!</h3>
+          <p className="text-sm text-slate-500 mt-1">Owner ko alert bhej diya gaya</p>
+        </div>
+      ) : (
+        <>
+          <h3 className="text-lg font-black mb-1 text-red-600">🚨 Send SOS Alert</h3>
+          <p className="text-xs text-slate-400 mb-3">Owner ko immediately notify karega</p>
+          <textarea value={sosMsg} onChange={e => setSosMsg(e.target.value)} 
+            placeholder="Incident describe karein... (e.g. Accident hua, vehicle kharab, help chahiye)"
+            rows={3} className="w-full border rounded-xl p-3 text-sm mb-3" />
+          <div className="flex gap-2">
+            <button 
+              onClick={() => { setShowSOS(false); setSosMsg(''); }}
+              className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black"
+            >
+              Cancel
+            </button>
+            <button onClick={sendSOS} 
+              className="flex-1 bg-red-600 text-white font-black py-3 rounded-xl text-sm">
+              🚨 Send SOS
+            </button>
           </div>
-        )}
+        </>
+      )}
+    </div>
+  </div>
+)}
 
         {showPaying && (
           <div className="absolute inset-0 bg-black/60 z-[100] flex items-center justify-center">
@@ -959,6 +1067,10 @@ const AccountTab = () => {
         {showReceipt && selTxn && (
           <div className="absolute inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl w-full max-w-sm p-6">
+              <button onClick={() => setShowReceipt(false)}
+        className="flex items-center gap-1 text-slate-500 text-sm mb-4">
+        <ChevronLeft size={16} /> Back
+      </button>
               <h3 className="text-xl font-black mb-4">Receipt</h3>
               <div className="text-center pb-4 border-b"><p className="text-3xl font-black">₹{selTxn.amount}</p></div>
               <div className="space-y-2 my-4">
@@ -970,6 +1082,56 @@ const AccountTab = () => {
             </div>
           </div>
         )}
+        {/* OWNER CHAT MODAL */}
+{showOwnerChat && (
+  <div className="absolute inset-0 z-[100] flex flex-col bg-slate-50">
+    <div className="bg-blue-600 text-white p-4 flex items-center gap-3">
+      <button onClick={() => setShowOwnerChat(false)}>
+        <ChevronLeft size={20}/>
+      </button>
+      <div>
+        <h3 className="font-black">Chat with Owner</h3>
+        <p className="text-xs opacity-75">MobilityGrid Fleet</p>
+      </div>
+    </div>
+
+    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      {chatMsgs.length === 0 ? (
+        <div className="text-center text-slate-400 text-xs py-8">
+          <MessageCircle size={32} className="mx-auto mb-2 opacity-30"/>
+          <p>No messages yet</p>
+          <p className="mt-1 text-[10px]">Owner se baat karo</p>
+        </div>
+      ) : chatMsgs.map((msg, i) => (
+        <div key={i} className={`flex ${msg.sender_type==='DRIVER'?'justify-end':'justify-start'}`}>
+          <div className={`max-w-[75%] p-3 rounded-2xl text-sm ${
+            msg.sender_type==='DRIVER'
+              ? 'bg-blue-600 text-white rounded-br-sm'
+              : 'bg-white text-slate-800 shadow-sm border border-slate-100 rounded-bl-sm'
+          }`}>
+            <p>{msg.message}</p>
+            <p className={`text-[9px] mt-1 ${msg.sender_type==='DRIVER'?'text-blue-200':'text-slate-400'}`}>
+              {new Date(msg.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div className="p-3 bg-white border-t flex gap-2">
+      <input
+        value={chatInput}
+        onChange={e => setChatInput(e.target.value)}
+        onKeyDown={e => e.key==='Enter' && sendChatMessage()}
+        placeholder="Type message..."
+        className="flex-1 border rounded-xl px-3 py-2 text-sm"
+      />
+      <button onClick={sendChatMessage} className="bg-blue-600 text-white p-2 rounded-xl">
+        <Send size={16}/>
+      </button>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );

@@ -259,6 +259,34 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   );
 };
 export default function OwnerDashboard() {
+  const [activeSOS, setActiveSOS] = useState(null); // current SOS alert
+const [showSOSAlert, setShowSOSAlert] = useState(false);
+const [seenSosIds, setSeenSosIds] = useState(new Set());
+
+// SOS polling
+useEffect(() => {
+  const pollSOS = async () => {
+    try {
+      const res = await fetch(
+        `${API}/api/payment/owner/sos-alerts?ownerId=${ownerId()}`,
+        { headers: { Authorization: `Bearer ${token()}` } }
+      );
+      const alerts = await res.json();
+      if (alerts.length > 0) {
+        const latest = alerts[0];
+        if (!seenSosIds.has(latest.id)) {
+          setActiveSOS(latest);
+          setShowSOSAlert(true);
+          setSeenSosIds(prev => new Set([...prev, latest.id]));
+        }
+      }
+    } catch(e) {}
+  };
+  
+  const interval = setInterval(pollSOS, 10000);
+  pollSOS();
+  return () => clearInterval(interval);
+}, [seenSosIds]);
   const [chatMessages, setChatMessages] = useState([]);
   const [lang, setLang] = useState('en');
   const T = {
@@ -924,6 +952,35 @@ useEffect(() => {
 const interval = setInterval(pollNotifications, 60000);//60 seconds
 return () => clearInterval(interval);
   }, [unreadCount]);
+  useEffect(() => {
+  if (!showChat || !selectedDriver) return;
+  
+  const pollChat = async () => {
+    const dPhone = selectedDriver?.phone_number || selectedDriver?.mobile_number || selectedDriver?.phone;
+    try {
+      const res = await fetch(
+        `${API}/api/payment/chat/messages?driverPhone=${dPhone}&ownerId=${ownerId()}`,
+        { headers: { Authorization: `Bearer ${token()}` } }
+      );
+      if (res.ok) {
+        const msgs = await res.json();
+        setChatHistory(msgs.map(m => ({
+          from: m.sender_type === 'OWNER' ? 'owner' : 'driver',
+          text: m.message,
+          time: new Date(m.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})
+        })));
+      }
+    } catch(e) {}
+  };
+
+  const interval = setInterval(pollChat, 3000);
+  return () => clearInterval(interval);
+}, [showChat, selectedDriver]);
+
+// fetchAllData useEffect
+useEffect(() => {
+  fetchAllData();
+}, [fetchAllData]);
 
   const logout = () => {
     localStorage.clear();
@@ -943,21 +1000,49 @@ return () => clearInterval(interval);
   };
 
   const openChatWithDriver = async (driver) => {
-    setSelectedDriver(driver);
-    setShowChat(true);
-    setChatHistory([
-      { from: 'bot', text: `Chat with ${driver.full_name || driver.name} started. How can I help?` }
-    ]);
-  };
+  setSelectedDriver(driver);
+  setShowChat(true);
+  
+  // Fetch real messages
+  const dPhone = driver.phone_number || driver.mobile_number || driver.phone;
+  const res = await fetch(
+    `${API}/api/payment/chat/messages?driverPhone=${dPhone}&ownerId=${ownerId()}`,
+    { headers: { Authorization: `Bearer ${token()}` } }
+  );
+  if (res.ok) {
+    const msgs = await res.json();
+    setChatHistory(msgs.map(m => ({
+      from: m.sender_type === 'OWNER' ? 'owner' : 'driver',
+      text: m.message,
+      time: new Date(m.created_at).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})
+    })));
+  }
+};
 
-  const sendMessageToDriver = () => {
-    if (!chatInput.trim()) return;
-    setChatHistory(prev => [...prev, { from: 'owner', text: chatInput, time: new Date().toLocaleTimeString() }]);
-    setTimeout(() => {
-      setChatHistory(prev => [...prev, { from: 'bot', text: 'Message sent to driver!', time: new Date().toLocaleTimeString() }]);
-    }, 500);
-    setChatInput('');
-  };
+  const sendMessageToDriver = async () => {
+  if (!chatInput.trim()) return;
+  const msg = chatInput.trim();
+  setChatInput('');
+  
+  const dPhone = selectedDriver?.phone_number || selectedDriver?.mobile_number || selectedDriver?.phone;
+  
+  await fetch(`${API}/api/payment/chat/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+    body: JSON.stringify({
+      driverPhone: dPhone,
+      message: msg,
+      senderType: 'OWNER',
+      ownerId: ownerId()
+    })
+  });
+  
+  setChatHistory(prev => [...prev, { 
+    from: 'owner', 
+    text: msg, 
+    time: new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})
+  }]);
+};
 
   const addDriver = async () => {
     if (!newDriver.name || !newDriver.phone) {
@@ -2548,6 +2633,90 @@ const ProfileTab = () => (
           Add
         </button>
       </div>
+    </div>
+  </div>
+)}
+{showSOSAlert && activeSOS && (
+  <div className="fixed inset-0 z-[9999] flex flex-col bg-red-600 text-white">
+    {/* Flashing header */}
+    <div className="bg-red-800 px-4 py-3 flex items-center justify-between animate-pulse">
+      <span className="font-black text-lg tracking-widest">🚨 SOS ALERT</span>
+      <span className="text-xs opacity-75">
+        {new Date(activeSOS.created_at).toLocaleTimeString('en-IN')}
+      </span>
+    </div>
+
+    {/* Driver info */}
+    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-6">
+      <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center text-5xl font-black animate-bounce">
+        {activeSOS.full_name?.charAt(0)}
+      </div>
+      
+      <div>
+        <h2 className="text-3xl font-black">{activeSOS.full_name}</h2>
+        <p className="text-red-200 font-mono text-sm mt-1">{activeSOS.mobile_number}</p>
+      </div>
+
+      <div className="bg-white/20 rounded-2xl p-4 w-full max-w-sm">
+        <p className="text-[10px] font-black uppercase tracking-wider opacity-75 mb-2">
+          Emergency Message
+        </p>
+        <p className="text-base font-medium">{activeSOS.message}</p>
+      </div>
+
+      {/* Location */}
+      {activeSOS.message?.includes('maps.google') && (
+        <a 
+          href={activeSOS.message.match(/https:\/\/maps\.google[^\s]*/)?.[0]}
+          target="_blank"
+          rel="noreferrer"
+          className="bg-white/20 rounded-xl px-4 py-2 text-sm font-black flex items-center gap-2"
+        >
+          📍 View Location on Maps
+        </a>
+      )}
+    </div>
+
+    {/* Action buttons */}
+    <div className="p-6 space-y-3">
+      <button
+        onClick={async () => {
+          // Dismiss SOS
+          await fetch(`${API}/api/payment/owner/sos-dismiss/${activeSOS.id}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token()}` }
+          }).catch(() => {});
+          
+          setShowSOSAlert(false);
+          
+          // ✅ Chat open karo usi driver ke saath
+          const driver = drivers.find(d => 
+            d.mobile_number === activeSOS.mobile_number ||
+            d.phone_number === activeSOS.mobile_number
+          );
+          if (driver) {
+            openChatWithDriver(driver);
+          }
+          setActiveSOS(null);
+        }}
+        className="w-full bg-white text-red-600 font-black py-4 rounded-2xl text-base"
+      >
+        💬 Respond — Open Chat
+      </button>
+      
+      <button
+        onClick={async () => {
+          await fetch(`${API}/api/payment/owner/sos-dismiss/${activeSOS.id}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token()}` }
+          }).catch(() => {});
+          setShowSOSAlert(false);
+          setActiveSOS(null);
+        }}
+        className="w-full bg-white/20 font-black py-3 rounded-2xl text-sm"
+      >
+        Dismiss Alert
+      </button>
     </div>
   </div>
 )}

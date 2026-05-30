@@ -1066,7 +1066,139 @@ router.get('/driver-details', async (req, res) => {
   }
 
 });
+// SOS ENDPOINT — owner ko notification bhejo
+router.post('/driver/sos', async (req, res) => {
+  try {
+    const { phone, message } = req.body;
 
+    const driver = await pool.query(
+      `SELECT d.id, d.full_name, v.owner_id
+       FROM public.drivers d
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.mobile_number = $1`, [phone]
+    );
+
+    if (!driver.rows[0]) return res.status(404).json({ success: false });
+    const d = driver.rows[0];
+
+    // SOS DB mein save karo
+    await pool.query(
+      `INSERT INTO public.sos_alerts (driver_id, driver_phone, message)
+       VALUES ($1, $2, $3)`,
+      [d.id, phone, message || 'SOS Alert!']
+    );
+
+    // Owner ko notification bhejo
+    await pool.query(
+      `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+       VALUES ($1, 'OWNER', '🚨 SOS ALERT', $2, NOW())`,
+      [d.id, `${d.full_name} ne SOS bheja: "${message || 'Emergency!'}" — Phone: ${phone}`]
+    ).catch(() => {});
+
+    // Driver ko confirmation
+    await pool.query(
+      `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+       VALUES ($1, 'DRIVER', '🚨 SOS Sent', 'Aapka SOS owner ko bhej diya gaya hai. Help aa rahi hai.', NOW())`,
+      [d.id]
+    ).catch(() => {});
+
+    res.json({ success: true, message: 'SOS sent to owner!' });
+  } catch(err) {
+    console.error('SOS error:', err);
+    res.status(500).json({ success: false });
+  }
+});
+
+// CHAT — message bhejo
+router.post('/chat/send', async (req, res) => {
+  try {
+    const { driverPhone, message, senderType, ownerId } = req.body;
+
+    const driver = await pool.query(
+      'SELECT id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
+    );
+    if (!driver.rows[0]) return res.status(404).json({ error: 'Driver not found' });
+    const driverId = driver.rows[0].id;
+
+    await pool.query(
+      `INSERT INTO public.chat_messages (driver_id, owner_id, sender_type, message)
+       VALUES ($1, $2, $3, $4)`,
+      [driverId, ownerId || 1, senderType || 'DRIVER', message]
+    );
+
+    // Notification bhejo opposite side ko
+    if (senderType === 'DRIVER') {
+      await pool.query(
+        `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+         VALUES ($1, 'OWNER', '💬 Driver Message', $2, NOW())`,
+        [driverId, `New message from driver: "${message.substring(0, 50)}"`]
+      ).catch(() => {});
+    } else {
+      await pool.query(
+        `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+         VALUES ($1, 'DRIVER', '💬 Owner Message', $2, NOW())`,
+        [driverId, `Owner: "${message.substring(0, 50)}"`]
+      ).catch(() => {});
+    }
+
+    res.json({ success: true });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CHAT — messages fetch karo
+router.get('/chat/messages', async (req, res) => {
+  try {
+    const { driverPhone, ownerId } = req.query;
+
+    const driver = await pool.query(
+      'SELECT id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
+    );
+    if (!driver.rows[0]) return res.json([]);
+    const driverId = driver.rows[0].id;
+
+    const messages = await pool.query(
+      `SELECT id, sender_type, message, is_read, created_at
+       FROM public.chat_messages
+       WHERE driver_id = $1
+       ORDER BY created_at ASC
+       LIMIT 100`,
+      [driverId]
+    );
+
+    // Messages read mark karo
+    await pool.query(
+      `UPDATE public.chat_messages SET is_read = TRUE
+       WHERE driver_id = $1 AND sender_type != $2`,
+      [driverId, ownerId ? 'OWNER' : 'DRIVER']
+    ).catch(() => {});
+
+    res.json(messages.rows);
+  } catch(err) {
+    res.json([]);
+  }
+});
+
+// CHAT — unread count
+router.get('/chat/unread', async (req, res) => {
+  try {
+    const { driverPhone, viewerType } = req.query;
+    const driver = await pool.query(
+      'SELECT id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
+    );
+    if (!driver.rows[0]) return res.json({ count: 0 });
+    
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM public.chat_messages
+       WHERE driver_id = $1 AND is_read = FALSE AND sender_type != $2`,
+      [driver.rows[0].id, viewerType || 'DRIVER']
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch(err) {
+    res.json({ count: 0 });
+  }
+});
 
 // WEBHOOK
 router.post('/webhook', async (req, res) => {
@@ -1347,6 +1479,31 @@ router.get('/driver/profile', async (req, res) => {
     console.error('Driver profile error:', err);
     res.status(500).json({ message: 'Failed' });
   }
+});
+router.get('/owner/sos-alerts', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    const result = await pool.query(
+      `SELECT s.*, d.full_name, d.mobile_number
+       FROM public.sos_alerts s
+       JOIN public.drivers d ON d.id = s.driver_id
+       WHERE s.status = 'ACTIVE'
+       AND d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+       ORDER BY s.created_at DESC LIMIT 5`,
+      [ownerId]
+    );
+    res.json(result.rows);
+  } catch(err) { res.json([]); }
+});
+
+router.put('/owner/sos-dismiss/:id', async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE public.sos_alerts SET status='DISMISSED' WHERE id=$1`,
+      [req.params.id]
+    );
+    res.json({ success: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
 });
 // GET owner notifications
 router.get('/owner/notifications', async (req, res) => {
