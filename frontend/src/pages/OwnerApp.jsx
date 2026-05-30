@@ -13,6 +13,7 @@ import {
   DollarSign, Copy, FileText, Landmark, Fingerprint, FileCheck2
 } from 'lucide-react';
 import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah "Chatbot"
+import DocumentSection from '../components/DocumentSection';
 const API ='https://mg-qw5s.onrender.com';
 const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [ledgerData, setLedgerData] = useState([]);
@@ -360,8 +361,6 @@ const [availableDriversForVehicle, setAvailableDriversForVehicle] = useState([])
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [phoneNumber] = useState('9876542345'); // SEARCH - ADDED
-  
   // Owner data
   const [owner, setOwner] = useState(null);
   const [stats, setStats] = useState({
@@ -434,12 +433,14 @@ const [multipleDrivers, setMultipleDrivers] = useState([{ name:'', phone:'' }]);
     const id = setInterval(tick, 300000);//every 5 minutes
     return () => clearInterval(id);
   }, []);
-
   const token = () => localStorage.getItem('token');
-  const ownerId = () => {
-    const u = JSON.parse(localStorage.getItem('user') || '{}');
-    return u.id || 1;
-  };
+const getUser = () => {
+  try { return JSON.parse(localStorage.getItem('user') || '{}'); } 
+  catch { return {}; }
+};
+const ownerId = () => getUser().id;
+const ownerPhone = () => getUser().mobile_number || getUser().phone_number;
+const ownerCode = () => getUser().owner_code;
   const fetchUnassignedDriversList = async () => {
   try {
     const token = localStorage.getItem('token');
@@ -840,9 +841,9 @@ const fetchAllData = useCallback(async () => {
   setLoading(true);
   try {
     const H = { Authorization: `Bearer ${token()}` };
-    
-    // DIRECT OWNER ID = 1 (hardcoded for 9876542345)
-    const oId = 1;
+    const u = getUser();
+const oId = u.id;
+if (!oId) { navigate('/login'); return; }
     
     console.log('Fetching data for owner ID:', oId);
     
@@ -896,16 +897,17 @@ const fetchAllData = useCallback(async () => {
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.is_read).length);
     }
-    
-    // Set owner data manually
-    setOwner({
-      id: 1,
-      full_name: 'Rajesh Kumar',
-      mobile_number: '9876542345',
-      owner_code: 'OWN701951',
-      wallet_balance: 0,
-      status: 'ACTIVE'
-    });
+    const u = getUser();
+setOwner({
+  id: u.id,
+  full_name: u.full_name || u.name,
+  mobile_number: u.mobile_number || u.phone_number,
+  owner_code: u.owner_code,
+  email: u.email,
+  business_name: u.business_name,
+  address: u.address,
+  status: u.status || 'ACTIVE'
+});
     
   } catch (error) {
     console.error('Fetch error:', error);
@@ -1159,7 +1161,7 @@ const importBulkDrivers = async () => {
     const res = await fetch(`${API}/api/payment/owner/bulk-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-      body: JSON.stringify({ drivers: valid, ownerCode: 'OWN701951' })
+      body: JSON.stringify({ vehicles: valid, ownerId: ownerId() })
     });
     const data = await res.json();
     setBulkResult(data);
@@ -2254,7 +2256,11 @@ const ProfileTab = () => (
     <button className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
       <Edit2 size={14} /> {t.editProfile}
     </button>
-    
+    <DocumentSection
+  userId={ownerId()}
+  userType="OWNER"
+  token={token()}
+/>
     <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2 border border-red-100">
       <LogOut size={14} /> {t.logout}
     </button>
@@ -2563,14 +2569,11 @@ const ProfileTab = () => (
           ))}
         </div>
         {showChatbot && (
-  <Chatbot 
+          <Chatbot 
   userRole="OWNER"
   userId={ownerId()}
-  userPhone="9876542345"
+  userPhone={ownerPhone()}  // dynamic
   token={token()}
-  onClose={() => setShowChatbot(false)}
-  persistedMessages={chatMessages}
-  onMessagesUpdate={setChatMessages}
 />
 )}
         {/* Chat Modal */}

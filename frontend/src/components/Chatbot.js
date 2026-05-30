@@ -63,17 +63,14 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, o
     window.speechSynthesis.addEventListener('voiceschanged', load);
     return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
   }, []);
-
-  // iOS keepalive
   useEffect(() => {
-    const t = setInterval(() => {
-      if (window.speechSynthesis?.speaking) {
-        window.speechSynthesis.pause();
-        window.speechSynthesis.resume();
-      }
-    }, 14000);
-    return () => clearInterval(t);
-  }, []);
+  const t = setInterval(() => {
+    if (window.speechSynthesis?.paused) {
+      window.speechSynthesis.resume();
+    }
+  }, 5000);
+  return () => clearInterval(t);
+}, []);
 
   // ─── SPEECH RECOGNITION ─────────────────────────────────────────────
   useEffect(() => {
@@ -287,8 +284,13 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, o
     switch (intent) {
       case 'hello': {
   if (isOwner) {
-    const stats = await fetchStats();
-    return `Namaste! Main aapka Fleet Assistant hoon.\n\nAaj ka collection: ${(stats.total_earnings || 0).toLocaleString('en-IN')} rupaye\nDrivers: ${stats.total_drivers || 0} | Vehicles: ${stats.total_vehicles || 0}\n\nMain in cheezon mein madad kar sakta hoon:\n• Collection aur earnings\n• Kaun paid, kaun pending\n• Vehicle assign/unassign\n• Driver details\n• Ledger aur accounts\n\nKuch bhi poochein!`;
+    const [stats, ledger] = await Promise.all([
+      fetchStats(),
+      fetch(`${API}/api/payment/owner/ledger?period=today`, { headers: H() })
+        .then(r => r.json()).catch(() => ({ received: 0 }))
+    ]);
+    const todayAmt = ledger.received || 0;
+    return `Namaste! Main aapka Fleet Assistant hoon.\n\nAaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nDrivers: ${stats.total_drivers || 0} | Vehicles: ${stats.total_vehicles || 0}\n\nMain in cheezon mein madad kar sakta hoon:\n• Collection aur earnings\n• Kaun paid, kaun pending\n• Vehicle assign/unassign\n• Driver details\n• Ledger aur accounts\n\nKuch bhi poochein!`;
   } else {
     const [profile, dues] = await Promise.all([fetchDriverProfile(), fetchDriverDues()]);
     return `Namaste ${profile.name || ''}! Main aapka Driver Assistant hoon.\n\nBakaya: ${dues.dues || 0} rupaye\nWallet: ${profile.wallet_balance || 0} rupaye\nGaadi: ${profile.vehicle_number || 'assign nahi'}\n\nMain in cheezon mein madad kar sakta hoon:\n• Aapka bakaya\n• Wallet balance\n• Gaadi ki details\n• Payment info`;
@@ -296,14 +298,15 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, o
 }
 
       case 'collection': {
-        const stats = await fetchStats();
-        const { orders } = await fetchDriversAndTx();
-        const today = new Date().toDateString();
-        const todayAmt = orders
-          .filter(o => o.transaction_status === 'SUCCESS' && new Date(o.order_completion_date).toDateString() === today)
-          .reduce((s, o) => s + parseFloat(o.order_amount || 0), 0);
-        return `Aaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nKul (lifetime): ${(stats.total_earnings || 0).toLocaleString('en-IN')} rupaye\nTotal drivers: ${stats.total_drivers || 0}`;
-      }
+  const [stats, ledger] = await Promise.all([
+    fetchStats(),
+    fetch(`${API}/api/payment/owner/ledger?period=today`, { headers: H() })
+      .then(r => r.json()).catch(() => ({ received: 0, outstanding: 0 }))
+  ]);
+  const todayAmt = ledger.received || 0;
+  const outstanding = ledger.outstanding || 0;
+  return `Aaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nBaaki outstanding: ${outstanding.toLocaleString('en-IN')} rupaye\nTotal drivers: ${stats.total_drivers || 0}`;
+}
 
       case 'who_paid': {
         const { drivers, orders } = await fetchDriversAndTx();

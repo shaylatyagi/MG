@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Chatbot from '../components/Chatbot';  // ← same
+import DocumentSection from '../components/DocumentSection';
 const API ='https://mg-qw5s.onrender.com';
 const KYC_API = 'https://mg-qw5s.onrender.com';
 
@@ -515,10 +516,6 @@ const addFloat = async () => {
     const label = { verified: '✅ Verified', failed: '❌ Failed', pending: 'Pending' };
     return <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase font-mono border ${map[s] || map.pending}`}>{label[s] || 'Pending'}</span>;
   };
-
-  // ACCOUNT TAB (Merged Profile + KYC)
-  // ACCOUNT TAB with full KYC and document upload
-// ACCOUNT TAB with Profile Details, Vehicle Info, and KYC
 const AccountTab = () => {
   const [uploading, setUploading] = useState(false);
   

@@ -55,14 +55,25 @@ export default function Login() {
     setSelectedDriver(driver);
     setStep('driver-otp');
   };
-
-  const handleSendOtp = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setStep('verify-otp');
-    }, 500);
-  };
+  const sendOTP = async () => {
+  if (!/^\d{10}$/.test(phone)) return setError('10 digit phone number daalen');
+  setLoading(true); setError('');
+  try {
+    const res = await fetch(`${API}/api/auth/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone_number: phone, role })
+    });
+    const data = await res.json();
+    if (data.success) {
+      setStep('otp');
+      startResendTimer();
+      setSuccess(`OTP: ${data.otp}`); // ✅ Screen pe dikhao
+      setOtp(data.otp);               // ✅ Autofill
+    } else setError(data.message);
+  } catch { setError('Network error.'); }
+  setLoading(false);
+};
 
   const handleDriverSendOtp = () => {
     setLoading(true);
