@@ -1540,7 +1540,67 @@ router.get('/owner/notifications', async (req, res) => {
     res.json([]);
   }
 });
+// ── BULK UPLOAD ──────────────────────────────
+router.post('/owner/bulk-upload', async (req, res) => {
+  try {
+    const { drivers, ownerCode } = req.body;
+    if (!drivers?.length) return res.status(400).json({ success: false, message: 'No data' });
 
+    const results = { success: [], failed: [] };
+
+    for (const driver of drivers) {
+      try {
+        const phone = String(driver.mobile_number || '').replace(/\s/g, '');
+
+        if (!driver.full_name?.trim())
+          { results.failed.push({ name: driver.full_name, reason: 'Name missing' }); continue; }
+        if (/[0-9]/.test(driver.full_name))
+          { results.failed.push({ name: driver.full_name, reason: 'Name mein numbers' }); continue; }
+        if (!/^\d{10}$/.test(phone))
+          { results.failed.push({ name: driver.full_name, reason: `${phone} — 10 digits chahiye` }); continue; }
+
+        const existing = await pool.query(
+          'SELECT id FROM public.drivers WHERE mobile_number = $1', [phone]
+        );
+        if (existing.rows.length > 0)
+          { results.failed.push({ name: driver.full_name, reason: `${phone} already exists` }); continue; }
+
+        const driverCode = 'DRV' + Date.now().toString().slice(-5) + 
+                           Math.random().toString(36).substr(2,3).toUpperCase();
+
+        await pool.query(
+          `INSERT INTO public.drivers 
+            (full_name, mobile_number, owner_code, driver_code, wallet_balance, status,
+             date_of_birth, emergency_contact_name, emergency_contact_number,
+             driving_license_number, driving_license_expiry, security_deposit)
+           VALUES ($1,$2,$3,$4,0,'ACTIVE',$5,$6,$7,$8,$9,$10)`,
+          [
+            driver.full_name.trim(), phone,
+            ownerCode || 'OWN701951', driverCode,
+            driver.date_of_birth || null,
+            driver.emergency_contact_name || null,
+            driver.emergency_contact_number || null,
+            driver.driving_license_number || null,
+            driver.driving_license_expiry || null,
+            parseFloat(driver.security_deposit) || 0
+          ]
+        );
+        results.success.push(driver.full_name);
+      } catch(err) {
+        results.failed.push({ name: driver.full_name, reason: err.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      imported: results.success.length,
+      failed: results.failed.length,
+      failures: results.failed
+    });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 // MARK notifications as read
 router.put('/notifications/mark-read', async (req, res) => {
   try {

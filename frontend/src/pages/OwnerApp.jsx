@@ -22,7 +22,6 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [entryType, setEntryType] = useState('ADVANCE_CREDIT');
   const [entryAmount, setEntryAmount] = useState('');
   const [entryDesc, setEntryDesc] = useState('');
-
   const downloadCSV = async (driver) => {
     try {
       const res = await fetch(
@@ -392,6 +391,13 @@ const [assigning, setAssigning] = useState(false);
   // Chat state
   const [showChatbot, setShowChatbot] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+const [bulkDrivers, setBulkDrivers] = useState([]);
+const [bulkLoading, setBulkLoading] = useState(false);
+const [bulkResult, setBulkResult] = useState(null);
+const [bulkFile, setBulkFile] = useState(null);
+const [addDriverMode, setAddDriverMode] = useState('single');
+const [multipleDrivers, setMultipleDrivers] = useState([{ name:'', phone:'' }]);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
@@ -1037,7 +1043,106 @@ return () => clearInterval(interval);
     time: new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})
   }]);
 };
+const validateBulkRow = (row) => {
+  const errs = [];
+  if (!row.full_name?.trim()) errs.push('Name missing');
+  else if (/[0-9]/.test(row.full_name)) errs.push('Name mein numbers nahi');
+  const ph = String(row.mobile_number||'').replace(/\s/g,'');
+  if (!ph) errs.push('Phone missing');
+  else if (!/^\d{10}$/.test(ph)) errs.push('Phone 10 digits chahiye');
+  return errs;
+};
 
+const downloadTemplate = () => {
+  const csv = [
+    'full_name,mobile_number,date_of_birth,driving_license_number,driving_license_expiry,security_deposit',
+    'Abdul Rahman,9876543210,1990-01-15,DL-0420100012345,2025-12-31,5000',
+    'Ramesh Kumar,9876543211,1985-06-20,,,3000',
+    'Priya Sharma,9876543212,,,,0'
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'driver_import_template.csv'; a.click();
+  URL.revokeObjectURL(url);
+};
+
+const handleBulkFile = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  setBulkFile(file.name); setBulkResult(null);
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const lines = ev.target.result.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/ /g,'_'));
+    const parsed = lines.slice(1).map((line, i) => {
+      const values = line.split(',').map(v => v.trim());
+      const obj = {};
+      headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
+      obj._row = i + 2;
+      obj._errors = validateBulkRow(obj);
+      return obj;
+    }).filter(d => d.full_name || d.mobile_number);
+    setBulkDrivers(parsed);
+  };
+  reader.readAsText(file);
+};
+
+const updateBulkRow = (index, field, value) => {
+  setBulkDrivers(prev => {
+    const updated = [...prev];
+    updated[index] = { ...updated[index], [field]: value };
+    updated[index]._errors = validateBulkRow(updated[index]);
+    return updated;
+  });
+};
+
+const importBulkDrivers = async () => {
+  const valid = bulkDrivers.filter(d => d._errors.length === 0);
+  if (!valid.length) return alert('Koi valid driver nahi — pehle errors fix karo');
+  setBulkLoading(true);
+  try {
+    const res = await fetch(`${API}/api/payment/owner/bulk-upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      body: JSON.stringify({ drivers: valid, ownerCode: 'OWN701951' })
+    });
+    const data = await res.json();
+    setBulkResult(data);
+    if (data.imported > 0) fetchAllData();
+  } catch(err) { alert('Network error'); }
+  finally { setBulkLoading(false); }
+};
+const addMultipleDrivers = async () => {
+  const toAdd = multipleDrivers.filter(d => d.name && d.phone && !d._saved);
+  if (!toAdd.length) return alert('Koi driver fill nahi kiya');
+  setBulkLoading(true);
+  let added = 0;
+  for (let i = 0; i < multipleDrivers.length; i++) {
+    const d = multipleDrivers[i];
+    if (!d.name || !d.phone || d._saved) continue;
+    if (!/^[A-Za-z\s]+$/.test(d.name)) {
+      setMultipleDrivers(prev => prev.map((x,idx) => idx===i ? {...x, _error:'Name mein numbers nahi'} : x));
+      continue;
+    }
+    if (!/^\d{10}$/.test(d.phone)) {
+      setMultipleDrivers(prev => prev.map((x,idx) => idx===i ? {...x, _error:'10 digits chahiye'} : x));
+      continue;
+    }
+    try {
+      const res = await fetch(`${API}/api/payment/owner/add-driver`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization:`Bearer ${token()}` },
+        body: JSON.stringify({ full_name: d.name, mobile_number: d.phone, owner_id: ownerId(), driving_license_number: d.license||null, security_deposit: parseFloat(d.deposit)||0 })
+      });
+      const data = await res.json();
+      if (data.success) { setMultipleDrivers(prev => prev.map((x,idx) => idx===i ? {...x, _saved:true, _error:null} : x)); added++; }
+      else { setMultipleDrivers(prev => prev.map((x,idx) => idx===i ? {...x, _error: data.message} : x)); }
+    } catch(err) { setMultipleDrivers(prev => prev.map((x,idx) => idx===i ? {...x, _error:'Network error'} : x)); }
+  }
+  setBulkLoading(false);
+  if (added > 0) { fetchAllData(); }
+};
   const addDriver = async () => {
     if (!newDriver.name || !newDriver.phone) {
       alert('Please fill name and phone');
@@ -1320,9 +1425,16 @@ const DriversTab = () => {
         )}
       </div>
       
-      <button onClick={() => setShowAddDriver(true)} className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
-        <UserPlus size={16} /> {t.addNewDriver}
-      </button>
+      <div className="flex gap-2">
+  <button onClick={() => setShowAddDriver(true)}
+    className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
+    <UserPlus size={16}/> {t.addNewDriver}
+  </button>
+  <button onClick={() => { setShowBulkModal(true); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
+    className="py-3 px-4 bg-emerald-600 text-white rounded-xl text-sm font-black">
+    📊 Bulk
+  </button>
+</div>
       
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="divide-y">
@@ -2564,105 +2676,177 @@ const ProfileTab = () => (
 )}
 {showAddDriver && (
   <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-    <div className="bg-white rounded-3xl w-full max-w-sm p-6 max-h-[85vh] overflow-y-auto">
-      <h3 className="text-lg font-black mb-4">Add Driver</h3>
+    <div className="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
       
-      <input placeholder="Full Name (Letters only)" 
-        className="w-full border rounded-xl p-3 mb-3 text-sm"
-        value={newDriver.name} 
-        onChange={e => setNewDriver({...newDriver, name: e.target.value})} />
-      
-      <input placeholder="Phone Number (10 digits)" 
-        className="w-full border rounded-xl p-3 mb-3 text-sm"
-        value={newDriver.phone} 
-        onChange={e => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g, '').slice(0,10)})} />
-      
-      <input placeholder="Email (optional)" 
-        className="w-full border rounded-xl p-3 mb-3 text-sm"
-        value={newDriver.email} 
-        onChange={e => setNewDriver({...newDriver, email: e.target.value})} />
-
-      {/* ✅ NEW: Security Deposit */}
-      <div className="relative mb-3">
-        <span className="absolute left-3 top-3 text-slate-400 text-sm font-black">₹</span>
-        <input 
-          type="number" 
-          placeholder="Security Deposit (optional)"
-          className="w-full border rounded-xl p-3 pl-7 text-sm"
-          value={newDriver.securityDeposit || ''}
-          onChange={e => setNewDriver({...newDriver, securityDeposit: e.target.value})} 
-        />
+      {/* Header */}
+      <div className="p-5 pb-3 flex justify-between items-center border-b">
+        <h3 className="text-lg font-black">Add Driver</h3>
+        <button onClick={() => {
+          setShowAddDriver(false);
+          setAddDriverMode('single');
+          setMultipleDrivers([{ name:'', phone:'' }]);
+        }}><X size={20}/></button>
       </div>
-      {/* DOB */}
-<div className="mb-3">
-  <label className="text-[10px] font-black text-slate-500 block mb-1">Date of Birth</label>
-  <input 
-    type="date" 
-    className="w-full border rounded-xl p-3 text-sm bg-white"
-    value={newDriver.dob}
-    onChange={e => setNewDriver({...newDriver, dob: e.target.value})} 
-  />
-</div>
 
-{/* Emergency Contact */}
-<div className="grid grid-cols-2 gap-2 mb-3">
-  <input 
-    placeholder="Emergency Contact Name"
-    className="border rounded-xl p-3 text-sm"
-    value={newDriver.emergencyName}
-    onChange={e => setNewDriver({...newDriver, emergencyName: e.target.value})} 
-  />
-  <input 
-    placeholder="Emergency Phone"
-    className="border rounded-xl p-3 text-sm"
-    value={newDriver.emergencyPhone}
-    onChange={e => setNewDriver({...newDriver, emergencyPhone: e.target.value.replace(/\D/g,'').slice(0,10)})} 
-  />
-</div>
-
-{/* License */}
-<div className="grid grid-cols-2 gap-2 mb-3">
-  <input 
-    placeholder="License Number"
-    className="border rounded-xl p-3 text-sm uppercase font-mono"
-    value={newDriver.licenseNumber}
-    onChange={e => setNewDriver({...newDriver, licenseNumber: e.target.value.toUpperCase()})} 
-  />
-  <div>
-    <label className="text-[10px] font-black text-slate-500 block mb-1">License Expiry</label>
-    <input 
-      type="date"
-      className="w-full border rounded-xl p-3 text-sm bg-white"
-      value={newDriver.licenseExpiry}
-      onChange={e => setNewDriver({...newDriver, licenseExpiry: e.target.value})} 
-    />
-  </div>
-</div>
-
-      {/* ✅ FIXED: Select separate kiya */}
-      <select
-        className="w-full border rounded-xl p-3 mb-4 text-sm bg-white"
-        value={newDriver.vehicleId || ''}
-        onChange={e => setNewDriver({...newDriver, vehicleId: e.target.value})}
-      >
-        <option value="">-- Assign Vehicle (Optional) --</option>
-        {vehicles.filter(v => !v.driver_id).map(v => (
-          <option key={v.id} value={v.id}>
-            {v.vehicle_number} — {v.vehicle_model} (₹{v.daily_rent}/day)
-          </option>
-        ))}
-      </select>
-
-      {/* ✅ FIXED: Buttons apne row mein */}
-      <div className="flex gap-3">
-        <button onClick={() => setShowAddDriver(false)} 
-          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">
-          Cancel
+      {/* Mode Toggle */}
+      <div className="flex gap-2 p-4 pb-0">
+        <button onClick={() => setAddDriverMode('single')}
+          className={`flex-1 py-2 rounded-xl text-sm font-black transition ${
+            addDriverMode==='single' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+          }`}>
+          👤 Single
         </button>
-        <button onClick={addDriver} 
-          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">
-          Add
+        <button onClick={() => setAddDriverMode('multiple')}
+          className={`flex-1 py-2 rounded-xl text-sm font-black transition ${
+            addDriverMode==='multiple' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+          }`}>
+          👥 Multiple
         </button>
+      </div>
+
+      <div className="p-5">
+        {/* ── SINGLE MODE ── */}
+        {addDriverMode === 'single' && (
+          <div className="space-y-3">
+            <input placeholder="Full Name (Letters only)"
+              className="w-full border rounded-xl p-3 text-sm"
+              value={newDriver.name}
+              onChange={e => setNewDriver({...newDriver, name: e.target.value})}/>
+            <input placeholder="Phone Number (10 digits)"
+              className="w-full border rounded-xl p-3 text-sm"
+              value={newDriver.phone}
+              onChange={e => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g,'').slice(0,10)})}/>
+            <div className="relative">
+              <span className="absolute left-3 top-3 text-slate-400 text-sm font-black">₹</span>
+              <input type="number" placeholder="Security Deposit (optional)"
+                className="w-full border rounded-xl p-3 pl-7 text-sm"
+                value={newDriver.securityDeposit || ''}
+                onChange={e => setNewDriver({...newDriver, securityDeposit: e.target.value})}/>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-black text-slate-500 block mb-1">Date of Birth</label>
+                <input type="date" className="w-full border rounded-xl p-3 text-sm bg-white"
+                  value={newDriver.dob}
+                  onChange={e => setNewDriver({...newDriver, dob: e.target.value})}/>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-500 block mb-1">License Expiry</label>
+                <input type="date" className="w-full border rounded-xl p-3 text-sm bg-white"
+                  value={newDriver.licenseExpiry}
+                  onChange={e => setNewDriver({...newDriver, licenseExpiry: e.target.value})}/>
+              </div>
+            </div>
+            <input placeholder="License Number"
+              className="w-full border rounded-xl p-3 text-sm uppercase font-mono"
+              value={newDriver.licenseNumber}
+              onChange={e => setNewDriver({...newDriver, licenseNumber: e.target.value.toUpperCase()})}/>
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="Emergency Contact Name"
+                className="border rounded-xl p-3 text-sm"
+                value={newDriver.emergencyName}
+                onChange={e => setNewDriver({...newDriver, emergencyName: e.target.value})}/>
+              <input placeholder="Emergency Phone"
+                className="border rounded-xl p-3 text-sm"
+                value={newDriver.emergencyPhone}
+                onChange={e => setNewDriver({...newDriver, emergencyPhone: e.target.value.replace(/\D/g,'').slice(0,10)})}/>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowAddDriver(false)}
+                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
+              <button onClick={addDriver}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Add</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── MULTIPLE MODE ── */}
+        {addDriverMode === 'multiple' && (
+          <div>
+            <p className="text-xs text-slate-400 mb-3">
+              Naam aur phone required hai. Baaki optional.
+            </p>
+            
+            <div className="space-y-2 mb-3">
+              {multipleDrivers.map((d, i) => (
+                <div key={i} className={`border rounded-xl p-3 space-y-2 ${
+                  d._saved ? 'bg-emerald-50 border-emerald-200' : 
+                  d._error ? 'bg-red-50 border-red-200' : 'bg-slate-50'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-400">Driver {i+1}</span>
+                    <div className="flex items-center gap-2">
+                      {d._saved && <span className="text-[10px] text-emerald-600 font-black">✅ Added</span>}
+                      {d._error && <span className="text-[10px] text-red-600 font-black">{d._error}</span>}
+                      {multipleDrivers.length > 1 && !d._saved && (
+                        <button onClick={() => {
+                          setMultipleDrivers(prev => prev.filter((_,idx) => idx!==i));
+                        }} className="text-red-400 text-xs">✕</button>
+                      )}
+                    </div>
+                  </div>
+                  {!d._saved && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        placeholder="Full Name *"
+                        className="border rounded-lg p-2 text-sm bg-white"
+                        value={d.name}
+                        onChange={e => setMultipleDrivers(prev => prev.map((x,idx) =>
+                          idx===i ? {...x, name: e.target.value, _error: null} : x
+                        ))}/>
+                      <input
+                        placeholder="Phone *"
+                        className="border rounded-lg p-2 text-sm bg-white font-mono"
+                        value={d.phone}
+                        maxLength={10}
+                        onChange={e => setMultipleDrivers(prev => prev.map((x,idx) =>
+                          idx===i ? {...x, phone: e.target.value.replace(/\D/g,'').slice(0,10), _error: null} : x
+                        ))}/>
+                      <input
+                        placeholder="License No. (optional)"
+                        className="border rounded-lg p-2 text-sm bg-white uppercase font-mono"
+                        value={d.license || ''}
+                        onChange={e => setMultipleDrivers(prev => prev.map((x,idx) =>
+                          idx===i ? {...x, license: e.target.value.toUpperCase()} : x
+                        ))}/>
+                      <input
+                        type="number"
+                        placeholder="₹ Security Deposit"
+                        className="border rounded-lg p-2 text-sm bg-white"
+                        value={d.deposit || ''}
+                        onChange={e => setMultipleDrivers(prev => prev.map((x,idx) =>
+                          idx===i ? {...x, deposit: e.target.value} : x
+                        ))}/>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Add Row */}
+            <button
+              onClick={() => setMultipleDrivers(prev => [...prev, {name:'', phone:'', license:'', deposit:''}])}
+              className="w-full py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-xl text-sm font-black mb-4 hover:border-blue-500 transition">
+              + Add Another Driver
+            </button>
+
+            <div className="flex gap-3">
+              <button onClick={() => {
+                setShowAddDriver(false);
+                setMultipleDrivers([{name:'', phone:''}]);
+                setAddDriverMode('single');
+              }} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">
+                Cancel
+              </button>
+              <button
+                onClick={addMultipleDrivers}
+                disabled={bulkLoading}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
+                {bulkLoading ? 'Adding...' : `Add ${multipleDrivers.filter(d=>d.name&&d.phone&&!d._saved).length} Drivers`}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   </div>
@@ -2793,6 +2977,138 @@ const ProfileTab = () => (
         >
           💵 Record Cash
         </button>
+      </div>
+    </div>
+  </div>
+)}
+{showBulkModal && (
+  <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-2">
+    <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[95vh] flex flex-col">
+      <div className="p-4 pb-3 flex justify-between items-center border-b shrink-0">
+        <div>
+          <h3 className="text-lg font-black">📊 Bulk Driver Import</h3>
+          <p className="text-[10px] text-slate-400">CSV upload → verify → fix → import</p>
+        </div>
+        <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}>
+          <X size={20}/>
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {!bulkResult ? (
+          <>
+            <div className="flex gap-3 mb-4">
+              <div className="flex-1 bg-blue-50 rounded-xl p-3">
+                <p className="text-xs font-black text-blue-700 mb-2">① Download Template</p>
+                <button onClick={downloadTemplate}
+                  className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1">
+                  📥 Download CSV
+                </button>
+              </div>
+              <div className="flex-1 bg-slate-50 rounded-xl p-3">
+                <p className="text-xs font-black text-slate-600 mb-2">② Upload Filled CSV</p>
+                <label className="w-full py-2 border-2 border-dashed border-slate-300 rounded-xl text-xs font-black text-slate-500 cursor-pointer hover:border-blue-400 flex items-center justify-center gap-1 transition">
+                  📂 {bulkFile || 'Choose File'}
+                  <input type="file" accept=".csv" className="hidden" onChange={handleBulkFile}/>
+                </label>
+              </div>
+            </div>
+
+            {bulkDrivers.length > 0 && (
+              <>
+                <div className="flex justify-between items-center mb-3 px-1">
+                  <span className="text-xs font-black text-slate-600">{bulkDrivers.length} drivers found</span>
+                  <div className="flex gap-3">
+                    <span className="text-xs text-emerald-600 font-black">✅ {bulkDrivers.filter(d=>d._errors.length===0).length} valid</span>
+                    {bulkDrivers.filter(d=>d._errors.length>0).length > 0 && (
+                      <span className="text-xs text-red-600 font-black">❌ {bulkDrivers.filter(d=>d._errors.length>0).length} errors</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border rounded-xl overflow-hidden mb-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs min-w-[600px]">
+                      <thead className="bg-slate-50 border-b">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-black text-slate-400 w-8">#</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-500">Full Name *</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-500">Phone *</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-500">License No.</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-500">Deposit (₹)</th>
+                          <th className="text-left px-3 py-2 font-black text-slate-500">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {bulkDrivers.map((d, i) => (
+                          <tr key={i} className={d._errors.length > 0 ? 'bg-red-50' : 'bg-white'}>
+                            <td className="px-3 py-2 text-slate-400">{i+1}</td>
+                            <td className="px-2 py-1.5">
+                              <input value={d.full_name||''} onChange={e=>updateBulkRow(i,'full_name',e.target.value)}
+                                className={`w-full border rounded-lg px-2 py-1 text-xs focus:outline-none ${d._errors.some(e=>e.includes('Name'))?'border-red-400 bg-red-50':'border-slate-200 focus:border-blue-400'}`}
+                                placeholder="Full Name"/>
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <input value={d.mobile_number||''} onChange={e=>updateBulkRow(i,'mobile_number',e.target.value.replace(/\D/g,'').slice(0,10))}
+                                className={`w-full border rounded-lg px-2 py-1 text-xs font-mono focus:outline-none ${d._errors.some(e=>e.includes('Phone')||e.includes('10 digits'))?'border-red-400 bg-red-50':'border-slate-200 focus:border-blue-400'}`}
+                                placeholder="9876543210" maxLength={10}/>
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <input value={d.driving_license_number||''} onChange={e=>updateBulkRow(i,'driving_license_number',e.target.value.toUpperCase())}
+                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs uppercase focus:outline-none focus:border-blue-400"
+                                placeholder="Optional"/>
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <input type="number" value={d.security_deposit||''} onChange={e=>updateBulkRow(i,'security_deposit',e.target.value)}
+                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-blue-400"
+                                placeholder="0"/>
+                            </td>
+                            <td className="px-3 py-2">
+                              {d._errors.length===0
+                                ? <span className="text-emerald-600 font-black text-[10px]">✅</span>
+                                : <span className="text-red-600 font-black text-[9px]">{d._errors.join(', ')}</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={() => setBulkDrivers(prev => prev.map(row => ({...row, _errors: validateBulkRow(row)})))}
+                    className="px-4 py-2.5 bg-slate-100 rounded-xl text-xs font-black">🔄 Re-verify</button>
+                  <button onClick={() => setBulkDrivers(prev => prev.filter(d => d._errors.length === 0))}
+                    className="px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-black border border-amber-200">🗑 Remove Errors</button>
+                  <button onClick={importBulkDrivers}
+                    disabled={bulkLoading || bulkDrivers.filter(d=>d._errors.length===0).length===0}
+                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black disabled:opacity-50 flex items-center justify-center gap-2">
+                    {bulkLoading ? '⏳ Importing...' : `Import ${bulkDrivers.filter(d=>d._errors.length===0).length} Valid Drivers →`}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <div className="space-y-4 py-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center">
+              <p className="text-5xl font-black text-emerald-600">{bulkResult.imported}</p>
+              <p className="text-base font-black text-emerald-600 mt-2">Drivers Imported! ✅</p>
+            </div>
+            {bulkResult.failed > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-xs font-black text-red-700 mb-2">❌ {bulkResult.failed} Failed:</p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {bulkResult.failures?.map((f, i) => (
+                    <p key={i} className="text-[10px] text-red-500">{f.name} — {f.reason}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
+              className="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-black">✓ Done</button>
+          </div>
+        )}
       </div>
     </div>
   </div>
