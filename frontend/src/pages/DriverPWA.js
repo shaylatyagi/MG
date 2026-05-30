@@ -13,51 +13,6 @@ const API ='https://mg-qw5s.onrender.com';
 const KYC_API = 'https://mg-qw5s.onrender.com';
 
 export default function DriverPWA() {
-  // ─── CHAT STATE ───
-const [showOwnerChat, setShowOwnerChat] = useState(false);
-const [chatMessages, setChatMessages] = useState([]);
-const [chatMsgs, setChatMsgs] = useState([]);
-const [chatUnread, setChatUnread] = useState(0);
-
-// Chat fetch
-const fetchChat = async () => {
-  const ph = phone();
-  if (!ph) return;
-  const res = await fetch(
-    `${API}/api/payment/chat/messages?driverPhone=${ph}&ownerId=1`,
-    { headers: { Authorization: `Bearer ${tk()}` } }
-  );
-  if (res.ok) {
-    const data = await res.json();
-    setChatMsgs(data);
-  }
-};
-
-useEffect(() => {
-  if (!user) return;
-  fetchChat();
-  const interval = setInterval(fetchChat, 5000); // 5 sec polling
-  return () => clearInterval(interval);
-}, [user]);
-
-// Send chat message
-const sendChatMessage = async () => {
-  if (!chatInput.trim()) return;
-  const msg = chatInput.trim();
-  setChatInput('');
-  
-  await fetch(`${API}/api/payment/chat/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-    body: JSON.stringify({
-      driverPhone: phone(),
-      message: msg,
-      senderType: 'DRIVER',
-      ownerId: 1
-    })
-  });
-  fetchChat();
-};
   const getHeaderTitle = (tab) => {
   const titles = {
     'home': 'Dashboard',
@@ -238,7 +193,51 @@ useEffect(() => {
     return cleaned.length >= 10 ? cleaned.slice(-10) : cleaned;
   } catch { return ''; }
 };
+  // ─── CHAT STATE ───
+const [showOwnerChat, setShowOwnerChat] = useState(false);
+const [chatMessages, setChatMessages] = useState([]);
+const [chatMsgs, setChatMsgs] = useState([]);
+const [chatUnread, setChatUnread] = useState(0);
 
+// Chat fetch
+const fetchChat = async () => {
+  const ph = phone();
+  if (!ph) return;
+  const res = await fetch(
+    `${API}/api/payment/chat/messages?driverPhone=${ph}&ownerId=1`,
+    { headers: { Authorization: `Bearer ${tk()}` } }
+  );
+  if (res.ok) {
+    const data = await res.json();
+    setChatMsgs(data);
+  }
+};
+
+useEffect(() => {
+  if (!user) return;
+  fetchChat();
+  const interval = setInterval(fetchChat, 5000); // 5 sec polling
+  return () => clearInterval(interval);
+}, [user]);
+
+// Send chat message
+const sendChatMessage = async () => {
+  if (!chatInput.trim()) return;
+  const msg = chatInput.trim();
+  setChatInput('');
+  
+  await fetch(`${API}/api/payment/chat/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+    body: JSON.stringify({
+      driverPhone: phone(),
+      message: msg,
+      senderType: 'DRIVER',
+      ownerId: 1
+    })
+  });
+  fetchChat();
+};
   const fetchAll = useCallback(async () => {
     if (!user) return; setLoading(true);
     try {
