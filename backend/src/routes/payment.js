@@ -1540,7 +1540,53 @@ router.get('/owner/notifications', async (req, res) => {
     res.json([]);
   }
 });
-// ── BULK UPLOAD ──────────────────────────────
+router.post('/owner/bulk-upload-vehicles', async (req, res) => {
+  try {
+    const { vehicles, ownerId } = req.body;
+    if (!vehicles?.length) return res.status(400).json({ success: false, message: 'No data' });
+
+    const results = { success: [], failed: [] };
+
+    for (const v of vehicles) {
+      try {
+        const num = (v.vehicle_number || '').trim().toUpperCase();
+        if (!num) { results.failed.push({ num, reason: 'Vehicle number missing' }); continue; }
+        if (!v.vehicle_model) { results.failed.push({ num, reason: 'Model missing' }); continue; }
+
+        const existing = await pool.query(
+          'SELECT id FROM public.vehicles WHERE vehicle_number = $1', [num]
+        );
+        if (existing.rows.length > 0) {
+          results.failed.push({ num, reason: `${num} already exists` }); continue;
+        }
+
+        await pool.query(
+          `INSERT INTO public.vehicles 
+            (vehicle_number, vehicle_model, vehicle_type, daily_rent, owner_id, status,
+             insurance_expiry, fitness_expiry, chassis_number, created_at)
+           VALUES ($1,$2,$3,$4,$5,'AVAILABLE',$6,$7,$8,NOW())`,
+          [
+            num,
+            v.vehicle_model.trim(),
+            v.vehicle_type || 'TRUCK',
+            parseFloat(v.daily_rent) || 850,
+            parseInt(ownerId) || 1,
+            v.insurance_expiry || null,
+            v.fitness_expiry || null,
+            v.chassis_number || null
+          ]
+        );
+        results.success.push(num);
+      } catch(err) {
+        results.failed.push({ num: v.vehicle_number, reason: err.message });
+      }
+    }
+
+    res.json({ success: true, imported: results.success.length, failed: results.failed.length, failures: results.failed });
+  } catch(err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 router.post('/owner/bulk-upload', async (req, res) => {
   try {
     const { drivers, ownerCode } = req.body;
@@ -1550,23 +1596,21 @@ router.post('/owner/bulk-upload', async (req, res) => {
 
     for (const driver of drivers) {
       try {
-        const phone = String(driver.mobile_number || '').replace(/\s/g, '');
+        const phone = String(driver.mobile_number || '').replace(/\s/g, '').trim();
+        const name = (driver.full_name || '').trim();
 
-        if (!driver.full_name?.trim())
-          { results.failed.push({ name: driver.full_name, reason: 'Name missing' }); continue; }
-        if (/[0-9]/.test(driver.full_name))
-          { results.failed.push({ name: driver.full_name, reason: 'Name mein numbers' }); continue; }
-        if (!/^\d{10}$/.test(phone))
-          { results.failed.push({ name: driver.full_name, reason: `${phone} — 10 digits chahiye` }); continue; }
+        if (!name) { results.failed.push({ name, reason: 'Name missing' }); continue; }
+        if (/[0-9]/.test(name)) { results.failed.push({ name, reason: 'Name mein numbers' }); continue; }
+        if (!/^\d{10}$/.test(phone)) { results.failed.push({ name, reason: `${phone} — invalid phone` }); continue; }
 
         const existing = await pool.query(
           'SELECT id FROM public.drivers WHERE mobile_number = $1', [phone]
         );
-        if (existing.rows.length > 0)
-          { results.failed.push({ name: driver.full_name, reason: `${phone} already exists` }); continue; }
+        if (existing.rows.length > 0) {
+          results.failed.push({ name, reason: `${phone} already exists` }); continue;
+        }
 
-        const driverCode = 'DRV' + Date.now().toString().slice(-5) + 
-                           Math.random().toString(36).substr(2,3).toUpperCase();
+        const driverCode = 'DRV' + Date.now().toString().slice(-5) + Math.random().toString(36).substr(2,3).toUpperCase();
 
         await pool.query(
           `INSERT INTO public.drivers 
@@ -1575,7 +1619,7 @@ router.post('/owner/bulk-upload', async (req, res) => {
              driving_license_number, driving_license_expiry, security_deposit)
            VALUES ($1,$2,$3,$4,0,'ACTIVE',$5,$6,$7,$8,$9,$10)`,
           [
-            driver.full_name.trim(), phone,
+            name, phone,
             ownerCode || 'OWN701951', driverCode,
             driver.date_of_birth || null,
             driver.emergency_contact_name || null,
@@ -1585,18 +1629,13 @@ router.post('/owner/bulk-upload', async (req, res) => {
             parseFloat(driver.security_deposit) || 0
           ]
         );
-        results.success.push(driver.full_name);
+        results.success.push(name);
       } catch(err) {
         results.failed.push({ name: driver.full_name, reason: err.message });
       }
     }
 
-    res.json({
-      success: true,
-      imported: results.success.length,
-      failed: results.failed.length,
-      failures: results.failed
-    });
+    res.json({ success: true, imported: results.success.length, failed: results.failed.length, failures: results.failed });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }

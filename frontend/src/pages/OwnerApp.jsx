@@ -392,6 +392,8 @@ const [assigning, setAssigning] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkTab, setBulkTab] = useState('drivers'); // 'drivers' or 'vehicles'
+const [bulkVehicles, setBulkVehicles] = useState([]);
 const [bulkDrivers, setBulkDrivers] = useState([]);
 const [bulkLoading, setBulkLoading] = useState(false);
 const [bulkResult, setBulkResult] = useState(null);
@@ -1052,13 +1054,12 @@ const validateBulkRow = (row) => {
   else if (!/^\d{10}$/.test(ph)) errs.push('Phone 10 digits chahiye');
   return errs;
 };
-
 const downloadTemplate = () => {
   const csv = [
-    'full_name,mobile_number,date_of_birth,driving_license_number,driving_license_expiry,security_deposit',
-    'Abdul Rahman,9876543210,1990-01-15,DL-0420100012345,2025-12-31,5000',
-    'Ramesh Kumar,9876543211,1985-06-20,,,3000',
-    'Priya Sharma,9876543212,,,,0'
+    'full_name,mobile_number,date_of_birth,emergency_contact_name,emergency_contact_number,driving_license_number,driving_license_expiry,security_deposit',
+    'Abdul Rahman,9876543210,1990-01-15,Mohammed Ali,9876541234,DL-0420100012345,2025-12-31,5000',
+    'Ramesh Kumar,9876543211,1985-06-20,Suresh Kumar,9876541235,DL-0520110054321,2026-06-30,3000',
+    'Priya Sharma,9876543212,1995-03-10,Meera Sharma,9876541236,,2027-01-15,0'
   ].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
@@ -1066,7 +1067,60 @@ const downloadTemplate = () => {
   a.href = url; a.download = 'driver_import_template.csv'; a.click();
   URL.revokeObjectURL(url);
 };
+const downloadVehicleTemplate = () => {
+  const csv = [
+    'vehicle_number,vehicle_model,vehicle_type,daily_rent,insurance_expiry,fitness_expiry,chassis_number',
+    'MH01AB1234,Tata Ace EV,EV,850,2026-12-31,2026-06-30,MA1TB2EL1NM123456',
+    'MH02CD5678,Mahindra Treo,EV,750,2027-01-15,2026-09-30,MA3HF2EL1PM654321',
+    'MH03EF9012,Bajaj RE,AUTO,600,2026-08-20,2026-04-15,'
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'vehicle_import_template.csv'; a.click();
+  URL.revokeObjectURL(url);
+};
 
+const handleVehicleBulkFile = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  setBulkFile(file.name);
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const lines = ev.target.result.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/ /g,'_'));
+    const parsed = lines.slice(1).map((line, i) => {
+      const values = line.split(',').map(v => v.trim());
+      const obj = {};
+      headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
+      const errs = [];
+      if (!obj.vehicle_number) errs.push('Vehicle number missing');
+      if (!obj.vehicle_model) errs.push('Model missing');
+      if (obj.daily_rent && isNaN(obj.daily_rent)) errs.push('Daily rent must be number');
+      obj._errors = errs;
+      return obj;
+    }).filter(v => v.vehicle_number || v.vehicle_model);
+    setBulkVehicles(parsed);
+  };
+  reader.readAsText(file);
+};
+
+const importBulkVehicles = async () => {
+  const valid = bulkVehicles.filter(v => v._errors.length === 0);
+  if (!valid.length) return alert('Koi valid vehicle nahi');
+  setBulkLoading(true);
+  try {
+    const res = await fetch(`${API}/api/payment/owner/bulk-upload-vehicles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      body: JSON.stringify({ vehicles: valid, ownerId: ownerId() })
+    });
+    const data = await res.json();
+    setBulkResult(data);
+    if (data.imported > 0) fetchAllData();
+  } catch(err) { alert('Network error'); }
+  finally { setBulkLoading(false); }
+};
 const handleBulkFile = (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -2984,89 +3038,113 @@ const ProfileTab = () => (
 {showBulkModal && (
   <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-2">
     <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[95vh] flex flex-col">
+      
+      {/* Header */}
       <div className="p-4 pb-3 flex justify-between items-center border-b shrink-0">
         <div>
-          <h3 className="text-lg font-black">📊 Bulk Driver Import</h3>
-          <p className="text-[10px] text-slate-400">CSV upload → verify → fix → import</p>
+          <h3 className="text-lg font-black">📊 Bulk Import</h3>
+          <p className="text-[10px] text-slate-400">CSV → verify → fix → import</p>
         </div>
-        <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}>
+        <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('drivers'); }}>
           <X size={20}/>
+        </button>
+      </div>
+
+      {/* Driver / Vehicle Tab */}
+      <div className="flex gap-2 px-4 pt-3 shrink-0">
+        <button onClick={() => { setBulkTab('drivers'); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
+          className={`flex-1 py-2 rounded-xl text-sm font-black transition ${bulkTab==='drivers'?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>
+          👤 Drivers
+        </button>
+        <button onClick={() => { setBulkTab('vehicles'); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); }}
+          className={`flex-1 py-2 rounded-xl text-sm font-black transition ${bulkTab==='vehicles'?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>
+          🚛 Vehicles
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
         {!bulkResult ? (
           <>
+            {/* Step row */}
             <div className="flex gap-3 mb-4">
               <div className="flex-1 bg-blue-50 rounded-xl p-3">
                 <p className="text-xs font-black text-blue-700 mb-2">① Download Template</p>
-                <button onClick={downloadTemplate}
-                  className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1">
-                  📥 Download CSV
+                <button onClick={bulkTab==='drivers' ? downloadTemplate : downloadVehicleTemplate}
+                  className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-black">
+                  📥 Download {bulkTab==='drivers'?'Driver':'Vehicle'} CSV
                 </button>
               </div>
               <div className="flex-1 bg-slate-50 rounded-xl p-3">
                 <p className="text-xs font-black text-slate-600 mb-2">② Upload Filled CSV</p>
                 <label className="w-full py-2 border-2 border-dashed border-slate-300 rounded-xl text-xs font-black text-slate-500 cursor-pointer hover:border-blue-400 flex items-center justify-center gap-1 transition">
                   📂 {bulkFile || 'Choose File'}
-                  <input type="file" accept=".csv" className="hidden" onChange={handleBulkFile}/>
+                  <input type="file" accept=".csv" className="hidden"
+                    onChange={bulkTab==='drivers' ? handleBulkFile : handleVehicleBulkFile}/>
                 </label>
               </div>
             </div>
 
-            {bulkDrivers.length > 0 && (
+            {/* ── DRIVERS TABLE ── */}
+            {bulkTab==='drivers' && bulkDrivers.length > 0 && (
               <>
-                <div className="flex justify-between items-center mb-3 px-1">
-                  <span className="text-xs font-black text-slate-600">{bulkDrivers.length} drivers found</span>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs font-black">{bulkDrivers.length} rows</span>
                   <div className="flex gap-3">
                     <span className="text-xs text-emerald-600 font-black">✅ {bulkDrivers.filter(d=>d._errors.length===0).length} valid</span>
-                    {bulkDrivers.filter(d=>d._errors.length>0).length > 0 && (
-                      <span className="text-xs text-red-600 font-black">❌ {bulkDrivers.filter(d=>d._errors.length>0).length} errors</span>
-                    )}
+                    {bulkDrivers.filter(d=>d._errors.length>0).length > 0 &&
+                      <span className="text-xs text-red-600 font-black">❌ {bulkDrivers.filter(d=>d._errors.length>0).length} errors</span>}
                   </div>
                 </div>
-
                 <div className="border rounded-xl overflow-hidden mb-4">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs min-w-[600px]">
+                    <table className="w-full text-xs min-w-[750px]">
                       <thead className="bg-slate-50 border-b">
                         <tr>
-                          <th className="text-left px-3 py-2 font-black text-slate-400 w-8">#</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-500">Full Name *</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-500">Phone *</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-500">License No.</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-500">Deposit (₹)</th>
-                          <th className="text-left px-3 py-2 font-black text-slate-500">Status</th>
+                          {['#','Name *','Phone *','DOB','Emergency Name','Emergency Phone','License No.','License Expiry','Deposit','Status'].map(h=>(
+                            <th key={h} className="text-left px-2 py-2 font-black text-slate-500 whitespace-nowrap">{h}</th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {bulkDrivers.map((d, i) => (
-                          <tr key={i} className={d._errors.length > 0 ? 'bg-red-50' : 'bg-white'}>
-                            <td className="px-3 py-2 text-slate-400">{i+1}</td>
-                            <td className="px-2 py-1.5">
+                          <tr key={i} className={d._errors.length>0?'bg-red-50':'bg-white'}>
+                            <td className="px-2 py-1.5 text-slate-400">{i+1}</td>
+                            <td className="px-1 py-1">
                               <input value={d.full_name||''} onChange={e=>updateBulkRow(i,'full_name',e.target.value)}
-                                className={`w-full border rounded-lg px-2 py-1 text-xs focus:outline-none ${d._errors.some(e=>e.includes('Name'))?'border-red-400 bg-red-50':'border-slate-200 focus:border-blue-400'}`}
-                                placeholder="Full Name"/>
+                                className={`w-24 border rounded px-1.5 py-1 text-xs focus:outline-none ${d._errors.some(e=>e.includes('Name'))?'border-red-400':'border-slate-200'}`}/>
                             </td>
-                            <td className="px-2 py-1.5">
+                            <td className="px-1 py-1">
                               <input value={d.mobile_number||''} onChange={e=>updateBulkRow(i,'mobile_number',e.target.value.replace(/\D/g,'').slice(0,10))}
-                                className={`w-full border rounded-lg px-2 py-1 text-xs font-mono focus:outline-none ${d._errors.some(e=>e.includes('Phone')||e.includes('10 digits'))?'border-red-400 bg-red-50':'border-slate-200 focus:border-blue-400'}`}
-                                placeholder="9876543210" maxLength={10}/>
+                                className={`w-24 border rounded px-1.5 py-1 text-xs font-mono focus:outline-none ${d._errors.some(e=>e.includes('Phone'))?'border-red-400':'border-slate-200'}`} maxLength={10}/>
                             </td>
-                            <td className="px-2 py-1.5">
+                            <td className="px-1 py-1">
+                              <input type="date" value={d.date_of_birth||''} onChange={e=>updateBulkRow(i,'date_of_birth',e.target.value)}
+                                className="w-28 border border-slate-200 rounded px-1.5 py-1 text-xs focus:outline-none"/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input value={d.emergency_contact_name||''} onChange={e=>updateBulkRow(i,'emergency_contact_name',e.target.value)}
+                                className="w-24 border border-slate-200 rounded px-1.5 py-1 text-xs focus:outline-none"/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input value={d.emergency_contact_number||''} onChange={e=>updateBulkRow(i,'emergency_contact_number',e.target.value.replace(/\D/g,'').slice(0,10))}
+                                className="w-24 border border-slate-200 rounded px-1.5 py-1 text-xs font-mono focus:outline-none" maxLength={10}/>
+                            </td>
+                            <td className="px-1 py-1">
                               <input value={d.driving_license_number||''} onChange={e=>updateBulkRow(i,'driving_license_number',e.target.value.toUpperCase())}
-                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs uppercase focus:outline-none focus:border-blue-400"
-                                placeholder="Optional"/>
+                                className="w-28 border border-slate-200 rounded px-1.5 py-1 text-xs uppercase focus:outline-none"/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input type="date" value={d.driving_license_expiry||''} onChange={e=>updateBulkRow(i,'driving_license_expiry',e.target.value)}
+                                className="w-28 border border-slate-200 rounded px-1.5 py-1 text-xs focus:outline-none"/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input type="number" value={d.security_deposit||''} onChange={e=>updateBulkRow(i,'security_deposit',e.target.value)}
+                                className="w-16 border border-slate-200 rounded px-1.5 py-1 text-xs focus:outline-none" placeholder="0"/>
                             </td>
                             <td className="px-2 py-1.5">
-                              <input type="number" value={d.security_deposit||''} onChange={e=>updateBulkRow(i,'security_deposit',e.target.value)}
-                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-blue-400"
-                                placeholder="0"/>
-                            </td>
-                            <td className="px-3 py-2">
                               {d._errors.length===0
                                 ? <span className="text-emerald-600 font-black text-[10px]">✅</span>
-                                : <span className="text-red-600 font-black text-[9px]">{d._errors.join(', ')}</span>}
+                                : <span className="text-red-600 font-black text-[9px]">{d._errors[0]}</span>}
                             </td>
                           </tr>
                         ))}
@@ -3074,16 +3152,95 @@ const ProfileTab = () => (
                     </table>
                   </div>
                 </div>
-
                 <div className="flex gap-3">
-                  <button onClick={() => setBulkDrivers(prev => prev.map(row => ({...row, _errors: validateBulkRow(row)})))}
+                  <button onClick={() => setBulkDrivers(prev => prev.map(row=>({...row,_errors:validateBulkRow(row)})))}
                     className="px-4 py-2.5 bg-slate-100 rounded-xl text-xs font-black">🔄 Re-verify</button>
-                  <button onClick={() => setBulkDrivers(prev => prev.filter(d => d._errors.length === 0))}
+                  <button onClick={() => setBulkDrivers(prev=>prev.filter(d=>d._errors.length===0))}
                     className="px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-black border border-amber-200">🗑 Remove Errors</button>
                   <button onClick={importBulkDrivers}
                     disabled={bulkLoading || bulkDrivers.filter(d=>d._errors.length===0).length===0}
-                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black disabled:opacity-50 flex items-center justify-center gap-2">
-                    {bulkLoading ? '⏳ Importing...' : `Import ${bulkDrivers.filter(d=>d._errors.length===0).length} Valid Drivers →`}
+                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black disabled:opacity-50">
+                    {bulkLoading ? '⏳ Importing...' : `Import ${bulkDrivers.filter(d=>d._errors.length===0).length} Drivers →`}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ── VEHICLES TABLE ── */}
+            {bulkTab==='vehicles' && bulkVehicles.length > 0 && (
+              <>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs font-black">{bulkVehicles.length} rows</span>
+                  <div className="flex gap-3">
+                    <span className="text-xs text-emerald-600 font-black">✅ {bulkVehicles.filter(v=>v._errors.length===0).length} valid</span>
+                    {bulkVehicles.filter(v=>v._errors.length>0).length > 0 &&
+                      <span className="text-xs text-red-600 font-black">❌ {bulkVehicles.filter(v=>v._errors.length>0).length} errors</span>}
+                  </div>
+                </div>
+                <div className="border rounded-xl overflow-hidden mb-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs min-w-[650px]">
+                      <thead className="bg-slate-50 border-b">
+                        <tr>
+                          {['#','Vehicle No. *','Model *','Type','Daily Rent','Insurance Expiry','Fitness Expiry','Chassis No.','Status'].map(h=>(
+                            <th key={h} className="text-left px-2 py-2 font-black text-slate-500 whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {bulkVehicles.map((v, i) => (
+                          <tr key={i} className={v._errors.length>0?'bg-red-50':'bg-white'}>
+                            <td className="px-2 py-1.5 text-slate-400">{i+1}</td>
+                            <td className="px-1 py-1">
+                              <input value={v.vehicle_number||''} onChange={e=>{
+                                setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],vehicle_number:e.target.value.toUpperCase()};const errs=[];if(!u[i].vehicle_number)errs.push('Number missing');if(!u[i].vehicle_model)errs.push('Model missing');u[i]._errors=errs;return u;});
+                              }} className={`w-24 border rounded px-1.5 py-1 text-xs uppercase font-mono focus:outline-none ${v._errors.some(e=>e.includes('Number'))?'border-red-400':'border-slate-200'}`}/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input value={v.vehicle_model||''} onChange={e=>{
+                                setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],vehicle_model:e.target.value};const errs=[];if(!u[i].vehicle_number)errs.push('Number missing');if(!u[i].vehicle_model)errs.push('Model missing');u[i]._errors=errs;return u;});
+                              }} className={`w-28 border rounded px-1.5 py-1 text-xs focus:outline-none ${v._errors.some(e=>e.includes('Model'))?'border-red-400':'border-slate-200'}`}/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <select value={v.vehicle_type||'EV'} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],vehicle_type:e.target.value};return u;})}}
+                                className="border border-slate-200 rounded px-1.5 py-1 text-xs bg-white focus:outline-none">
+                                <option>EV</option><option>TRUCK</option><option>AUTO</option><option>CAR</option><option>BUS</option>
+                              </select>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input type="number" value={v.daily_rent||''} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],daily_rent:e.target.value};return u;})}}
+                                className="w-16 border border-slate-200 rounded px-1.5 py-1 text-xs focus:outline-none" placeholder="850"/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input type="date" value={v.insurance_expiry||''} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],insurance_expiry:e.target.value};return u;})}}
+                                className="w-28 border border-slate-200 rounded px-1.5 py-1 text-xs focus:outline-none"/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input type="date" value={v.fitness_expiry||''} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],fitness_expiry:e.target.value};return u;})}}
+                                className="w-28 border border-slate-200 rounded px-1.5 py-1 text-xs focus:outline-none"/>
+                            </td>
+                            <td className="px-1 py-1">
+                              <input value={v.chassis_number||''} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],chassis_number:e.target.value.toUpperCase()};return u;})}}
+                                className="w-28 border border-slate-200 rounded px-1.5 py-1 text-xs uppercase font-mono focus:outline-none"/>
+                            </td>
+                            <td className="px-2 py-1.5">
+                              {v._errors.length===0
+                                ? <span className="text-emerald-600 font-black text-[10px]">✅</span>
+                                : <span className="text-red-600 font-black text-[9px]">{v._errors[0]}</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setBulkVehicles(prev=>prev.filter(v=>v._errors.length===0))}
+                    className="px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-black border border-amber-200">🗑 Remove Errors</button>
+                  <button onClick={importBulkVehicles}
+                    disabled={bulkLoading || bulkVehicles.filter(v=>v._errors.length===0).length===0}
+                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black disabled:opacity-50">
+                    {bulkLoading ? '⏳ Importing...' : `Import ${bulkVehicles.filter(v=>v._errors.length===0).length} Vehicles →`}
                   </button>
                 </div>
               </>
@@ -3093,19 +3250,21 @@ const ProfileTab = () => (
           <div className="space-y-4 py-4">
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center">
               <p className="text-5xl font-black text-emerald-600">{bulkResult.imported}</p>
-              <p className="text-base font-black text-emerald-600 mt-2">Drivers Imported! ✅</p>
+              <p className="text-base font-black text-emerald-600 mt-2">
+                {bulkTab==='drivers'?'Drivers':'Vehicles'} Imported! ✅
+              </p>
             </div>
             {bulkResult.failed > 0 && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                 <p className="text-xs font-black text-red-700 mb-2">❌ {bulkResult.failed} Failed:</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {bulkResult.failures?.map((f, i) => (
-                    <p key={i} className="text-[10px] text-red-500">{f.name} — {f.reason}</p>
+                    <p key={i} className="text-[10px] text-red-500">{f.name||f.num} — {f.reason}</p>
                   ))}
                 </div>
               </div>
             )}
-            <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
+            <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('drivers'); }}
               className="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-black">✓ Done</button>
           </div>
         )}
