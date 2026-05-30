@@ -1,14 +1,12 @@
 // frontend/src/components/Chatbot.js
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, X, Send, Volume2, VolumeX, Loader, Wallet, CreditCard, Truck, Users, IndianRupee } from 'lucide-react';
+import { Mic, MicOff, X, Send, Loader, Wallet, CreditCard, Truck, Users, IndianRupee } from 'lucide-react';
 
 const API = 'https://mg-qw5s.onrender.com';
 
-export default function Chatbot({ userRole, userId, userPhone, token, onClose, persistedMessages, onMessagesUpdate }) {
+export default function Chatbot({ userRole, userId, userPhone, token, onClose, onMessagesUpdate }) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const storageKey = `mg_chat_${userRole}`;
-
   const [messages, setMessages] = useState(() => {
     try {
       const saved = localStorage.getItem(`mg_chat_${userRole}`);
@@ -19,126 +17,107 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
     } catch {}
     return [];
   });
-
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [data, setUserData] = useState(null);
+  const [quickStats, setQuickStats] = useState(null);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
-
-  // ✅ FIX 1: Voices cache — mobile pe voiceschanged ek baar hi fire hoti hai
   const cachedVoicesRef = useRef([]);
-  // ✅ FIX 2: TTS unlock ref — iOS/Android ke liye
   const ttsUnlockedRef = useRef(false);
-
   const isOwner = userRole === 'OWNER';
 
-  // Welcome message
+  // ─── INIT ───────────────────────────────────────────────────────────
   useEffect(() => {
     setMessages(prev => {
       if (prev.length === 0) {
-        const welcome = isOwner
-          ? 'नमस्ते! Main aapka Fleet Assistant hoon. 🏢\n\nCollection, driver status, vehicle assignment — kuch bhi poochein!'
-          : 'नमस्ते! Main aapka Driver Assistant hoon. 🚛\n\nBakaya, wallet, vehicle — kuch bhi poochein!';
-        return [{ role: 'bot', content: welcome }];
+        const w = isOwner
+          ? 'Namaste! Fleet Assistant ready hoon.\n\nCollection, drivers, vehicles, ledger — kuch bhi poochein!'
+          : 'Namaste! Driver Assistant ready hoon.\n\nBakaya, wallet, gaadi — kuch bhi poochein!';
+        return [{ role: 'bot', content: w }];
       }
       return prev;
     });
-    fetchUserData();
+    fetchQuickStats();
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Save messages to localStorage
   useEffect(() => {
     if (messages.length > 0) {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(messages.slice(-50)));
-      } catch {}
+      try { localStorage.setItem(`mg_chat_${userRole}`, JSON.stringify(messages.slice(-50))); } catch {}
     }
   }, [messages]);
 
-  // ✅ FIX 3: Cache voices on load — mobile ke liye
+  // ─── VOICES CACHE ───────────────────────────────────────────────────
   useEffect(() => {
     if (!('speechSynthesis' in window)) return;
-    const loadVoices = () => {
+    const load = () => {
       const v = window.speechSynthesis.getVoices();
       if (v.length > 0) cachedVoicesRef.current = v;
     };
-    loadVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+    load();
+    window.speechSynthesis.addEventListener('voiceschanged', load);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
   }, []);
 
-  // ✅ FIX 4: iOS TTS keepalive — 15 sec ke baad ruk jaata tha
+  // iOS keepalive
   useEffect(() => {
-    const interval = setInterval(() => {
+    const t = setInterval(() => {
       if (window.speechSynthesis?.speaking) {
         window.speechSynthesis.pause();
         window.speechSynthesis.resume();
       }
     }, 14000);
-    return () => clearInterval(interval);
+    return () => clearInterval(t);
   }, []);
 
-  // Speech Recognition setup
+  // ─── SPEECH RECOGNITION ─────────────────────────────────────────────
   useEffect(() => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
-    const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-    recognitionRef.current = new SpeechRecognition();
-    recognitionRef.current.continuous = true;        // ✅ Bar bar mute nahi hoga
+    const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+    recognitionRef.current = new SR();
+    recognitionRef.current.continuous = true;
     recognitionRef.current.interimResults = true;
-    recognitionRef.current.lang = 'hi-IN';
+    recognitionRef.current.lang = 'en-IN'; // Hinglish dono
 
-    recognitionRef.current.onresult = (event) => {
-      let interim = '';
-      let final = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const t = event.results[i][0].transcript;
-        if (event.results[i].isFinal) final += t;
+    recognitionRef.current.onresult = (e) => {
+      let interim = '', final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t;
         else interim += t;
       }
       setInputText(final || interim);
       if (final) {
-        recognitionRef.current.stop();              // ✅ Final milne pe stop
+        recognitionRef.current.stop();
         handleUserMessage(final.trim());
         setIsListening(false);
       }
     };
-
-    recognitionRef.current.onerror = (event) => {
+    recognitionRef.current.onerror = (e) => {
       setIsListening(false);
-      if (event.error !== 'no-speech' && event.error !== 'aborted') {
-        addMessage('bot', 'Mic permission required. Browser settings mein allow karein.');
-      }
+      if (e.error !== 'no-speech' && e.error !== 'aborted')
+        addMessage('bot', 'Mic access nahi mila. Browser permissions check karein.');
     };
-
-    recognitionRef.current.onend = () => {
-      setIsListening(false);
-    };
+    recognitionRef.current.onend = () => setIsListening(false);
   }, []);
 
-  // ✅ FIX 5: TTS unlock — iOS/Android pehle user gesture chahta hai
+  // ─── TTS ────────────────────────────────────────────────────────────
   const unlockTTS = () => {
     if (ttsUnlockedRef.current || !('speechSynthesis' in window)) return;
     try {
-      const silent = new SpeechSynthesisUtterance('');
-      silent.volume = 0;
-      window.speechSynthesis.speak(silent);
+      const u = new SpeechSynthesisUtterance('');
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
       ttsUnlockedRef.current = true;
-    } catch (e) {}
+    } catch {}
   };
 
-  // ✅ FIX 6: speak() — cached voices + no voiceschanged wait + delay
   const speak = (text) => {
     if (!('speechSynthesis' in window)) return;
-
-    try {
-      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-    } catch (e) {}
-
+    try { if (window.speechSynthesis.paused) window.speechSynthesis.resume(); } catch {}
     window.speechSynthesis.cancel();
 
     const speakable = text
@@ -146,60 +125,33 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
       .replace(/[^\x00-\x7F\u0900-\u097F\s0-9.,!?]/g, '')
       .replace(/\n+/g, '. ')
       .trim();
-
     if (!speakable) return;
-    setIsSpeaking(true);
 
-    // ✅ Cached voices use karo — voiceschanged ka wait mat karo
+    setIsSpeaking(true);
     const voices = cachedVoicesRef.current.length > 0
       ? cachedVoicesRef.current
       : window.speechSynthesis.getVoices();
-
     const best =
       voices.find(v => v.lang === 'hi-IN') ||
       voices.find(v => v.lang?.startsWith('hi')) ||
       voices.find(v => v.lang === 'en-IN') ||
-      voices.find(v => v.lang?.startsWith('en')) ||
       voices[0];
 
     const u = new SpeechSynthesisUtterance(speakable);
-    if (best) { u.voice = best; u.lang = best.lang; }
-    else u.lang = 'hi-IN';
-    u.rate = 0.85;
-    u.volume = 1.0;
+    if (best) { u.voice = best; u.lang = best.lang; } else u.lang = 'hi-IN';
+    u.rate = 0.85; u.volume = 1.0;
     u.onend = () => setIsSpeaking(false);
     u.onerror = () => setIsSpeaking(false);
-
-    // ✅ 300ms delay — cancel ke baad turant speak mobile pe block hota hai
-    setTimeout(() => {
-      try { window.speechSynthesis.speak(u); }
-      catch (e) { setIsSpeaking(false); }
-    }, 300);
+    setTimeout(() => { try { window.speechSynthesis.speak(u); } catch { setIsSpeaking(false); } }, 300);
   };
 
-  const stopSpeaking = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
-  };
-
-  // ✅ FIX 7: startListening — unlockTTS + stop before start
   const startListening = () => {
-    unlockTTS(); // User gesture = TTS unlock
-    if (!recognitionRef.current) {
-      addMessage('bot', 'Speech recognition supported nahi hai. Please type karein.');
-      return;
-    }
-    try { recognitionRef.current.stop(); } catch (e) {}
+    unlockTTS();
+    if (!recognitionRef.current) { addMessage('bot', 'Speech recognition supported nahi hai.'); return; }
+    try { recognitionRef.current.stop(); } catch {}
     setTimeout(() => {
-      try {
-        setInputText('');
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (error) {
-        setIsListening(false);
-      }
+      try { setInputText(''); recognitionRef.current.start(); setIsListening(true); }
+      catch { setIsListening(false); }
     }, 200);
   };
 
@@ -211,184 +163,296 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
     });
   };
 
-  const fetchUserData = async () => {
+  // ─── QUICK STATS (header mein dikhane ke liye) ──────────────────────
+  const fetchQuickStats = async () => {
     try {
       const H = { Authorization: `Bearer ${token}` };
-      let freshData = {};
-
       if (isOwner) {
-        const [statsRes, vehiclesRes, driversRes, ordersRes] = await Promise.all([
-          fetch(`${API}/api/payment/owner/stats?ownerId=${userId}`, { headers: H }),
-          fetch(`${API}/api/payment/owner/vehicles?ownerId=${userId}`, { headers: H }),
-          fetch(`${API}/api/payment/owner/drivers/list?ownerId=${userId}`, { headers: H }),
-          fetch(`${API}/api/payment/owner/transactions?ownerId=${userId}`, { headers: H })
-        ]);
-        const stats = await statsRes.json();
-        const vehicles = await vehiclesRes.json();
-        const driversData = await driversRes.json();
-        const orders = await ordersRes.json();
-        freshData = {
-          totalVehicles: stats.total_vehicles || 0,
-          totalDrivers: stats.total_drivers || 0,
-          todayCollection: stats.total_earnings || 0,
-          vehicles: Array.isArray(vehicles) ? vehicles : [],
-          drivers: Array.isArray(driversData) ? driversData : (driversData.drivers || []),
-          orders: Array.isArray(orders) ? orders : []
-        };
+        const res = await fetch(`${API}/api/payment/owner/stats?ownerId=${userId}`, { headers: H });
+        const d = await res.json();
+        setQuickStats({ a: d.total_earnings || 0, b: d.total_drivers || 0, c: d.total_vehicles || 0 });
       } else {
-        const [profileRes, duesRes, txRes] = await Promise.all([
+        const [pRes, dRes] = await Promise.all([
           fetch(`${API}/api/payment/driver/profile?phone=${userPhone}`, { headers: H }),
-          fetch(`${API}/api/payment/driver/dues?phone=${userPhone}`, { headers: H }),
-          fetch(`${API}/api/payment/my-transactions?phone=${userPhone}`, { headers: H })
+          fetch(`${API}/api/payment/driver/dues?phone=${userPhone}`, { headers: H })
         ]);
-        const profile = await profileRes.json();
-        const dues = await duesRes.json();
-        const transactions = await txRes.json();
-        freshData = {
-          name: profile.full_name || profile.name || 'Driver',
-          vehicleNumber: profile.vehicle_number || 'Not Assigned',
-          walletBalance: profile.wallet_balance || 0,
-          dailyRent: dues.daily_rent || 850,
-          todayDues: dues.dues || 0,
-          paidToday: dues.paid_today || 0,
-          transactions: Array.isArray(transactions) ? transactions : []
-        };
+        const p = await pRes.json(); const d = await dRes.json();
+        setQuickStats({ a: p.wallet_balance || 0, b: d.dues || 0, c: p.vehicle_number || '—' });
       }
-      setUserData(freshData);
-      return freshData;
-    } catch (err) {
-      console.error('fetchUserData error:', err);
-      return null;
-    }
+    } catch {}
   };
 
-  const hasDriverPaidToday = (driverPhone, orders) => {
+  // ─── INTENT DETECTION ───────────────────────────────────────────────
+  const detectIntent = (msg) => {
+    if (msg.match(/collection|kitni aayi|kitna aaya|earning|kamai|received|aaj kitna|today.*earn|कलेक्शन|कमाई/)) return 'collection';
+    if (msg.match(/kaun.*paid|kisne.*diya|who.*paid|paid.*today|payment.*kiya|किसने.*दिया|paid.*list/)) return 'who_paid';
+    if (msg.match(/pending|nahi.*diya|baaki|outstanding|due.*kaun|किसने नहीं|बाकी/)) return 'pending';
+    if (msg.match(/ledger|hisab|account|bakaya.*kiska|advance|entry|record/)) return 'ledger';
+    if (msg.match(/assign|de do|lagao|vehicle.*de|gaadi.*de|attach|jod|rent.*set/)) return 'assign';
+    if (msg.match(/unassign|wapas|remove|hata do|free karo|chhod/)) return 'unassign';
+    if (msg.match(/vehicle|gaadi|fleet|वाहन|गाड़ी/)) return 'vehicles';
+    if (msg.match(/driver|kitne log|team|ड्राइवर|sab driver/)) return 'drivers';
+    if (msg.match(/damage|accident|repair|tyre|engine|नुकसान/)) return 'damage';
+    if (msg.match(/summary|sab batao|full report|update|aaj ka|status|overview/)) return 'summary';
+    if (msg.match(/hello|hi|namaste|hey|हेलो|नमस्ते|start|shuru/)) return 'hello';
+    // Driver intents
+    if (msg.match(/mera.*bakaya|mujhe.*dena|kitna.*dena|my.*due|मेरा बकाया/)) return 'my_dues';
+    if (msg.match(/wallet|balance|mere.*paisa|मेरा वॉलेट/)) return 'my_wallet';
+    if (msg.match(/meri.*gaadi|mera.*vehicle|my.*vehicle|मेरी गाड़ी/)) return 'my_vehicle';
+    if (msg.match(/pay|payment.*karo|rent.*do|भुगतान/)) return 'pay_info';
+    return 'unknown';
+  };
+
+  // ─── DATA FETCHERS ──────────────────────────────────────────────────
+  const H = () => ({ Authorization: `Bearer ${token}` });
+
+  const fetchStats = () =>
+    fetch(`${API}/api/payment/owner/stats?ownerId=${userId}`, { headers: H() }).then(r => r.json());
+
+  const fetchDriversAndTx = async () => {
+    const [dRes, tRes] = await Promise.all([
+      fetch(`${API}/api/payment/owner/drivers/list?ownerId=${userId}`, { headers: H() }),
+      fetch(`${API}/api/payment/owner/transactions?ownerId=${userId}`, { headers: H() })
+    ]);
+    const d = await dRes.json(); const t = await tRes.json();
+    return {
+      drivers: Array.isArray(d) ? d : (d.drivers || []),
+      orders: Array.isArray(t) ? t : (t.transactions || [])
+    };
+  };
+
+  const fetchVehiclesAndDrivers = async () => {
+    const [vRes, dRes] = await Promise.all([
+      fetch(`${API}/api/payment/owner/vehicles?ownerId=${userId}`, { headers: H() }),
+      fetch(`${API}/api/payment/owner/drivers/list?ownerId=${userId}`, { headers: H() })
+    ]);
+    const v = await vRes.json(); const d = await dRes.json();
+    return {
+      vehicles: Array.isArray(v) ? v : (v.vehicles || []),
+      drivers: Array.isArray(d) ? d : (d.drivers || [])
+    };
+  };
+
+  const fetchLedger = () =>
+    fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${userId}`, { headers: H() }).then(r => r.json());
+
+  const fetchDriverProfile = () =>
+    fetch(`${API}/api/payment/driver/profile?phone=${userPhone}`, { headers: H() }).then(r => r.json());
+
+  const fetchDriverDues = () =>
+    fetch(`${API}/api/payment/driver/dues?phone=${userPhone}`, { headers: H() }).then(r => r.json());
+
+  // ─── INTENT HANDLERS ────────────────────────────────────────────────
+  const hasDriverPaidToday = (phone, orders) => {
     const today = new Date().toISOString().split('T')[0];
-    return orders.some(order =>
-      order.payer_mobile === driverPhone &&
-      order.transaction_status === 'SUCCESS' &&
-      order.order_completion_date?.split('T')[0] === today
+    return orders.some(o =>
+      o.payer_mobile === phone &&
+      o.transaction_status === 'SUCCESS' &&
+      o.order_completion_date?.split('T')[0] === today
     );
   };
 
-  const processIntent = async (userMessage) => {
-    const msg = userMessage.toLowerCase().trim();
-    const freshData = await fetchUserData();
-    if (!freshData) return 'Data load nahi hua. Internet check karein.';
+  const handleIntent = async (intent, msg) => {
+    switch (intent) {
 
-    if (isOwner) {
-      // Collection
-      if (msg.match(/collection|kitna|aaya|earning|kamai|received|total|पैसे/)) {
+      case 'hello': {
+        const stats = await fetchStats();
+        const { drivers, orders } = await fetchDriversAndTx();
+        const unpaid = drivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders)).length;
+        return `Namaste! Aaj ka collection: ${(stats.total_earnings || 0).toLocaleString('en-IN')} rupaye.\n${unpaid} drivers ka payment abhi baaki hai.\n\nKya jaanna chahte hain?`;
+      }
+
+      case 'collection': {
+        const stats = await fetchStats();
+        const { orders } = await fetchDriversAndTx();
         const today = new Date().toDateString();
-        const todayEarnings = (freshData.orders || [])
-          .filter(o => o.transaction_status === 'SUCCESS' &&
-            new Date(o.order_completion_date).toDateString() === today)
-          .reduce((sum, o) => sum + parseFloat(o.order_amount || 0), 0);
-        return `aaj ka collection: ${todayEarnings.toLocaleString('en-IN')} rupaye\nTotal lifetime: ${freshData.todayCollection.toLocaleString('en-IN')} rupaye`;
+        const todayAmt = orders
+          .filter(o => o.transaction_status === 'SUCCESS' && new Date(o.order_completion_date).toDateString() === today)
+          .reduce((s, o) => s + parseFloat(o.order_amount || 0), 0);
+        return `Aaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nKul (lifetime): ${(stats.total_earnings || 0).toLocaleString('en-IN')} rupaye\nTotal drivers: ${stats.total_drivers || 0}`;
       }
 
-      // Who paid
-      if (msg.match(/paid|pay|diya|kisne|who|kiya/)) {
-        const paid = [], notPaid = [];
-        for (const d of (freshData.drivers || []))
-          hasDriverPaidToday(d.mobile_number, freshData.orders) ? paid.push(d.full_name) : notPaid.push(d.full_name);
-        return `Paid (${paid.length}): ${paid.join(', ') || 'koi nahi'}\nNahi diya (${notPaid.length}): ${notPaid.join(', ') || 'koi nahi'}`;
+      case 'who_paid': {
+        const { drivers, orders } = await fetchDriversAndTx();
+        const paid = drivers.filter(d => hasDriverPaidToday(d.mobile_number, orders));
+        const notPaid = drivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders));
+        return `Paid aaj (${paid.length}): ${paid.map(d => d.full_name).join(', ') || 'koi nahi'}\n\nNahi diya (${notPaid.length}): ${notPaid.map(d => d.full_name).join(', ') || 'koi nahi'}`;
       }
 
-      // Pending
-      if (msg.match(/nahi|nhi|pending|due|baaki|outstanding/)) {
-        const notPaid = (freshData.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, freshData.orders)).map(d => d.full_name);
-        return notPaid.length === 0 ? 'Sabne payment kar di!' : `Pending (${notPaid.length}):\n${notPaid.join('\n')}`;
+      case 'pending': {
+        const { drivers, orders } = await fetchDriversAndTx();
+        const pending = drivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders));
+        if (pending.length === 0) return 'Sabne payment kar di aaj!';
+        return `Pending (${pending.length} drivers):\n${pending.map(d => `${d.full_name} - ${d.phone_number || d.mobile_number}`).join('\n')}`;
       }
 
-      // Assign
-      if (msg.match(/assign|de do|lagao|vehicle de|gaadi de/)) {
-        const freeDrivers = (freshData.drivers || []).filter(d => !freshData.vehicles.some(v => v.driver_id === d.id));
-        const freeVehicles = (freshData.vehicles || []).filter(v => !v.driver_id);
-        const driver = freeDrivers.find(d =>
-          (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p))
+      case 'ledger': {
+        const ledgerData = await fetchLedger();
+        if (!ledgerData?.length) return 'Abhi koi ledger data nahi hai.';
+        // Specific driver dhundo message mein
+        const named = ledgerData.find(d =>
+          (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
         );
-        const vehicle = freeVehicles.find(v => msg.includes(v.vehicle_number.toLowerCase()));
-        const rentMatch = msg.match(/(\d{3,5})/);
-        const rentAmount = rentMatch ? parseInt(rentMatch[1]) : null;
-
-        if (driver && vehicle && rentAmount) {
-          try {
-            const res = await fetch(`${API}/api/assignment/assign-with-rent`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ vehicleId: vehicle.id, driverId: driver.id, rentType: 'DAILY', rentAmount, dailyRent: rentAmount })
-            });
-            const result = await res.json();
-            return result.success
-              ? `Done! ${vehicle.vehicle_number} assigned to ${driver.full_name} at ${rentAmount} rupaye per day`
-              : `Failed: ${result.error}`;
-          } catch { return 'Network error.'; }
+        if (named) {
+          const net = parseFloat(named.pending || 0) - parseFloat(named.advance || 0);
+          return `${named.full_name}\nKul paid: ${parseFloat(named.total_paid || 0).toLocaleString('en-IN')} rupaye\nPending: ${parseFloat(named.pending || 0).toLocaleString('en-IN')} rupaye\nAdvance: ${parseFloat(named.advance || 0).toLocaleString('en-IN')} rupaye\nNet: ${net > 0 ? net.toLocaleString('en-IN') + ' rupaye baaki' : Math.abs(net).toLocaleString('en-IN') + ' rupaye credit'}`;
         }
-        if (!driver && !vehicle) return `Driver aur vehicle specify karein.\nFree drivers: ${freeDrivers.map(d => d.full_name).join(', ')}\nFree vehicles: ${freeVehicles.map(v => v.vehicle_number).join(', ')}`;
-        if (!driver) return `Konsa driver? Free hain:\n${freeDrivers.map(d => d.full_name).join('\n')}`;
-        if (!vehicle) return `Konsa vehicle? Free hain:\n${freeVehicles.map(v => v.vehicle_number).join('\n')}`;
-        if (!rentAmount) return `${driver.full_name} ko ${vehicle.vehicle_number} - rent kitna? Jaise "700 rupaye daily"`;
+        // Overall summary
+        const totalPending = ledgerData.reduce((s, d) => s + parseFloat(d.pending || 0), 0);
+        const totalPaid = ledgerData.reduce((s, d) => s + parseFloat(d.total_paid || 0), 0);
+        return `Kul ledger (${ledgerData.length} drivers):\nTotal collected: ${totalPaid.toLocaleString('en-IN')} rupaye\nTotal pending: ${totalPending.toLocaleString('en-IN')} rupaye\n\nKisi ek driver ka naam lo detail ke liye.`;
       }
 
-      // Vehicles
-      if (msg.match(/vehicle|gaadi|fleet|assigned|rent/)) {
-        const assigned = (freshData.vehicles || []).filter(v => v.driver_id);
-        const free = (freshData.vehicles || []).filter(v => !v.driver_id);
-        const list = assigned.map(v => `${v.driver_name} - ${v.vehicle_number} - ${v.daily_rent} rupaye per day`).join('\n');
-        return `Assigned (${assigned.length}):\n${list || 'koi nahi'}\n\nFree (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'koi nahi'}`;
+      case 'vehicles': {
+        const { vehicles, drivers } = await fetchVehiclesAndDrivers();
+        const assigned = vehicles.filter(v => v.driver_id);
+        const free = vehicles.filter(v => !v.driver_id);
+        const list = assigned.map(v => `${v.vehicle_number} - ${v.driver_name || '?'} - ${v.daily_rent} rupaye/day`).join('\n');
+        return `Fleet (${vehicles.length} total)\n\nAssigned (${assigned.length}):\n${list || 'koi nahi'}\n\nFree (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'koi nahi'}`;
       }
 
-      // Drivers
-      if (msg.match(/driver|kitne log|team/))
-        return `Kul ${freshData.totalDrivers} drivers hain.`;
-
-      // Summary
-      if (msg.match(/summary|sab|batao|update|report|status/)) {
-        const paid = (freshData.drivers || []).filter(d => hasDriverPaidToday(d.mobile_number, freshData.orders)).length;
-        return `Collection: ${freshData.todayCollection.toLocaleString('en-IN')} rupaye\nPaid: ${paid} out of ${freshData.totalDrivers}\nFleet: ${freshData.totalVehicles} vehicles`;
+      case 'drivers': {
+        const { drivers, orders } = await fetchDriversAndTx();
+        const paid = drivers.filter(d => hasDriverPaidToday(d.mobile_number, orders)).length;
+        // Specific driver dhundo
+        const named = drivers.find(d =>
+          (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
+        );
+        if (named) {
+          const paidToday = hasDriverPaidToday(named.mobile_number, orders);
+          const { vehicles } = await fetchVehiclesAndDrivers();
+          const veh = vehicles.find(v => v.driver_id === named.id);
+          return `${named.full_name}\nPhone: ${named.phone_number || named.mobile_number}\nAaj payment: ${paidToday ? 'Ho gayi' : 'Nahi hui'}\nVehicle: ${veh?.vehicle_number || 'assign nahi'}\nWallet: ${named.wallet_balance || 0} rupaye`;
+        }
+        return `Kul drivers: ${drivers.length}\nAaj paid: ${paid}\nPending: ${drivers.length - paid}\n\nKisi driver ka naam lo detail ke liye.`;
       }
 
-      // Individual driver
-      const named = (freshData.drivers || [])
-        .map(d => ({ d, score: (d.full_name || '').toLowerCase().split(' ').filter(p => p.length > 2 && msg.includes(p)).length }))
-        .filter(x => x.score > 0).sort((a, b) => b.score - a.score)[0]?.d;
-      if (named) {
-        const paid = hasDriverPaidToday(named.mobile_number, freshData.orders);
-        const veh = (freshData.vehicles || []).find(v => v.driver_id === named.id);
-        return `${named.full_name}\n${paid ? 'Aaj payment ho gayi' : 'Aaj payment nahi hui'}\nVehicle: ${veh?.vehicle_number || 'koi nahi'}\nWallet: ${named.wallet_balance || 0} rupaye`;
+      case 'assign': {
+        const { vehicles, drivers } = await fetchVehiclesAndDrivers();
+        const freeV = vehicles.filter(v => !v.driver_id);
+        const freeD = drivers.filter(d => !vehicles.some(v => v.driver_id === d.id));
+        const driver = freeD.find(d =>
+          (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
+        );
+        const vehicle = freeV.find(v => msg.toLowerCase().includes(v.vehicle_number.toLowerCase()));
+        const rentMatch = msg.match(/\b(\d{3,5})\b/);
+        const rent = rentMatch ? parseInt(rentMatch[1]) : null;
+
+        if (driver && vehicle && rent) {
+          const res = await fetch(`${API}/api/assignment/assign-with-rent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ vehicleId: vehicle.id, driverId: driver.id, rentType: 'DAILY', rentAmount: rent, dailyRent: rent })
+          });
+          const result = await res.json();
+          return result.success
+            ? `${vehicle.vehicle_number} assign ho gaya ${driver.full_name} ko. Rent: ${rent} rupaye per day.`
+            : `Assignment fail: ${result.error}`;
+        }
+        if (!driver && !vehicle) return `Driver aur vehicle dono bolo.\n\nFree drivers: ${freeD.map(d => d.full_name).join(', ') || 'koi nahi'}\nFree vehicles: ${freeV.map(v => v.vehicle_number).join(', ') || 'koi nahi'}`;
+        if (!driver) return `Konsa driver?\nFree: ${freeD.map(d => d.full_name).join(', ')}`;
+        if (!vehicle) return `Konsa vehicle?\nFree: ${freeV.map(v => v.vehicle_number).join(', ')}`;
+        if (!rent) return `${driver.full_name} ko ${vehicle.vehicle_number} — rent kitna? (sirf number bolo, jaise 700)`;
+        return 'Kuch samajh nahi aaya. Driver naam, vehicle number, aur rent amount bolo.';
       }
 
-      // Hello
-      if (msg.match(/hello|hi|namaste|hey/)) {
-        const unpaid = (freshData.drivers || []).filter(d => !hasDriverPaidToday(d.mobile_number, freshData.orders)).length;
-        return `Namaste! ${freshData.todayCollection.toLocaleString('en-IN')} rupaye collect hua. ${unpaid} drivers ka payment baaki hai.`;
+      case 'unassign': {
+        const { vehicles } = await fetchVehiclesAndDrivers();
+        const veh = vehicles.find(v =>
+          v.driver_id && msg.toLowerCase().includes(v.vehicle_number.toLowerCase())
+        ) || vehicles.find(v =>
+          v.driver_id && (v.driver_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
+        );
+        if (!veh) {
+          const assigned = vehicles.filter(v => v.driver_id);
+          return `Konsa vehicle free karna hai?\n${assigned.map(v => `${v.vehicle_number} - ${v.driver_name}`).join('\n')}`;
+        }
+        const res = await fetch(`${API}/api/assignment/unassign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ vehicleId: veh.id })
+        });
+        const result = await res.json();
+        return result.success ? `${veh.vehicle_number} free ho gaya. ${veh.driver_name} unassigned.` : `Failed: ${result.error}`;
       }
 
-    } else {
-      // Driver intents
-      if (msg.match(/bakaya|due|kitna dena|pending/)) return freshData.todayDues <= 0 ? 'Koi bakaya nahi!' : `${freshData.todayDues} rupaye bakaya hai.`;
-      if (msg.match(/wallet|balance|paisa/)) return `Wallet balance: ${freshData.walletBalance} rupaye`;
-      if (msg.match(/pay|diya|paid/)) return freshData.paidToday > 0 ? 'Haan, aaj pay kar diya.' : `Nahi, bakaya ${freshData.todayDues} rupaye hai`;
-      if (msg.match(/vehicle|gaadi/)) return freshData.vehicleNumber === 'Not Assigned' ? 'Vehicle assign nahi hai.' : `Vehicle: ${freshData.vehicleNumber} - ${freshData.dailyRent} rupaye per day`;
-      if (msg.match(/hello|hi|namaste/)) return `Namaste! Bakaya: ${freshData.todayDues} rupaye. Wallet: ${freshData.walletBalance} rupaye`;
+      case 'summary': {
+        const [stats, { drivers, orders }, ledgerData] = await Promise.all([
+          fetchStats(), fetchDriversAndTx(), fetchLedger()
+        ]);
+        const paid = drivers.filter(d => hasDriverPaidToday(d.mobile_number, orders)).length;
+        const totalPending = (ledgerData || []).reduce((s, d) => s + parseFloat(d.pending || 0), 0);
+        return `Aaj ka summary:\nCollection: ${(stats.total_earnings || 0).toLocaleString('en-IN')} rupaye\nDrivers paid: ${paid} out of ${drivers.length}\nPending dues: ${totalPending.toLocaleString('en-IN')} rupaye\nFleet: ${stats.total_vehicles || 0} vehicles\n${drivers.length - paid > 0 ? `\nAbhi baki: ${drivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders)).map(d => d.full_name).join(', ')}` : ''}`;
+      }
+
+      // ─── DRIVER INTENTS ───────────────────────────────────────────
+      case 'my_dues': {
+        const dues = await fetchDriverDues();
+        if (dues.dues <= 0) return 'Aaj ka koi bakaya nahi hai!';
+        return `Aaj dena hai: ${dues.dues} rupaye\nRent: ${dues.daily_rent || 0} rupaye per day\nAaj paid: ${dues.paid_today || 0} rupaye`;
+      }
+
+      case 'my_wallet': {
+        const profile = await fetchDriverProfile();
+        return `Wallet balance: ${profile.wallet_balance || 0} rupaye\nStatus: ${profile.status || 'Active'}`;
+      }
+
+      case 'my_vehicle': {
+        const profile = await fetchDriverProfile();
+        if (!profile.vehicle_number) return 'Abhi koi vehicle assign nahi hai. Owner se baat karein.';
+        return `Gaadi: ${profile.vehicle_number}\nModel: ${profile.vehicle_model || '—'}\nRent: ${profile.vehicle_daily_rent || profile.daily_rent || '—'} rupaye per day`;
+      }
+
+      case 'pay_info': {
+        const dues = await fetchDriverDues();
+        return `Bakaya: ${dues.dues || 0} rupaye\nPayment karne ke liye Dashboard ke Wallet section mein jaayein.\nUPI aur online payment available hai.`;
+      }
+
+      case 'hello': {
+        if (!isOwner) {
+          const [profile, dues] = await Promise.all([fetchDriverProfile(), fetchDriverDues()]);
+          return `Namaste ${profile.name || ''}!\nBakaya: ${dues.dues || 0} rupaye\nWallet: ${profile.wallet_balance || 0} rupaye\nGaadi: ${profile.vehicle_number || 'assign nahi'}\n\nKya poochna hai?`;
+        }
+        break;
+      }
+
+      default:
+        return null;
+    }
+  };
+
+  // ─── MAIN PROCESS ───────────────────────────────────────────────────
+  const processMessage = async (userMessage) => {
+    const msg = userMessage.toLowerCase().trim();
+    const intent = detectIntent(msg);
+
+    try {
+      const result = await handleIntent(intent, msg);
+      if (result) return result;
+    } catch (err) {
+      console.error('Intent handler error:', err);
     }
 
-    // OpenRouter fallback
+    // LLM Fallback — unknown intent ya koi error
     try {
-      const recentHistory = messages.slice(-6).map(m => ({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.content
-      }));
+      const statsRaw = await fetchStats().catch(() => ({}));
       const res = await fetch(`${API}/api/payment/chatbot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: userMessage, context: freshData, history: recentHistory })
+        body: JSON.stringify({
+          message: userMessage,
+          context: {
+            role: userRole,
+            ...statsRaw,
+            userId, userPhone
+          },
+          history: messages.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
+        })
       });
       const d = await res.json();
-      return d.reply || d.message || '"summary" type karein poori jankari ke liye.';
+      return d.reply || d.message || 'Samajh nahi aaya. "summary", "collection", ya "drivers" try karein.';
     } catch {
-      return '"summary" type karein poori jankari ke liye.';
+      return 'Samajh nahi aaya. "summary", "collection", ya "pending" bolein.';
     }
   };
 
@@ -398,75 +462,59 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
     setInputText('');
     setIsProcessing(true);
     try {
-      const response = await processIntent(message);
+      const response = await processMessage(message);
       addMessage('bot', response);
-      // ✅ 300ms delay before speak
       setTimeout(() => speak(response), 300);
-    } catch (error) {
-      addMessage('bot', 'Kuch galat ho gaya. Please dobara try karein.');
+    } catch {
+      const err = 'Kuch gadbad ho gayi. Dobara try karein.';
+      addMessage('bot', err);
+      setTimeout(() => speak(err), 300);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleSend = () => {
-    unlockTTS(); // ✅ User gesture = TTS unlock
+    unlockTTS();
     if (inputText.trim()) handleUserMessage(inputText);
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') handleSend();
-  };
-
+  // ─── RENDER ─────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-white" style={{ maxWidth: 412, margin: '0 auto', left: 0, right: 0 }}>
+
       {/* Header */}
-      <div className={`p-4 rounded-t-3xl flex items-center justify-between ${isOwner ? 'bg-gradient-to-r from-blue-600 to-indigo-700' : 'bg-gradient-to-r from-green-600 to-emerald-700'} text-white`}>
+      <div className={`p-4 flex items-center justify-between ${isOwner ? 'bg-gradient-to-r from-blue-600 to-indigo-700' : 'bg-gradient-to-r from-green-600 to-emerald-700'} text-white`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-            <span className="text-xl">{isOwner ? '🏢' : '🚛'}</span>
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
+            {isOwner ? '🏢' : '🚛'}
           </div>
           <div>
             <h3 className="font-black">{isOwner ? 'Fleet Assistant' : 'Driver Assistant'}</h3>
-            <p className="text-[10px] opacity-80">Hindi / English • Voice Enabled</p>
+            <p className="text-[10px] opacity-80">
+              {isSpeaking ? '🔊 Bol raha hoon...' : isListening ? '🎤 Sun raha hoon...' : 'Hindi / English • Voice Enabled'}
+            </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          {/* ✅ Volume button — replay last message */}
-          <button
-            onClick={() => {
-              unlockTTS();
-              if (isSpeaking) {
-                stopSpeaking();
-              } else {
-                const lastBot = [...messages].reverse().find(m => m.role === 'bot');
-                if (lastBot) speak(lastBot.content);
-              }
-            }}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center"
-          >
-            {isSpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-            <X size={16} />
-          </button>
-        </div>
+        <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+          <X size={16} />
+        </button>
       </div>
 
       {/* Quick Stats */}
-      {data && (
+      {quickStats && (
         <div className="px-4 py-2 bg-slate-100 border-b flex justify-around">
           {isOwner ? (
             <>
-              <div className="text-center"><IndianRupee size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.todayCollection}</p><p className="text-[7px] text-slate-400">Collection</p></div>
-              <div className="text-center"><Users size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.totalDrivers}</p><p className="text-[7px] text-slate-400">Drivers</p></div>
-              <div className="text-center"><Truck size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.totalVehicles}</p><p className="text-[7px] text-slate-400">Vehicles</p></div>
+              <div className="text-center"><IndianRupee size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{quickStats.a}</p><p className="text-[7px] text-slate-400">Collection</p></div>
+              <div className="text-center"><Users size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{quickStats.b}</p><p className="text-[7px] text-slate-400">Drivers</p></div>
+              <div className="text-center"><Truck size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{quickStats.c}</p><p className="text-[7px] text-slate-400">Vehicles</p></div>
             </>
           ) : (
             <>
-              <div className="text-center"><Wallet size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.walletBalance}</p><p className="text-[7px] text-slate-400">Wallet</p></div>
-              <div className="text-center"><CreditCard size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.todayDues}</p><p className="text-[7px] text-slate-400">Due Today</p></div>
-              <div className="text-center"><Truck size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{data.vehicleNumber === 'Not Assigned' ? '—' : '✓'}</p><p className="text-[7px] text-slate-400">Vehicle</p></div>
+              <div className="text-center"><Wallet size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{quickStats.a}</p><p className="text-[7px] text-slate-400">Wallet</p></div>
+              <div className="text-center"><CreditCard size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">₹{quickStats.b}</p><p className="text-[7px] text-slate-400">Due</p></div>
+              <div className="text-center"><Truck size={12} className="mx-auto text-slate-500" /><p className="text-[9px] font-black">{quickStats.c}</p><p className="text-[7px] text-slate-400">Vehicle</p></div>
             </>
           )}
         </div>
@@ -478,28 +526,45 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user'
               ? (isOwner ? 'bg-blue-600 text-white rounded-br-none' : 'bg-green-600 text-white rounded-br-none')
-              : 'bg-white text-slate-800 rounded-bl-none border border-slate-200'}`}>
-              {msg.role === 'bot' && <span className="text-xs font-black mr-1">{isOwner ? '🏢' : '🚛'}</span>}
-              <div className="whitespace-pre-wrap">{msg.content}</div>
+              : 'bg-white text-slate-800 rounded-bl-none border border-slate-200 shadow-sm'}`}>
+              {msg.role === 'bot' && <span className="text-xs mr-1">{isOwner ? '🏢' : '🚛'}</span>}
+              <span className="whitespace-pre-wrap">{msg.content}</span>
             </div>
           </div>
         ))}
         {isProcessing && (
           <div className="flex justify-start">
-            <div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200">
-              <Loader size={16} className="animate-spin text-blue-600" />
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
+              <Loader size={14} className="animate-spin text-blue-600" />
+              <span className="text-xs text-slate-400">Data fetch kar raha hoon...</span>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Quick chips — sirf shuru mein */}
+      {messages.length <= 2 && (
+        <div className="px-4 py-2 bg-white border-t flex gap-2 flex-wrap">
+          {(isOwner
+            ? ['Collection?', 'Kaun paid?', 'Pending?', 'Summary', 'Vehicles?', 'Drivers?']
+            : ['Mera bakaya?', 'Wallet?', 'Meri gaadi?', 'Aaj kitna dena?']
+          ).map(q => (
+            <button key={q}
+              onClick={() => { unlockTTS(); handleUserMessage(q); }}
+              className="text-[10px] font-black px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full border border-blue-200 hover:bg-blue-100 transition">
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
-      <div className="p-4 border-t bg-white rounded-b-3xl flex-shrink-0">
+      <div className="p-3 border-t bg-white flex-shrink-0">
         <div className="flex gap-2">
           <button
             onClick={startListening}
-            disabled={isListening}
+            disabled={isListening || isProcessing}
             className={`p-3 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-slate-600 hover:bg-blue-100'}`}
           >
             {isListening ? <MicOff size={20} /> : <Mic size={20} />}
@@ -507,24 +572,19 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, p
           <input
             type="text"
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Hindi ya English mein likhein / bolein..."
+            onChange={e => setInputText(e.target.value)}
+            onKeyPress={e => e.key === 'Enter' && handleSend()}
+            placeholder={isListening ? 'Sun raha hoon...' : 'Kuch bhi poochein...'}
             className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
             disabled={isListening}
           />
           <button
             onClick={handleSend}
             disabled={!inputText.trim() || isProcessing}
-            className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+            className="p-3 bg-blue-600 text-white rounded-xl disabled:opacity-50"
           >
             <Send size={18} />
           </button>
-        </div>
-        <div className="mt-2 text-center">
-          <p className="text-[9px] text-slate-400">
-            Bolein: {isOwner ? '"aaj ka collection?"' : '"mera bakaya?"'} • Type "help" for commands
-          </p>
         </div>
       </div>
     </div>
