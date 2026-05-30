@@ -1285,10 +1285,6 @@ router.get('/driver/profile', async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ message: 'Phone required' });
-    let amount_paid_today = 0;
-    let total_outstanding = 0;
-    let dailyDepositRecovery = 0;
-    let effectiveDailyCharge = 0;
     const result = await pool.query(
       `SELECT 
          d.id, d.full_name as name, d.mobile_number as phone,
