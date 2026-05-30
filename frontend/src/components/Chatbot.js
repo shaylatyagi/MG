@@ -25,6 +25,8 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, o
   const cachedVoicesRef = useRef([]);
   const ttsUnlockedRef = useRef(false);
   const isOwner = userRole === 'OWNER';
+  const accumulatedTextRef = useRef('');  // ✅ poori baat collect karo
+  const silenceTimerRef = useRef(null);   // ✅ silence detect karo
 
   // ─── INIT ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -81,21 +83,32 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, o
     recognitionRef.current.continuous = true;
     recognitionRef.current.interimResults = true;
     recognitionRef.current.lang = 'en-IN'; // Hinglish dono
-
     recognitionRef.current.onresult = (e) => {
-      let interim = '', final = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) final += t;
-        else interim += t;
-      }
-      setInputText(final || interim);
-      if (final) {
-        recognitionRef.current.stop();
-        handleUserMessage(final.trim());
-        setIsListening(false);
-      }
-    };
+  let interim = '';
+  for (let i = e.resultIndex; i < e.results.length; i++) {
+    const t = e.results[i][0].transcript;
+    if (e.results[i].isFinal) {
+      accumulatedTextRef.current += ' ' + t; // ✅ final chunks jodta ja
+    } else {
+      interim += t;
+    }
+  }
+
+  // Display — accumulated + interim
+  setInputText((accumulatedTextRef.current + ' ' + interim).trim());
+
+  // ✅ Silence timer reset — 1.5 sec silence ke baad process karo
+  if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+  silenceTimerRef.current = setTimeout(() => {
+    const finalText = accumulatedTextRef.current.trim();
+    if (finalText) {
+      recognitionRef.current.stop();
+      handleUserMessage(finalText);
+      setIsListening(false);
+      accumulatedTextRef.current = ''; // reset
+    }
+  }, 1500);
+};
     recognitionRef.current.onerror = (e) => {
       setIsListening(false);
       if (e.error !== 'no-speech' && e.error !== 'aborted')
@@ -181,28 +194,46 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, o
       }
     } catch {}
   };
-
-  // ─── INTENT DETECTION ───────────────────────────────────────────────
   const detectIntent = (msg) => {
-    if (msg.match(/collection|kitni aayi|kitna aaya|earning|kamai|received|aaj kitna|today.*earn|कलेक्शन|कमाई/)) return 'collection';
-    if (msg.match(/kaun.*paid|kisne.*diya|who.*paid|paid.*today|payment.*kiya|किसने.*दिया|paid.*list/)) return 'who_paid';
-    if (msg.match(/pending|nahi.*diya|baaki|outstanding|due.*kaun|किसने नहीं|बाकी/)) return 'pending';
-    if (msg.match(/ledger|hisab|account|bakaya.*kiska|advance|entry|record/)) return 'ledger';
-    if (msg.match(/assign|de do|lagao|vehicle.*de|gaadi.*de|attach|jod|rent.*set/)) return 'assign';
-    if (msg.match(/unassign|wapas|remove|hata do|free karo|chhod/)) return 'unassign';
-    if (msg.match(/vehicle|gaadi|fleet|वाहन|गाड़ी/)) return 'vehicles';
-    if (msg.match(/driver|kitne log|team|ड्राइवर|sab driver/)) return 'drivers';
-    if (msg.match(/damage|accident|repair|tyre|engine|नुकसान/)) return 'damage';
-    if (msg.match(/summary|sab batao|full report|update|aaj ka|status|overview/)) return 'summary';
-    if (msg.match(/hello|hi|namaste|hey|हेलो|नमस्ते|start|shuru/)) return 'hello';
-    // Driver intents
-    if (msg.match(/mera.*bakaya|mujhe.*dena|kitna.*dena|my.*due|मेरा बकाया/)) return 'my_dues';
-    if (msg.match(/wallet|balance|mere.*paisa|मेरा वॉलेट/)) return 'my_wallet';
-    if (msg.match(/meri.*gaadi|mera.*vehicle|my.*vehicle|मेरी गाड़ी/)) return 'my_vehicle';
-    if (msg.match(/pay|payment.*karo|rent.*do|भुगतान/)) return 'pay_info';
-    return 'unknown';
-  };
+  const m = msg.toLowerCase().trim();
 
+  // Exact patterns
+  if (m.match(/collect|kitni aayi|kitna aaya|earning|kamai|received|aaj kitna|आज का/)) return 'collection';
+  if (m.match(/kaun.*paid|kisne.*diya|who.*paid|paid.*today|payment.*kiya|paid list/)) return 'who_paid';
+  if (m.match(/pending|nahi.*diya|baaki|outstanding|due|kiska baaki/)) return 'pending';
+  if (m.match(/ledger|hisab|account|advance|entry|record/)) return 'ledger';
+  if (m.match(/assign|de do|lagao|vehicle.*de|gaadi.*de|attach|rent.*set/)) return 'assign';
+  if (m.match(/unassign|wapas|remove|hata|free karo|chhod/)) return 'unassign';
+  if (m.match(/vehicle|gaadi|fleet|gadi/)) return 'vehicles';
+  if (m.match(/driver|kitne log|team/)) return 'drivers';
+  if (m.match(/summary|sab batao|full report|update|aaj ka|overview/)) return 'summary';
+  if (m.match(/damage|accident|repair|tyre/)) return 'damage';
+  if (m.match(/hello|hi |namaste|hey |start|help|madad|kya kar|kya pata/)) return 'hello';
+
+  // Driver
+  if (m.match(/mera.*bakaya|mujhe.*dena|kitna.*dena|my due|due/)) return 'my_dues';
+  if (m.match(/wallet|balance|mere paisa|paisa kitna/)) return 'my_wallet';
+  if (m.match(/meri.*gaadi|mera.*vehicle|my vehicle/)) return 'my_vehicle';
+  if (m.match(/pay|payment karo|rent do/)) return 'pay_info';
+
+  // ✅ Nearest word fallback — 3-char prefix match
+  const words = m.split(/\s+/);
+  const keywordMap = {
+    collection: ['col', 'kol', 'earn', 'aay', 'kam'],
+    who_paid:   ['pai', 'pay', 'diy', 'kis'],
+    pending:    ['pen', 'baa', 'due', 'bak'],
+    vehicles:   ['veh', 'gaa', 'fle', 'car', 'tru'],
+    drivers:    ['dri', 'tea', 'log'],
+    summary:    ['sum', 'rep', 'bat', 'sta'],
+    ledger:     ['led', 'his', 'acc'],
+    hello:      ['hel', 'nam', 'hey', 'mad', 'kya'],
+  };
+  for (const [intent, prefixes] of Object.entries(keywordMap)) {
+    if (words.some(w => prefixes.some(p => w.startsWith(p)))) return intent;
+  }
+
+  return 'unknown';
+};
   // ─── DATA FETCHERS ──────────────────────────────────────────────────
   const H = () => ({ Authorization: `Bearer ${token}` });
 
@@ -254,13 +285,15 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, o
 
   const handleIntent = async (intent, msg) => {
     switch (intent) {
-
       case 'hello': {
-        const stats = await fetchStats();
-        const { drivers, orders } = await fetchDriversAndTx();
-        const unpaid = drivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders)).length;
-        return `Namaste! Aaj ka collection: ${(stats.total_earnings || 0).toLocaleString('en-IN')} rupaye.\n${unpaid} drivers ka payment abhi baaki hai.\n\nKya jaanna chahte hain?`;
-      }
+  if (isOwner) {
+    const stats = await fetchStats();
+    return `Namaste! Main aapka Fleet Assistant hoon.\n\nAaj ka collection: ${(stats.total_earnings || 0).toLocaleString('en-IN')} rupaye\nDrivers: ${stats.total_drivers || 0} | Vehicles: ${stats.total_vehicles || 0}\n\nMain in cheezon mein madad kar sakta hoon:\n• Collection aur earnings\n• Kaun paid, kaun pending\n• Vehicle assign/unassign\n• Driver details\n• Ledger aur accounts\n\nKuch bhi poochein!`;
+  } else {
+    const [profile, dues] = await Promise.all([fetchDriverProfile(), fetchDriverDues()]);
+    return `Namaste ${profile.name || ''}! Main aapka Driver Assistant hoon.\n\nBakaya: ${dues.dues || 0} rupaye\nWallet: ${profile.wallet_balance || 0} rupaye\nGaadi: ${profile.vehicle_number || 'assign nahi'}\n\nMain in cheezon mein madad kar sakta hoon:\n• Aapka bakaya\n• Wallet balance\n• Gaadi ki details\n• Payment info`;
+  }
+}
 
       case 'collection': {
         const stats = await fetchStats();
@@ -420,41 +453,44 @@ export default function Chatbot({ userRole, userId, userPhone, token, onClose, o
         return null;
     }
   };
+const processMessage = async (userMessage) => {
+  const msg = userMessage.toLowerCase().trim();
+  const intent = detectIntent(msg);
 
-  // ─── MAIN PROCESS ───────────────────────────────────────────────────
-  const processMessage = async (userMessage) => {
-    const msg = userMessage.toLowerCase().trim();
-    const intent = detectIntent(msg);
-
+  // Known intent handle karo
+  if (intent !== 'unknown') {
     try {
       const result = await handleIntent(intent, msg);
       if (result) return result;
     } catch (err) {
       console.error('Intent handler error:', err);
     }
+  }
 
-    // LLM Fallback — unknown intent ya koi error
-    try {
-      const statsRaw = await fetchStats().catch(() => ({}));
-      const res = await fetch(`${API}/api/payment/chatbot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          message: userMessage,
-          context: {
-            role: userRole,
-            ...statsRaw,
-            userId, userPhone
-          },
-          history: messages.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
-        })
-      });
-      const d = await res.json();
-      return d.reply || d.message || 'Samajh nahi aaya. "summary", "collection", ya "drivers" try karein.';
-    } catch {
-      return 'Samajh nahi aaya. "summary", "collection", ya "pending" bolein.';
-    }
-  };
+  // Unknown ya intent fail — LLM try karo
+  try {
+    const statsRaw = await fetchStats().catch(() => ({}));
+    const res = await fetch(`${API}/api/payment/chatbot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        message: userMessage,
+        context: { role: userRole, ...statsRaw, userId, userPhone },
+        history: messages.slice(-6).map(m => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.content
+        }))
+      })
+    });
+    const d = await res.json();
+    if (d.reply || d.message) return d.reply || d.message;
+  } catch {}
+
+  // Final fallback — helpful hint
+  return isOwner
+    ? 'Yeh samajh nahi aaya. Try karein:\n"collection", "pending", "vehicles", "summary", ya kisi driver ka naam bolein.'
+    : 'Yeh samajh nahi aaya. Try karein:\n"mera bakaya", "wallet", "meri gaadi"';
+};
 
   const handleUserMessage = async (message) => {
     if (!message.trim()) return;
