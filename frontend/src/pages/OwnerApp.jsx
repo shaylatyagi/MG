@@ -897,7 +897,6 @@ if (!oId) { navigate('/login'); return; }
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.is_read).length);
     }
-    const u = getUser();
 setOwner({
   id: u.id,
   full_name: u.full_name || u.name,

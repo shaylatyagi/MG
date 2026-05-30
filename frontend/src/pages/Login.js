@@ -11,6 +11,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [drivers, setDrivers] = useState([]);
   const [selectedDriver, setSelectedDriver] = useState(null);
+  const [success, setSuccess] = useState('');
+const [otp, setOtp] = useState('');
+const [resendTimer, setResendTimer] = useState(0);
 
   // Fetch drivers from database on mount
   useEffect(() => {
@@ -54,6 +57,15 @@ export default function Login() {
   const handleDriverSelect = (driver) => {
     setSelectedDriver(driver);
     setStep('driver-otp');
+  };
+  const startResendTimer = () => {
+    setResendTimer(30);
+    const t = setInterval(() => {
+      setResendTimer(prev => {
+        if (prev <= 1) { clearInterval(t); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
   };
   const sendOTP = async () => {
   if (!/^\d{10}$/.test(phone)) return setError('10 digit phone number daalen');
@@ -301,7 +313,7 @@ export default function Login() {
               </div>
             </div>
             <button 
-              onClick={handleSendOtp} 
+              onClick={sendOTP}  
               disabled={loading} 
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
             >
