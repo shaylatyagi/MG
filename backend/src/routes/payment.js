@@ -1128,12 +1128,20 @@ router.post('/chat/send', async (req, res) => {
 
     // Notification bhejo opposite side ko
     if (senderType === 'DRIVER') {
-      await pool.query(
-        `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
-         VALUES ($1, 'OWNER', '💬 Driver Message', $2, NOW())`,
-        [driverId, `New message from driver: "${message.substring(0, 50)}"`]
-      ).catch(() => {});
-    } else {
+  // ✅ Driver name fetch karo pehle
+  const driverNameRes = await pool.query(
+    'SELECT full_name FROM public.drivers WHERE id = $1', [driverId]
+  );
+  const driverName = driverNameRes.rows[0]?.full_name || 'Driver';
+  
+  await pool.query(
+    `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+     VALUES ($1, 'OWNER', $2, $3, NOW())`,
+    [driverId, 
+     `💬 ${driverName}`,           // ← name title mein
+     message.substring(0, 80)]    // ← actual message
+  ).catch(() => {});
+} else {
       await pool.query(
         `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
          VALUES ($1, 'DRIVER', '💬 Owner Message', $2, NOW())`,
@@ -1510,12 +1518,16 @@ router.get('/owner/notifications', async (req, res) => {
   try {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
-    
-    // First get owner_code
-    const ownerResult = await pool.query(
-      'SELECT owner_code FROM public.owners WHERE id = $1',
-      [ownerId]
-    );
+     const result = await pool.query(
+    `SELECT n.id, n.title, n.message, n.is_read, n.created_at, n.metadata, d.full_name as driver_name
+     FROM public.notifications n
+     LEFT JOIN public.drivers d ON d.id = n.driver_id
+     WHERE (d.owner_code = $1 OR n.user_type = 'OWNER')
+     AND n.user_type != 'DRIVER'  -- ✅ DRIVER type notifications owner ko mat dikhao
+     ORDER BY n.created_at DESC
+     LIMIT 50`,
+    [ownerCode]
+  );
     
     if (ownerResult.rows.length === 0) {
       return res.json([]);
@@ -2040,8 +2052,6 @@ router.post('/driver-otp-verify', async (req, res) => {
     });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
-
-// ── DRIVER NOTIFICATIONS (public schema) ──
 router.get('/driver/notifications', async (req, res) => {
   try {
     const { phone } = req.query;
@@ -2051,6 +2061,7 @@ router.get('/driver/notifications', async (req, res) => {
        FROM public.notifications n
        JOIN public.drivers d ON d.id = n.driver_id
        WHERE d.mobile_number = $1
+       AND n.user_type = 'DRIVER'  -- ✅ SIRF DRIVER notifications
        ORDER BY n.created_at DESC LIMIT 50`,
       [phone]
     );

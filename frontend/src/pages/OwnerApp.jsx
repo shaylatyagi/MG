@@ -2301,28 +2301,50 @@ const ProfileTab = () => (
                 <div className="p-4 text-center text-slate-400 text-xs">{t.noNotif}</div>
               ) : (
                 notifications.map((n, i) => (
-                  <div key={i}
-                    className={`px-4 py-3 border-b cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-blue-50' : ''}`}
-                    onClick={() => {
-  setNotifications(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
-  setUnreadCount(prev => Math.max(0, prev - 1));
-  setShowNotif(false);
-  const title = (n.title || '').toLowerCase();
-  if (title.includes('payment') || title.includes('rent') || title.includes('cash')) {
-    setActiveTab('payments');
-  } else if (title.includes('vehicle') || title.includes('assign')) {
-    setActiveTab('vehicles');
-  } else {
-    setActiveTab('home');
-  }
-}}
-                  >
-                    <p className="text-xs font-black">{n.title}</p>
-                    <p className="text-[10px] text-slate-500">{n.message}</p>
-                    <p className="text-[9px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
-                    {!n.is_read && <p className="text-[9px] text-blue-500 font-black mt-0.5">Tap to view transaction →</p>}
-                  </div>
-                ))
+  <div key={i}
+    className={`px-4 py-3 border-b cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-blue-50' : ''}`}
+    onClick={() => {
+      setNotifications(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      setShowNotif(false);
+      
+      const title = (n.title || '').toLowerCase();
+      
+      // ✅ Chat notification → driver ki chat kholo
+      if (title.includes('💬') || title.includes('message')) {
+        setActiveTab('drivers');
+        // Driver dhundo aur chat kholo
+        const driver = drivers.find(d => 
+          d.id === n.driver_id ||
+          d.full_name === n.driver_name
+        );
+        if (driver) {
+          setTimeout(() => openChatWithDriver(driver), 100);
+        }
+      } else if (title.includes('payment') || title.includes('rent') || title.includes('cash')) {
+        setActiveTab('payments');
+      } else if (title.includes('sos')) {
+        // SOS already handles itself
+      } else if (title.includes('vehicle') || title.includes('assign')) {
+        setActiveTab('vehicles');
+      } else {
+        setActiveTab('home');
+      }
+    }}
+  >
+    <p className="text-xs font-black">{n.title}</p>
+    <p className="text-[10px] text-slate-500">{n.message}</p>
+    <p className="text-[9px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
+    {!n.is_read && (
+      <p className="text-[9px] font-black mt-0.5 text-blue-500">
+        {/* ✅ Chat vs transaction alag text */}
+        {(n.title||'').includes('💬') ? 'Tap to open chat →' : 
+         (n.title||'').includes('🚨') ? 'Tap to view SOS →' :
+         'Tap to view →'}
+      </p>
+    )}
+  </div>
+))
               )}
             </div>
           </div>
