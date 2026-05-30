@@ -508,6 +508,16 @@ const DriverDetailsModal = () => {
         </div>
         
         <div className="p-5">
+          <button
+    onClick={() => {
+      setShowDriverDetailsModal(false);
+      setSelectedDriverDetails(null);
+      openChatWithDriver(driver);
+    }}
+    className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2 mb-4"
+  >
+    <MessageCircle size={16}/> Chat with Driver
+  </button>
           {/* Vehicle Assignment Info */}
           <div className="mb-5">
             <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
@@ -653,17 +663,6 @@ const DriverDetailsModal = () => {
     )}
   </div>
 </div>
-          
-          <button
-            onClick={() => {
-              setShowDriverDetailsModal(false);
-              setSelectedDriverDetails(null);
-              openChatWithDriver(driver);
-            }}
-            className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2"
-          >
-            <MessageCircle size={16} /> Chat with Driver
-          </button>
         </div>
       </div>
     </div>
@@ -976,11 +975,6 @@ return () => clearInterval(interval);
   const interval = setInterval(pollChat, 3000);
   return () => clearInterval(interval);
 }, [showChat, selectedDriver]);
-
-// fetchAllData useEffect
-useEffect(() => {
-  fetchAllData();
-}, [fetchAllData]);
 
   const logout = () => {
     localStorage.clear();
@@ -1776,6 +1770,21 @@ const addDamage = async () => {
             {vehicle.driver_id ? (
               <div className="space-y-3">
                 <h3 className="font-black text-slate-800 flex items-center gap-2"><Users size={16}/> Assigned Driver</h3>
+                <button 
+      onClick={() => {
+        const driver = drivers.find(d => 
+          d.id === vehicle.driver_id || 
+          d.mobile_number === vehicle.driver_phone ||
+          d.phone_number === vehicle.driver_phone
+        );
+        setShowVehicleDetailModal(false);
+        setSelectedVehicleDetails(null);
+        if (driver) openChatWithDriver(driver);
+      }}
+      className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2"
+    >
+      <MessageCircle size={16}/> Chat with Driver
+    </button>
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                   <p className="font-black text-slate-800 text-lg">{vehicle.driver_name}</p>
                   <p className="text-xs text-slate-500 font-mono mt-1">{vehicle.driver_phone}</p>
@@ -2315,7 +2324,7 @@ const ProfileTab = () => (
         setActiveTab('drivers');
         // Driver dhundo aur chat kholo
         const driver = drivers.find(d => 
-          d.id === n.driver_id ||
+          String(d.id) === String(n.driver_id) ||
           d.full_name === n.driver_name
         );
         if (driver) {

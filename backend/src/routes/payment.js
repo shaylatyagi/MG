@@ -1125,23 +1125,19 @@ router.post('/chat/send', async (req, res) => {
        VALUES ($1, $2, $3, $4)`,
       [driverId, ownerId || 1, senderType || 'DRIVER', message]
     );
-
-    // Notification bhejo opposite side ko
     if (senderType === 'DRIVER') {
-  // ✅ Driver name fetch karo pehle
   const driverNameRes = await pool.query(
     'SELECT full_name FROM public.drivers WHERE id = $1', [driverId]
   );
   const driverName = driverNameRes.rows[0]?.full_name || 'Driver';
   
-  await pool.query(
+  const notifInsert = await pool.query(
     `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
-     VALUES ($1, 'OWNER', $2, $3, NOW())`,
-    [driverId, 
-     `💬 ${driverName}`,           // ← name title mein
-     message.substring(0, 80)]    // ← actual message
-  ).catch(() => {});
-} else {
+     VALUES ($1, 'OWNER', $2, $3, NOW()) RETURNING id`,
+    [driverId, `💬 ${driverName}`, message.substring(0, 80)]
+  );
+  console.log('Owner notification inserted:', notifInsert.rows[0]?.id);
+}else {
       await pool.query(
         `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
          VALUES ($1, 'DRIVER', '💬 Owner Message', $2, NOW())`,
@@ -1513,40 +1509,32 @@ router.put('/owner/sos-dismiss/:id', async (req, res) => {
     res.json({ success: true });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
-// GET owner notifications
 router.get('/owner/notifications', async (req, res) => {
   try {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
-     const result = await pool.query(
-    `SELECT n.id, n.title, n.message, n.is_read, n.created_at, n.metadata, d.full_name as driver_name
-     FROM public.notifications n
-     LEFT JOIN public.drivers d ON d.id = n.driver_id
-     WHERE (d.owner_code = $1 OR n.user_type = 'OWNER')
-     AND n.user_type != 'DRIVER'  -- ✅ DRIVER type notifications owner ko mat dikhao
-     ORDER BY n.created_at DESC
-     LIMIT 50`,
-    [ownerCode]
-  );
     
-    if (ownerResult.rows.length === 0) {
-      return res.json([]);
-    }
+    const ownerResult = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id = $1', [ownerId]
+    );
+    if (ownerResult.rows.length === 0) return res.json([]);
     
     const ownerCode = ownerResult.rows[0].owner_code;
     
-    // Get notifications for drivers under this owner
+    // ✅ notifResult — duplicate const result avoid, aur driver_id bhi add
     const notifResult = await pool.query(
-  `SELECT n.id, n.title, n.message, n.is_read, n.created_at, n.metadata, d.full_name as driver_name
-   FROM public.notifications n
-   LEFT JOIN public.drivers d ON d.id = n.driver_id
-   WHERE (d.owner_code = $1 OR n.user_type = 'OWNER')
-   AND n.user_type != 'DRIVER'
-   ORDER BY n.created_at DESC
-   LIMIT 50`,
-  [ownerCode]
-);
-res.json(notifResult.rows);
+      `SELECT n.id, n.driver_id, n.title, n.message, n.is_read, 
+              n.created_at, n.metadata, d.full_name as driver_name
+       FROM public.notifications n
+       LEFT JOIN public.drivers d ON d.id = n.driver_id
+       WHERE (d.owner_code = $1 OR n.user_type = 'OWNER')
+       AND n.user_type != 'DRIVER'
+       ORDER BY n.created_at DESC
+       LIMIT 50`,
+      [ownerCode]
+    );
+    
+    res.json(notifResult.rows);
   } catch (err) {
     console.error('Owner notifications error:', err);
     res.json([]);

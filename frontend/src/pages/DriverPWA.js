@@ -927,6 +927,13 @@ const AccountTab = () => {
   setUnread(prev => Math.max(0, prev - 1));
   setShowNotif(false);
   const title = (n.title || '').toLowerCase();
+  
+  // ✅ Chat notification → owner chat open
+  if (title.includes('💬') || title.includes('owner') || title.includes('message')) {
+    setShowOwnerChat(true);
+    fetchChat();
+    return;
+  }
   if (title.includes('payment') || title.includes('rent')) {
     setTab('wallet'); setActiveTab('wallet');
   } else if (title.includes('vehicle') || title.includes('assign')) {
@@ -953,28 +960,32 @@ const AccountTab = () => {
             </>
           )}
         </div>
+{/* SOS BAR */}
+<div className="absolute left-0 right-0 bg-gradient-to-r from-red-600 to-orange-600 text-white px-3 py-2 flex items-center justify-between z-40" style={{bottom:'64px'}}>
+  
+  {/* ✅ Chat LEFT side pe */}
+  <button 
+    onClick={() => { setShowOwnerChat(true); fetchChat(); }}
+    className="bg-white/20 text-white text-[9px] font-black px-3 py-1.5 rounded-lg flex items-center gap-1"
+  >
+    <MessageCircle size={11}/> Chat Owner
+  </button>
 
-        {/* SOS BAR */}
-        {/* SOS BAR */}
-<div className="absolute left-0 right-0 bg-gradient-to-r from-red-600 to-orange-600 text-white px-4 py-2 flex items-center justify-between z-40" style={{bottom:'64px'}}>
-  <div className="flex items-center gap-2">
-    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center animate-pulse">
-      <ShieldAlert size={13}/>
+  {/* Center — Emergency text */}
+  <div className="flex items-center gap-1">
+    <div className="w-5 h-5 rounded bg-white/20 flex items-center justify-center animate-pulse">
+      <ShieldAlert size={11}/>
     </div>
-    <span className="text-[10px] font-black tracking-wide">{t.emergency}</span>
+    <span className="text-[9px] font-black">{t.emergency}</span>
   </div>
-  <div className="flex gap-2">
-    {/* ✅ Chat button */}
-    <button 
-      onClick={() => { setShowOwnerChat(true); fetchChat(); }}
-      className="bg-white/20 text-white text-[9px] font-black px-3 py-1.5 rounded-lg flex items-center gap-1"
-    >
-      <MessageCircle size={11}/> Chat
-    </button>
-    <button onClick={() => setShowSOS(true)} className="bg-white text-red-700 text-[9px] font-black px-3 py-1.5 rounded-lg">
-      {t.triggerSos}
-    </button>
-  </div>
+
+  {/* ✅ SOS RIGHT side pe — alag jagah */}
+  <button 
+    onClick={() => setShowSOS(true)} 
+    className="bg-white text-red-700 text-[9px] font-black px-3 py-1.5 rounded-lg"
+  >
+    🚨 {t.triggerSos}
+  </button>
 </div>
 {/* Bottom Navigation - Fixed */}
 <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50">
