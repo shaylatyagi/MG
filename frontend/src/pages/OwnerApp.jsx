@@ -391,6 +391,8 @@ const [assigning, setAssigning] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [incentiveRules, setIncentiveRules] = useState({ is_enabled: false, rules: [] });
+const [savingRules, setSavingRules] = useState(false);
   const [bulkTab, setBulkTab] = useState('drivers'); // 'drivers' or 'vehicles'
 const [bulkVehicles, setBulkVehicles] = useState([]);
 const [bulkDrivers, setBulkDrivers] = useState([]);
@@ -493,6 +495,13 @@ const DriverDetailsModal = () => {
   if (!selectedDriverDetails) return null;
   
   const driver = selectedDriverDetails;
+   const [driverHistory, setDriverHistory] = useState(null);
+  useEffect(() => {
+    if (!driver?.id) return;
+    fetch(`${API}/api/payment/owner/driver-history/${driver.id}`, {
+      headers: { Authorization: `Bearer ${token()}` }
+    }).then(r => r.json()).then(setDriverHistory).catch(() => {});
+  }, [driver?.id]);
   const assignedVehicle = vehicles.find(v => v.driver_id === driver.id);
   
   return (
@@ -672,6 +681,61 @@ const DriverDetailsModal = () => {
     )}
   </div>
 </div>
+{driverHistory && (
+  <div className="mb-5">
+    <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">📋 Vehicle History</h3>
+    {driverHistory.vehicle_history?.length === 0 ? (
+      <p className="text-xs text-slate-400 text-center py-2">Koi history nahi</p>
+    ) : (
+      <div className="space-y-2">
+        {driverHistory.vehicle_history?.map((h, i) => (
+          <div key={i} className={`rounded-xl p-3 border ${!h.unassigned_at ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-black text-slate-800">{h.vehicle_number} — {h.vehicle_model}</p>
+                <p className="text-[10px] text-slate-500">
+                  {new Date(h.assigned_at).toLocaleDateString('en-IN')} → {h.unassigned_at ? new Date(h.unassigned_at).toLocaleDateString('en-IN') : 'Present'}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {Math.floor((new Date(h.unassigned_at||Date.now()) - new Date(h.assigned_at)) / 86400000)} days · ₹{h.daily_rent}/day
+                </p>
+              </div>
+              {!h.unassigned_at && <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Current</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+    {driverHistory.daily_log?.length > 0 && (
+      <div className="mt-3">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Last 30 Days Activity</p>
+        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {driverHistory.daily_log.map((log, i) => {
+            const hrs = Math.floor((log.active_minutes||0)/60);
+            const mins = (log.active_minutes||0)%60;
+            return (
+              <div key={i} className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                <span className="text-xs text-slate-600">
+                  {new Date(log.log_date).toLocaleDateString('en-IN', {day:'2-digit',month:'short',weekday:'short'})}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-700">{hrs}h {mins}m</span>
+                  {log.incentive_applied && <span className="text-[9px] text-emerald-600 font-black">+₹{parseFloat(log.incentive_amount||0).toFixed(0)}</span>}
+                  {log.login_time && (
+                    <span className="text-[9px] text-slate-400">
+                      {new Date(log.login_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}
+                      {log.logout_time && ` - ${new Date(log.logout_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+  </div>
+)}
         </div>
       </div>
     </div>
@@ -930,6 +994,12 @@ useEffect(() => {
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+  useEffect(() => {
+  if (!ownerId()) return;
+  fetch(`${API}/api/payment/owner/incentive-rules?ownerId=${ownerId()}`, {
+    headers: { Authorization: `Bearer ${token()}` }
+  }).then(r => r.json()).then(setIncentiveRules).catch(() => {});
+}, []);
 
   // POLLING FOR REAL-TIME NOTIFICATIONS
   useEffect(() => {
@@ -1212,7 +1282,30 @@ const addMultipleDrivers = async () => {
   setBulkLoading(false);
   if (added > 0) { fetchAllData(); }
 };
-  const addDriver = async () => {
+
+// ─── INCENTIVE RULES ──────────────────────────────────────────────────────────
+const saveRules = async () => {
+  setSavingRules(true);
+  try {
+    await fetch(`${API}/api/payment/owner/incentive-rules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      body: JSON.stringify({ ownerId: ownerId(), isEnabled: incentiveRules.is_enabled, rules: incentiveRules.rules })
+    });
+    alert('✅ Rules saved!');
+  } catch { alert('Network error'); }
+  setSavingRules(false);
+};
+const addRule = () => setIncentiveRules(prev => ({
+  ...prev, rules: [...prev.rules, { min_hours: 8, type: 'PERCENTAGE', value: 50 }]
+}));
+const updateRule = (i, field, val) => setIncentiveRules(prev => ({
+  ...prev, rules: prev.rules.map((r, idx) => idx === i ? { ...r, [field]: val } : r)
+}));
+const removeRule = (i) => setIncentiveRules(prev => ({
+  ...prev, rules: prev.rules.filter((_, idx) => idx !== i)
+}));
+// ──────────────────────────────────────────────────────────────────────────────
     if (!newDriver.name || !newDriver.phone) {
       alert('Please fill name and phone');
       return;
@@ -1748,11 +1841,18 @@ const addDamage = async () => {
   // ✅ Hooks PEHLE — early return se pehle
   const [vStats, setVStats] = useState(null);
 
+const [vehicleHistory, setVehicleHistory] = useState([]);
+
   useEffect(() => {
     if (selectedVehicleDetails?.id) {
       fetch(`${API}/api/payment/owner/vehicle-stats/${selectedVehicleDetails.id}`, {
         headers: { Authorization: `Bearer ${token()}` }
       }).then(r => r.json()).then(setVStats).catch(() => {});
+
+      // Vehicle history bhi fetch karo
+      fetch(`${API}/api/payment/owner/vehicle-history/${selectedVehicleDetails.id}`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      }).then(r => r.json()).then(setVehicleHistory).catch(() => {});
     }
   }, [selectedVehicleDetails?.id]);
 
@@ -1982,6 +2082,36 @@ const addDamage = async () => {
                   className="w-full py-3 bg-red-50 text-red-600 rounded-xl text-sm font-black border border-red-200">
                   🔗 Remove Driver Assignment
                 </button>
+                {/* Driver History */}
+                <div className="mt-4 border-t pt-4">
+                  <h3 className="font-black text-slate-800 mb-3">📋 Driver History</h3>
+                  {vehicleHistory.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-2">Koi history nahi</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {vehicleHistory.map((h, i) => (
+                        <div key={i} className={`rounded-xl p-3 border ${!h.unassigned_at ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-sm font-black text-slate-800">{h.driver_name}</p>
+                              <p className="text-[10px] text-slate-500 font-mono">{h.driver_phone}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                {new Date(h.assigned_at).toLocaleDateString('en-IN')} → {h.unassigned_at ? new Date(h.unassigned_at).toLocaleDateString('en-IN') : 'Present'}
+                              </p>
+                              <p className="text-[10px] text-slate-500 mt-0.5">
+                                {Math.floor((new Date(h.unassigned_at||Date.now()) - new Date(h.assigned_at)) / 86400000)} days · ₹{h.daily_rent}/day ({h.rent_type})
+                              </p>
+                              <p className="text-[10px] font-black text-emerald-600">
+                                Total: ₹{(Math.floor((new Date(h.unassigned_at||Date.now()) - new Date(h.assigned_at)) / 86400000) * parseFloat(h.daily_rent||0)).toLocaleString('en-IN')}
+                              </p>
+                            </div>
+                            {!h.unassigned_at && <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Current</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <>
@@ -2270,6 +2400,72 @@ const ProfileTab = () => (
     <button className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
       <Edit2 size={14} /> {t.editProfile}
     </button>
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-black text-slate-800">🎯 Driver Incentive Rules</p>
+          <p className="text-[10px] text-slate-400">Active hours pe rent discount configure karo</p>
+        </div>
+        <button onClick={() => setIncentiveRules(prev => ({ ...prev, is_enabled: !prev.is_enabled }))}
+          className={`w-12 h-6 rounded-full relative transition-all ${incentiveRules.is_enabled ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+          <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 shadow transition-all ${incentiveRules.is_enabled ? 'right-0.5' : 'left-0.5'}`}/>
+        </button>
+      </div>
+      {incentiveRules.is_enabled && (
+        <div className="space-y-3 pt-2 border-t border-slate-100">
+          {incentiveRules.rules.length === 0 && (
+            <p className="text-xs text-slate-400 text-center py-2">Koi rule nahi — neeche add karo</p>
+          )}
+          {incentiveRules.rules.map((rule, i) => (
+            <div key={i} className="bg-slate-50 rounded-xl p-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-slate-500">Rule {i + 1}</span>
+                <button onClick={() => removeRule(i)} className="text-red-400 text-xs font-black">✕ Remove</button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[9px] text-slate-500 font-black block mb-1">Min Hours</label>
+                  <input type="number" min={1} max={24} value={rule.min_hours}
+                    onChange={e => updateRule(i, 'min_hours', parseInt(e.target.value))}
+                    className="w-full border rounded-lg p-2 text-xs text-center font-black"/>
+                </div>
+                <div>
+                  <label className="text-[9px] text-slate-500 font-black block mb-1">Type</label>
+                  <select value={rule.type} onChange={e => updateRule(i, 'type', e.target.value)}
+                    className="w-full border rounded-lg p-2 text-xs bg-white">
+                    <option value="FULL_WAIVER">🆓 Free</option>
+                    <option value="PERCENTAGE">% Off</option>
+                    <option value="FIXED">₹ Off</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] text-slate-500 font-black block mb-1">
+                    {rule.type === 'PERCENTAGE' ? '%' : rule.type === 'FIXED' ? '₹' : '—'}
+                  </label>
+                  <input type="number" value={rule.type === 'FULL_WAIVER' ? '' : rule.value}
+                    disabled={rule.type === 'FULL_WAIVER'}
+                    onChange={e => updateRule(i, 'value', parseFloat(e.target.value))}
+                    className="w-full border rounded-lg p-2 text-xs text-center disabled:bg-slate-100"/>
+                </div>
+              </div>
+              <div className="bg-blue-50 rounded-lg px-2 py-1">
+                <p className="text-[9px] text-blue-700 font-black">
+                  {rule.min_hours}h+ active → {rule.type === 'FULL_WAIVER' ? 'Rent free!' : rule.type === 'PERCENTAGE' ? `${rule.value||0}% rent discount` : `₹${rule.value||0} off`}
+                </p>
+              </div>
+            </div>
+          ))}
+          <button onClick={addRule}
+            className="w-full py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-xl text-xs font-black hover:border-blue-500 transition">
+            + Add Rule
+          </button>
+          <button onClick={saveRules} disabled={savingRules}
+            className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
+            {savingRules ? 'Saving...' : '💾 Save Rules'}
+          </button>
+        </div>
+      )}
+    </div>
     <DocumentSection
   userId={ownerId()}
   userType="OWNER"
@@ -3282,4 +3478,3 @@ const ProfileTab = () => (
       </div>
     </div>
   );
-}

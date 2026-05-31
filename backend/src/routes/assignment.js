@@ -2,6 +2,37 @@ const express = require('express');
 const pool = require('../config/db');
 
 const router = express.Router();
+
+// ─── HISTORY HELPERS ──────────────────────────────────────────────────────────
+const logAssignment = async (driverId, vehicleId, ownerId, dailyRent, rentType) => {
+  try {
+    // Close any open record for this driver
+    await pool.query(
+      `UPDATE public.driver_vehicle_history SET unassigned_at = NOW()
+       WHERE driver_id = $1 AND unassigned_at IS NULL`,
+      [driverId]
+    );
+    // New record
+    await pool.query(
+      `INSERT INTO public.driver_vehicle_history
+         (driver_id, vehicle_id, owner_id, daily_rent, rent_type, reason)
+       VALUES ($1, $2, $3, $4, $5, 'ASSIGNED')`,
+      [driverId, vehicleId, ownerId || null, dailyRent || 0, rentType || 'DAILY']
+    );
+  } catch (e) { console.error('logAssignment error:', e.message); }
+};
+
+const logUnassignment = async (vehicleId) => {
+  try {
+    await pool.query(
+      `UPDATE public.driver_vehicle_history
+       SET unassigned_at = NOW(), reason = 'UNASSIGNED'
+       WHERE vehicle_id = $1 AND unassigned_at IS NULL`,
+      [vehicleId]
+    );
+  } catch (e) { console.error('logUnassignment error:', e.message); }
+};
+// ──────────────────────────────────────────────────────────────────────────────
 // Get available vehicles for a driver (vehicles without driver)
 router.get('/available/vehicles', async (req, res) => {
   try {
@@ -34,6 +65,7 @@ router.post('/unassign', async (req, res) => {
       await client.query('UPDATE drivers SET assigned_vehicle_id=NULL WHERE id=$1', [driverId]);
     }
     await client.query('COMMIT');
+    await logUnassignment(vehicleId);  // ✅ History log
     res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -169,7 +201,11 @@ await pool.query(
     );
     
     await client.query('COMMIT');
-    
+
+    // ✅ History log — BEFORE res.json
+    const ownerIdFromBody = req.body.owner_id || null;
+    await logAssignment(driverId, vehicleId, ownerIdFromBody, finalDailyRent, rentType);
+
     res.json({ 
       success: true, 
       message: 'Vehicle assigned successfully',

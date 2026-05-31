@@ -7,6 +7,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 
 const pool = require('../config/db');
+
 const parseDate = (d) => {
   if (!d || d.trim() === '') return null;
   
@@ -105,7 +106,360 @@ router.get('/driver/wallet', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch wallet' });
   }
 });
+// ─── DRIVER PING (har 5 min) ─────────────────────────────────────────
+router.post('/driver/activity/ping', async (req, res) => {
+  try {
+    const { driverPhone } = req.body;
+    const driverRes = await pool.query(
+      `SELECT id FROM public.drivers WHERE mobile_number = $1`, [driverPhone]
+    );
+    if (!driverRes.rows[0]) return res.json({ success: false });
+    const driverId = driverRes.rows[0].id;
 
+    await pool.query(
+      `INSERT INTO public.driver_activity (driver_id, activity_date, first_login, last_seen, total_active_minutes)
+       VALUES ($1, CURRENT_DATE, NOW(), NOW(), 5)
+       ON CONFLICT (driver_id, activity_date)
+       DO UPDATE SET
+         last_seen = NOW(),
+         total_active_minutes = public.driver_activity.total_active_minutes + 5,
+         updated_at = NOW()
+       WHERE public.driver_activity.last_seen < NOW() - INTERVAL '6 minutes'`,
+      [driverId]
+    );
+
+    // Check if incentive should be applied
+    const activity = await pool.query(
+      `SELECT da.*, d.owner_code FROM public.driver_activity da
+       JOIN public.drivers d ON d.id = da.driver_id
+       WHERE da.driver_id = $1 AND da.activity_date = CURRENT_DATE`,
+      [driverId]
+    );
+
+    if (activity.rows[0] && !activity.rows[0].is_incentive_applied) {
+      const act = activity.rows[0];
+      const hoursActive = act.total_active_minutes / 60;
+
+      // Owner ka config fetch karo
+      const ownerRes = await pool.query(
+        `SELECT o.id FROM public.owners o WHERE o.owner_code = $1`, [act.owner_code]
+      );
+      if (ownerRes.rows[0]) {
+        const configRes = await pool.query(
+          `SELECT * FROM public.owner_incentive_config 
+           WHERE owner_id = $1 AND is_enabled = TRUE`, [ownerRes.rows[0].id]
+        );
+        const config = configRes.rows[0];
+
+        if (config && hoursActive >= config.min_active_hours) {
+          // Incentive apply karo
+          let rentReduction = 0;
+          const driverData = await pool.query(
+            `SELECT v.daily_rent FROM public.vehicles v
+             JOIN public.drivers d ON d.id = $1
+             WHERE v.driver_id = $1 LIMIT 1`, [driverId]
+          );
+          const dailyRent = parseFloat(driverData.rows[0]?.daily_rent || 0);
+
+          if (config.incentive_type === 'FULL_WAIVER') rentReduction = dailyRent;
+          else if (config.incentive_type === 'PERCENTAGE') rentReduction = dailyRent * (config.incentive_value / 100);
+          else if (config.incentive_type === 'FIXED') rentReduction = parseFloat(config.incentive_value);
+
+          // Wallet mein credit karo
+          if (rentReduction > 0) {
+            await pool.query(
+              `UPDATE public.drivers SET wallet_balance = wallet_balance + $1 WHERE id = $2`,
+              [rentReduction, driverId]
+            );
+            await pool.query(
+              `UPDATE public.driver_activity SET is_incentive_applied = TRUE WHERE driver_id = $1 AND activity_date = CURRENT_DATE`,
+              [driverId]
+            );
+            // Notification bhejo
+            await pool.query(
+              `INSERT INTO public.notifications (user_id, user_type, title, message)
+               VALUES ($1, 'DRIVER', '🎉 Rent Incentive!', $2)`,
+              [driverId, `Aaj ${Math.floor(hoursActive)} hours active the! ₹${rentReduction.toFixed(0)} wallet mein credit ho gaye.`]
+            );
+          }
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Activity ping error:', err);
+    res.json({ success: false });
+  }
+});
+
+// ─── OWNER: GET INCENTIVE CONFIG ─────────────────────────────────────
+router.get('/owner/incentive-config', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    const result = await pool.query(
+      `SELECT * FROM public.owner_incentive_config WHERE owner_id = $1`, [ownerId]
+    );
+    res.json(result.rows[0] || {
+      is_enabled: false, min_active_hours: 12,
+      incentive_type: 'FULL_WAIVER', incentive_value: 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── OWNER: SAVE INCENTIVE CONFIG ────────────────────────────────────
+router.post('/owner/incentive-config', async (req, res) => {
+  try {
+    const { ownerId, isEnabled, minActiveHours, incentiveType, incentiveValue } = req.body;
+    await pool.query(
+      `INSERT INTO public.owner_incentive_config
+         (owner_id, is_enabled, min_active_hours, incentive_type, incentive_value)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (owner_id) DO UPDATE SET
+         is_enabled = $2, min_active_hours = $3,
+         incentive_type = $4, incentive_value = $5, updated_at = NOW()`,
+      [ownerId, isEnabled, minActiveHours, incentiveType, incentiveValue || 0]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── OWNER: TODAY'S DRIVER ACTIVITY ──────────────────────────────────
+router.get('/owner/driver-activity', async (req, res) => {
+  try {
+    const { ownerId, date } = req.query;
+    const actDate = date || new Date().toISOString().split('T')[0];
+    const result = await pool.query(
+      `SELECT 
+         d.full_name, d.mobile_number, d.driver_code,
+         COALESCE(da.total_active_minutes, 0) as total_active_minutes,
+         da.first_login, da.last_seen, da.is_incentive_applied,
+         v.daily_rent, v.vehicle_number
+       FROM public.drivers d
+       LEFT JOIN public.driver_activity da ON da.driver_id = d.id AND da.activity_date = $2
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+       ORDER BY COALESCE(da.total_active_minutes, 0) DESC`,
+      [ownerId, actDate]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+router.post('/driver/activity/login', async (req, res) => {
+  try {
+    const { driverPhone } = req.body;
+    const dr = await pool.query(
+      `SELECT d.*, o.id as owner_db_id
+       FROM public.drivers d
+       LEFT JOIN public.owners o ON o.owner_code = d.owner_code
+       WHERE d.mobile_number = $1`, [driverPhone]
+    );
+    if (!dr.rows[0]) return res.json({ success: false });
+    const driver = dr.rows[0];
+
+    // Daily log
+    const veh = await pool.query(
+      `SELECT id FROM public.vehicles WHERE driver_id = $1`, [driver.id]
+    );
+    await pool.query(
+      `INSERT INTO public.driver_daily_log (driver_id, log_date, login_time, vehicle_id)
+       VALUES ($1, CURRENT_DATE, NOW(), $2)
+       ON CONFLICT (driver_id, log_date) DO NOTHING`,
+      [driver.id, veh.rows[0]?.id || null]
+    );
+
+    // Owner notification
+    if (driver.owner_db_id) {
+      const t = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      await pool.query(
+        `INSERT INTO public.notifications (user_id, user_type, title, message)
+         VALUES ($1, 'OWNER', $2, $3)`,
+        [driver.owner_db_id, `🟢 ${driver.full_name} logged in`, `App open kiya at ${t}`]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) { res.json({ success: false }); }
+});
+
+router.post('/driver/activity/logout', async (req, res) => {
+  try {
+    const { driverPhone } = req.body;
+    const dr = await pool.query(
+      `SELECT d.*, o.id as owner_db_id
+       FROM public.drivers d
+       LEFT JOIN public.owners o ON o.owner_code = d.owner_code
+       WHERE d.mobile_number = $1`, [driverPhone]
+    );
+    if (!dr.rows[0]) return res.json({ success: false });
+    const driver = dr.rows[0];
+
+    const logRes = await pool.query(
+      `SELECT * FROM public.driver_daily_log
+       WHERE driver_id = $1 AND log_date = CURRENT_DATE`, [driver.id]
+    );
+    if (!logRes.rows[0]?.login_time) return res.json({ success: false });
+
+    const minutes = Math.floor((new Date() - new Date(logRes.rows[0].login_time)) / 60000);
+    await pool.query(
+      `UPDATE public.driver_daily_log
+       SET logout_time = NOW(), active_minutes = $1
+       WHERE driver_id = $2 AND log_date = CURRENT_DATE`,
+      [minutes, driver.id]
+    );
+
+    // Incentive check
+    if (driver.owner_db_id) {
+      const rulesRes = await pool.query(
+        `SELECT * FROM public.owner_incentive_rules
+         WHERE owner_id = $1 AND is_enabled = TRUE`, [driver.owner_db_id]
+      );
+      const rules = rulesRes.rows[0]?.rules || [];
+      const hoursWorked = minutes / 60;
+
+      // Best applicable rule dhundo
+      const applicable = rules
+        .filter(r => hoursWorked >= r.min_hours)
+        .sort((a, b) => b.min_hours - a.min_hours)[0];
+
+      if (applicable && !logRes.rows[0].incentive_applied) {
+        const vehRes = await pool.query(
+          `SELECT daily_rent FROM public.vehicles WHERE driver_id = $1`, [driver.id]
+        );
+        const rent = parseFloat(vehRes.rows[0]?.daily_rent || 0);
+        let amt = 0;
+        if (applicable.type === 'FULL_WAIVER') amt = rent;
+        else if (applicable.type === 'PERCENTAGE') amt = rent * (applicable.value / 100);
+        else if (applicable.type === 'FIXED') amt = applicable.value;
+
+        if (amt > 0) {
+          await pool.query(
+            `UPDATE public.drivers SET wallet_balance = wallet_balance + $1 WHERE id = $2`,
+            [amt, driver.id]
+          );
+          await pool.query(
+            `UPDATE public.driver_daily_log SET incentive_applied = TRUE, incentive_amount = $1
+             WHERE driver_id = $2 AND log_date = CURRENT_DATE`,
+            [amt, driver.id]
+          );
+          await pool.query(
+            `INSERT INTO public.notifications (user_id, user_type, title, message)
+             VALUES ($1, 'DRIVER', '🎉 Incentive Mila!', $2)`,
+            [driver.id, `${Math.floor(hoursWorked)} ghante kaam kiya! ₹${amt.toFixed(0)} wallet mein aaye.`]
+          );
+        }
+      }
+    }
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+// Driver ki puri history
+router.get('/owner/driver-history/:driverId', async (req, res) => {
+  try {
+    const { driverId } = req.params;
+
+    const [vehicleHistory, dailyLog] = await Promise.all([
+      pool.query(
+        `SELECT 
+           dvh.*,
+           v.vehicle_number, v.vehicle_model,
+           dvh.assigned_at,
+           dvh.unassigned_at,
+           dvh.total_days,
+           COALESCE(dvh.total_days, 0) * dvh.daily_rent as total_earned
+         FROM public.driver_vehicle_history dvh
+         JOIN public.vehicles v ON v.id = dvh.vehicle_id
+         WHERE dvh.driver_id = $1
+         ORDER BY dvh.assigned_at DESC`,
+        [driverId]
+      ),
+      pool.query(
+        `SELECT * FROM public.driver_daily_log
+         WHERE driver_id = $1
+         ORDER BY log_date DESC LIMIT 30`,
+        [driverId]
+      )
+    ]);
+
+    res.json({
+      vehicle_history: vehicleHistory.rows,
+      daily_log: dailyLog.rows
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Vehicle ki puri history
+router.get('/owner/vehicle-history/:vehicleId', async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const result = await pool.query(
+      `SELECT 
+         dvh.*,
+         d.full_name as driver_name, d.mobile_number as driver_phone,
+         dvh.assigned_at, dvh.unassigned_at, dvh.total_days,
+         COALESCE(dvh.total_days, 0) * dvh.daily_rent as total_earned
+       FROM public.driver_vehicle_history dvh
+       JOIN public.drivers d ON d.id = dvh.driver_id
+       WHERE dvh.vehicle_id = $1
+       ORDER BY dvh.assigned_at DESC`,
+      [vehicleId]
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Today's activity for owner
+router.get('/owner/driver-activity', async (req, res) => {
+  try {
+    const { ownerId, date } = req.query;
+    const actDate = date || new Date().toISOString().split('T')[0];
+    const result = await pool.query(
+      `SELECT 
+         d.id, d.full_name, d.mobile_number,
+         COALESCE(dl.active_minutes, 0) as active_minutes,
+         dl.login_time, dl.logout_time,
+         dl.incentive_applied, dl.incentive_amount,
+         v.vehicle_number, v.daily_rent
+       FROM public.drivers d
+       LEFT JOIN public.driver_daily_log dl ON dl.driver_id = d.id AND dl.log_date = $2
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+       ORDER BY COALESCE(dl.active_minutes, 0) DESC`,
+      [ownerId, actDate]
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Incentive rules
+router.get('/owner/incentive-rules', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    const res2 = await pool.query(
+      `SELECT * FROM public.owner_incentive_rules WHERE owner_id = $1`, [ownerId]
+    );
+    res.json(res2.rows[0] || { is_enabled: false, rules: [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/owner/incentive-rules', async (req, res) => {
+  try {
+    const { ownerId, isEnabled, rules } = req.body;
+    await pool.query(
+      `INSERT INTO public.owner_incentive_rules (owner_id, is_enabled, rules)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (owner_id) DO UPDATE
+       SET is_enabled = $2, rules = $3, updated_at = NOW()`,
+      [ownerId, isEnabled, JSON.stringify(rules)]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 // TEST ENDPOINT - Set test dues for a driver (REMOVE IN PRODUCTION)
 router.post('/driver/set-test-dues', async (req, res) => {
   try {
