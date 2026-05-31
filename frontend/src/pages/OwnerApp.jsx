@@ -2045,12 +2045,16 @@ const VehiclesTab = () => {
   const sorted = [...vehicles].sort((a,b) => (a.driver_id ? 1 : -1) - (b.driver_id ? 1 : -1));
   return (
   <div className="space-y-3 pb-4">
-    <button 
-      onClick={openAddVehicleModal}
-      className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2"
-    >
-      <Plus size={16} /> Add Vehicle
-    </button>
+    <div className="flex gap-2">
+  <button onClick={openAddVehicleModal}
+    className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
+    <Plus size={16} /> Add Vehicle
+  </button>
+  <button onClick={() => { setShowBulkModal(true); setBulkTab('vehicles'); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); }}
+    className="py-3 px-4 bg-emerald-600 text-white rounded-xl text-sm font-black">
+    📊 Bulk
+  </button>
+</div>
     
     <div className="space-y-3">
       
@@ -2114,28 +2118,13 @@ const VehiclesTab = () => {
           </div>
         </div>
       ))}
-      
       {vehicles.length === 0 && (
-        <div className="bg-white rounded-2xl p-8 text-center text-slate-400">
-          <Truck size={32} className="mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No vehicles yet</p>
-<div className="flex gap-2">
-  <button onClick={openAddVehicleModal}
-    className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
-    <Plus size={16} /> Add Vehicle
-  </button>
-  <button onClick={() => {
-    setShowBulkModal(true);
-    setBulkTab('vehicles');
-    setBulkVehicles([]);
-    setBulkResult(null);
-    setBulkFile(null);
-  }} className="py-3 px-4 bg-emerald-600 text-white rounded-xl text-sm font-black">
-    📊 Bulk
-  </button>
-</div>
-        </div>
-      )}
+  <div className="bg-white rounded-2xl p-8 text-center text-slate-400">
+    <Truck size={32} className="mx-auto mb-2 opacity-50" />
+    <p className="text-sm">No vehicles yet</p>
+    <p className="text-xs mt-1">Use buttons above to add vehicles</p>
+  </div>
+)}
     </div>
   </div>
 );}

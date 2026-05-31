@@ -1571,8 +1571,8 @@ router.post('/owner/bulk-upload-vehicles', async (req, res) => {
             v.vehicle_type || 'TRUCK',
             parseFloat(v.daily_rent) || 850,
             parseInt(ownerId) || 1,
-            v.insurance_expiry || null,
-            v.fitness_expiry || null,
+            parseDate(v.insurance_expiry),
+            parseDate(v.fitness_expiry),
             v.chassis_number || null
           ]
         );
@@ -1619,7 +1619,26 @@ router.post('/owner/bulk-upload', async (req, res) => {
         if (existing.rows.length > 0) {
           results.failed.push({ name, reason: `${phone} already exists` }); continue;
         }
-
+        const parseDate = (d) => {
+  if (!d || d.trim() === '') return null;
+  
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d.trim())) return d.trim();
+  
+  // D-M-YYYY or DD-MM-YYYY (dash)
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(d.trim())) {
+    const [dd, mm, yyyy] = d.trim().split('-');
+    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+  
+  // D/M/YYYY or DD/MM/YYYY (slash)
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d.trim())) {
+    const [dd, mm, yyyy] = d.trim().split('/');
+    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+  
+  return null;
+};
         const driverCode = 'DRV' + Date.now().toString().slice(-5) + Math.random().toString(36).substr(2,3).toUpperCase();
 
         await pool.query(
@@ -1630,11 +1649,11 @@ router.post('/owner/bulk-upload', async (req, res) => {
            VALUES ($1,$2,$3,$4,0,'ACTIVE',$5,$6,$7,$8,$9,$10)`,
           [
             name, phone, finalOwnerCode, driverCode,
-            driver.date_of_birth || null,
+            parseDate(driver.date_of_birth),
             driver.emergency_contact_name || null,
             driver.emergency_contact_number || null,
             driver.driving_license_number || null,
-            driver.driving_license_expiry || null,
+            parseDate(driver.driving_license_expiry),
             parseFloat(driver.security_deposit) || 0
           ]
         );
