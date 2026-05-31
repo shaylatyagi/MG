@@ -1105,7 +1105,6 @@ const handleVehicleBulkFile = (e) => {
   };
   reader.readAsText(file);
 };
-
 const importBulkVehicles = async () => {
   const valid = bulkVehicles.filter(v => v._errors.length === 0);
   if (!valid.length) return alert('Koi valid vehicle nahi');
@@ -1114,12 +1113,18 @@ const importBulkVehicles = async () => {
     const res = await fetch(`${API}/api/payment/owner/bulk-upload-vehicles`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-      body: JSON.stringify({ vehicles: valid, ownerId: ownerId() })
+      body: JSON.stringify({ 
+        vehicles: valid, 
+        ownerId: ownerId()  // ✅ Already correct tha
+      })
     });
     const data = await res.json();
     setBulkResult(data);
-    if (data.imported > 0) fetchAllData();
-  } catch(err) { alert('Network error'); }
+    if (data.imported > 0) {
+      fetchAllData();
+      alert(`✅ ${data.imported} vehicles import ho gaye!`);
+    }
+  } catch(err) { alert('Network error: ' + err.message); }
   finally { setBulkLoading(false); }
 };
 const handleBulkFile = (e) => {
@@ -1151,7 +1156,6 @@ const updateBulkRow = (index, field, value) => {
     return updated;
   });
 };
-
 const importBulkDrivers = async () => {
   const valid = bulkDrivers.filter(d => d._errors.length === 0);
   if (!valid.length) return alert('Koi valid driver nahi — pehle errors fix karo');
@@ -1160,12 +1164,22 @@ const importBulkDrivers = async () => {
     const res = await fetch(`${API}/api/payment/owner/bulk-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-      body: JSON.stringify({ vehicles: valid, ownerId: ownerId() })
+      body: JSON.stringify({ 
+        drivers: valid, 
+        ownerId: ownerId(),      // ✅ ID bhejo
+        ownerCode: ownerCode()   // ✅ Code bhi bhejo (fallback)
+      })
     });
     const data = await res.json();
     setBulkResult(data);
-    if (data.imported > 0) fetchAllData();
-  } catch(err) { alert('Network error'); }
+    if (data.imported > 0) {
+      fetchAllData();
+      alert(`✅ ${data.imported} drivers import ho gaye!`);
+    }
+    if (data.failed > 0) {
+      console.log('Failed:', data.failures);
+    }
+  } catch(err) { alert('Network error: ' + err.message); }
   finally { setBulkLoading(false); }
 };
 const addMultipleDrivers = async () => {

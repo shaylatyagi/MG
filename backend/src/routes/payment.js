@@ -1589,8 +1589,18 @@ router.post('/owner/bulk-upload-vehicles', async (req, res) => {
 });
 router.post('/owner/bulk-upload', async (req, res) => {
   try {
-    const { drivers, ownerCode } = req.body;
+    const { drivers, ownerId, ownerCode } = req.body;
     if (!drivers?.length) return res.status(400).json({ success: false, message: 'No data' });
+
+    // ✅ ownerCode DB se fetch karo agar direct nahi aaya
+    let finalOwnerCode = ownerCode;
+    if (!finalOwnerCode && ownerId) {
+      const ownerRes = await pool.query(
+        `SELECT owner_code FROM public.owners WHERE id = $1`, [parseInt(ownerId)]
+      );
+      finalOwnerCode = ownerRes.rows[0]?.owner_code;
+    }
+    if (!finalOwnerCode) return res.status(400).json({ success: false, message: 'Owner not found' });
 
     const results = { success: [], failed: [] };
 
@@ -1619,8 +1629,7 @@ router.post('/owner/bulk-upload', async (req, res) => {
              driving_license_number, driving_license_expiry, security_deposit)
            VALUES ($1,$2,$3,$4,0,'ACTIVE',$5,$6,$7,$8,$9,$10)`,
           [
-            name, phone,
-            ownerCode || 'OWN701951', driverCode,
+            name, phone, finalOwnerCode, driverCode,
             driver.date_of_birth || null,
             driver.emergency_contact_name || null,
             driver.emergency_contact_number || null,
@@ -1635,7 +1644,12 @@ router.post('/owner/bulk-upload', async (req, res) => {
       }
     }
 
-    res.json({ success: true, imported: results.success.length, failed: results.failed.length, failures: results.failed });
+    res.json({ 
+      success: true, 
+      imported: results.success.length, 
+      failed: results.failed.length, 
+      failures: results.failed 
+    });
   } catch(err) {
     res.status(500).json({ success: false, message: err.message });
   }
