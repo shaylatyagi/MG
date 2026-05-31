@@ -1410,21 +1410,21 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   };
   return subtitles[activeTab] || '';
 };
-  const StatCard = ({ title, value, icon: Icon, color, trend,isMoney = false }) => (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+  const StatCard = ({ title, value, icon: Icon, color, trend, isMoney = false }) => (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 hover:border-blue-100 transition">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
           <p className="text-xl font-black text-slate-800 mt-1">{isMoney ? `₹${value.toLocaleString('en-IN')}` : value}</p>
           {trend && (
             <div className="flex items-center gap-1 mt-1">
-              {trend === 'up' ? <ArrowUpRight size={10} className="text-emerald-500" /> : <ArrowDownRight size={10} className="text-red-500" />}
-              <span className={`text-[9px] font-black ${trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>12.5%</span>
+              <ArrowDownRight size={10} className="text-slate-400" />
+              <span className="text-[9px] text-slate-400">pending</span>
             </div>
           )}
         </div>
-        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${color}`}>
-          <Icon size={18} className="text-white" />
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color}`}>
+          <Icon size={16} className="text-white" />
         </div>
       </div>
     </div>
@@ -1434,84 +1434,93 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   const HomeTab = () => (
     <div className="space-y-4 pb-4">
     {/* Yield Ledger — YAHAN ADD KARO */}
-    <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-3">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.ledger}</span>
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{t.ledger}</span>
         <select value={horizon} onChange={e=>setHorizon(e.target.value)}
-          className="bg-slate-100 px-2 py-1 rounded text-[11px] font-bold text-slate-700 outline-none border border-slate-200">
-          <option value="today">Today (Live)</option>
+          className="bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-[10px] font-black text-slate-600 outline-none">
+          <option value="today">Today</option>
           <option value="yesterday">Yesterday</option>
           <option value="week">Last 7 Days</option>
           <option value="this_month">This Month</option>
           <option value="last_month">Last Month</option>
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-3 text-center">
-  <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
-    <span className="text-[9px] text-emerald-600 font-bold uppercase block">{t.received}</span>
-    <b className="text-base font-mono font-bold text-emerald-700 block mt-1">₹{ledger.received.toLocaleString('en-IN')}</b>
-  </div>
-  <div className="bg-amber-50 p-3 rounded-xl border border-amber-200">
-    <span className="text-[9px] text-amber-600 font-bold uppercase block">{t.outstanding}</span>
-    <b className="text-base font-mono font-bold text-amber-700 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
-  </div>
-</div>
-      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-        <span className="flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"/>{t.escrow}</span>
-        <span className="font-bold">{t.calcToday}</span>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+          <span className="text-[9px] text-blue-600 font-black uppercase block">{t.received}</span>
+          <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.received.toLocaleString('en-IN')}</b>
+        </div>
+        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <span className="text-[9px] text-slate-500 font-black uppercase block">{t.outstanding}</span>
+          <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-[9px] text-slate-400">
+        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/>{t.escrow}</span>
+        <span>{t.calcToday}</span>
       </div>
     </div>
 
-    <div className="grid grid-cols-2 gap-3">
-
-        <StatCard title={t.fleet} value={stats.totalVehicles} icon={Truck} color="bg-blue-600" />
-        <StatCard title={t.drivers} value={stats.totalDrivers} icon={Users} color="bg-emerald-600" />
-        <StatCard title={t.collection} value={stats.todayCollection} icon={Wallet} color="bg-amber-600" isMoney/>
-        <StatCard title={t.pending} value={stats.pendingDues} icon={AlertCircle} color="bg-red-600" trend="down" isMoney/>
-      </div>
-
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => setShowAddVehicle(true)} className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-4 text-white text-left">
-          <Truck size={20} className="mb-2 opacity-80" />
-          <p className="text-xs font-black">{t.addVehicle}</p>
-          <p className="text-[9px] opacity-70">{t.addVehicleSub}</p>
+        <StatCard title={t.fleet} value={stats.totalVehicles} icon={Truck} color="bg-blue-600" />
+        <StatCard title={t.drivers} value={stats.totalDrivers} icon={Users} color="bg-blue-500" />
+        <StatCard title={t.collection} value={stats.todayCollection} icon={Wallet} color="bg-slate-700" isMoney/>
+        <StatCard title={t.pending} value={stats.pendingDues} icon={AlertCircle} color="bg-slate-500" trend="down" isMoney/>
+      </div>
+      {/* Quick Nav */}
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => setActiveTab('drivers')}
+          className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2 hover:border-blue-200 hover:bg-blue-50/30 transition">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+            <UserPlus size={14} className="text-blue-600"/>
+          </div>
+          <div className="text-left">
+            <p className="text-xs font-black text-slate-800">Drivers</p>
+            <p className="text-[9px] text-slate-400">{stats.totalDrivers} active</p>
+          </div>
         </button>
-        <button onClick={() => setShowAddDriver(true)} className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-4 text-white text-left">
-          <UserPlus size={20} className="mb-2 opacity-80" />
-          <p className="text-xs font-black">{t.addDriver}</p>
-          <p className="text-[9px] opacity-70">{t.addDriverSub}</p>
+        <button onClick={() => setActiveTab('vehicles')}
+          className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2 hover:border-blue-200 hover:bg-blue-50/30 transition">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+            <Truck size={14} className="text-blue-600"/>
+          </div>
+          <div className="text-left">
+            <p className="text-xs font-black text-slate-800">Fleet</p>
+            <p className="text-[9px] text-slate-400">{stats.totalVehicles} vehicles</p>
+          </div>
         </button>
       </div>
+
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t.recentDrivers}</h3>
           <button onClick={() => setActiveTab('drivers')} className="text-[10px] text-blue-600 font-black">{t.viewAll}</button>
         </div>
         <div className="divide-y">
-          {drivers.slice(0, 5).map((driver, i) => (
-            <div key={i} className="px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-black text-lg">
-                  {driver.full_name?.charAt(0) || driver.name?.charAt(0) || 'D'}
+          {drivers.slice(0, 5).map((driver, i) => {
+            const dVehicle = vehicles.find(v => Number(v.driver_id) === Number(driver.id));
+            return (
+              <div key={i} className="px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-black text-sm border border-blue-100">
+                    {driver.full_name?.charAt(0) || 'D'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-slate-800">{driver.full_name || driver.name}</p>
+                    <p className="text-[9px] text-slate-400 font-mono">{dVehicle?.vehicle_number || 'Unassigned'}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-black text-slate-800">{driver.full_name || driver.name}</p>
-                  <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
-                </div>
+                <button onClick={() => openChatWithDriver(driver)}
+                  className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:border-blue-200 hover:text-blue-600 transition">
+                  <MessageCircle size={13} />
+                </button>
               </div>
-              <button 
-                onClick={() => openChatWithDriver(driver)}
-                className="p-2 rounded-lg bg-blue-50 text-blue-600"
-              >
-                <MessageCircle size={14} />
-              </button>
-            </div>
-          ))}
+            );
+          })}
           {drivers.length === 0 && (
-            <div className="p-8 text-center text-slate-400">
-              <Users size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-xs">No drivers added yet</p>
-              <button onClick={() => setShowAddDriver(true)} className="mt-2 text-blue-600 text-xs font-black">+ Add Driver</button>
+            <div className="p-6 text-center text-slate-400">
+              <p className="text-xs">No drivers yet</p>
             </div>
           )}
         </div>
@@ -1662,23 +1671,6 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
                         <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
                         <p className="text-[9px] text-slate-400">
                           Vehicle: {assignedVehicle?.vehicle_number || 'Not Assigned'}
-                          <p className="text-[9px] text-slate-400">
-  Vehicle: {assignedVehicle?.vehicle_number || 'Not Assigned'}
-</p>
-
-{/* ✅ YAHAN ADD KARO — vehicle ke neeche */}
-{hasVehicle && assignedVehicle && (() => {
-  const since = assignedVehicle.updated_at || assignedVehicle.created_at;
-  if (!since) return null;
-  const hrs = Math.floor((new Date() - new Date(since)) / 3600000);
-  const days = Math.floor(hrs / 24);
-  return (
-    <p className="text-[9px] text-blue-600 font-black">
-      ⏱ {days > 0 ? `${days}d ` : ''}{hrs % 24}h with vehicle
-    </p>
-  );
-})()}
-
                         </p>
                       </div>
                     </div>
@@ -2349,40 +2341,57 @@ const PaymentsTab = () => {
   
   const liveTx = transactions.filter(tx => tx.payment_mode !== 'CASH');
   const cashTx = transactions.filter(tx => tx.payment_mode === 'CASH');
+  const cashTotal = cashTx.reduce((s, tx) => s + parseFloat(tx.order_amount || 0), 0);
+  const [showAllTx, setShowAllTx] = useState(false);
+  const displayedTx = showAllTx ? liveTx : liveTx.slice(0, 5);
 
   return (
     <div className="space-y-4 pb-4">
       
-      {/* Total Banner */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-5 text-white">
-        <p className="text-[10px] font-black opacity-80">{t.totalCol}</p>
-        <p className="text-3xl font-black">₹{stats.todayCollection.toLocaleString('en-IN')}</p>
-        <p className="text-[10px] opacity-70 mt-1">Last 30 days</p>
+      {/* Total Banner — clean minimal */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">{t.totalCol}</p>
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[9px] text-slate-400 mb-0.5">Online + UPI</p>
+            <p className="text-2xl font-black text-slate-800">₹{stats.todayCollection.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[9px] text-slate-400 mb-0.5">Cash Collected</p>
+            <p className="text-2xl font-black text-blue-600">₹{cashTotal.toLocaleString('en-IN')}</p>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center">
+          <p className="text-[9px] text-slate-400">Total (Online + Cash)</p>
+          <p className="text-sm font-black text-slate-700">₹{(stats.todayCollection + cashTotal).toLocaleString('en-IN')}</p>
+        </div>
+        <p className="text-[9px] text-slate-400 mt-1">Last 30 days</p>
       </div>
 
-      {/* Live Transaction History — mat chedo, simple rakho */}
+      {/* Transaction History */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
           <h3 className="text-[10px] font-black text-slate-400 uppercase">{t.txHistory}</h3>
+          <span className="text-[9px] text-slate-400">{liveTx.length} transactions</span>
         </div>
-        <div className="divide-y max-h-96 overflow-y-auto">
+        <div className="divide-y">
           {loadingTx ? (
             <div className="p-8 text-center text-slate-400 text-xs">Loading...</div>
           ) : liveTx.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs">{t.noTx}</div>
           ) : (
-            liveTx.map((tx, i) => (
-              <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+            displayedTx.map((tx, i) => (
+              <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition">
                 <div>
                   <p className="text-xs font-black text-slate-800">{tx.driver_name || tx.payer_name || 'Driver'}</p>
                   <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
                   <p className="text-[9px] text-slate-400 font-mono">
-                    {new Date(tx.order_completion_date || tx.order_initiation_date).toLocaleString()}
+                    {new Date(tx.order_completion_date || tx.order_initiation_date).toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-emerald-600">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                  <p className="text-sm font-black text-slate-800">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
                     {tx.transaction_status || 'SUCCESS'}
                   </span>
                 </div>
@@ -2390,6 +2399,14 @@ const PaymentsTab = () => {
             ))
           )}
         </div>
+        {liveTx.length > 5 && (
+          <div className="px-4 py-3 border-t border-slate-100">
+            <button onClick={() => setShowAllTx(!showAllTx)}
+              className="w-full text-[11px] font-black text-blue-600 py-2 rounded-xl hover:bg-blue-50 transition">
+              {showAllTx ? `Show Less ↑` : `Load More (${liveTx.length - 5} more) ↓`}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Cash Payments — ALAG SECTION NICHE */}
@@ -2901,7 +2918,6 @@ const ProfileTab = () => (
         value={newVehicle.number} 
         onChange={e => setNewVehicle({...newVehicle, number: e.target.value})} 
       />
-
       
       {/* Vehicle Model */}
       <input 
