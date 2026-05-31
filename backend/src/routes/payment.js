@@ -7,6 +7,26 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 
 const pool = require('../config/db');
+const parseDate = (d) => {
+  if (!d || d.trim() === '') return null;
+  
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d.trim())) return d.trim();
+  
+  // D-M-YYYY or DD-MM-YYYY (dash)
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(d.trim())) {
+    const [dd, mm, yyyy] = d.trim().split('-');
+    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+  
+  // D/M/YYYY or DD/MM/YYYY (slash)
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d.trim())) {
+    const [dd, mm, yyyy] = d.trim().split('/');
+    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+  
+  return null;
+};
 
 const CLIENT_ID = process.env.PAYYANTRA_CLIENT_ID;
 
@@ -1619,26 +1639,6 @@ router.post('/owner/bulk-upload', async (req, res) => {
         if (existing.rows.length > 0) {
           results.failed.push({ name, reason: `${phone} already exists` }); continue;
         }
-        const parseDate = (d) => {
-  if (!d || d.trim() === '') return null;
-  
-  // Already YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(d.trim())) return d.trim();
-  
-  // D-M-YYYY or DD-MM-YYYY (dash)
-  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(d.trim())) {
-    const [dd, mm, yyyy] = d.trim().split('-');
-    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
-  }
-  
-  // D/M/YYYY or DD/MM/YYYY (slash)
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d.trim())) {
-    const [dd, mm, yyyy] = d.trim().split('/');
-    return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
-  }
-  
-  return null;
-};
         const driverCode = 'DRV' + Date.now().toString().slice(-5) + Math.random().toString(36).substr(2,3).toUpperCase();
 
         await pool.query(

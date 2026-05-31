@@ -3059,23 +3059,13 @@ const ProfileTab = () => (
       {/* Header */}
       <div className="p-4 pb-3 flex justify-between items-center border-b shrink-0">
         <div>
-          <h3 className="text-lg font-black">📊 Bulk Import</h3>
-          <p className="text-[10px] text-slate-400">CSV → verify → fix → import</p>
+          <h3 className="text-lg font-black">
+  {bulkTab === 'drivers' ? '👤 Bulk Driver Import' : '🚛 Bulk Vehicle Import'}
+</h3>
+<p className="text-[10px] text-slate-400">CSV → verify → fix → import</p>
         </div>
         <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('drivers'); }}>
           <X size={20}/>
-        </button>
-      </div>
-
-      {/* Driver / Vehicle Tab */}
-      <div className="flex gap-2 px-4 pt-3 shrink-0">
-        <button onClick={() => { setBulkTab('drivers'); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
-          className={`flex-1 py-2 rounded-xl text-sm font-black transition ${bulkTab==='drivers'?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>
-          👤 Drivers
-        </button>
-        <button onClick={() => { setBulkTab('vehicles'); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); }}
-          className={`flex-1 py-2 rounded-xl text-sm font-black transition ${bulkTab==='vehicles'?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>
-          🚛 Vehicles
         </button>
       </div>
 
