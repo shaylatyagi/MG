@@ -7,7 +7,31 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 
 const pool = require('../config/db');
-
+// ─── ASSIGNMENT HISTORY HELPER ───────────────────────────────────────
+const logAssignment = async (driverId, vehicleId, ownerId, dailyRent, rentType) => {
+  // Pehle koi open record close karo
+  await pool.query(
+    UPDATE public.driver_vehicle_history 
+     SET unassigned_at = NOW()
+     WHERE driver_id = $1 AND unassigned_at IS NULL,
+    [driverId]
+  );
+  // Naya record
+  await pool.query(
+    INSERT INTO public.driver_vehicle_history 
+     (driver_id, vehicle_id, owner_id, daily_rent, rent_type, reason)
+     VALUES ($1, $2, $3, $4, $5, 'ASSIGNED'),
+    [driverId, vehicleId, ownerId, dailyRent, rentType || 'DAILY']
+  );
+};
+const logUnassignment = async (vehicleId) => {
+  await pool.query(
+    UPDATE public.driver_vehicle_history
+     SET unassigned_at = NOW(), reason = 'UNASSIGNED'
+     WHERE vehicle_id = $1 AND unassigned_at IS NULL,
+    [vehicleId]
+  );
+};
 const parseDate = (d) => {
   if (!d || d.trim() === '') return null;
   
@@ -228,29 +252,7 @@ router.post('/owner/incentive-config', async (req, res) => {
   }
 });
 
-// ─── OWNER: TODAY'S DRIVER ACTIVITY ──────────────────────────────────
-router.get('/owner/driver-activity', async (req, res) => {
-  try {
-    const { ownerId, date } = req.query;
-    const actDate = date || new Date().toISOString().split('T')[0];
-    const result = await pool.query(
-      `SELECT 
-         d.full_name, d.mobile_number, d.driver_code,
-         COALESCE(da.total_active_minutes, 0) as total_active_minutes,
-         da.first_login, da.last_seen, da.is_incentive_applied,
-         v.daily_rent, v.vehicle_number
-       FROM public.drivers d
-       LEFT JOIN public.driver_activity da ON da.driver_id = d.id AND da.activity_date = $2
-       LEFT JOIN public.vehicles v ON v.driver_id = d.id
-       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-       ORDER BY COALESCE(da.total_active_minutes, 0) DESC`,
-      [ownerId, actDate]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// ─── DRIVER LOGIN + OWNER NOTIFICATION ───────────────────────────────
 router.post('/driver/activity/login', async (req, res) => {
   try {
     const { driverPhone } = req.body;
@@ -370,8 +372,8 @@ router.get('/owner/driver-history/:driverId', async (req, res) => {
            v.vehicle_number, v.vehicle_model,
            dvh.assigned_at,
            dvh.unassigned_at,
-           dvh.total_days,
-           COALESCE(dvh.total_days, 0) * dvh.daily_rent as total_earned
+           EXTRACT(DAY FROM COALESCE(dvh.unassigned_at, NOW()) - dvh.assigned_at)::INTEGER as total_days,
+           EXTRACT(DAY FROM COALESCE(dvh.unassigned_at, NOW()) - dvh.assigned_at)::INTEGER * COALESCE(dvh.daily_rent, 0) as total_earned
          FROM public.driver_vehicle_history dvh
          JOIN public.vehicles v ON v.id = dvh.vehicle_id
          WHERE dvh.driver_id = $1
@@ -401,8 +403,9 @@ router.get('/owner/vehicle-history/:vehicleId', async (req, res) => {
       `SELECT 
          dvh.*,
          d.full_name as driver_name, d.mobile_number as driver_phone,
-         dvh.assigned_at, dvh.unassigned_at, dvh.total_days,
-         COALESCE(dvh.total_days, 0) * dvh.daily_rent as total_earned
+         dvh.assigned_at, dvh.unassigned_at,
+         EXTRACT(DAY FROM COALESCE(dvh.unassigned_at, NOW()) - dvh.assigned_at)::INTEGER as total_days,
+         EXTRACT(DAY FROM COALESCE(dvh.unassigned_at, NOW()) - dvh.assigned_at)::INTEGER * COALESCE(dvh.daily_rent, 0) as total_earned
        FROM public.driver_vehicle_history dvh
        JOIN public.drivers d ON d.id = dvh.driver_id
        WHERE dvh.vehicle_id = $1
