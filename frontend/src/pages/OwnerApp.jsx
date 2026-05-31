@@ -1306,6 +1306,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   ...prev, rules: prev.rules.filter((_, idx) => idx !== i)
 }));
 // ──────────────────────────────────────────────────────────────────────────────
+  const addDriver = async () => {
     if (!newDriver.name || !newDriver.phone) {
       alert('Please fill name and phone');
       return;
@@ -3478,3 +3479,4 @@ const ProfileTab = () => (
       </div>
     </div>
   );
+}
