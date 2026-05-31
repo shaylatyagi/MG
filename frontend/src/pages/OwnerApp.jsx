@@ -492,10 +492,9 @@ const fetchAvailableVehicles = async (driverId) => {
   }
 };
 const DriverDetailsModal = () => {
-  if (!selectedDriverDetails) return null;
-  
+  const [driverHistory] = useState(null);    // ← hook pehle
+if (!selectedDriverDetails) return null;
   const driver = selectedDriverDetails;
-   const [driverHistory, setDriverHistory] = useState(null);
   useEffect(() => {
     if (!driver?.id) return;
     fetch(`${API}/api/payment/owner/driver-history/${driver.id}`, {
