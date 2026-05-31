@@ -55,8 +55,12 @@ router.post('/unassign', async (req, res) => {
   try {
     const { vehicleId } = req.body;
     await client.query('BEGIN');
-    const veh = await client.query('SELECT driver_id FROM vehicles WHERE id=$1', [vehicleId]);
+    
+    const veh = await client.query(
+      'SELECT driver_id FROM vehicles WHERE id=$1', [vehicleId]
+    );
     const driverId = veh.rows[0]?.driver_id;
+
     await client.query(
       `UPDATE vehicles SET driver_id=NULL, driver_name=NULL, driver_phone=NULL, status='AVAILABLE' WHERE id=$1`,
       [vehicleId]
@@ -65,7 +69,81 @@ router.post('/unassign', async (req, res) => {
       await client.query('UPDATE drivers SET assigned_vehicle_id=NULL WHERE id=$1', [driverId]);
     }
     await client.query('COMMIT');
-    await logUnassignment(vehicleId);  // ✅ History log
+
+    // ✅ History update + incentive calculate
+    await logUnassignment(vehicleId);
+
+    if (driverId) {
+      // Duration calculate karo
+      const histRes = await pool.query(
+        `SELECT assigned_at, daily_rent,
+         EXTRACT(EPOCH FROM (NOW() - assigned_at))/3600 as hours_held
+         FROM public.driver_vehicle_history
+         WHERE driver_id = $1 AND unassigned_at IS NOT NULL
+         ORDER BY unassigned_at DESC LIMIT 1`,
+        [driverId]
+      );
+      const hist = histRes.rows[0];
+      const hoursHeld = parseFloat(hist?.hours_held || 0);
+
+      // Owner ka incentive rule fetch karo
+      const ownerRes = await pool.query(
+        `SELECT o.id FROM public.owners o
+         JOIN public.drivers d ON d.owner_code = o.owner_code
+         WHERE d.id = $1`, [driverId]
+      );
+      const ownerId = ownerRes.rows[0]?.id;
+
+      if (ownerId) {
+        const rulesRes = await pool.query(
+          `SELECT * FROM public.owner_incentive_rules
+           WHERE owner_id = $1 AND is_enabled = TRUE`, [ownerId]
+        );
+        const rules = rulesRes.rows[0]?.rules || [];
+
+        // Per-driver override check
+        const driverRuleRes = await pool.query(
+          `SELECT incentive_rule_index FROM public.drivers WHERE id = $1`, [driverId]
+        );
+        const overrideIdx = driverRuleRes.rows[0]?.incentive_rule_index;
+
+        let applicableRule = null;
+        if (overrideIdx === -1) {
+          // No incentive for this driver
+        } else if (overrideIdx !== null && rules[overrideIdx]) {
+          // Specific rule for this driver
+          if (hoursHeld >= rules[overrideIdx].min_hours) {
+            applicableRule = rules[overrideIdx];
+          }
+        } else {
+          // Global rules — best applicable dhundo
+          applicableRule = rules
+            .filter(r => hoursHeld >= r.min_hours)
+            .sort((a, b) => b.min_hours - a.min_hours)[0] || null;
+        }
+
+        if (applicableRule) {
+          const dailyRent = parseFloat(hist?.daily_rent || 0);
+          let amt = 0;
+          if (applicableRule.type === 'FULL_WAIVER') amt = dailyRent;
+          else if (applicableRule.type === 'PERCENTAGE') amt = dailyRent * (applicableRule.value / 100);
+          else if (applicableRule.type === 'FIXED') amt = parseFloat(applicableRule.value);
+
+          if (amt > 0) {
+            await pool.query(
+              `UPDATE public.drivers SET wallet_balance = wallet_balance + $1 WHERE id = $2`,
+              [amt, driverId]
+            );
+            await pool.query(
+              `INSERT INTO public.notifications (driver_id, user_type, title, message)
+               VALUES ($1, 'DRIVER', '🎉 Incentive Mila!', $2)`,
+              [driverId, `${Math.floor(hoursHeld)} ghante vehicle rakhi! ₹${amt.toFixed(0)} wallet mein aaye.`]
+            );
+          }
+        }
+      }
+    }
+
     res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');

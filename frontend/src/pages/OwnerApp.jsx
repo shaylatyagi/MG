@@ -1662,6 +1662,23 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
                         <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
                         <p className="text-[9px] text-slate-400">
                           Vehicle: {assignedVehicle?.vehicle_number || 'Not Assigned'}
+                          <p className="text-[9px] text-slate-400">
+  Vehicle: {assignedVehicle?.vehicle_number || 'Not Assigned'}
+</p>
+
+{/* ✅ YAHAN ADD KARO — vehicle ke neeche */}
+{hasVehicle && assignedVehicle && (() => {
+  const since = assignedVehicle.updated_at || assignedVehicle.created_at;
+  if (!since) return null;
+  const hrs = Math.floor((new Date() - new Date(since)) / 3600000);
+  const days = Math.floor(hrs / 24);
+  return (
+    <p className="text-[9px] text-blue-600 font-black">
+      ⏱ {days > 0 ? `${days}d ` : ''}{hrs % 24}h with vehicle
+    </p>
+  );
+})()}
+
                         </p>
                       </div>
                     </div>
@@ -2884,6 +2901,7 @@ const ProfileTab = () => (
         value={newVehicle.number} 
         onChange={e => setNewVehicle({...newVehicle, number: e.target.value})} 
       />
+
       
       {/* Vehicle Model */}
       <input 
