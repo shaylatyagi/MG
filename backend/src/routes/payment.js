@@ -2607,4 +2607,18 @@ router.post('/admin/generate-daily-rent', async (req, res) => {
   await generateDailyRentEntries();
   res.json({ success: true, message: 'Done!' });
 });
+// ─── PER-DRIVER INCENTIVE RULE ───────────────────────────────────────
+router.post('/owner/driver-incentive-rule', async (req, res) => {
+  try {
+    const { driverId, ruleIndex } = req.body;
+    await pool.query(
+      `UPDATE public.drivers SET incentive_rule_index = $1 WHERE id = $2`,
+      [ruleIndex, driverId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

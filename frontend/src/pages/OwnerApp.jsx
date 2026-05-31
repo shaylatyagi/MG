@@ -361,6 +361,7 @@ const [availableDriversForVehicle, setAvailableDriversForVehicle] = useState([])
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [vehicleSearch, setVehicleSearch] = useState('');
   // Owner data
   const [owner, setOwner] = useState(null);
   const [stats, setStats] = useState({
@@ -682,6 +683,36 @@ const DriverDetailsModal = () => {
     )}
   </div>
 </div>
+
+{/* ─── Per-Driver Incentive Rule ─── */}
+{incentiveRules.is_enabled && incentiveRules.rules.length > 0 && (
+  <div className="mb-5">
+    <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">🎯 Incentive Rule</h3>
+    <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+      <p className="text-[10px] text-slate-500 mb-2">Is driver ke liye applicable rule select karo:</p>
+      <select
+        defaultValue={driver.incentive_rule_index ?? ''}
+        onChange={async (e) => {
+          const val = e.target.value;
+          await fetch(`${API}/api/payment/owner/driver-incentive-rule`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+            body: JSON.stringify({ driverId: driver.id, ruleIndex: val === '' ? null : parseInt(val) })
+          }).catch(() => {});
+        }}
+        className="w-full border rounded-xl p-2.5 text-sm bg-white">
+        <option value="">⚙️ Use global rules (auto)</option>
+        <option value="-1">🚫 No incentive for this driver</option>
+        {incentiveRules.rules.map((rule, i) => (
+          <option key={i} value={i}>
+            {rule.min_hours}h+ → {rule.type === 'FULL_WAIVER' ? 'Rent free' : rule.type === 'PERCENTAGE' ? `${rule.value}% off` : `₹${rule.value} off`}
+          </option>
+        ))}
+      </select>
+    </div>
+  </div>
+)}
+
 {driverHistory && (
   <div className="mb-5">
     <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">📋 Vehicle History</h3>
@@ -2174,9 +2205,28 @@ const VehiclesTab = () => {
     return { bg: 'bg-red-100', icon: '🚛' };
   return { bg: 'bg-amber-100', icon: '🚗' };
 };
-  const sorted = [...vehicles].sort((a,b) => (a.driver_id ? 1 : -1) - (b.driver_id ? 1 : -1));
+  const sorted = [...vehicles]
+    .filter(v =>
+      (v.vehicle_number || '').toLowerCase().includes(vehicleSearch.toLowerCase()) ||
+      (v.vehicle_model || '').toLowerCase().includes(vehicleSearch.toLowerCase()) ||
+      (v.driver_name || '').toLowerCase().includes(vehicleSearch.toLowerCase())
+    )
+    .sort((a,b) => (a.driver_id ? 1 : -1) - (b.driver_id ? 1 : -1));
   return (
   <div className="space-y-3 pb-4">
+    {/* Search Bar */}
+    <div className="relative">
+      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input type="text" placeholder="Search by vehicle no, model or driver..."
+        value={vehicleSearch}
+        onChange={e => setVehicleSearch(e.target.value)}
+        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"/>
+      {vehicleSearch && (
+        <button onClick={() => setVehicleSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+          <X size={14} className="text-slate-400"/>
+        </button>
+      )}
+    </div>
     <div className="flex gap-2">
   <button onClick={openAddVehicleModal}
     className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
@@ -2771,7 +2821,8 @@ const ProfileTab = () => (
               key={id}
               onClick={() => {
                 setActiveTab(id);
-                setSearchQuery(''); // Reset search when changing tabs
+                setSearchQuery('');
+                setVehicleSearch('');
               }}
               className={`flex flex-col items-center gap-1 transition-all ${activeTab === id ? 'text-blue-600 -translate-y-0.5' : 'text-slate-400'}`}
             >
@@ -2784,8 +2835,9 @@ const ProfileTab = () => (
           <Chatbot 
   userRole="OWNER"
   userId={ownerId()}
-  userPhone={ownerPhone()}  // dynamic
+  userPhone={ownerPhone()}
   token={token()}
+  onClose={() => setShowChatbot(false)}
 />
 )}
         {/* Chat Modal */}
