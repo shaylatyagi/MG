@@ -9,28 +9,30 @@ const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/db');
 // ─── ASSIGNMENT HISTORY HELPER ───────────────────────────────────────
 const logAssignment = async (driverId, vehicleId, ownerId, dailyRent, rentType) => {
-  // Pehle koi open record close karo
-  await pool.query(
-    UPDATE public.driver_vehicle_history 
-     SET unassigned_at = NOW()
-     WHERE driver_id = $1 AND unassigned_at IS NULL,
-    [driverId]
-  );
-  // Naya record
-  await pool.query(
-    INSERT INTO public.driver_vehicle_history 
-     (driver_id, vehicle_id, owner_id, daily_rent, rent_type, reason)
-     VALUES ($1, $2, $3, $4, $5, 'ASSIGNED'),
-    [driverId, vehicleId, ownerId, dailyRent, rentType || 'DAILY']
-  );
+  try {
+    await pool.query(
+      `UPDATE public.driver_vehicle_history 
+       SET unassigned_at = NOW()
+       WHERE driver_id = $1 AND unassigned_at IS NULL`,
+      [driverId]
+    );
+    await pool.query(
+      `INSERT INTO public.driver_vehicle_history 
+       (driver_id, vehicle_id, owner_id, daily_rent, rent_type, reason)
+       VALUES ($1, $2, $3, $4, $5, 'ASSIGNED')`,
+      [driverId, vehicleId, ownerId || null, dailyRent || 0, rentType || 'DAILY']
+    );
+  } catch (e) { console.error('logAssignment error:', e.message); }
 };
 const logUnassignment = async (vehicleId) => {
-  await pool.query(
-    UPDATE public.driver_vehicle_history
-     SET unassigned_at = NOW(), reason = 'UNASSIGNED'
-     WHERE vehicle_id = $1 AND unassigned_at IS NULL,
-    [vehicleId]
-  );
+  try {
+    await pool.query(
+      `UPDATE public.driver_vehicle_history
+       SET unassigned_at = NOW(), reason = 'UNASSIGNED'
+       WHERE vehicle_id = $1 AND unassigned_at IS NULL`,
+      [vehicleId]
+    );
+  } catch (e) { console.error('logUnassignment error:', e.message); }
 };
 const parseDate = (d) => {
   if (!d || d.trim() === '') return null;
