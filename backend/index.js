@@ -36,6 +36,8 @@ const authRoutes = require('./src/routes/auth');
 const driverRoutes = require('./src/routes/driver');
 const paymentRoutes = require('./src/routes/payment');
 const ownerRoutes = require('./src/routes/owner');
+const uploadRoutes = require('./src/routes/uploads');
+app.use('/api/uploads', uploadRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);  // ← confirm karo ye hai

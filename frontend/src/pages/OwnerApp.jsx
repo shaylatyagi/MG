@@ -2119,9 +2119,21 @@ const VehiclesTab = () => {
         <div className="bg-white rounded-2xl p-8 text-center text-slate-400">
           <Truck size={32} className="mx-auto mb-2 opacity-50" />
           <p className="text-sm">No vehicles yet</p>
-          <button onClick={openAddVehicleModal} className="mt-2 text-blue-600 text-xs font-black">
-            + Add your first vehicle
-          </button>
+<div className="flex gap-2">
+  <button onClick={openAddVehicleModal}
+    className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
+    <Plus size={16} /> Add Vehicle
+  </button>
+  <button onClick={() => {
+    setShowBulkModal(true);
+    setBulkTab('vehicles');
+    setBulkVehicles([]);
+    setBulkResult(null);
+    setBulkFile(null);
+  }} className="py-3 px-4 bg-emerald-600 text-white rounded-xl text-sm font-black">
+    📊 Bulk
+  </button>
+</div>
         </div>
       )}
     </div>
