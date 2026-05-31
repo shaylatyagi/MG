@@ -492,15 +492,17 @@ const fetchAvailableVehicles = async (driverId) => {
   }
 };
 const DriverDetailsModal = () => {
-  const [driverHistory] = useState(null);    // ← hook pehle
-if (!selectedDriverDetails) return null;
-  const driver = selectedDriverDetails;
+  // ✅ Hooks PEHLE — early return se pehle
+  const [driverHistory, setDriverHistory] = useState(null);
   useEffect(() => {
-    if (!driver?.id) return;
-    fetch(`${API}/api/payment/owner/driver-history/${driver.id}`, {
+    if (!selectedDriverDetails?.id) return;
+    fetch(`${API}/api/payment/owner/driver-history/${selectedDriverDetails.id}`, {
       headers: { Authorization: `Bearer ${token()}` }
     }).then(r => r.json()).then(setDriverHistory).catch(() => {});
-  }, [driver?.id]);
+  }, [selectedDriverDetails?.id]);
+
+  if (!selectedDriverDetails) return null;
+  const driver = selectedDriverDetails;
   const assignedVehicle = vehicles.find(v => v.driver_id === driver.id);
   
   return (
