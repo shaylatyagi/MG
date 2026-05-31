@@ -670,6 +670,9 @@ export default function DriverPWA() {
               {unread > 0 ? <BellRing size={15} className="text-blue-600"/> : <Bell size={15} className="text-slate-500"/>}
               {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-600 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unread > 9 ? '9+' : unread}</span>}
             </button>
+            <button onClick={logout} className="p-2 rounded-lg bg-red-50 hover:bg-red-100 transition border border-red-100">
+              <LogOut size={15} className="text-red-500"/>
+            </button>
           </div>
         </div>
 
