@@ -41,12 +41,11 @@ export default function CompanyDashboard() {
   const [logs, setLogs]             = useState([`[${new Date().toISOString()}] Session started`]);
   const addLog = t => setLogs(p=>[`[${new Date().toISOString()}] ${t}`,...p]);
 
-  const ADMIN_KEY = 'mg_admin_2026_secret';  // Render env se match karna chahiye
+  const ADMIN_KEY = 'mg_admin_2026_secret';
 
   const get = async (url) => {
-    const r = await fetch(`${API}${url}`, {
-      headers: { 'x-admin-key': ADMIN_KEY }
-    });
+    const sep = url.includes('?') ? '&' : '?';
+    const r = await fetch(`${API}${url}${sep}admin_key=${ADMIN_KEY}`);
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
       throw new Error(err.error || `HTTP ${r.status}`);
@@ -807,11 +806,12 @@ function FinancePanel({ API, ADMIN_KEY, fmt, fmtDate, fmtTime, pStats, companies
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
   const [mode, setMode] = useState('ALL');
-  const [datePreset, setDatePreset] = useState('this_month');
+  const [datePreset, setDatePreset] = useState('last30');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(1);
+  const [txError, setTxError] = useState(null);
 
   const getDateRange = (preset) => {
     const today = new Date();
@@ -819,6 +819,7 @@ function FinancePanel({ API, ADMIN_KEY, fmt, fmtDate, fmtTime, pStats, companies
     if (preset==='today')      return { from: fmt(today), to: fmt(today) };
     if (preset==='yesterday')  { const y=new Date(today); y.setDate(y.getDate()-1); return { from: fmt(y), to: fmt(y) }; }
     if (preset==='last7')      { const s=new Date(today); s.setDate(s.getDate()-6); return { from: fmt(s), to: fmt(today) }; }
+    if (preset==='last30')     { const s=new Date(today); s.setDate(s.getDate()-29); return { from: fmt(s), to: fmt(today) }; }
     if (preset==='this_month') { return { from: fmt(new Date(today.getFullYear(),today.getMonth(),1)), to: fmt(today) }; }
     if (preset==='last_month') {
       const s=new Date(today.getFullYear(),today.getMonth()-1,1);
@@ -839,12 +840,12 @@ function FinancePanel({ API, ADMIN_KEY, fmt, fmtDate, fmtTime, pStats, companies
       dateTo: range.to,
     });
     try {
-      const r = await fetch(`${API}/api/admin/transactions?${params}`, {
-        headers: { 'x-admin-key': ADMIN_KEY }
-      });
+      const sep = params.toString() ? '&' : '';
+      const r = await fetch(`${API}/api/admin/transactions?${params}${sep}admin_key=${ADMIN_KEY}`);
       const d = await r.json();
-      setTxns(Array.isArray(d) ? d : []);
-    } catch { setTxns([]); }
+      if (Array.isArray(d)) { setTxns(d); setTxError(null); }
+      else { setTxns([]); setTxError(d.error || JSON.stringify(d)); }
+    } catch(e) { setTxns([]); setTxError(e.message); }
     setLoading(false);
   };
 
@@ -859,6 +860,7 @@ function FinancePanel({ API, ADMIN_KEY, fmt, fmtDate, fmtTime, pStats, companies
     {id:'today',label:'Today'},
     {id:'yesterday',label:'Yesterday'},
     {id:'last7',label:'Last 7 Days'},
+        {id:'last30',label:'Last 30 Days'},
     {id:'this_month',label:'This Month'},
     {id:'last_month',label:'Last Month'},
     {id:'custom',label:'Custom'},
@@ -963,6 +965,7 @@ function FinancePanel({ API, ADMIN_KEY, fmt, fmtDate, fmtTime, pStats, companies
             </select>
           </div>
         </div>
+        {txError && <div className="px-4 py-3 bg-red-50 border-b border-red-100"><p className="text-xs text-red-600 font-black">⚠️ {txError}</p></div>}
         {loading ? (
           <div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading...</div>
         ) : (
