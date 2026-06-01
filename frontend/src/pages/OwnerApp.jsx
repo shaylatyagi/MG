@@ -393,6 +393,15 @@ const [assigning, setAssigning] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [incentiveRules, setIncentiveRules] = useState({ is_enabled: false, rules: [] });
+  const [ownerPlan, setOwnerPlan] = useState({ plan: 'FREE', is_premium: false });
+  const [managers, setManagers] = useState([]);
+  const [showAddManager, setShowAddManager] = useState(false);
+  const [managerDemoMode, setManagerDemoMode] = useState(false);
+  const [newManager, setNewManager] = useState({ name: '', phone: '', permissions: {
+    assign_vehicles: true, record_cash: true, view_financials: true,
+    chat_drivers: true, add_drivers: false, remove_drivers: false,
+    add_vehicles: false, bulk_import: false, upload_documents: false
+  }});
 const [savingRules, setSavingRules] = useState(false);
   const [bulkTab, setBulkTab] = useState('drivers'); // 'drivers' or 'vehicles'
 const [bulkVehicles, setBulkVehicles] = useState([]);
@@ -1028,9 +1037,20 @@ useEffect(() => {
   }, [fetchAllData]);
   useEffect(() => {
   if (!ownerId()) return;
-  fetch(`${API}/api/payment/owner/incentive-rules?ownerId=${ownerId()}`, {
+  const oId = ownerId();
+  fetch(`${API}/api/payment/owner/incentive-rules?ownerId=${oId}`, {
     headers: { Authorization: `Bearer ${token()}` }
   }).then(r => r.json()).then(setIncentiveRules).catch(() => {});
+
+  // Plan status
+  fetch(`${API}/api/payment/owner/plan?ownerId=${oId}`, {
+    headers: { Authorization: `Bearer ${token()}` }
+  }).then(r => r.json()).then(d => setOwnerPlan(d)).catch(() => {});
+
+  // Managers
+  fetch(`${API}/api/payment/owner/managers?ownerId=${oId}`, {
+    headers: { Authorization: `Bearer ${token()}` }
+  }).then(r => r.json()).then(d => { if (d.managers) setManagers(d.managers); }).catch(() => {});
 }, []);
 
   // POLLING FOR REAL-TIME NOTIFICATIONS
@@ -2498,6 +2518,261 @@ const ProfileTab = () => (
     <button className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
       <Edit2 size={14} /> {t.editProfile}
     </button>
+
+    {/* ─── Manager Role (Premium) ─── */}
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-black text-slate-800">👥 Manager Role</span>
+          {ownerPlan.is_premium
+            ? <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">PREMIUM ✓</span>
+            : <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">🔒 LOCKED</span>
+          }
+        </div>
+        {ownerPlan.is_premium && (
+          <button onClick={() => setShowAddManager(true)}
+            className="text-xs font-black text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition">
+            + Add Manager
+          </button>
+        )}
+      </div>
+
+      {!ownerPlan.is_premium ? (
+        !managerDemoMode ? (
+        /* ── Paywall ── */
+        <div className="p-5">
+          <div className="text-center mb-4">
+            <div className="text-4xl mb-2">🔐</div>
+            <p className="font-black text-slate-800">Unlock Manager Role</p>
+            <p className="text-xs text-slate-400 mt-1">Add managers and control exactly what they can do</p>
+          </div>
+          <div className="space-y-2 mb-4">
+            {['Add unlimited managers','Custom permissions per manager','Assign vehicles, record cash, view reports','Full access control'].map((f,i)=>(
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+                  <span className="text-[8px] text-blue-600 font-black">✓</span>
+                </div>
+                <span className="text-xs text-slate-600">{f}</span>
+              </div>
+            ))}
+          </div>
+          <div className="bg-slate-50 rounded-xl p-4 text-center border border-slate-200 mb-3">
+            <p className="text-[10px] text-slate-400 mb-1">Starting at</p>
+            <p className="text-2xl font-black text-blue-600">₹499<span className="text-sm font-normal text-slate-400">/month</span></p>
+          </div>
+          {/* Sneak peek button */}
+          <button onClick={() => setManagerDemoMode(true)}
+            className="w-full border-2 border-blue-200 text-blue-600 font-black py-2.5 rounded-xl text-sm mb-2 hover:bg-blue-50 transition flex items-center justify-center gap-2">
+            👀 See how it works — Free Preview
+          </button>
+          <button onClick={async () => {
+              const u = JSON.parse(localStorage.getItem('user') || '{}');
+              const r = await fetch(`${API}/api/payment/create-order`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || 'owner@mg.com', purpose: 'PREMIUM_MANAGER' })
+              }).then(r => r.json());
+              const url = r?.checkoutUrl || r?.data?.checkoutUrl;
+              if (url) window.location.href = url; else alert('Contact support to upgrade.');
+            }}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-xl text-sm transition">
+            🚀 Unlock — ₹499/month
+          </button>
+          <p className="text-[9px] text-slate-400 text-center mt-2">Secure payment via PayYantra</p>
+        </div>
+        ) : (
+        /* ── Demo / Sneak Peek Mode ── */
+        <div>
+          {/* Demo banner */}
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-black text-amber-700 bg-amber-200 px-2 py-0.5 rounded-full">PREVIEW MODE</span>
+              <span className="text-[10px] text-amber-700">Explore the feature — changes won't be saved</span>
+            </div>
+            <button onClick={() => setManagerDemoMode(false)} className="text-amber-600 text-[10px] font-black">✕ Exit</button>
+          </div>
+
+          {/* Demo manager pre-populated */}
+          <div className="divide-y divide-slate-50">
+            {/* Sample manager 1 */}
+            {[
+              { name: 'Ankit Sharma', phone: '9876500001', code: 'MGR-DEMO1', perms: ['assign_vehicles','record_cash','view_financials','chat_drivers'] },
+              { name: 'Meera Patel', phone: '9876500002', code: 'MGR-DEMO2', perms: ['record_cash','chat_drivers'] },
+            ].map((dm, i) => (
+              <div key={i} className="px-4 py-3 flex items-start justify-between gap-2 opacity-70">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
+                    {dm.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-black text-slate-800">{dm.name}</p>
+                      <span className="text-[8px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">DEMO</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 font-mono">{dm.phone} · {dm.code}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {dm.perms.map(k => (
+                        <span key={k} className="text-[8px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded border border-blue-100">{k.replace(/_/g,' ')}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[10px] text-slate-300 shrink-0">🔒 Locked</span>
+              </div>
+            ))}
+
+            {/* Try adding a manager */}
+            <div className="p-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">Try adding a manager</p>
+              <div className="space-y-2 mb-3">
+                <input placeholder="Manager Name" disabled
+                  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 text-slate-400 cursor-not-allowed"/>
+                <input placeholder="Phone Number" disabled
+                  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 text-slate-400 cursor-not-allowed"/>
+              </div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Permissions</p>
+              <div className="space-y-0 mb-4">
+                {[
+                  {key:'assign_vehicles', label:'Assign / Unassign Vehicles', def: true},
+                  {key:'record_cash',     label:'Record Cash Payments',       def: true},
+                  {key:'view_financials', label:'View Collections & Ledger',  def: false},
+                  {key:'add_drivers',     label:'Add New Drivers',            def: false},
+                ].map(({key, label, def}) => {
+                  const [on, setOn] = React.useState(def);
+                  return (
+                    <div key={key} className="flex items-center justify-between py-2 border-b border-slate-50">
+                      <span className="text-xs text-slate-600">{label}</span>
+                      <button onClick={() => setOn(!on)}
+                        className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${on?'bg-blue-600':'bg-slate-200'}`}>
+                        <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 shadow transition-all ${on?'right-0.5':'left-0.5'}`}/>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Upgrade CTA after they've explored */}
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-4 text-white text-center">
+                <p className="text-sm font-black mb-1">🎉 Looks good, right?</p>
+                <p className="text-[10px] text-blue-200 mb-3">Unlock to actually add managers and save their permissions</p>
+                <button onClick={async () => {
+                    setManagerDemoMode(false);
+                    const u = JSON.parse(localStorage.getItem('user') || '{}');
+                    const r = await fetch(`${API}/api/payment/create-order`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                      body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || 'owner@mg.com', purpose: 'PREMIUM_MANAGER' })
+                    }).then(r => r.json());
+                    const url = r?.checkoutUrl || r?.data?.checkoutUrl;
+                    if (url) window.location.href = url; else alert('Contact support to upgrade.');
+                  }}
+                  className="w-full bg-white text-blue-600 font-black py-2.5 rounded-xl text-sm hover:bg-blue-50 transition">
+                  🚀 Unlock Now — ₹499/month
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        )
+      ) : (
+        <div className="divide-y divide-slate-50">
+          {managers.length === 0 ? (
+            <div className="p-6 text-center">
+              <p className="text-xs text-slate-400">No managers yet</p>
+              <button onClick={() => setShowAddManager(true)} className="text-blue-600 font-black text-xs mt-1">+ Add first manager</button>
+            </div>
+          ) : managers.map((m, i) => (
+            <div key={i} className="px-4 py-3 flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
+                  {m.full_name?.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-black text-slate-800">{m.full_name}</p>
+                  <p className="text-[9px] text-slate-400 font-mono">{m.mobile_number} · {m.manager_code}</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Object.entries(m.permissions||{}).filter(([,v])=>v).map(([k])=>(
+                      <span key={k} className="text-[8px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded border border-blue-100">{k.replace(/_/g,' ')}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button onClick={async () => {
+                if (!window.confirm(`Remove ${m.full_name}?`)) return;
+                await fetch(`${API}/api/payment/owner/managers/${m.id}?ownerId=${ownerId()}`, { method:'DELETE', headers:{Authorization:`Bearer ${token()}`} });
+                setManagers(p => p.filter(x => x.id !== m.id));
+              }} className="text-[10px] font-black text-red-500 shrink-0">Remove</button>
+            </div>
+          ))}
+          {ownerPlan.expires_at && (
+            <div className="px-4 py-2 bg-slate-50">
+              <p className="text-[9px] text-slate-400">Premium until {new Date(ownerPlan.expires_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+
+    {/* Add Manager Modal */}
+    {showAddManager && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="px-5 py-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+            <p className="font-black text-slate-800">Add Manager</p>
+            <button onClick={() => setShowAddManager(false)}><X size={18} className="text-slate-400"/></button>
+          </div>
+          <div className="p-5 space-y-4">
+            <input placeholder="Full Name *" value={newManager.name}
+              onChange={e => setNewManager(p => ({...p, name: e.target.value.replace(/[^a-zA-Z\s]/g,'')}))}
+              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-blue-500"/>
+            <input placeholder="Phone Number *" value={newManager.phone} maxLength={10}
+              onChange={e => setNewManager(p => ({...p, phone: e.target.value.replace(/\D/g,'').slice(0,10)}))}
+              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-mono focus:outline-none focus:border-blue-500"/>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Set Permissions</p>
+              <div className="space-y-0">
+                {[
+                  {key:'assign_vehicles',   label:'Assign / Unassign Vehicles'},
+                  {key:'record_cash',       label:'Record Cash Payments'},
+                  {key:'view_financials',   label:'View Collections & Ledger'},
+                  {key:'chat_drivers',      label:'Chat with Drivers'},
+                  {key:'add_drivers',       label:'Add New Drivers'},
+                  {key:'remove_drivers',    label:'Remove Drivers'},
+                  {key:'add_vehicles',      label:'Add New Vehicles'},
+                  {key:'bulk_import',       label:'Bulk CSV Import'},
+                  {key:'upload_documents',  label:'Upload Documents'},
+                ].map(({key,label}) => (
+                  <div key={key} className="flex items-center justify-between py-2 border-b border-slate-50">
+                    <span className="text-xs text-slate-600">{label}</span>
+                    <button onClick={() => setNewManager(p => ({...p, permissions:{...p.permissions,[key]:!p.permissions[key]}}))}
+                      className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${newManager.permissions[key]?'bg-blue-600':'bg-slate-200'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 shadow transition-all ${newManager.permissions[key]?'right-0.5':'left-0.5'}`}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowAddManager(false)}
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
+              <button onClick={async () => {
+                if (!newManager.name || newManager.phone.length !== 10) return alert('Enter valid name and 10-digit phone');
+                const r = await fetch(`${API}/api/payment/owner/managers/add`, {
+                  method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token()}`},
+                  body: JSON.stringify({ownerId:ownerId(), fullName:newManager.name, mobileNumber:newManager.phone, permissions:newManager.permissions})
+                }).then(r=>r.json());
+                if (r.success) {
+                  setManagers(p=>[r.manager,...p]); setShowAddManager(false);
+                  setNewManager({name:'',phone:'',permissions:{assign_vehicles:true,record_cash:true,view_financials:true,chat_drivers:true,add_drivers:false,remove_drivers:false,add_vehicles:false,bulk_import:false,upload_documents:false}});
+                  alert(`✅ ${newManager.name} added as manager!`);
+                } else alert(r.error || 'Failed');
+              }} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 transition">
+                Add Manager
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">
       <div className="flex items-center justify-between">
         <div>

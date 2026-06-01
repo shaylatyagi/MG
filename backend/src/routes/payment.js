@@ -2622,3 +2622,135 @@ router.post('/owner/driver-incentive-rule', async (req, res) => {
 });
 
 module.exports = router;
+// ─── PREMIUM PLAN CHECK ──────────────────────────────────────────────────────
+const isPremium = async (ownerId) => {
+  const r = await pool.query(
+    `SELECT plan, plan_expires_at FROM public.owners WHERE id=$1`, [ownerId]
+  );
+  const o = r.rows[0];
+  if (!o) return false;
+  if (o.plan === 'PREMIUM') {
+    if (!o.plan_expires_at || new Date(o.plan_expires_at) > new Date()) return true;
+    // Expired — downgrade
+    await pool.query(`UPDATE public.owners SET plan='FREE' WHERE id=$1`, [ownerId]);
+  }
+  return false;
+};
+
+// ─── MANAGERS ────────────────────────────────────────────────────────────────
+
+// Get managers list
+router.get('/owner/managers', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!await isPremium(ownerId)) {
+      return res.status(403).json({ error: 'PREMIUM_REQUIRED' });
+    }
+    const r = await pool.query(
+      `SELECT * FROM public.managers WHERE owner_id=$1 AND status='ACTIVE' ORDER BY created_at DESC`,
+      [ownerId]
+    );
+    res.json({ success: true, managers: r.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Add manager
+router.post('/owner/managers/add', async (req, res) => {
+  try {
+    const { ownerId, fullName, mobileNumber, permissions } = req.body;
+    if (!await isPremium(ownerId)) {
+      return res.status(403).json({ error: 'PREMIUM_REQUIRED' });
+    }
+    // Check if mobile already a manager
+    const exists = await pool.query(
+      `SELECT id FROM public.managers WHERE mobile_number=$1 AND status='ACTIVE'`, [mobileNumber]
+    );
+    if (exists.rows.length > 0) {
+      return res.status(400).json({ error: 'This number is already a manager' });
+    }
+    const code = 'MGR' + Math.random().toString(36).substr(2,6).toUpperCase();
+    const r = await pool.query(
+      `INSERT INTO public.managers (owner_id, full_name, mobile_number, manager_code, permissions)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [ownerId, fullName, mobileNumber, code, JSON.stringify(permissions || {})]
+    );
+    // Notify manager
+    await pool.query(
+      `INSERT INTO public.notifications (driver_id, user_type, title, message)
+       SELECT id, 'DRIVER', '🎉 Manager Access', 'You have been added as a manager. Login with your phone number.'
+       FROM public.drivers WHERE mobile_number=$1`,
+      [mobileNumber]
+    ).catch(() => {});
+    res.json({ success: true, manager: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Update manager permissions
+router.put('/owner/managers/:managerId/permissions', async (req, res) => {
+  try {
+    const { ownerId, permissions } = req.body;
+    if (!await isPremium(ownerId)) {
+      return res.status(403).json({ error: 'PREMIUM_REQUIRED' });
+    }
+    await pool.query(
+      `UPDATE public.managers SET permissions=$1 WHERE id=$2 AND owner_id=$3`,
+      [JSON.stringify(permissions), req.params.managerId, ownerId]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Remove manager
+router.delete('/owner/managers/:managerId', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    await pool.query(
+      `UPDATE public.managers SET status='REMOVED' WHERE id=$1 AND owner_id=$2`,
+      [req.params.managerId, ownerId]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Manager login check
+router.get('/manager/profile', async (req, res) => {
+  try {
+    const { phone } = req.query;
+    const r = await pool.query(
+      `SELECT m.*, o.full_name as owner_name, o.owner_code, o.mobile_number as owner_phone
+       FROM public.managers m
+       JOIN public.owners o ON o.id = m.owner_id
+       WHERE m.mobile_number=$1 AND m.status='ACTIVE'`,
+      [phone]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'Not a manager' });
+    res.json({ success: true, manager: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Upgrade to premium (admin manually upgrades, or payment webhook)
+router.post('/owner/upgrade-premium', async (req, res) => {
+  try {
+    const { ownerId, months = 1 } = req.body;
+    const expires = new Date();
+    expires.setMonth(expires.getMonth() + months);
+    await pool.query(
+      `UPDATE public.owners SET plan='PREMIUM', plan_expires_at=$1 WHERE id=$2`,
+      [expires, ownerId]
+    );
+    res.json({ success: true, expires_at: expires });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get owner plan status
+router.get('/owner/plan', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    const r = await pool.query(
+      `SELECT plan, plan_expires_at FROM public.owners WHERE id=$1`, [ownerId]
+    );
+    const o = r.rows[0];
+    const premium = o?.plan === 'PREMIUM' && (!o.plan_expires_at || new Date(o.plan_expires_at) > new Date());
+    res.json({ plan: o?.plan || 'FREE', is_premium: premium, expires_at: o?.plan_expires_at });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
