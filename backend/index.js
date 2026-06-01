@@ -42,8 +42,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/admin', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();  // ← sirf ye line add karo
   const key = req.headers['x-admin-key'];
-  if (key !== process.env.ADMIN_SECRET_KEY) 
+  if (!key || key !== process.env.ADMIN_SECRET_KEY) 
     return res.status(403).json({ error: 'Forbidden' });
   next();
 }, require('./src/routes/admin'));
