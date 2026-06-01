@@ -1077,7 +1077,7 @@ return () => clearInterval(interval);
         setChatHistory(msgs.map(m => ({
           from: m.sender_type === 'OWNER' ? 'owner' : 'driver',
           text: m.message,
-          time: new Date(m.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})
+          time: formatChatTime(m.created_at)
         })));
       }
     } catch(e) {}
@@ -1119,7 +1119,7 @@ return () => clearInterval(interval);
     setChatHistory(msgs.map(m => ({
       from: m.sender_type === 'OWNER' ? 'owner' : 'driver',
       text: m.message,
-      time: new Date(m.created_at).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})
+      time: formatChatTime(m.created_at)
     })));
   }
 };
@@ -1145,7 +1145,7 @@ return () => clearInterval(interval);
   setChatHistory(prev => [...prev, { 
     from: 'owner', 
     text: msg, 
-    time: new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})
+    time: formatChatTime(new Date().toISOString())
   }]);
 };
 const validateBulkRow = (row) => {
@@ -1338,7 +1338,18 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   ...prev, rules: prev.rules.filter((_, idx) => idx !== i)
 }));
 // ──────────────────────────────────────────────────────────────────────────────
-  const addDriver = async () => {
+  const formatChatTime = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate()-1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+    const time = d.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:true});
+    if (isToday) return time;
+    if (isYesterday) return `Yesterday ${time}`;
+    return `${d.toLocaleDateString('en-IN', {day:'2-digit', month:'short'})} ${time}`;
+  };
     if (!newDriver.name || !newDriver.phone) {
       alert('Please fill name and phone');
       return;
@@ -3566,4 +3577,3 @@ const ProfileTab = () => (
       </div>
     </div>
   );
-}

@@ -263,6 +263,19 @@ export default function DriverPWA() {
     setTimeout(() => { setShowSOS(false); setSosMsg(''); setSosSent(false); setShowOwnerChat(true); fetchChat(); }, 2000);
   };
 
+  const formatChatTime = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate()-1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+    const time = d.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:true});
+    if (isToday) return time;
+    if (isYesterday) return `Yesterday ${time}`;
+    return `${d.toLocaleDateString('en-IN', {day:'2-digit', month:'short'})} ${time}`;
+  };
+
   const logout = async () => {
     try {
       await fetch(`${API}/api/payment/driver/activity/logout`, {
@@ -843,7 +856,7 @@ export default function DriverPWA() {
                   }`}>
                     <p className="text-sm">{msg.message}</p>
                     <p className={`text-[9px] mt-1 ${msg.sender_type === 'DRIVER' ? 'text-blue-200' : 'text-slate-400'}`}>
-                      {new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      {formatChatTime(msg.created_at)}
                     </p>
                   </div>
                 </div>
