@@ -1,223 +1,233 @@
 const express = require('express');
-const router = express.Router();
-const pool = require('../config/db');
+const router  = express.Router();
+const pool    = require('../config/db');
 
 // ─── EXISTING ROUTES (unchanged) ─────────────────────────────────────────────
-
 router.get('/tenants', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT id, company_name, company_code, company_status FROM auth.client_companies');
     res.json(rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 router.post('/register-company', async (req, res) => {
   const { companyName, legalName, gstNumber } = req.body;
   try {
     const code = companyName.slice(0,4).toUpperCase() + Math.floor(Math.random()*100);
-    await pool.query(
-      `INSERT INTO auth.client_companies (company_code, company_name, legal_name, gst_number) VALUES ($1,$2,$3,$4) RETURNING id`,
-      [code, companyName, legalName, gstNumber]
-    );
+    await pool.query(`INSERT INTO auth.client_companies (company_code,company_name,legal_name,gst_number) VALUES ($1,$2,$3,$4)`, [code, companyName, legalName, gstNumber]);
     res.status(201).json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 router.get('/metrics', async (req, res) => {
   const { companyId, filter } = req.query;
   try {
-    let timeCondition = "order_initiation_date >= CURRENT_DATE - INTERVAL '7 days'";
-    if (filter === 'today')     timeCondition = "DATE(order_initiation_date) = CURRENT_DATE";
-    if (filter === 'yesterday') timeCondition = "DATE(order_initiation_date) = CURRENT_DATE - INTERVAL '1 day'";
-    const { rows } = await pool.query(
-      `SELECT COUNT(id) AS total_orders, COALESCE(SUM(order_amount),0) AS gross_revenue
-       FROM ms_orders WHERE client_company_id=$1 AND ${timeCondition}`,
-      [companyId]
-    );
+    let tc = "order_initiation_date >= CURRENT_DATE - INTERVAL '7 days'";
+    if (filter==='today')     tc = "DATE(order_initiation_date) = CURRENT_DATE";
+    if (filter==='yesterday') tc = "DATE(order_initiation_date) = CURRENT_DATE - INTERVAL '1 day'";
+    const { rows } = await pool.query(`SELECT COUNT(id) AS total_orders, COALESCE(SUM(order_amount),0) AS gross_revenue FROM ms_orders WHERE client_company_id=$1 AND ${tc}`, [companyId]);
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── NEW ROUTES (hierarchy drill-down) ───────────────────────────────────────
-
-// Platform overview stats
+// ─── PLATFORM STATS ───────────────────────────────────────────────────────────
 router.get('/platform-stats', async (req, res) => {
   try {
-    const [companiesR, ownersR, driversR, vehiclesR, collectionR] = await Promise.all([
+    const [c,o,d,v,col] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM public.companies WHERE status='Active'`),
       pool.query(`SELECT COUNT(*) FROM public.owners WHERE status='ACTIVE'`),
       pool.query(`SELECT COUNT(*) FROM public.drivers WHERE status='ACTIVE'`),
       pool.query(`SELECT COUNT(*) FROM public.vehicles`),
-      pool.query(`
-        SELECT
-          COALESCE(SUM(CASE WHEN DATE(order_completion_date)=CURRENT_DATE THEN order_amount END),0) as today,
-          COALESCE(SUM(CASE WHEN DATE_TRUNC('month',order_completion_date)=DATE_TRUNC('month',NOW()) THEN order_amount END),0) as this_month
-        FROM public.ms_orders WHERE transaction_status='SUCCESS'
-      `),
+      pool.query(`SELECT
+        COALESCE(SUM(CASE WHEN DATE(order_completion_date)=CURRENT_DATE THEN order_amount END),0) as today,
+        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',order_completion_date)=DATE_TRUNC('month',NOW()) THEN order_amount END),0) as this_month,
+        COALESCE(SUM(order_amount),0) as all_time
+        FROM public.ms_orders WHERE transaction_status='SUCCESS'`),
     ]);
     res.json({
-      total_companies: parseInt(companiesR.rows[0].count),
-      total_owners:    parseInt(ownersR.rows[0].count),
-      total_drivers:   parseInt(driversR.rows[0].count),
-      total_vehicles:  parseInt(vehiclesR.rows[0].count),
-      collection_today: parseFloat(collectionR.rows[0].today),
-      collection_month: parseFloat(collectionR.rows[0].this_month),
+      total_companies:  parseInt(c.rows[0].count),
+      total_owners:     parseInt(o.rows[0].count),
+      total_drivers:    parseInt(d.rows[0].count),
+      total_vehicles:   parseInt(v.rows[0].count),
+      collection_today: parseFloat(col.rows[0].today),
+      collection_month: parseFloat(col.rows[0].this_month),
+      collection_total: parseFloat(col.rows[0].all_time),
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// All companies with stats
+// ─── COMPANIES LIST ───────────────────────────────────────────────────────────
 router.get('/companies', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT
-        c.*,
-        COUNT(DISTINCT o.id)::int          as owners,
-        COUNT(DISTINCT d.id)::int          as drivers,
-        COUNT(DISTINCT v.id)::int          as vehicles,
-        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE
-                     THEN mo.order_amount END),0) as collection_today,
-        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW())
-                     THEN mo.order_amount END),0) as collection_month
+      SELECT c.*,
+        COUNT(DISTINCT o.id)::int  as owners,
+        COUNT(DISTINCT d.id)::int  as drivers,
+        COUNT(DISTINCT v.id)::int  as vehicles,
+        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0)          as collection_today,
+        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month,
+        COALESCE(SUM(mo.order_amount),0) as collection_total
       FROM public.companies c
-      LEFT JOIN public.owners  o  ON o.company_id = c.id AND o.status='ACTIVE'
-      LEFT JOIN public.drivers d  ON d.owner_code = o.owner_code AND d.status='ACTIVE'
-      LEFT JOIN public.vehicles v ON v.owner_id   = o.id
-      LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status='SUCCESS'
-      GROUP BY c.id
-      ORDER BY c.created_at DESC
-    `);
+      LEFT JOIN public.owners  o  ON o.company_id=c.id AND o.status='ACTIVE'
+      LEFT JOIN public.drivers d  ON d.owner_code=o.owner_code
+      LEFT JOIN public.vehicles v ON v.owner_id=o.id
+      LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
+      GROUP BY c.id ORDER BY c.created_at DESC`);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Add company
 router.post('/companies', async (req, res) => {
   try {
     const { name, cin, city } = req.body;
     if (!name) return res.status(400).json({ error: 'Name required' });
-    const result = await pool.query(
-      `INSERT INTO public.companies (name, cin, city) VALUES ($1,$2,$3) RETURNING *`,
-      [name, cin || null, city || null]
-    );
-    res.json({ success: true, company: result.rows[0] });
+    const r = await pool.query(`INSERT INTO public.companies(name,cin,city) VALUES($1,$2,$3) RETURNING *`, [name, cin||null, city||null]);
+    res.json({ success: true, company: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Owners by company (with stats)
+// ─── OWNERS BY COMPANY (full data) ────────────────────────────────────────────
 router.get('/companies/:companyId/owners', async (req, res) => {
   try {
+    const { companyId } = req.params;
     const result = await pool.query(`
       SELECT
-        o.id, o.full_name, o.mobile_number, o.owner_code,
-        o.business_name, o.status,
-        COUNT(DISTINCT d.id)::int  as total_drivers,
-        COUNT(DISTINCT v.id)::int  as total_vehicles,
-        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE
-                     THEN mo.order_amount END),0) as collection_today,
-        COALESCE(SUM(mo.order_amount),0)           as collection_total
+        o.id, o.full_name, o.mobile_number, o.owner_code, o.business_name,
+        o.email, o.address, o.status, o.created_at,
+        COUNT(DISTINCT d.id)::int                    as total_drivers,
+        COUNT(DISTINCT CASE WHEN d.assigned_vehicle_id IS NOT NULL THEN d.id END)::int as active_drivers,
+        COUNT(DISTINCT v.id)::int                    as total_vehicles,
+        COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int           as assigned_vehicles,
+        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0)          as collection_today,
+        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month,
+        COALESCE(SUM(mo.order_amount),0)             as collection_total,
+        COALESCE(SUM(d.wallet_balance),0)            as total_wallet_balance
       FROM public.owners o
-      LEFT JOIN public.drivers   d  ON d.owner_code = o.owner_code AND d.status='ACTIVE'
-      LEFT JOIN public.vehicles  v  ON v.owner_id   = o.id
-      LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status='SUCCESS'
-      WHERE o.company_id = $1 AND o.status='ACTIVE'
+      LEFT JOIN public.drivers   d  ON d.owner_code=o.owner_code
+      LEFT JOIN public.vehicles  v  ON v.owner_id=o.id
+      LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
+      WHERE o.company_id=$1 OR (o.company_id IS NULL AND $1::int=1)
       GROUP BY o.id
-      ORDER BY collection_today DESC
-    `, [req.params.companyId]);
+      ORDER BY collection_today DESC, o.full_name`,
+    [companyId]);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Drivers by owner (with stats)
+// ─── OWNER FULL DETAIL ────────────────────────────────────────────────────────
+router.get('/owners/:ownerId', async (req, res) => {
+  try {
+    const { ownerId } = req.params;
+    const [ownerR, incentiveR, vehiclesR, recentR] = await Promise.all([
+      pool.query(`
+        SELECT o.*,
+          COUNT(DISTINCT d.id)::int   as total_drivers,
+          COUNT(DISTINCT v.id)::int   as total_vehicles,
+          COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int as assigned_vehicles,
+          COALESCE(SUM(mo.order_amount),0)                                      as collection_total,
+          COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as collection_today,
+          COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month
+        FROM public.owners o
+        LEFT JOIN public.drivers   d  ON d.owner_code=o.owner_code
+        LEFT JOIN public.vehicles  v  ON v.owner_id=o.id
+        LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
+        WHERE o.id=$1 GROUP BY o.id`, [ownerId]),
+      pool.query(`SELECT * FROM public.owner_incentive_rules WHERE owner_id=$1`, [ownerId]).catch(()=>({rows:[]})),
+      pool.query(`SELECT id,vehicle_number,vehicle_model,daily_rent,status,driver_name,driver_id,created_at FROM public.vehicles WHERE owner_id=$1 ORDER BY created_at DESC`, [ownerId]),
+      pool.query(`SELECT mo.order_amount,mo.order_completion_date,mo.transaction_status,d.full_name as driver_name FROM public.ms_orders mo JOIN public.drivers d ON d.mobile_number=mo.payer_mobile JOIN public.owners o ON o.owner_code=d.owner_code WHERE o.id=$1 AND mo.transaction_status='SUCCESS' ORDER BY mo.order_completion_date DESC LIMIT 10`, [ownerId]).catch(()=>({rows:[]})),
+    ]);
+    if (!ownerR.rows[0]) return res.status(404).json({ error: 'Owner not found' });
+    res.json({
+      owner:          ownerR.rows[0],
+      incentive_rules: incentiveR.rows[0] || null,
+      vehicles:       vehiclesR.rows,
+      recent_payments: recentR.rows,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── DRIVERS BY OWNER (full data) ────────────────────────────────────────────
 router.get('/owners/:ownerId/drivers', async (req, res) => {
   try {
     const ownerRes = await pool.query(`SELECT owner_code FROM public.owners WHERE id=$1`, [req.params.ownerId]);
     if (!ownerRes.rows[0]) return res.status(404).json({ error: 'Owner not found' });
-
     const result = await pool.query(`
       SELECT
-        d.id, d.full_name, d.mobile_number, d.driver_code,
-        d.wallet_balance, d.status,
+        d.id, d.full_name, d.mobile_number, d.driver_code, d.status,
+        d.date_of_birth, d.driving_license_number, d.driving_license_expiry,
+        d.wallet_balance, d.security_deposit, d.advance_balance,
+        d.rent_type, d.rent_amount, d.created_at,
         v.vehicle_number, v.vehicle_model, v.daily_rent,
+        dvh.assigned_at as vehicle_since,
         COALESCE(SUM(mo.order_amount),0)  as total_paid,
-        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE
-                     THEN mo.order_amount END),0) as paid_today
+        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as paid_today,
+        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as paid_month,
+        COUNT(DISTINCT mo.id)::int         as total_transactions,
+        MAX(mo.order_completion_date)      as last_payment_date,
+        COALESCE(SUM(dlog.active_minutes),0)::int  as total_active_minutes,
+        COUNT(DISTINCT dlog.log_date)::int          as total_active_days
       FROM public.drivers d
-      LEFT JOIN public.vehicles  v  ON v.driver_id   = d.id
-      LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status='SUCCESS'
-      WHERE d.owner_code = $1
-      GROUP BY d.id, v.vehicle_number, v.vehicle_model, v.daily_rent
-      ORDER BY d.full_name
-    `, [ownerRes.rows[0].owner_code]);
+      LEFT JOIN public.vehicles v ON v.driver_id=d.id
+      LEFT JOIN public.driver_vehicle_history dvh ON dvh.driver_id=d.id AND dvh.unassigned_at IS NULL
+      LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
+      LEFT JOIN public.driver_daily_log dlog ON dlog.driver_id=d.id
+      WHERE d.owner_code=$1
+      GROUP BY d.id,v.vehicle_number,v.vehicle_model,v.daily_rent,dvh.assigned_at
+      ORDER BY d.full_name`, [ownerRes.rows[0].owner_code]);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Driver full detail
+// ─── DRIVER FULL DETAIL ───────────────────────────────────────────────────────
 router.get('/drivers/:driverId', async (req, res) => {
   try {
     const { driverId } = req.params;
-    const [driverR, historyR, logsR, docsR] = await Promise.all([
+    const [driverR, historyR, logsR, txR, notifR] = await Promise.all([
       pool.query(`
         SELECT d.*,
-          v.vehicle_number, v.vehicle_model, v.daily_rent,
-          COALESCE(SUM(mo.order_amount),0) as total_paid
+          v.vehicle_number, v.vehicle_model, v.daily_rent, v.rent_type as v_rent_type,
+          v.insurance_expiry, v.fitness_expiry,
+          dvh.assigned_at as vehicle_since,
+          COALESCE(SUM(mo.order_amount),0) as total_paid,
+          COUNT(DISTINCT mo.id)::int        as total_transactions,
+          MAX(mo.order_completion_date)     as last_payment_date,
+          COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as paid_today
         FROM public.drivers d
-        LEFT JOIN public.vehicles  v  ON v.driver_id   = d.id
-        LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status='SUCCESS'
+        LEFT JOIN public.vehicles v ON v.driver_id=d.id
+        LEFT JOIN public.driver_vehicle_history dvh ON dvh.driver_id=d.id AND dvh.unassigned_at IS NULL
+        LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
         WHERE d.id=$1
-        GROUP BY d.id, v.vehicle_number, v.vehicle_model, v.daily_rent
-      `, [driverId]),
+        GROUP BY d.id,v.vehicle_number,v.vehicle_model,v.daily_rent,v.rent_type,v.insurance_expiry,v.fitness_expiry,dvh.assigned_at`,
+        [driverId]),
       pool.query(`
         SELECT dvh.*,
           v.vehicle_number, v.vehicle_model,
-          EXTRACT(DAY FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int as total_days
+          EXTRACT(EPOCH FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)/3600 as hours_held,
+          EXTRACT(DAY  FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int   as total_days,
+          EXTRACT(DAY  FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int * COALESCE(dvh.daily_rent,0) as total_earned
         FROM public.driver_vehicle_history dvh
-        JOIN public.vehicles v ON v.id = dvh.vehicle_id
+        JOIN public.vehicles v ON v.id=dvh.vehicle_id
         WHERE dvh.driver_id=$1
-        ORDER BY dvh.assigned_at DESC LIMIT 10
-      `, [driverId]),
+        ORDER BY dvh.assigned_at DESC LIMIT 20`, [driverId]),
       pool.query(`
         SELECT * FROM public.driver_daily_log
         WHERE driver_id=$1
-        ORDER BY log_date DESC LIMIT 30
-      `, [driverId]),
+        ORDER BY log_date DESC LIMIT 30`, [driverId]),
       pool.query(`
-        SELECT * FROM public.user_documents
-        WHERE user_id=$1 AND user_type='DRIVER'
-      `, [driverId]).catch(() => ({ rows: [] })),
+        SELECT order_amount,order_completion_date,order_initiation_date,transaction_status,order_id
+        FROM public.ms_orders
+        WHERE payer_mobile=(SELECT mobile_number FROM public.drivers WHERE id=$1)
+        ORDER BY order_initiation_date DESC LIMIT 20`, [driverId]),
+      pool.query(`
+        SELECT title,message,is_read,created_at FROM public.notifications
+        WHERE driver_id=$1 ORDER BY created_at DESC LIMIT 10`, [driverId]).catch(()=>({rows:[]})),
     ]);
     if (!driverR.rows[0]) return res.status(404).json({ error: 'Driver not found' });
     res.json({
       driver:          driverR.rows[0],
       vehicle_history: historyR.rows,
       daily_logs:      logsR.rows,
-      documents:       docsR.rows,
+      transactions:    txR.rows,
+      notifications:   notifR.rows,
     });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Owner full detail
-router.get('/owners/:ownerId', async (req, res) => {
-  try {
-    const [ownerR, docsR] = await Promise.all([
-      pool.query(`
-        SELECT o.*,
-          COUNT(DISTINCT d.id)::int  as total_drivers,
-          COUNT(DISTINCT v.id)::int  as total_vehicles,
-          COALESCE(SUM(mo.order_amount),0) as total_collection
-        FROM public.owners o
-        LEFT JOIN public.drivers   d  ON d.owner_code  = o.owner_code AND d.status='ACTIVE'
-        LEFT JOIN public.vehicles  v  ON v.owner_id    = o.id
-        LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status='SUCCESS'
-        WHERE o.id=$1
-        GROUP BY o.id
-      `, [req.params.ownerId]),
-      pool.query(`SELECT * FROM public.user_documents WHERE user_id=$1 AND user_type='OWNER'`,
-        [req.params.ownerId]).catch(() => ({ rows: [] })),
-    ]);
-    if (!ownerR.rows[0]) return res.status(404).json({ error: 'Owner not found' });
-    res.json({ owner: ownerR.rows[0], documents: docsR.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

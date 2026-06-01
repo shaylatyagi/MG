@@ -1,417 +1,288 @@
 // frontend/src/pages/admin/CompanyDashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  ChevronRight, ChevronLeft, Building2, Users, Truck, Wallet,
-  TrendingUp, Upload, X, Search, ArrowUpRight,
-  CheckCircle, Shield, Activity, RefreshCw
-} from 'lucide-react';
+import { ChevronRight, ChevronLeft, Building2, Users, Truck, Wallet, TrendingUp, Upload, X, Search, CheckCircle, Shield, Activity, RefreshCw, Clock, CreditCard, Bell } from 'lucide-react';
 
 const API = 'https://mg-qw5s.onrender.com';
+const fmt  = (n) => `₹${parseFloat(n||0).toLocaleString('en-IN')}`;
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+const timeSince = (d) => {
+  if (!d) return '—';
+  const hrs = Math.floor((Date.now()-new Date(d))/3600000);
+  if (hrs<24) return `${hrs}h ago`;
+  const days = Math.floor(hrs/24);
+  if (days<30) return `${days}d ago`;
+  return fmtDate(d);
+};
 
 export default function CompanyDashboard() {
-  const [activePanel, setActivePanel] = useState('overview');
-  const [breadcrumb, setBreadcrumb] = useState([]);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [selectedOwner, setSelectedOwner] = useState(null);
-  const [selectedDriver, setSelectedDriver] = useState(null);
+  const [panel, setPanel]           = useState('overview');
+  const [crumbs, setCrumbs]         = useState([]);
+  const [selCompany, setSelCompany] = useState(null);
+  const [selOwner, setSelOwner]     = useState(null);
+  const [selDriver, setSelDriver]   = useState(null);
 
-  const [platformStats, setPlatformStats] = useState({});
-  const [companies, setCompanies] = useState([]);
-  const [owners, setOwners] = useState([]);
-  const [drivers, setDrivers] = useState([]);
+  const [pStats, setPStats]         = useState({});
+  const [companies, setCompanies]   = useState([]);
+  const [owners, setOwners]         = useState([]);
+  const [ownerDetail, setOwnerDetail] = useState(null);
+  const [drivers, setDrivers]       = useState([]);
   const [driverDetail, setDriverDetail] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [q, setQ]                   = useState('');
 
-  const [timeHorizon, setTimeHorizon] = useState('today');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showDocModal, setShowDocModal] = useState(false);
-  const [docTarget, setDocTarget] = useState(null);
-  const [showAddCompany, setShowAddCompany] = useState(false);
-  const [newCompany, setNewCompany] = useState({ name: '', cin: '', city: '' });
-  const [auditLogs, setAuditLogs] = useState([
-    `[${new Date().toISOString()}] Admin session started`,
-  ]);
+  const [showDoc, setShowDoc]       = useState(false);
+  const [docTarget, setDocTarget]   = useState(null);
+  const [showAddCo, setShowAddCo]   = useState(false);
+  const [newCo, setNewCo]           = useState({name:'',cin:'',city:''});
+  const [logs, setLogs]             = useState([`[${new Date().toISOString()}] Session started`]);
+  const addLog = t => setLogs(p=>[`[${new Date().toISOString()}] ${t}`,...p]);
 
-  const addLog = (text) => setAuditLogs(p => [`[${new Date().toISOString()}] ${text}`, ...p]);
-  const fmt = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN')}`;
-
-  // ── Fetch platform stats ─────────────────────────────────────────────────
-  const fetchPlatformStats = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/api/admin/platform-stats`);
-      const data = await res.json();
-      setPlatformStats(data);
-    } catch { console.error('Platform stats fetch failed'); }
-  }, []);
-
-  // ── Fetch companies ──────────────────────────────────────────────────────
-  const fetchCompanies = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/admin/companies`);
-      const data = await res.json();
-      setCompanies(Array.isArray(data) ? data : []);
-    } catch { setCompanies([]); }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchPlatformStats();
-    fetchCompanies();
-  }, [fetchPlatformStats, fetchCompanies]);
-
-  // ── Drill to company → fetch owners ─────────────────────────────────────
-  const drillToCompany = async (company) => {
-    setSelectedCompany(company);
-    setSelectedOwner(null);
-    setSelectedDriver(null);
-    setBreadcrumb([{ label: company.name, level: 'company', data: company }]);
-    setActivePanel('owners');
-    setSearchQuery('');
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/admin/companies/${company.id}/owners`);
-      const data = await res.json();
-      setOwners(Array.isArray(data) ? data : []);
-    } catch { setOwners([]); }
-    setLoading(false);
-    addLog(`Viewed company: ${company.name}`);
+  const get = async (url) => {
+    const r = await fetch(`${API}${url}`);
+    if (!r.ok) throw new Error(`${r.status}`);
+    return r.json();
   };
 
-  // ── Drill to owner → fetch drivers ──────────────────────────────────────
-  const drillToOwner = async (owner) => {
-    setSelectedOwner(owner);
-    setSelectedDriver(null);
-    setBreadcrumb(prev => [
-      ...prev.filter(b => b.level === 'company'),
-      { label: owner.full_name, level: 'owner', data: owner }
-    ]);
-    setActivePanel('drivers');
-    setSearchQuery('');
+  const loadPStats   = useCallback(async () => { try { setPStats(await get('/api/admin/platform-stats')); } catch {} }, []);
+  const loadCompanies= useCallback(async () => { setLoading(true); try { const d=await get('/api/admin/companies'); setCompanies(Array.isArray(d)?d:[]); } catch { setCompanies([]); } setLoading(false); }, []);
+
+  useEffect(()=>{ loadPStats(); loadCompanies(); },[]);
+
+  const drillCompany = async (co) => {
+    setSelCompany(co); setSelOwner(null); setSelDriver(null); setOwnerDetail(null); setDriverDetail(null);
+    setCrumbs([{label:co.name,level:'company'}]); setPanel('owners'); setQ('');
+    setLoading(true);
+    try { setOwners(await get(`/api/admin/companies/${co.id}/owners`)); } catch { setOwners([]); }
+    setLoading(false); addLog(`Company: ${co.name}`);
+  };
+
+  const drillOwner = async (o) => {
+    setSelOwner(o); setSelDriver(null); setDriverDetail(null);
+    setCrumbs(p=>[...p.filter(x=>x.level==='company'),{label:o.full_name,level:'owner'}]);
+    setPanel('drivers'); setQ('');
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/admin/owners/${owner.id}/drivers`);
-      const data = await res.json();
-      setDrivers(Array.isArray(data) ? data : []);
+      const [drv, det] = await Promise.all([
+        get(`/api/admin/owners/${o.id}/drivers`),
+        get(`/api/admin/owners/${o.id}`),
+      ]);
+      setDrivers(Array.isArray(drv)?drv:[]);
+      setOwnerDetail(det);
     } catch { setDrivers([]); }
-    setLoading(false);
-    addLog(`Viewed owner: ${owner.full_name}`);
+    setLoading(false); addLog(`Owner: ${o.full_name}`);
   };
 
-  // ── Drill to driver → fetch full detail ─────────────────────────────────
-  const drillToDriver = async (driver) => {
-    setSelectedDriver(driver);
-    setBreadcrumb(prev => [
-      ...prev.filter(b => b.level !== 'driver'),
-      { label: driver.full_name, level: 'driver', data: driver }
-    ]);
-    setActivePanel('driver-detail');
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/admin/drivers/${driver.id}`);
-      const data = await res.json();
-      setDriverDetail(data);
-    } catch { setDriverDetail(null); }
-    setLoading(false);
-    addLog(`Viewed driver: ${driver.full_name}`);
+  const drillDriver = async (d) => {
+    setSelDriver(d);
+    setCrumbs(p=>[...p.filter(x=>x.level!=='driver'),{label:d.full_name,level:'driver'}]);
+    setPanel('driver-detail'); setLoading(true);
+    try { setDriverDetail(await get(`/api/admin/drivers/${d.id}`)); } catch { setDriverDetail(null); }
+    setLoading(false); addLog(`Driver: ${d.full_name}`);
   };
 
   const goBack = () => {
-    if (activePanel === 'driver-detail') { setActivePanel('drivers'); setSelectedDriver(null); setBreadcrumb(p => p.filter(b => b.level !== 'driver')); }
-    else if (activePanel === 'drivers') { setActivePanel('owners'); setSelectedOwner(null); setBreadcrumb(p => p.filter(b => b.level !== 'owner')); }
-    else if (activePanel === 'owners') { setActivePanel('overview'); setSelectedCompany(null); setBreadcrumb([]); }
+    if (panel==='driver-detail') { setPanel('drivers'); setSelDriver(null); setCrumbs(p=>p.filter(x=>x.level!=='driver')); }
+    else if (panel==='drivers')  { setPanel('owners');  setSelOwner(null);  setCrumbs(p=>p.filter(x=>x.level!=='owner')); }
+    else if (panel==='owners')   { setPanel('overview'); setSelCompany(null); setCrumbs([]); }
   };
 
-  const refresh = async () => {
-    setRefreshing(true);
-    await fetchPlatformStats();
-    await fetchCompanies();
-    setRefreshing(false);
-  };
+  const filt = arr => arr.filter(x => !q || Object.values(x).some(v=>String(v||'').toLowerCase().includes(q.toLowerCase())));
 
-  const filtered = (arr) => arr.filter(item => {
-    const q = searchQuery.toLowerCase();
-    return !q || Object.values(item).some(v => String(v || '').toLowerCase().includes(q));
-  });
-
-  // ── Stat card ────────────────────────────────────────────────────────────
-  const Stat = ({ label, value, sub, icon: Icon, blue }) => (
+  // ── UI Primitives ────────────────────────────────────────────────────────
+  const Stat = ({label,value,sub,icon:I,blue,tiny}) => (
     <div className="bg-white border border-slate-200 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-        {Icon && <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${blue ? 'bg-blue-50' : 'bg-slate-100'}`}>
-          <Icon size={13} className={blue ? 'text-blue-600' : 'text-slate-500'}/>
-        </div>}
+      <div className="flex justify-between items-start mb-2">
+        <p className={`font-black text-slate-400 uppercase tracking-widest ${tiny?'text-[8px]':'text-[9px]'}`}>{label}</p>
+        {I && <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${blue?'bg-blue-50':'bg-slate-100'}`}><I size={12} className={blue?'text-blue-600':'text-slate-500'}/></div>}
       </div>
-      <p className="text-xl font-black text-slate-800">{value}</p>
-      {sub && <p className="text-[9px] text-slate-400 mt-1">{sub}</p>}
+      <p className="text-xl font-black text-slate-800 leading-none">{value}</p>
+      {sub && <p className="text-[9px] text-slate-400 mt-1.5">{sub}</p>}
     </div>
   );
 
-  // ── Doc upload modal ─────────────────────────────────────────────────────
-  const DocModal = () => {
-    const [file, setFile] = useState(null);
-    const [docType, setDocType] = useState('');
-    const [uploading, setUploading] = useState(false);
-    const types = {
-      company: ['GST_CERTIFICATE','PAN_CARD','INCORPORATION_CERT','BANK_STATEMENT','AGREEMENT'],
-      owner:   ['AADHAAR','PAN_CARD','BANK_CHEQUE','BUSINESS_REG','GST'],
-      driver:  ['AADHAAR','PAN_CARD','DRIVING_LICENSE','BANK_CHEQUE','PROFILE_PHOTO'],
-    }[docTarget?.level] || [];
-
-    const upload = async () => {
-      if (!file || !docType) return alert('Select type and file');
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('doc_type', docType);
-      formData.append('user_type', docTarget.level.toUpperCase());
-      formData.append('user_id', String(docTarget.id));
-      try {
-        const res = await fetch(`${API}/api/uploads/upload`, { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.success) { addLog(`Doc uploaded: ${docType} for ${docTarget.full_name || docTarget.name}`); alert('✅ Uploaded!'); setShowDocModal(false); }
-        else alert('Upload failed: ' + data.message);
-      } catch { alert('Network error'); }
-      setUploading(false);
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-          <div className="px-5 py-4 border-b flex justify-between items-center">
-            <div>
-              <p className="font-black text-slate-800">Upload Document</p>
-              <p className="text-xs text-slate-400 mt-0.5 capitalize">{docTarget?.level}: {docTarget?.full_name || docTarget?.name}</p>
-            </div>
-            <button onClick={() => setShowDocModal(false)}><X size={18} className="text-slate-400"/></button>
-          </div>
-          <div className="p-5 space-y-4">
-            <div>
-              <p className="text-xs font-black text-slate-500 mb-1.5">Document Type</p>
-              <select value={docType} onChange={e => setDocType(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:outline-none focus:border-blue-500">
-                <option value="">— Select —</option>
-                {types.map(t => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
-              </select>
-            </div>
-            <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-xl cursor-pointer transition ${file ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}>
-              {file
-                ? <div className="text-center"><CheckCircle size={20} className="text-blue-600 mx-auto mb-1"/><p className="text-xs font-black text-blue-700">{file.name}</p></div>
-                : <div className="text-center"><Upload size={18} className="text-slate-400 mx-auto mb-1"/><p className="text-xs text-slate-400">Click to upload</p></div>}
-              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setFile(e.target.files[0])}/>
-            </label>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDocModal(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
-              <button onClick={upload} disabled={uploading} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-60 hover:bg-blue-700 transition">
-                {uploading ? 'Uploading...' : 'Upload'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const Badge = ({v,green,blue,red,amber}) => {
+    const cls = green?'bg-emerald-50 text-emerald-700 border-emerald-200':blue?'bg-blue-50 text-blue-700 border-blue-200':red?'bg-red-50 text-red-700 border-red-200':amber?'bg-amber-50 text-amber-700 border-amber-200':'bg-slate-50 text-slate-500 border-slate-200';
+    return <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${cls}`}>{v}</span>;
   };
 
-  // ── Sidebar items ────────────────────────────────────────────────────────
-  const sideItems = [
-    { id: 'overview',  icon: '▦', label: 'Overview' },
-    { id: 'hierarchy', icon: '◈', label: 'Fleet Hierarchy' },
-    { id: 'finance',   icon: '◎', label: 'Financials' },
-    { id: 'kyc',       icon: '◷', label: 'KYC Desk' },
-    { id: 'audit',     icon: '◑', label: 'Audit Logs' },
+  const Row = ({label,value,mono}) => (
+    <div className="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
+      <span className="text-xs text-slate-400">{label}</span>
+      <span className={`text-xs font-black text-slate-700 ${mono?'font-mono':''}`}>{value||'—'}</span>
+    </div>
+  );
+
+  const UpBtn = (target) => (
+    <button onClick={e=>{e.stopPropagation();setDocTarget(target);setShowDoc(true);}}
+      className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition" title="Upload docs">
+      <Upload size={11}/>
+    </button>
+  );
+
+  const SideItems = [
+    {id:'overview',icon:'▦',label:'Overview'},
+    {id:'hierarchy',icon:'◈',label:'Fleet Hierarchy'},
+    {id:'finance',icon:'◎',label:'Financials'},
+    {id:'kyc',icon:'◷',label:'KYC Desk'},
+    {id:'audit',icon:'◑',label:'Audit Logs'},
   ];
   const hierarchyPanels = ['overview','owners','drivers','driver-detail'];
-  const isHierarchy = (id) => id === 'hierarchy' || hierarchyPanels.includes(activePanel);
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex bg-white font-sans">
+    <div className="h-screen w-screen overflow-hidden flex bg-slate-50 font-sans">
 
       {/* Sidebar */}
       <aside className="w-52 bg-slate-950 flex flex-col shrink-0">
         <div className="px-4 py-4 border-b border-slate-800 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">MG</div>
-          <div><p className="text-white font-black text-sm">MobilityGrid</p><p className="text-[9px] text-slate-500 uppercase tracking-widest">Admin Panel</p></div>
+          <div><p className="text-white font-black text-sm">MobilityGrid</p><p className="text-[9px] text-slate-500 uppercase tracking-widest">Admin</p></div>
         </div>
         <nav className="flex-1 p-3 space-y-0.5">
-          {sideItems.map(item => {
-            const active = item.id === 'hierarchy' ? hierarchyPanels.includes(activePanel) : activePanel === item.id;
-            return (
-              <button key={item.id}
-                onClick={() => {
-                  if (item.id === 'hierarchy') { setActivePanel('overview'); setBreadcrumb([]); setSelectedCompany(null); setSelectedOwner(null); setSelectedDriver(null); }
-                  else setActivePanel(item.id);
-                }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition ${active ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
-                <span>{item.icon}</span>{item.label}
-              </button>
-            );
+          {SideItems.map(item=>{
+            const active = item.id==='hierarchy' ? hierarchyPanels.includes(panel) : panel===item.id;
+            return <button key={item.id}
+              onClick={()=>{ if(item.id==='hierarchy'){setPanel('overview');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}else setPanel(item.id); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition ${active?'bg-blue-600 text-white':'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+              <span>{item.icon}</span>{item.label}
+            </button>;
           })}
         </nav>
         <div className="p-4 border-t border-slate-800 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/>
-          <span className="text-[9px] text-slate-500">Live</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/><span className="text-[9px] text-slate-500">Live</span>
         </div>
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
-
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0">
-          {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-xs">
-            <button onClick={() => { setActivePanel('overview'); setBreadcrumb([]); setSelectedCompany(null); setSelectedOwner(null); setSelectedDriver(null); }}
-              className="font-black text-slate-400 hover:text-blue-600 transition">Platform</button>
-            {breadcrumb.map((b, i) => (
+            <button onClick={()=>{setPanel('overview');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}} className="font-black text-slate-400 hover:text-blue-600 transition">Platform</button>
+            {crumbs.map((b,i)=>(
               <React.Fragment key={i}>
                 <ChevronRight size={11} className="text-slate-300"/>
-                <button
-                  onClick={() => {
-                    if (b.level === 'company') { setActivePanel('owners'); setSelectedOwner(null); setSelectedDriver(null); setBreadcrumb([b]); }
-                    else if (b.level === 'owner') { setActivePanel('drivers'); setSelectedDriver(null); setBreadcrumb(prev => prev.filter(x => x.level !== 'driver')); }
-                  }}
-                  className={`font-black transition ${i === breadcrumb.length-1 ? 'text-slate-800' : 'text-slate-400 hover:text-blue-600'}`}>
-                  {(b.label || '').length > 24 ? b.label.slice(0,24)+'...' : b.label}
-                </button>
+                <button onClick={()=>{
+                  if(b.level==='company'){setPanel('owners');setSelOwner(null);setSelDriver(null);setCrumbs([b]);}
+                  else if(b.level==='owner'){setPanel('drivers');setSelDriver(null);setCrumbs(p=>p.filter(x=>x.level!=='driver'));}
+                }} className={`font-black transition max-w-[180px] truncate ${i===crumbs.length-1?'text-slate-800':'text-slate-400 hover:text-blue-600'}`}>{b.label}</button>
               </React.Fragment>
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={refresh} className={`p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition ${refreshing ? 'animate-spin' : ''}`}>
-              <RefreshCw size={13}/>
-            </button>
-            <select value={timeHorizon} onChange={e => setTimeHorizon(e.target.value)}
-              className="border border-slate-200 text-xs font-black text-slate-600 px-3 py-1.5 rounded-lg bg-white focus:outline-none">
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="this_month">This Month</option>
-              <option value="last_month">Last Month</option>
-            </select>
+            <button onClick={()=>{loadPStats();loadCompanies();}} className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><RefreshCw size={12}/></button>
             <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600">SA</div>
           </div>
         </header>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
 
-          {/* ── OVERVIEW ─────────────────────────────────────────────────── */}
-          {activePanel === 'overview' && (
-            <div className="space-y-6 max-w-5xl">
+          {/* ── OVERVIEW ─────────────────────────────────────────── */}
+          {panel==='overview' && (
+            <div className="space-y-5 max-w-5xl">
               <div className="flex items-center justify-between">
-                <div><h2 className="text-base font-black text-slate-800">Platform Overview</h2><p className="text-xs text-slate-400">All fleet companies</p></div>
-                <button onClick={() => setShowAddCompany(true)} className="flex items-center gap-1.5 text-xs font-black text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">
-                  + Add Company
-                </button>
+                <div><h2 className="text-base font-black text-slate-800">Platform Overview</h2><p className="text-xs text-slate-400">All data live from DB</p></div>
+                <button onClick={()=>setShowAddCo(true)} className="flex items-center gap-1.5 text-xs font-black text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">+ Add Company</button>
               </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <Stat label="Collection Today" value={fmt(platformStats.collection_today)} sub={fmt(platformStats.collection_month) + ' this month'} icon={Wallet} blue/>
-                <Stat label="Active Drivers" value={(platformStats.total_drivers || 0).toLocaleString()} sub={`${platformStats.total_owners || 0} owners`} icon={Users}/>
-                <Stat label="Vehicles" value={(platformStats.total_vehicles || 0).toLocaleString()} sub={`${platformStats.total_companies || 0} companies`} icon={Truck}/>
+              <div className="grid grid-cols-5 gap-3">
+                <Stat label="Companies"   value={pStats.total_companies||0} icon={Building2}/>
+                <Stat label="Owners"      value={pStats.total_owners||0}    icon={Shield}/>
+                <Stat label="Drivers"     value={(pStats.total_drivers||0).toLocaleString()}   icon={Users} blue/>
+                <Stat label="Vehicles"    value={(pStats.total_vehicles||0).toLocaleString()}  icon={Truck}/>
+                <Stat label="Today"       value={fmt(pStats.collection_today)} icon={Wallet} blue sub={fmt(pStats.collection_month)+' this month'}/>
               </div>
-
-              {loading ? <div className="py-12 text-center text-sm text-slate-400 animate-pulse">Loading...</div> : (
+              {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading...</div>:(
                 <div className="space-y-2">
-                  {companies.map((c, i) => (
-                    <div key={i} onClick={() => drillToCompany(c)}
-                      className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-200 hover:shadow-sm transition cursor-pointer group">
+                  {companies.map((c,i)=>(
+                    <div key={i} onClick={()=>drillCompany(c)} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-200 hover:shadow-sm transition cursor-pointer group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
-                            <Building2 size={14} className="text-blue-600"/>
-                          </div>
+                          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center"><Building2 size={14} className="text-blue-600"/></div>
                           <div>
-                            <p className="font-black text-slate-800 text-sm">{c.name}</p>
-                            <p className="text-[10px] text-slate-400">{c.cin || 'No CIN'} · {c.city || '—'}</p>
+                            <p className="font-black text-slate-800">{c.name}</p>
+                            <p className="text-[10px] text-slate-400">{c.cin||'No CIN'} · {c.city||'—'} · Added {fmtDate(c.created_at)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-5">
-                          {[['Owners', c.owners||0], ['Drivers', c.drivers||0], ['Vehicles', c.vehicles||0]].map(([k,v]) => (
-                            <div key={k} className="text-center">
-                              <p className="text-[9px] text-slate-400 uppercase tracking-wider">{k}</p>
-                              <p className="text-sm font-black text-slate-700">{parseInt(v||0).toLocaleString()}</p>
-                            </div>
+                          {[['Owners',c.owners||0],['Drivers',c.drivers||0],['Vehicles',c.vehicles||0]].map(([k,v])=>(
+                            <div key={k} className="text-center"><p className="text-[9px] text-slate-400 uppercase">{k}</p><p className="text-sm font-black text-slate-700">{parseInt(v||0)}</p></div>
                           ))}
-                          <div className="text-center">
-                            <p className="text-[9px] text-slate-400 uppercase tracking-wider">Today</p>
-                            <p className="text-sm font-black text-blue-600">{fmt(c.collection_today)}</p>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={e => { e.stopPropagation(); setDocTarget({...c, level:'company'}); setShowDocModal(true); }}
-                              className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition">
-                              <Upload size={11}/>
-                            </button>
+                          <div className="text-center"><p className="text-[9px] text-slate-400 uppercase">Today</p><p className="text-sm font-black text-blue-600">{fmt(c.collection_today)}</p></div>
+                          <div className="text-center"><p className="text-[9px] text-slate-400 uppercase">Month</p><p className="text-sm font-black text-slate-700">{fmt(c.collection_month)}</p></div>
+                          <div className="flex gap-1">
+                            {UpBtn({...c,level:'company',full_name:c.name})}
                             <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-500 transition"/>
                           </div>
                         </div>
                       </div>
                     </div>
                   ))}
-                  {companies.length === 0 && !loading && (
-                    <div className="py-12 text-center text-sm text-slate-400">No companies yet — add one above</div>
-                  )}
+                  {!loading&&companies.length===0&&<div className="py-10 text-center text-sm text-slate-400">No companies — add one above</div>}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── OWNERS ───────────────────────────────────────────────────── */}
-          {activePanel === 'owners' && selectedCompany && (
-            <div className="space-y-5 max-w-5xl">
+          {/* ── OWNERS ───────────────────────────────────────────── */}
+          {panel==='owners' && selCompany && (
+            <div className="space-y-4 max-w-6xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <button onClick={goBack} className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><ChevronLeft size={15}/></button>
-                  <div>
-                    <h2 className="text-base font-black text-slate-800">{selectedCompany.name}</h2>
-                    <p className="text-[10px] text-slate-400">{owners.length} owners</p>
-                  </div>
+                  <div><h2 className="text-base font-black text-slate-800">{selCompany.name}</h2><p className="text-[10px] text-slate-400">{owners.length} owners · {selCompany.city}</p></div>
                 </div>
-                <button onClick={() => { setDocTarget({...selectedCompany, level:'company'}); setShowDocModal(true); }}
-                  className="flex items-center gap-1.5 text-xs font-black text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:border-blue-200 transition">
-                  <Upload size={12}/> Company Docs
-                </button>
+                {UpBtn({...selCompany,level:'company',full_name:selCompany.name})}
               </div>
-
-              <div className="grid grid-cols-4 gap-3">
-                <Stat label="Today" value={fmt(selectedCompany.collection_today)} icon={Wallet} blue/>
-                <Stat label="This Month" value={fmt(selectedCompany.collection_month)} icon={TrendingUp}/>
-                <Stat label="Drivers" value={parseInt(selectedCompany.drivers||0).toLocaleString()} icon={Users}/>
-                <Stat label="Vehicles" value={parseInt(selectedCompany.vehicles||0).toLocaleString()} icon={Truck}/>
+              <div className="grid grid-cols-5 gap-3">
+                <Stat label="Today"       value={fmt(selCompany.collection_today)}  blue icon={Wallet}/>
+                <Stat label="This Month"  value={fmt(selCompany.collection_month)}  icon={TrendingUp}/>
+                <Stat label="All Time"    value={fmt(selCompany.collection_total)}  icon={TrendingUp}/>
+                <Stat label="Drivers"     value={parseInt(selCompany.drivers||0)}   blue icon={Users}/>
+                <Stat label="Vehicles"    value={parseInt(selCompany.vehicles||0)}  icon={Truck}/>
               </div>
-
               <div className="relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search owner..."
+                <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search owner name, code, phone..."
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white"/>
               </div>
-
-              {loading ? <div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading owners...</div> : (
+              {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading owners...</div>:(
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead><tr className="border-b border-slate-100 bg-slate-50">
-                      {['Owner','Code','Drivers','Vehicles','Today',''].map(h => <th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider">{h}</th>)}
+                    <thead><tr className="border-b border-slate-100 bg-slate-50/80">
+                      {['Owner','Joined','Drivers','Vehicles','Today','Month','Total Wallet',''].map(h=><th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider">{h}</th>)}
                     </tr></thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filtered(owners).map((o, i) => (
-                        <tr key={i} onClick={() => drillToOwner(o)} className="hover:bg-slate-50/50 cursor-pointer transition group">
+                      {filt(owners).map((o,i)=>(
+                        <tr key={i} onClick={()=>drillOwner(o)} className="hover:bg-blue-50/20 cursor-pointer transition group">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-sm">{o.full_name?.charAt(0)}</div>
+                              <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-black">{o.full_name?.charAt(0)}</div>
                               <div>
                                 <p className="font-black text-slate-800">{o.full_name}</p>
-                                <p className="text-[9px] text-slate-400 font-mono">{o.mobile_number}</p>
+                                <p className="text-[9px] text-slate-400 font-mono">{o.owner_code} · {o.mobile_number}</p>
+                                {o.business_name && <p className="text-[9px] text-slate-500">{o.business_name}</p>}
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-[10px] font-mono text-slate-500">{o.owner_code}</td>
-                          <td className="px-4 py-3 font-black text-slate-700 text-center">{parseInt(o.total_drivers||0)}</td>
-                          <td className="px-4 py-3 font-black text-slate-700 text-center">{parseInt(o.total_vehicles||0)}</td>
-                          <td className="px-4 py-3 font-black text-blue-600 text-right">{fmt(o.collection_today)}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(o.created_at)}</td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition">
-                              <button onClick={e=>{e.stopPropagation();setDocTarget({...o,level:'owner'});setShowDocModal(true);}} className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition"><Upload size={11}/></button>
+                            <div className="text-center">
+                              <p className="font-black text-slate-800">{o.total_drivers||0}</p>
+                              <p className="text-[9px] text-slate-400">{o.active_drivers||0} active</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-center">
+                              <p className="font-black text-slate-800">{o.total_vehicles||0}</p>
+                              <p className="text-[9px] text-slate-400">{o.assigned_vehicles||0} assigned</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-black text-blue-600">{fmt(o.collection_today)}</td>
+                          <td className="px-4 py-3 font-black text-slate-700">{fmt(o.collection_month)}</td>
+                          <td className="px-4 py-3 font-black text-slate-600">{fmt(o.total_wallet_balance)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                              {UpBtn({...o,level:'owner'})}
                               <ChevronRight size={13} className="text-slate-300 group-hover:text-blue-500"/>
                             </div>
                           </td>
@@ -419,72 +290,100 @@ export default function CompanyDashboard() {
                       ))}
                     </tbody>
                   </table>
-                  {filtered(owners).length === 0 && <div className="py-10 text-center text-sm text-slate-400">No owners found</div>}
+                  {filt(owners).length===0&&<div className="py-10 text-center text-sm text-slate-400">No owners found</div>}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── DRIVERS ──────────────────────────────────────────────────── */}
-          {activePanel === 'drivers' && selectedOwner && (
-            <div className="space-y-5 max-w-5xl">
+          {/* ── DRIVERS ──────────────────────────────────────────── */}
+          {panel==='drivers' && selOwner && (
+            <div className="space-y-4 max-w-7xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <button onClick={goBack} className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><ChevronLeft size={15}/></button>
                   <div>
-                    <h2 className="text-base font-black text-slate-800">{selectedOwner.full_name}</h2>
-                    <p className="text-[10px] text-slate-400">{selectedOwner.business_name || selectedOwner.owner_code} · {drivers.length} drivers</p>
+                    <h2 className="text-base font-black text-slate-800">{selOwner.full_name}</h2>
+                    <p className="text-[10px] text-slate-400">{selOwner.business_name||selOwner.owner_code} · Joined {fmtDate(selOwner.created_at)}</p>
                   </div>
                 </div>
-                <button onClick={() => {setDocTarget({...selectedOwner,level:'owner'});setShowDocModal(true);}}
-                  className="flex items-center gap-1.5 text-xs font-black text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:border-blue-200 transition">
-                  <Upload size={12}/> Owner Docs
-                </button>
+                {UpBtn({...selOwner,level:'owner'})}
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
-                <Stat label="Owner Code" value={selectedOwner.owner_code} icon={Shield}/>
-                <Stat label="Phone" value={selectedOwner.mobile_number} icon={Activity}/>
-                <Stat label="Drivers" value={parseInt(selectedOwner.total_drivers||drivers.length)} icon={Users} blue/>
-                <Stat label="Collection" value={fmt(selectedOwner.collection_total)} icon={Wallet} blue/>
-              </div>
+              {ownerDetail && (
+                <div className="grid grid-cols-4 gap-3">
+                  <Stat label="Today"          value={fmt(ownerDetail.owner?.collection_today)}  blue icon={Wallet}/>
+                  <Stat label="This Month"     value={fmt(ownerDetail.owner?.collection_month)}  icon={TrendingUp}/>
+                  <Stat label="All Time"       value={fmt(ownerDetail.owner?.collection_total)}  icon={TrendingUp}/>
+                  <Stat label="Total Vehicles" value={`${ownerDetail.owner?.total_vehicles||0} (${ownerDetail.owner?.assigned_vehicles||0} assigned)`} icon={Truck}/>
+                </div>
+              )}
+
+              {/* Owner detail strip */}
+              {ownerDetail && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Owner Info</p>
+                    <Row label="Phone"     value={ownerDetail.owner?.mobile_number} mono/>
+                    <Row label="Email"     value={ownerDetail.owner?.email}/>
+                    <Row label="Address"   value={ownerDetail.owner?.address}/>
+                    <Row label="Status"    value={ownerDetail.owner?.status}/>
+                    <Row label="Incentives" value={ownerDetail.incentive_rules?.is_enabled ? `${ownerDetail.incentive_rules?.rules?.length||0} rules active` : 'Disabled'}/>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-4">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Recent Payments</p>
+                    {ownerDetail.recent_payments?.length===0 && <p className="text-xs text-slate-400 text-center py-2">No payments</p>}
+                    {ownerDetail.recent_payments?.slice(0,5).map((p,i)=>(
+                      <div key={i} className="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
+                        <div><p className="text-xs font-black text-slate-700">{p.driver_name}</p><p className="text-[9px] text-slate-400">{fmtDate(p.order_completion_date)}</p></div>
+                        <p className="text-sm font-black text-blue-600">{fmt(p.order_amount)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search driver, vehicle..."
+                <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search driver name, vehicle, phone..."
                   className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white"/>
               </div>
 
-              {loading ? <div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading drivers...</div> : (
+              {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading drivers...</div>:(
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead><tr className="border-b border-slate-100 bg-slate-50">
-                      {['Driver','Vehicle','Daily Rent','Total Paid','Today','Wallet',''].map(h => <th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider">{h}</th>)}
+                    <thead><tr className="border-b border-slate-100 bg-slate-50/80">
+                      {['Driver','Joined','Vehicle / Since','Rent','Paid Total','Today','Wallet','Active Days',''].map(h=><th key={h} className="text-left px-3 py-3 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}
                     </tr></thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filtered(drivers).map((d, i) => (
-                        <tr key={i} onClick={() => drillToDriver(d)} className="hover:bg-slate-50/50 cursor-pointer transition group">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-black text-sm">{d.full_name?.charAt(0)}</div>
+                      {filt(drivers).map((d,i)=>(
+                        <tr key={i} onClick={()=>drillDriver(d)} className="hover:bg-blue-50/20 cursor-pointer transition group">
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-600">{d.full_name?.charAt(0)}</div>
                               <div>
                                 <p className="font-black text-slate-800">{d.full_name}</p>
                                 <p className="text-[9px] text-slate-400 font-mono">{d.driver_code} · {d.mobile_number}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-3 py-3 text-xs text-slate-500">{fmtDate(d.created_at)}</td>
+                          <td className="px-3 py-3">
                             {d.vehicle_number
-                              ? <span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">{d.vehicle_number}</span>
+                              ? <div><span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{d.vehicle_number}</span><p className="text-[9px] text-slate-400 mt-0.5">{timeSince(d.vehicle_since)}</p></div>
                               : <span className="text-xs text-slate-400">—</span>}
                           </td>
-                          <td className="px-4 py-3 font-black text-slate-700">{d.daily_rent ? `₹${d.daily_rent}` : '—'}</td>
-                          <td className="px-4 py-3 font-black text-slate-700">{fmt(d.total_paid)}</td>
-                          <td className="px-4 py-3 font-black text-blue-600">{fmt(d.paid_today)}</td>
-                          <td className="px-4 py-3 font-black text-slate-600">{fmt(d.wallet_balance)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition">
-                              <button onClick={e=>{e.stopPropagation();setDocTarget({...d,level:'driver'});setShowDocModal(true);}} className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition"><Upload size={11}/></button>
+                          <td className="px-3 py-3 text-xs font-black text-slate-700">{d.daily_rent?`₹${d.daily_rent}/d`:'—'}</td>
+                          <td className="px-3 py-3 font-black text-slate-700 text-sm">{fmt(d.total_paid)}</td>
+                          <td className="px-3 py-3 font-black text-blue-600">{fmt(d.paid_today)}</td>
+                          <td className="px-3 py-3 font-black text-slate-600">{fmt(d.wallet_balance)}</td>
+                          <td className="px-3 py-3 text-center">
+                            <p className="font-black text-slate-700">{d.total_active_days||0}</p>
+                            <p className="text-[9px] text-slate-400">{Math.floor((d.total_active_minutes||0)/60)}h total</p>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                              {UpBtn({...d,level:'driver'})}
                               <ChevronRight size={13} className="text-slate-300 group-hover:text-blue-500"/>
                             </div>
                           </td>
@@ -492,101 +391,118 @@ export default function CompanyDashboard() {
                       ))}
                     </tbody>
                   </table>
-                  {filtered(drivers).length === 0 && <div className="py-10 text-center text-sm text-slate-400">No drivers</div>}
+                  {filt(drivers).length===0&&<div className="py-10 text-center text-sm text-slate-400">No drivers</div>}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── DRIVER DETAIL ─────────────────────────────────────────────── */}
-          {activePanel === 'driver-detail' && selectedDriver && (
-            <div className="space-y-5 max-w-4xl">
+          {/* ── DRIVER DETAIL ────────────────────────────────────── */}
+          {panel==='driver-detail' && selDriver && (
+            <div className="space-y-4 max-w-5xl">
               <div className="flex items-center gap-3">
                 <button onClick={goBack} className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><ChevronLeft size={15}/></button>
                 <div className="flex-1">
-                  <h2 className="text-base font-black text-slate-800">{selectedDriver.full_name}</h2>
-                  <p className="text-[10px] text-slate-400">{selectedDriver.driver_code} · {selectedDriver.mobile_number}</p>
+                  <h2 className="text-base font-black text-slate-800">{selDriver.full_name}</h2>
+                  <p className="text-[10px] text-slate-400">{selDriver.driver_code} · {selDriver.mobile_number} · Joined {fmtDate(selDriver.created_at)}</p>
                 </div>
-                <button onClick={() => {setDocTarget({...selectedDriver,level:'driver'});setShowDocModal(true);}}
-                  className="flex items-center gap-1.5 text-xs font-black text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:border-blue-200 transition">
-                  <Upload size={12}/> Upload Driver Docs
-                </button>
+                <Badge v={selDriver.status} green={selDriver.status==='ACTIVE'} amber={selDriver.status!=='ACTIVE'}/>
+                {UpBtn({...selDriver,level:'driver'})}
               </div>
 
-              {loading ? <div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading...</div> : driverDetail && (
+              {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading...</div>:driverDetail&&(
                 <>
-                  <div className="grid grid-cols-4 gap-3">
-                    <Stat label="Vehicle" value={driverDetail.driver?.vehicle_number || 'Unassigned'} icon={Truck} blue={!!driverDetail.driver?.vehicle_number}/>
-                    <Stat label="Daily Rent" value={driverDetail.driver?.daily_rent ? `₹${driverDetail.driver.daily_rent}` : '—'} icon={Wallet}/>
-                    <Stat label="Total Paid" value={fmt(driverDetail.driver?.total_paid)} icon={TrendingUp} blue/>
-                    <Stat label="Wallet" value={fmt(driverDetail.driver?.wallet_balance)} icon={Activity}/>
+                  {/* Top stats */}
+                  <div className="grid grid-cols-5 gap-3">
+                    <Stat label="Total Paid"    value={fmt(driverDetail.driver?.total_paid)}    blue icon={CreditCard} sub={`${driverDetail.driver?.total_transactions||0} transactions`}/>
+                    <Stat label="Today"         value={fmt(driverDetail.driver?.paid_today)}    blue icon={Wallet}/>
+                    <Stat label="Wallet Balance" value={fmt(driverDetail.driver?.wallet_balance)} icon={Wallet}/>
+                    <Stat label="Security Dep." value={fmt(driverDetail.driver?.security_deposit)} icon={Shield}/>
+                    <Stat label="Last Payment"  value={driverDetail.driver?.last_payment_date?timeSince(driverDetail.driver.last_payment_date):'Never'} icon={Clock}/>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     {/* Profile */}
                     <div className="bg-white border border-slate-200 rounded-xl p-4">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Profile</p>
-                      {[
-                        ['Name', driverDetail.driver?.full_name],
-                        ['Mobile', driverDetail.driver?.mobile_number],
-                        ['Driver Code', driverDetail.driver?.driver_code],
-                        ['License No.', driverDetail.driver?.driving_license_number || '—'],
-                        ['License Expiry', driverDetail.driver?.driving_license_expiry ? new Date(driverDetail.driver.driving_license_expiry).toLocaleDateString('en-IN') : '—'],
-                        ['Security Deposit', fmt(driverDetail.driver?.security_deposit)],
-                        ['Status', driverDetail.driver?.status],
-                      ].map(([k, v]) => (
-                        <div key={k} className="flex justify-between py-1.5 border-b border-slate-50">
-                          <span className="text-xs text-slate-400">{k}</span>
-                          <span className="text-xs font-black text-slate-700">{v}</span>
-                        </div>
-                      ))}
+                      <Row label="Name"       value={driverDetail.driver?.full_name}/>
+                      <Row label="Mobile"     value={driverDetail.driver?.mobile_number} mono/>
+                      <Row label="Driver Code" value={driverDetail.driver?.driver_code} mono/>
+                      <Row label="DOB"        value={fmtDate(driverDetail.driver?.date_of_birth)}/>
+                      <Row label="License No." value={driverDetail.driver?.driving_license_number} mono/>
+                      <Row label="DL Expiry"  value={fmtDate(driverDetail.driver?.driving_license_expiry)}/>
+                      <Row label="Advance Bal." value={fmt(driverDetail.driver?.advance_balance)}/>
+                      <Row label="Rent Type"  value={driverDetail.driver?.rent_type}/>
+                      <Row label="Joined"     value={fmtDate(driverDetail.driver?.created_at)}/>
                     </div>
 
-                    {/* Documents */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Documents</p>
-                        <button onClick={() => {setDocTarget({...selectedDriver,level:'driver'});setShowDocModal(true);}}
-                          className="text-[10px] font-black text-blue-600 flex items-center gap-1 hover:text-blue-700">
-                          <Upload size={10}/> Add
-                        </button>
+                    {/* Current vehicle + docs */}
+                    <div className="space-y-3">
+                      <div className="bg-white border border-slate-200 rounded-xl p-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Current Vehicle</p>
+                        {driverDetail.driver?.vehicle_number?(
+                          <>
+                            <p className="text-lg font-black text-blue-600 mb-1">{driverDetail.driver.vehicle_number}</p>
+                            <Row label="Model"       value={driverDetail.driver.vehicle_model}/>
+                            <Row label="Daily Rent"  value={`₹${driverDetail.driver.daily_rent}`}/>
+                            <Row label="Assigned"    value={timeSince(driverDetail.driver.vehicle_since)}/>
+                            <Row label="Ins. Expiry" value={fmtDate(driverDetail.driver.insurance_expiry)}/>
+                            <Row label="FC Expiry"   value={fmtDate(driverDetail.driver.fitness_expiry)}/>
+                          </>
+                        ):<p className="text-xs text-slate-400 text-center py-2">No vehicle assigned</p>}
                       </div>
-                      {['PROFILE','AADHAAR','PAN_CARD','DRIVING_LICENSE','BANK_CHEQUE'].map(docType => {
-                        const doc = driverDetail.documents?.find(d => d.doc_type === docType);
-                        return (
-                          <div key={docType} className="flex items-center justify-between py-1.5 border-b border-slate-50">
-                            <span className="text-xs text-slate-600">{docType.replace(/_/g,' ')}</span>
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
-                              doc?.status === 'VERIFIED' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                              doc ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                              'bg-slate-50 text-slate-400 border-slate-200'
-                            }`}>
-                              {doc?.status === 'VERIFIED' ? '✓ Verified' : doc ? '⏳ Pending' : 'Missing'}
-                            </span>
-                          </div>
-                        );
-                      })}
+
+                      <div className="bg-white border border-slate-200 rounded-xl p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Documents</p>
+                          <button onClick={()=>{setDocTarget({...selDriver,level:'driver'});setShowDoc(true);}} className="text-[9px] font-black text-blue-600 flex items-center gap-1"><Upload size={9}/>Upload</button>
+                        </div>
+                        {['AADHAAR','PAN_CARD','DRIVING_LICENSE','BANK_CHEQUE','PROFILE_PHOTO'].map(dt=>{
+                          const doc = driverDetail.documents?.find(d=>d.doc_type===dt);
+                          return <div key={dt} className="flex justify-between items-center py-1 border-b border-slate-50 last:border-0">
+                            <span className="text-xs text-slate-500">{dt.replace(/_/g,' ')}</span>
+                            <Badge v={doc?.status==='VERIFIED'?'✓ Verified':doc?'Pending':'Missing'}
+                              blue={doc?.status==='VERIFIED'} amber={doc&&doc?.status!=='VERIFIED'} red={!doc}/>
+                          </div>;
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Notifications */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-4">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1"><Bell size={10}/>Notifications</p>
+                      {driverDetail.notifications?.length===0&&<p className="text-xs text-slate-400 text-center py-4">No notifications</p>}
+                      {driverDetail.notifications?.map((n,i)=>(
+                        <div key={i} className="py-1.5 border-b border-slate-50 last:border-0">
+                          <p className="text-xs font-black text-slate-700">{n.title}</p>
+                          <p className="text-[9px] text-slate-400 mt-0.5">{n.message}</p>
+                          <p className="text-[8px] text-slate-300 mt-0.5">{timeSince(n.created_at)}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
                   {/* Vehicle History */}
-                  {driverDetail.vehicle_history?.length > 0 && (
+                  {driverDetail.vehicle_history?.length>0&&(
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vehicle History</p>
+                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vehicle History ({driverDetail.vehicle_history.length})</p>
                       </div>
                       <table className="w-full text-xs">
                         <thead><tr className="border-b border-slate-100">
-                          {['Vehicle','From','To','Days','Rent/day'].map(h => <th key={h} className="text-left px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}
+                          {['Vehicle','Model','Assigned','Returned','Days','Daily Rent','Total Earned','Reason'].map(h=><th key={h} className="text-left px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}
                         </tr></thead>
                         <tbody className="divide-y divide-slate-50">
-                          {driverDetail.vehicle_history.map((h, i) => (
+                          {driverDetail.vehicle_history.map((h,i)=>(
                             <tr key={i}>
                               <td className="px-4 py-2.5 font-black text-blue-600">{h.vehicle_number}</td>
-                              <td className="px-4 py-2.5 text-slate-500">{new Date(h.assigned_at).toLocaleDateString('en-IN')}</td>
-                              <td className="px-4 py-2.5 text-slate-500">{h.unassigned_at ? new Date(h.unassigned_at).toLocaleDateString('en-IN') : <span className="text-blue-600 font-black">Current</span>}</td>
-                              <td className="px-4 py-2.5 font-black text-slate-700">{h.total_days}</td>
-                              <td className="px-4 py-2.5 font-black text-slate-700">₹{h.daily_rent}</td>
+                              <td className="px-4 py-2.5 text-slate-500">{h.vehicle_model}</td>
+                              <td className="px-4 py-2.5 text-slate-500">{fmtDate(h.assigned_at)}</td>
+                              <td className="px-4 py-2.5">{h.unassigned_at?fmtDate(h.unassigned_at):<Badge v="Current" blue/>}</td>
+                              <td className="px-4 py-2.5 font-black text-slate-700">{h.total_days}d</td>
+                              <td className="px-4 py-2.5 text-slate-600">₹{h.daily_rent}</td>
+                              <td className="px-4 py-2.5 font-black text-blue-600">{fmt(h.total_earned)}</td>
+                              <td className="px-4 py-2.5 text-slate-400">{h.reason||'—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -594,58 +510,73 @@ export default function CompanyDashboard() {
                     </div>
                   )}
 
-                  {/* Daily Logs */}
-                  {driverDetail.daily_logs?.length > 0 && (
+                  {/* Transactions + Activity side by side */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Transactions */}
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Activity Log (Last 30 Days)</p>
+                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Transactions</p>
+                        <p className="text-[9px] text-slate-400">{driverDetail.transactions?.length} shown</p>
                       </div>
-                      <div className="divide-y divide-slate-50 max-h-48 overflow-y-auto">
-                        {driverDetail.daily_logs.map((log, i) => {
-                          const hrs = Math.floor((log.active_minutes||0)/60);
-                          const mins = (log.active_minutes||0)%60;
-                          return (
-                            <div key={i} className="px-4 py-2.5 flex justify-between items-center">
-                              <span className="text-xs text-slate-600">{new Date(log.log_date).toLocaleDateString('en-IN',{day:'2-digit',month:'short',weekday:'short'})}</span>
-                              <div className="flex items-center gap-3 text-xs">
-                                <span className="font-black text-slate-700">{hrs}h {mins}m</span>
-                                {log.login_time && <span className="text-slate-400">{new Date(log.login_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</span>}
-                                {log.incentive_applied && <span className="font-black text-blue-600">+₹{parseFloat(log.incentive_amount||0).toFixed(0)}</span>}
-                              </div>
+                      <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
+                        {driverDetail.transactions?.length===0&&<p className="p-4 text-xs text-slate-400 text-center">No transactions</p>}
+                        {driverDetail.transactions?.map((tx,i)=>(
+                          <div key={i} className="px-4 py-2.5 flex justify-between items-center">
+                            <div><p className="text-xs font-black text-slate-700">{fmt(tx.order_amount)}</p><p className="text-[9px] text-slate-400">{fmtDate(tx.order_initiation_date)} {fmtTime(tx.order_initiation_date)}</p></div>
+                            <Badge v={tx.transaction_status==='SUCCESS'?'Paid':'Failed'} blue={tx.transaction_status==='SUCCESS'} red={tx.transaction_status!=='SUCCESS'}/>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Activity log */}
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Activity Log (30 days)</p>
+                      </div>
+                      <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
+                        {driverDetail.daily_logs?.length===0&&<p className="p-4 text-xs text-slate-400 text-center">No activity</p>}
+                        {driverDetail.daily_logs?.map((l,i)=>{
+                          const hrs=Math.floor((l.active_minutes||0)/60), mins=(l.active_minutes||0)%60;
+                          return <div key={i} className="px-4 py-2 flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-black text-slate-700">{fmtDate(l.log_date)}</p>
+                              {l.login_time&&<p className="text-[9px] text-slate-400">{fmtTime(l.login_time)} – {l.logout_time?fmtTime(l.logout_time):'Active'}</p>}
                             </div>
-                          );
+                            <div className="text-right">
+                              <p className="text-xs font-black text-slate-700">{hrs}h {mins}m</p>
+                              {l.incentive_applied&&<p className="text-[9px] font-black text-blue-600">+{fmt(l.incentive_amount)}</p>}
+                            </div>
+                          </div>;
                         })}
                       </div>
                     </div>
-                  )}
+                  </div>
                 </>
               )}
             </div>
           )}
 
-          {/* ── FINANCE ──────────────────────────────────────────────────── */}
-          {activePanel === 'finance' && (
+          {/* ── FINANCE ──────────────────────────────────────────── */}
+          {panel==='finance'&&(
             <div className="space-y-5 max-w-5xl">
               <h2 className="text-base font-black text-slate-800">Financial Monitor</h2>
               <div className="grid grid-cols-3 gap-4">
-                <Stat label="Today" value={fmt(platformStats.collection_today)} icon={Wallet} blue/>
-                <Stat label="This Month" value={fmt(platformStats.collection_month)} icon={TrendingUp}/>
-                <Stat label="Companies" value={platformStats.total_companies||0} icon={Building2}/>
+                <Stat label="Today"      value={fmt(pStats.collection_today)}  blue icon={Wallet}/>
+                <Stat label="This Month" value={fmt(pStats.collection_month)}  icon={TrendingUp}/>
+                <Stat label="All Time"   value={fmt(pStats.collection_total)}  icon={TrendingUp}/>
               </div>
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Company-wise</p>
-                </div>
+                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Company Breakdown</p></div>
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b border-slate-100">
-                    {['Company','Today','This Month','Owners','Drivers'].map(h => <th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider">{h}</th>)}
-                  </tr></thead>
+                  <thead><tr className="border-b border-slate-100">{['Company','Today','Month','All Time','Owners','Drivers'].map(h=><th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}</tr></thead>
                   <tbody className="divide-y divide-slate-50">
-                    {companies.map((c, i) => (
-                      <tr key={i} onClick={() => drillToCompany(c)} className="hover:bg-slate-50/50 cursor-pointer">
+                    {companies.map((c,i)=>(
+                      <tr key={i} onClick={()=>drillCompany(c)} className="hover:bg-blue-50/20 cursor-pointer transition">
                         <td className="px-4 py-3 font-black text-slate-800">{c.name}</td>
                         <td className="px-4 py-3 font-black text-blue-600">{fmt(c.collection_today)}</td>
                         <td className="px-4 py-3 font-black text-slate-700">{fmt(c.collection_month)}</td>
+                        <td className="px-4 py-3 font-black text-slate-700">{fmt(c.collection_total)}</td>
                         <td className="px-4 py-3 text-slate-600">{parseInt(c.owners||0)}</td>
                         <td className="px-4 py-3 text-slate-600">{parseInt(c.drivers||0)}</td>
                       </tr>
@@ -656,58 +587,39 @@ export default function CompanyDashboard() {
             </div>
           )}
 
-          {/* ── KYC ──────────────────────────────────────────────────────── */}
-          {activePanel === 'kyc' && (
-            <div className="space-y-5 max-w-4xl">
-              <h2 className="text-base font-black text-slate-800">KYC Desk</h2>
-              <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">
-                ✅ No pending KYC cases
-              </div>
-            </div>
-          )}
+          {/* ── KYC ──────────────────────────────────────────────── */}
+          {panel==='kyc'&&<div className="max-w-4xl"><h2 className="text-base font-black text-slate-800 mb-5">KYC Desk</h2><div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">✅ No pending KYC cases</div></div>}
 
-          {/* ── AUDIT ────────────────────────────────────────────────────── */}
-          {activePanel === 'audit' && (
-            <div className="space-y-5 max-w-4xl">
-              <h2 className="text-base font-black text-slate-800">Audit Logs</h2>
+          {/* ── AUDIT ────────────────────────────────────────────── */}
+          {panel==='audit'&&(
+            <div className="max-w-4xl">
+              <h2 className="text-base font-black text-slate-800 mb-5">Audit Logs</h2>
               <div className="bg-slate-950 rounded-xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/>
-                  <span className="text-xs font-black text-slate-400">Live Stream</span>
-                </div>
-                <div className="p-4 space-y-1.5 max-h-96 overflow-y-auto">
-                  {auditLogs.map((log, i) => <p key={i} className="text-xs text-emerald-400 font-mono">{log}</p>)}
-                </div>
+                <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/><span className="text-xs font-black text-slate-400">Live</span></div>
+                <div className="p-4 space-y-1.5 max-h-96 overflow-y-auto">{logs.map((l,i)=><p key={i} className="text-xs text-emerald-400 font-mono">{l}</p>)}</div>
               </div>
             </div>
           )}
-
         </div>
       </div>
 
       {/* Add Company Modal */}
-      {showAddCompany && (
+      {showAddCo&&(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="px-5 py-4 border-b flex justify-between items-center">
-              <p className="font-black text-slate-800">Register Company</p>
-              <button onClick={() => setShowAddCompany(false)}><X size={18} className="text-slate-400"/></button>
-            </div>
+            <div className="px-5 py-4 border-b flex justify-between"><p className="font-black text-slate-800">Register Company</p><button onClick={()=>setShowAddCo(false)}><X size={17} className="text-slate-400"/></button></div>
             <div className="p-5 space-y-3">
-              <input placeholder="Company Name *" value={newCompany.name} onChange={e => setNewCompany(p=>({...p,name:e.target.value}))}
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-blue-500"/>
-              <input placeholder="CIN Number" value={newCompany.cin} onChange={e => setNewCompany(p=>({...p,cin:e.target.value}))}
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-mono focus:outline-none focus:border-blue-500"/>
-              <input placeholder="City" value={newCompany.city} onChange={e => setNewCompany(p=>({...p,city:e.target.value}))}
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-blue-500"/>
+              <input placeholder="Company Name *" value={newCo.name} onChange={e=>setNewCo(p=>({...p,name:e.target.value}))} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-blue-500"/>
+              <input placeholder="CIN Number"     value={newCo.cin}  onChange={e=>setNewCo(p=>({...p,cin:e.target.value}))}  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-mono focus:outline-none focus:border-blue-500"/>
+              <input placeholder="City"           value={newCo.city} onChange={e=>setNewCo(p=>({...p,city:e.target.value}))} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-blue-500"/>
               <div className="flex gap-3 pt-1">
-                <button onClick={() => setShowAddCompany(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
-                <button onClick={async () => {
-                  if (!newCompany.name) return alert('Name required');
-                  const res = await fetch(`${API}/api/admin/companies`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(newCompany) });
-                  const data = await res.json();
-                  if (data.success) { await fetchCompanies(); addLog(`Company created: ${newCompany.name}`); setShowAddCompany(false); setNewCompany({name:'',cin:'',city:''}); }
-                  else alert(data.error || 'Failed');
+                <button onClick={()=>setShowAddCo(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
+                <button onClick={async()=>{
+                  if(!newCo.name) return alert('Name required');
+                  const r=await fetch(`${API}/api/admin/companies`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(newCo)});
+                  const d=await r.json();
+                  if(d.success){await loadCompanies();addLog(`Company: ${newCo.name}`);setShowAddCo(false);setNewCo({name:'',cin:'',city:''});}
+                  else alert(d.error||'Failed');
                 }} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 transition">Create</button>
               </div>
             </div>
@@ -715,7 +627,37 @@ export default function CompanyDashboard() {
         </div>
       )}
 
-      {showDocModal && <DocModal/>}
+      {/* Doc Upload Modal */}
+      {showDoc&&docTarget&&(()=>{
+        const types = {company:['GST_CERTIFICATE','PAN_CARD','INCORPORATION_CERT','BANK_STATEMENT','AGREEMENT'],owner:['AADHAAR','PAN_CARD','BANK_CHEQUE','BUSINESS_REG','GST'],driver:['AADHAAR','PAN_CARD','DRIVING_LICENSE','BANK_CHEQUE','PROFILE_PHOTO']}[docTarget.level]||[];
+        let docType='',file=null,uploading=false;
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+              <div className="px-5 py-4 border-b flex justify-between"><div><p className="font-black text-slate-800">Upload Document</p><p className="text-xs text-slate-400 mt-0.5 capitalize">{docTarget.level}: {docTarget.full_name||docTarget.name}</p></div><button onClick={()=>setShowDoc(false)}><X size={17} className="text-slate-400"/></button></div>
+              <div className="p-5 space-y-4">
+                <select onChange={e=>docType=e.target.value} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:outline-none focus:border-blue-500">
+                  <option value="">— Select type —</option>
+                  {types.map(t=><option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+                </select>
+                <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
+                  <Upload size={18} className="text-slate-400 mb-1"/><p className="text-xs text-slate-400">Click to upload PDF/Image</p>
+                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>file=e.target.files[0]}/>
+                </label>
+                <div className="flex gap-3">
+                  <button onClick={()=>setShowDoc(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
+                  <button onClick={async()=>{
+                    if(!file||!docType) return alert('Select type and file');
+                    const fd=new FormData(); fd.append('file',file); fd.append('doc_type',docType); fd.append('user_type',docTarget.level.toUpperCase()); fd.append('user_id',String(docTarget.id));
+                    const r=await fetch(`${API}/api/uploads/upload`,{method:'POST',body:fd}); const d=await r.json();
+                    if(d.success){addLog(`Doc: ${docType} for ${docTarget.full_name||docTarget.name}`);alert('✅ Uploaded!');setShowDoc(false);}else alert(d.message||'Failed');
+                  }} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 transition">Upload</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
