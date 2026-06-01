@@ -35,19 +35,6 @@ export default function CompanyDashboard() {
   const [showDoc, setShowDoc]       = useState(false);
   const [sideOpen, setSideOpen]     = useState(false);
 
-  // Intercept browser back button — don't let it logout
-  useEffect(() => {
-    const onPop = (e) => {
-      if (['owners','drivers','driver-detail'].includes(panel)) {
-        e.preventDefault();
-        goBack();
-        window.history.pushState(null, '', window.location.pathname);
-      }
-    };
-    window.history.pushState(null, '', window.location.pathname);
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, [panel]);
   const [docTarget, setDocTarget]   = useState(null);
   const [showAddCo, setShowAddCo]   = useState(false);
   const [newCo, setNewCo]           = useState({name:'',cin:'',city:''});
@@ -111,11 +98,24 @@ export default function CompanyDashboard() {
     setLoading(false); addLog(`Driver: ${d.full_name}`);
   };
 
-  const goBack = () => {
+  const goBack = useCallback(() => {
     if (panel==='driver-detail') { setPanel('drivers'); setSelDriver(null); setCrumbs(p=>p.filter(x=>x.level!=='driver')); }
     else if (panel==='drivers')  { setPanel('owners');  setSelOwner(null);  setCrumbs(p=>p.filter(x=>x.level!=='owner')); }
     else if (panel==='owners')   { setPanel('overview'); setSelCompany(null); setCrumbs([]); }
-  };
+  }, [panel]);
+
+  // Intercept browser back — don't logout
+  useEffect(() => {
+    window.history.pushState(null, '', window.location.pathname);
+    const onPop = () => {
+      if (['owners','drivers','driver-detail'].includes(panel)) {
+        goBack();
+        window.history.pushState(null, '', window.location.pathname);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [panel, goBack]);
 
   const filt = arr => arr.filter(x => !q || Object.values(x).some(v=>String(v||'').toLowerCase().includes(q.toLowerCase())));
 
@@ -167,15 +167,24 @@ export default function CompanyDashboard() {
 
       {/* Sidebar */}
       <aside className={`fixed lg:static inset-y-0 left-0 w-52 bg-slate-950 flex flex-col shrink-0 z-40 transition-transform duration-200 ${sideOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="px-4 py-4 border-b border-slate-800 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">MG</div>
-          <div><p className="text-white font-black text-sm">MobilityGrid</p><p className="text-[9px] text-slate-500 uppercase tracking-widest">Admin</p></div>
+        <div className="px-4 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">MG</div>
+            <div><p className="text-white font-black text-sm">MobilityGrid</p><p className="text-[9px] text-slate-500 uppercase tracking-widest">Admin</p></div>
+          </div>
+          <button onClick={()=>setSideOpen(false)} className="lg:hidden text-slate-500 hover:text-white transition p-1">
+            <X size={16}/>
+          </button>
         </div>
         <nav className="flex-1 p-3 space-y-0.5">
           {SideItems.map(item=>{
             const active = item.id==='hierarchy' ? hierarchyPanels.includes(panel) : panel===item.id;
             return <button key={item.id}
-              onClick={()=>{ if(item.id==='hierarchy'){setPanel('overview');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}else setPanel(item.id); }}
+              onClick={()=>{
+                setSideOpen(false); // ← close on mobile
+                if(item.id==='hierarchy'){setPanel('overview');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}
+                else setPanel(item.id);
+              }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition ${active?'bg-blue-600 text-white':'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
               <span>{item.icon}</span>{item.label}
             </button>;
