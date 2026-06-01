@@ -68,7 +68,7 @@ router.get('/companies', async (req, res) => {
       FROM public.companies c
       LEFT JOIN public.owners  o  ON o.company_id=c.id AND o.status='ACTIVE'
       LEFT JOIN public.drivers d  ON d.owner_code=o.owner_code
-      LEFT JOIN public.vehicles v ON v.owner_id=o.id
+      LEFT JOIN public.vehicles v ON EXISTS(SELECT 1 FROM public.drivers dd WHERE dd.id=v.driver_id AND dd.owner_code=o.owner_code)
       LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
       GROUP BY c.id ORDER BY c.created_at DESC`);
     res.json(result.rows);
@@ -96,62 +96,65 @@ router.get('/companies/:companyId/owners', async (req, res) => {
   try {
     const { companyId } = req.params;
 
-    // Step 1: Simple fetch — no complex JOINs that might fail
+    // Step 1: Fetch owners — SELECT * to avoid missing column errors
     const ownersRes = await pool.query(`
-      SELECT id, full_name, mobile_number, owner_code, business_name,
-             email, address, status, created_at, company_id
-      FROM public.owners
+      SELECT * FROM public.owners
       WHERE company_id = $1 OR company_id IS NULL
       ORDER BY full_name
     `, [companyId]);
 
-    if (ownersRes.rows.length === 0) {
-      return res.json([]);
-    }
+    if (ownersRes.rows.length === 0) return res.json([]);
 
-    // Step 2: Enrich each owner with stats
+    // Step 2: Enrich each owner safely
     const enriched = await Promise.all(ownersRes.rows.map(async (o) => {
+      const stats = { total_drivers: 0, total_vehicles: 0, assigned_vehicles: 0, collection_today: 0, collection_month: 0, collection_total: 0 };
       try {
-        const [dStats, vStats, colStats] = await Promise.all([
-          pool.query(
-            `SELECT COUNT(*)::int as total_drivers FROM public.drivers WHERE owner_code=$1`,
-            [o.owner_code]
-          ),
-          pool.query(
-            `SELECT COUNT(*)::int as total_vehicles,
-                    COUNT(CASE WHEN driver_id IS NOT NULL THEN 1 END)::int as assigned_vehicles
-             FROM public.vehicles WHERE owner_id=$1`,
-            [o.id]
-          ).catch(() => ({ rows: [{ total_vehicles: 0, assigned_vehicles: 0 }] })),
-          pool.query(
-            `SELECT
-               COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as collection_today,
-               COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month,
-               COALESCE(SUM(mo.order_amount),0) as collection_total
-             FROM public.ms_orders mo
-             JOIN public.drivers d ON d.mobile_number=mo.payer_mobile
-             WHERE d.owner_code=$1 AND mo.transaction_status='SUCCESS'`,
-            [o.owner_code]
-          ).catch(() => ({ rows: [{ collection_today: 0, collection_month: 0, collection_total: 0 }] })),
-        ]);
-        return {
-          ...o,
-          total_drivers:    dStats.rows[0]?.total_drivers    || 0,
-          total_vehicles:   vStats.rows[0]?.total_vehicles   || 0,
-          assigned_vehicles: vStats.rows[0]?.assigned_vehicles || 0,
-          collection_today: colStats.rows[0]?.collection_today  || 0,
-          collection_month: colStats.rows[0]?.collection_month  || 0,
-          collection_total: colStats.rows[0]?.collection_total  || 0,
-        };
-      } catch {
-        return { ...o, total_drivers: 0, total_vehicles: 0, collection_today: 0, collection_month: 0, collection_total: 0 };
-      }
+        const dRes = await pool.query(
+          `SELECT COUNT(*)::int as n FROM public.drivers WHERE owner_code=$1`, [o.owner_code]
+        );
+        stats.total_drivers = dRes.rows[0]?.n || 0;
+      } catch(e) { console.error('driver count err:', e.message); }
+
+      try {
+        // Try owner_id first, fallback to joining through drivers
+        const vRes = await pool.query(`
+          SELECT COUNT(*)::int as total,
+                 COUNT(CASE WHEN driver_id IS NOT NULL THEN 1 END)::int as assigned
+          FROM public.vehicles
+          WHERE owner_id = $1`, [o.id]
+        ).catch(() => pool.query(`
+          SELECT COUNT(DISTINCT v.id)::int as total,
+                 COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int as assigned
+          FROM public.vehicles v
+          JOIN public.drivers d ON d.id = v.driver_id
+          WHERE d.owner_code = $1`, [o.owner_code]
+        ));
+        stats.total_vehicles   = vRes.rows[0]?.total    || 0;
+        stats.assigned_vehicles = vRes.rows[0]?.assigned || 0;
+      } catch(e) { console.error('vehicle count err:', e.message); }
+
+      try {
+        const cRes = await pool.query(`
+          SELECT
+            COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0)          as today,
+            COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as month,
+            COALESCE(SUM(mo.order_amount),0) as total
+          FROM public.ms_orders mo
+          JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+          WHERE d.owner_code = $1 AND mo.transaction_status = 'SUCCESS'
+        `, [o.owner_code]);
+        stats.collection_today = parseFloat(cRes.rows[0]?.today || 0);
+        stats.collection_month = parseFloat(cRes.rows[0]?.month || 0);
+        stats.collection_total = parseFloat(cRes.rows[0]?.total || 0);
+      } catch(e) { console.error('collection err:', e.message); }
+
+      return { ...o, ...stats };
     }));
 
     res.json(enriched);
   } catch (err) {
-    console.error('owners by company error:', err.message);
-    res.status(500).json({ error: err.message });
+    console.error('OWNERS BY COMPANY ERROR:', err.message, err.stack);
+    res.status(500).json({ error: err.message, hint: 'Check Render logs for SQL details' });
   }
 });
 
@@ -161,10 +164,8 @@ router.get('/owners/:ownerId', async (req, res) => {
     const { ownerId } = req.params;
     const [ownerR, incentiveR, vehiclesR, recentR] = await Promise.all([
       pool.query(`
-        SELECT o.id, o.full_name, o.mobile_number, o.owner_code, o.business_name,
-          o.email, o.address, o.status, o.created_at,
+        SELECT o.*,
           COUNT(DISTINCT d.id)::int as total_drivers,
-          COUNT(DISTINCT CASE WHEN d.assigned_vehicle_id IS NOT NULL THEN d.id END)::int as active_drivers,
           COUNT(DISTINCT v.id)::int as total_vehicles,
           COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int as assigned_vehicles,
           COALESCE(SUM(mo.order_amount),0) as collection_total,
@@ -172,16 +173,13 @@ router.get('/owners/:ownerId', async (req, res) => {
           COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month
         FROM public.owners o
         LEFT JOIN public.drivers d ON d.owner_code=o.owner_code
-        LEFT JOIN public.vehicles v ON v.owner_id=o.id
+        LEFT JOIN public.vehicles v ON v.driver_id IS NOT NULL AND EXISTS(SELECT 1 FROM public.drivers dd WHERE dd.id=v.driver_id AND dd.owner_code=o.owner_code)
         LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
         WHERE o.id=$1 GROUP BY o.id`, [ownerId]),
       pool.query(`SELECT * FROM public.owner_incentive_rules WHERE owner_id=$1`, [ownerId]).catch(()=>({rows:[]})),
       pool.query(`
         SELECT
-          v.id, v.vehicle_number, v.vehicle_model, v.vehicle_type,
-          v.daily_rent, v.rent_type, v.rent_amount, v.status,
-          v.insurance_expiry, v.fitness_expiry, v.permit_expiry, v.created_at,
-          v.driver_id, v.driver_name, v.driver_phone,
+          v.*,
           d.driver_code, d.mobile_number as driver_mobile, d.created_at as driver_joined,
           dvh.assigned_at as assigned_since,
           EXTRACT(DAY FROM NOW() - dvh.assigned_at)::int as days_assigned,
@@ -190,7 +188,7 @@ router.get('/owners/:ownerId', async (req, res) => {
         FROM public.vehicles v
         LEFT JOIN public.drivers d ON d.id=v.driver_id
         LEFT JOIN public.driver_vehicle_history dvh ON dvh.vehicle_id=v.id AND dvh.unassigned_at IS NULL
-        WHERE v.owner_id=$1
+        WHERE EXISTS(SELECT 1 FROM public.drivers dx WHERE dx.id=v.driver_id AND dx.owner_code=(SELECT owner_code FROM public.owners WHERE id=$1))
         ORDER BY v.status DESC, v.vehicle_number
       `, [ownerId]),
       pool.query(`
@@ -259,8 +257,8 @@ router.get('/drivers/:driverId', async (req, res) => {
           o.id           as owner_id,
           o.full_name    as owner_name,
           o.mobile_number as owner_phone,
-          o.business_name as owner_business,
-          v.vehicle_number, v.vehicle_model, v.vehicle_type, v.daily_rent,
+          NULL::text as owner_business,
+          v.vehicle_number, v.vehicle_model, v.daily_rent,
           v.rent_type    as v_rent_type, v.insurance_expiry, v.fitness_expiry,
           dvh.assigned_at as vehicle_since,
           COALESCE(SUM(mo.order_amount),0)   as total_paid,
@@ -278,15 +276,15 @@ router.get('/drivers/:driverId', async (req, res) => {
         LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number
                AND mo.transaction_status = 'SUCCESS'
         WHERE d.id = $1
-        GROUP BY d.id, o.id, o.full_name, o.mobile_number, o.business_name,
-                 v.vehicle_number, v.vehicle_model, v.vehicle_type, v.daily_rent,
+        GROUP BY d.id, o.id, o.full_name, o.mobile_number,
+                 v.vehicle_number, v.vehicle_model, v.daily_rent,
                  v.rent_type, v.insurance_expiry, v.fitness_expiry, dvh.assigned_at
       `, [driverId]),
       pool.query(`
         SELECT
           dvh.id, dvh.assigned_at, dvh.unassigned_at, dvh.daily_rent,
           dvh.rent_type, dvh.reason,
-          v.vehicle_number, v.vehicle_model, v.vehicle_type,
+          v.vehicle_number, v.vehicle_model,
           ROUND(EXTRACT(EPOCH FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)/3600)::int as hours_held,
           EXTRACT(DAY FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int as total_days,
           EXTRACT(DAY FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int
