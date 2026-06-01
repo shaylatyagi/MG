@@ -68,7 +68,10 @@ router.get('/companies', async (req, res) => {
       FROM public.companies c
       LEFT JOIN public.owners  o  ON o.company_id=c.id AND o.status='ACTIVE'
       LEFT JOIN public.drivers d  ON d.owner_code=o.owner_code
-      LEFT JOIN public.vehicles v ON EXISTS(SELECT 1 FROM public.drivers dd WHERE dd.id=v.driver_id AND dd.owner_code=o.owner_code)
+      LEFT JOIN public.vehicles v ON (
+        v.owner_id = o.id
+        OR EXISTS(SELECT 1 FROM public.drivers dd WHERE dd.id=v.driver_id AND dd.owner_code=o.owner_code)
+      )
       LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
       GROUP BY c.id ORDER BY c.created_at DESC`);
     res.json(result.rows);
@@ -125,7 +128,10 @@ router.get('/companies/:companyId/owners', async (req, res) => {
           SELECT COUNT(*)::int as total,
                  COUNT(CASE WHEN driver_id IS NOT NULL THEN 1 END)::int as assigned
           FROM public.vehicles
-          WHERE owner_id = $1`, [o.id]
+          WHERE owner_id = $1 OR EXISTS(
+            SELECT 1 FROM public.drivers dx
+            WHERE dx.id = vehicles.driver_id AND dx.owner_code = $2
+          )`, [o.id, o.owner_code]
         ).catch(() => pool.query(`
           SELECT COUNT(DISTINCT v.id)::int as total,
                  COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int as assigned
