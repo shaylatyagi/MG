@@ -307,7 +307,7 @@ export default function CompanyDashboard() {
                           <td className="px-4 py-3">
                             <div className="text-center">
                               <p className="font-black text-slate-800">{o.total_drivers||0}</p>
-                              <p className="text-[9px] text-slate-400">{o.active_drivers||0} active</p>
+                              <p className="text-[9px] text-slate-400">{o.active_drivers||0} w/ vehicle</p>
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -415,10 +415,12 @@ export default function CompanyDashboard() {
                               ? <div><p className="font-black text-slate-800">{v.driver_name}</p><p className="text-slate-400 text-[9px] font-mono">{v.driver_mobile} · {v.driver_code}</p></div>
                               : <span className="text-slate-400">—</span>}
                           </td>
-                          <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{v.assigned_since ? fmtDate(v.assigned_since) : '—'}</td>
-                          <td className="px-3 py-2.5 font-black text-slate-700 text-center">{v.days_assigned||'—'}</td>
+                          <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+                            {v.assigned_since ? fmtDate(v.assigned_since) : v.driver_id ? <span className="text-[9px] text-amber-500">Pre-history</span> : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 font-black text-slate-700 text-center">{v.days_assigned ?? (v.driver_id ? '?' : '—')}</td>
                           <td className="px-3 py-2.5 font-black text-slate-700">₹{v.daily_rent||0}</td>
-                          <td className="px-3 py-2.5 font-black text-blue-600">{v.earned_from_driver ? fmt(v.earned_from_driver) : '—'}</td>
+                          <td className="px-3 py-2.5 font-black text-blue-600">{v.earned_from_driver != null ? fmt(v.earned_from_driver) : v.driver_id ? '?' : '—'}</td>
                           <td className="px-3 py-2.5 text-center text-slate-600">{v.total_assignments||0}</td>
                           <td className="px-3 py-2.5">
                             <p className="text-[9px] text-slate-500">Ins: {fmtDate(v.insurance_expiry)}</p>

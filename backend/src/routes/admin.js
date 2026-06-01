@@ -37,8 +37,8 @@ router.get('/platform-stats', async (req, res) => {
       pool.query(`SELECT COUNT(*) FROM public.drivers WHERE status='ACTIVE'`),
       pool.query(`SELECT COUNT(*) FROM public.vehicles`),
       pool.query(`SELECT
-        COALESCE(SUM(CASE WHEN DATE(order_completion_date)=CURRENT_DATE THEN order_amount END),0) as today,
-        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',order_completion_date)=DATE_TRUNC('month',NOW()) THEN order_amount END),0) as this_month,
+        COALESCE(SUM(CASE WHEN DATE(order_initiation_date)=CURRENT_DATE THEN order_amount END),0) as today,
+        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',order_initiation_date)=DATE_TRUNC('month',NOW()) THEN order_amount END),0) as this_month,
         COALESCE(SUM(order_amount),0) as all_time
         FROM public.ms_orders WHERE transaction_status='SUCCESS'`),
     ]);
@@ -62,8 +62,8 @@ router.get('/companies', async (req, res) => {
         COUNT(DISTINCT o.id)::int  as owners,
         COUNT(DISTINCT d.id)::int  as drivers,
         COUNT(DISTINCT v.id)::int  as vehicles,
-        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0)          as collection_today,
-        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month,
+        COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0)          as collection_today,
+        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month,
         COALESCE(SUM(mo.order_amount),0) as collection_total
       FROM public.companies c
       LEFT JOIN public.owners  o  ON o.company_id=c.id AND o.status='ACTIVE'
@@ -110,9 +110,13 @@ router.get('/companies/:companyId/owners', async (req, res) => {
       const stats = { total_drivers: 0, total_vehicles: 0, assigned_vehicles: 0, collection_today: 0, collection_month: 0, collection_total: 0 };
       try {
         const dRes = await pool.query(
-          `SELECT COUNT(*)::int as n FROM public.drivers WHERE owner_code=$1`, [o.owner_code]
+          `SELECT 
+             COUNT(*)::int as total_drivers,
+             COUNT(CASE WHEN d.id IN (SELECT driver_id FROM public.vehicles WHERE driver_id IS NOT NULL) THEN 1 END)::int as active_drivers
+           FROM public.drivers d WHERE owner_code=$1`, [o.owner_code]
         );
-        stats.total_drivers = dRes.rows[0]?.n || 0;
+        stats.total_drivers  = dRes.rows[0]?.total_drivers  || 0;
+        stats.active_drivers = dRes.rows[0]?.active_drivers || 0;
       } catch(e) { console.error('driver count err:', e.message); }
 
       try {
@@ -136,8 +140,8 @@ router.get('/companies/:companyId/owners', async (req, res) => {
       try {
         const cRes = await pool.query(`
           SELECT
-            COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0)          as today,
-            COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as month,
+            COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0)          as today,
+            COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as month,
             COALESCE(SUM(mo.order_amount),0) as total
           FROM public.ms_orders mo
           JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
@@ -169,8 +173,8 @@ router.get('/owners/:ownerId', async (req, res) => {
           COUNT(DISTINCT v.id)::int as total_vehicles,
           COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int as assigned_vehicles,
           COALESCE(SUM(mo.order_amount),0) as collection_total,
-          COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as collection_today,
-          COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month
+          COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0) as collection_today,
+          COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month
         FROM public.owners o
         LEFT JOIN public.drivers d ON d.owner_code=o.owner_code
         LEFT JOIN public.vehicles v ON v.driver_id IS NOT NULL AND EXISTS(SELECT 1 FROM public.drivers dd WHERE dd.id=v.driver_id AND dd.owner_code=o.owner_code)
@@ -182,13 +186,24 @@ router.get('/owners/:ownerId', async (req, res) => {
           v.*,
           d.driver_code, d.mobile_number as driver_mobile, d.created_at as driver_joined,
           dvh.assigned_at as assigned_since,
-          EXTRACT(DAY FROM NOW() - dvh.assigned_at)::int as days_assigned,
-          EXTRACT(DAY FROM NOW() - dvh.assigned_at)::int * COALESCE(v.daily_rent,0) as earned_from_driver,
+          CASE WHEN dvh.assigned_at IS NOT NULL
+            THEN EXTRACT(DAY FROM NOW() - dvh.assigned_at)::int
+            ELSE NULL END as days_assigned,
+          CASE WHEN dvh.assigned_at IS NOT NULL
+            THEN EXTRACT(DAY FROM NOW() - dvh.assigned_at)::int * COALESCE(v.daily_rent,0)
+            ELSE NULL END as earned_from_driver,
           (SELECT COUNT(*)::int FROM public.driver_vehicle_history h WHERE h.vehicle_id=v.id) as total_assignments
         FROM public.vehicles v
         LEFT JOIN public.drivers d ON d.id=v.driver_id
         LEFT JOIN public.driver_vehicle_history dvh ON dvh.vehicle_id=v.id AND dvh.unassigned_at IS NULL
-        WHERE EXISTS(SELECT 1 FROM public.drivers dx WHERE dx.id=v.driver_id AND dx.owner_code=(SELECT owner_code FROM public.owners WHERE id=$1))
+        WHERE (
+          v.owner_id = $1
+          OR EXISTS(
+            SELECT 1 FROM public.drivers dx
+            WHERE dx.id = v.driver_id
+            AND dx.owner_code = (SELECT owner_code FROM public.owners WHERE id=$1)
+          )
+        )
         ORDER BY v.status DESC, v.vehicle_number
       `, [ownerId]),
       pool.query(`
@@ -224,8 +239,8 @@ router.get('/owners/:ownerId/drivers', async (req, res) => {
         v.vehicle_number, v.vehicle_model, v.daily_rent,
         dvh.assigned_at as vehicle_since,
         COALESCE(SUM(mo.order_amount),0)  as total_paid,
-        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as paid_today,
-        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as paid_month,
+        COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0) as paid_today,
+        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as paid_month,
         COUNT(DISTINCT mo.id)::int         as total_transactions,
         MAX(mo.order_completion_date)      as last_payment_date,
         COALESCE(SUM(dlog.active_minutes),0)::int  as total_active_minutes,
