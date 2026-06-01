@@ -118,27 +118,52 @@ router.get('/owners/:ownerId', async (req, res) => {
     const { ownerId } = req.params;
     const [ownerR, incentiveR, vehiclesR, recentR] = await Promise.all([
       pool.query(`
-        SELECT o.*,
-          COUNT(DISTINCT d.id)::int   as total_drivers,
-          COUNT(DISTINCT v.id)::int   as total_vehicles,
+        SELECT o.id, o.full_name, o.mobile_number, o.owner_code, o.business_name,
+          o.email, o.address, o.status, o.created_at,
+          COUNT(DISTINCT d.id)::int as total_drivers,
+          COUNT(DISTINCT CASE WHEN d.assigned_vehicle_id IS NOT NULL THEN d.id END)::int as active_drivers,
+          COUNT(DISTINCT v.id)::int as total_vehicles,
           COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int as assigned_vehicles,
-          COALESCE(SUM(mo.order_amount),0)                                      as collection_total,
+          COALESCE(SUM(mo.order_amount),0) as collection_total,
           COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as collection_today,
           COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month
         FROM public.owners o
-        LEFT JOIN public.drivers   d  ON d.owner_code=o.owner_code
-        LEFT JOIN public.vehicles  v  ON v.owner_id=o.id
+        LEFT JOIN public.drivers d ON d.owner_code=o.owner_code
+        LEFT JOIN public.vehicles v ON v.owner_id=o.id
         LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
         WHERE o.id=$1 GROUP BY o.id`, [ownerId]),
       pool.query(`SELECT * FROM public.owner_incentive_rules WHERE owner_id=$1`, [ownerId]).catch(()=>({rows:[]})),
-      pool.query(`SELECT id,vehicle_number,vehicle_model,daily_rent,status,driver_name,driver_id,created_at FROM public.vehicles WHERE owner_id=$1 ORDER BY created_at DESC`, [ownerId]),
-      pool.query(`SELECT mo.order_amount,mo.order_completion_date,mo.transaction_status,d.full_name as driver_name FROM public.ms_orders mo JOIN public.drivers d ON d.mobile_number=mo.payer_mobile JOIN public.owners o ON o.owner_code=d.owner_code WHERE o.id=$1 AND mo.transaction_status='SUCCESS' ORDER BY mo.order_completion_date DESC LIMIT 10`, [ownerId]).catch(()=>({rows:[]})),
+      pool.query(`
+        SELECT
+          v.id, v.vehicle_number, v.vehicle_model, v.vehicle_type,
+          v.daily_rent, v.rent_type, v.rent_amount, v.status,
+          v.insurance_expiry, v.fitness_expiry, v.permit_expiry, v.created_at,
+          v.driver_id, v.driver_name, v.driver_phone,
+          d.driver_code, d.mobile_number as driver_mobile, d.created_at as driver_joined,
+          dvh.assigned_at as assigned_since,
+          EXTRACT(DAY FROM NOW() - dvh.assigned_at)::int as days_assigned,
+          EXTRACT(DAY FROM NOW() - dvh.assigned_at)::int * COALESCE(v.daily_rent,0) as earned_from_driver,
+          (SELECT COUNT(*)::int FROM public.driver_vehicle_history h WHERE h.vehicle_id=v.id) as total_assignments
+        FROM public.vehicles v
+        LEFT JOIN public.drivers d ON d.id=v.driver_id
+        LEFT JOIN public.driver_vehicle_history dvh ON dvh.vehicle_id=v.id AND dvh.unassigned_at IS NULL
+        WHERE v.owner_id=$1
+        ORDER BY v.status DESC, v.vehicle_number
+      `, [ownerId]),
+      pool.query(`
+        SELECT mo.order_amount, mo.order_completion_date, mo.transaction_status, d.full_name as driver_name
+        FROM public.ms_orders mo
+        JOIN public.drivers d ON d.mobile_number=mo.payer_mobile
+        JOIN public.owners o ON o.owner_code=d.owner_code
+        WHERE o.id=$1 AND mo.transaction_status='SUCCESS'
+        ORDER BY mo.order_completion_date DESC LIMIT 10
+      `, [ownerId]).catch(()=>({rows:[]})),
     ]);
     if (!ownerR.rows[0]) return res.status(404).json({ error: 'Owner not found' });
     res.json({
-      owner:          ownerR.rows[0],
+      owner:           ownerR.rows[0],
       incentive_rules: incentiveR.rows[0] || null,
-      vehicles:       vehiclesR.rows,
+      vehicles:        vehiclesR.rows,
       recent_payments: recentR.rows,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -182,43 +207,68 @@ router.get('/drivers/:driverId', async (req, res) => {
     const { driverId } = req.params;
     const [driverR, historyR, logsR, txR, notifR] = await Promise.all([
       pool.query(`
-        SELECT d.*,
-          v.vehicle_number, v.vehicle_model, v.daily_rent, v.rent_type as v_rent_type,
-          v.insurance_expiry, v.fitness_expiry,
+        SELECT
+          d.id, d.full_name, d.mobile_number, d.driver_code, d.status,
+          d.date_of_birth, d.driving_license_number, d.driving_license_expiry,
+          d.wallet_balance, d.security_deposit, d.advance_balance,
+          d.rent_type, d.rent_amount, d.created_at, d.owner_code,
+          d.incentive_rule_index,
+          o.id           as owner_id,
+          o.full_name    as owner_name,
+          o.mobile_number as owner_phone,
+          o.business_name as owner_business,
+          v.vehicle_number, v.vehicle_model, v.vehicle_type, v.daily_rent,
+          v.rent_type    as v_rent_type, v.insurance_expiry, v.fitness_expiry,
           dvh.assigned_at as vehicle_since,
-          COALESCE(SUM(mo.order_amount),0) as total_paid,
-          COUNT(DISTINCT mo.id)::int        as total_transactions,
-          MAX(mo.order_completion_date)     as last_payment_date,
-          COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as paid_today
+          COALESCE(SUM(mo.order_amount),0)   as total_paid,
+          COUNT(DISTINCT mo.id)::int          as total_transactions,
+          MAX(mo.order_completion_date)       as last_payment_date,
+          COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE
+                       THEN mo.order_amount END),0) as paid_today,
+          COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW())
+                       THEN mo.order_amount END),0) as paid_month
         FROM public.drivers d
-        LEFT JOIN public.vehicles v ON v.driver_id=d.id
-        LEFT JOIN public.driver_vehicle_history dvh ON dvh.driver_id=d.id AND dvh.unassigned_at IS NULL
-        LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
-        WHERE d.id=$1
-        GROUP BY d.id,v.vehicle_number,v.vehicle_model,v.daily_rent,v.rent_type,v.insurance_expiry,v.fitness_expiry,dvh.assigned_at`,
-        [driverId]),
+        LEFT JOIN public.owners  o   ON o.owner_code  = d.owner_code
+        LEFT JOIN public.vehicles v  ON v.driver_id   = d.id
+        LEFT JOIN public.driver_vehicle_history dvh
+               ON dvh.driver_id = d.id AND dvh.unassigned_at IS NULL
+        LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number
+               AND mo.transaction_status = 'SUCCESS'
+        WHERE d.id = $1
+        GROUP BY d.id, o.id, o.full_name, o.mobile_number, o.business_name,
+                 v.vehicle_number, v.vehicle_model, v.vehicle_type, v.daily_rent,
+                 v.rent_type, v.insurance_expiry, v.fitness_expiry, dvh.assigned_at
+      `, [driverId]),
       pool.query(`
-        SELECT dvh.*,
-          v.vehicle_number, v.vehicle_model,
-          EXTRACT(EPOCH FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)/3600 as hours_held,
-          EXTRACT(DAY  FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int   as total_days,
-          EXTRACT(DAY  FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int * COALESCE(dvh.daily_rent,0) as total_earned
+        SELECT
+          dvh.id, dvh.assigned_at, dvh.unassigned_at, dvh.daily_rent,
+          dvh.rent_type, dvh.reason,
+          v.vehicle_number, v.vehicle_model, v.vehicle_type,
+          ROUND(EXTRACT(EPOCH FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)/3600)::int as hours_held,
+          EXTRACT(DAY FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int as total_days,
+          EXTRACT(DAY FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int
+            * COALESCE(dvh.daily_rent,0) as total_earned
         FROM public.driver_vehicle_history dvh
-        JOIN public.vehicles v ON v.id=dvh.vehicle_id
-        WHERE dvh.driver_id=$1
-        ORDER BY dvh.assigned_at DESC LIMIT 20`, [driverId]),
+        JOIN public.vehicles v ON v.id = dvh.vehicle_id
+        WHERE dvh.driver_id = $1
+        ORDER BY dvh.assigned_at DESC
+      `, [driverId]),
       pool.query(`
         SELECT * FROM public.driver_daily_log
-        WHERE driver_id=$1
-        ORDER BY log_date DESC LIMIT 30`, [driverId]),
+        WHERE driver_id = $1 ORDER BY log_date DESC LIMIT 30
+      `, [driverId]),
       pool.query(`
-        SELECT order_amount,order_completion_date,order_initiation_date,transaction_status,order_id
+        SELECT order_id, order_amount, order_completion_date,
+               order_initiation_date, transaction_status
         FROM public.ms_orders
-        WHERE payer_mobile=(SELECT mobile_number FROM public.drivers WHERE id=$1)
-        ORDER BY order_initiation_date DESC LIMIT 20`, [driverId]),
+        WHERE payer_mobile = (SELECT mobile_number FROM public.drivers WHERE id=$1)
+        ORDER BY order_initiation_date DESC LIMIT 30
+      `, [driverId]),
       pool.query(`
-        SELECT title,message,is_read,created_at FROM public.notifications
-        WHERE driver_id=$1 ORDER BY created_at DESC LIMIT 10`, [driverId]).catch(()=>({rows:[]})),
+        SELECT title, message, is_read, created_at
+        FROM public.notifications
+        WHERE driver_id = $1 ORDER BY created_at DESC LIMIT 10
+      `, [driverId]).catch(()=>({ rows:[] })),
     ]);
     if (!driverR.rows[0]) return res.status(404).json({ error: 'Driver not found' });
     res.json({

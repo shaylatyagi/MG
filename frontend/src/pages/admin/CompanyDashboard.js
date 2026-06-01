@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/CompanyDashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, ChevronLeft, Building2, Users, Truck, Wallet, TrendingUp, Upload, X, Search, CheckCircle, Shield, Activity, RefreshCw, Clock, CreditCard, Bell } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Building2, Users, Truck, Wallet, TrendingUp, Upload, X, Search, CheckCircle, Shield, Activity, RefreshCw, Clock, CreditCard, Bell, LogOut } from 'lucide-react';
 
 const API = 'https://mg-qw5s.onrender.com';
 const fmt  = (n) => `₹${parseFloat(n||0).toLocaleString('en-IN')}`;
@@ -172,6 +172,10 @@ export default function CompanyDashboard() {
           <div className="flex items-center gap-2">
             <button onClick={()=>{loadPStats();loadCompanies();}} className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><RefreshCw size={12}/></button>
             <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600">SA</div>
+            <button onClick={()=>{ localStorage.removeItem('admin_token'); window.location.href='/login'; }}
+              className="p-2 rounded-lg bg-red-50 border border-red-100 text-red-500 hover:bg-red-100 transition" title="Logout">
+              <LogOut size={13}/>
+            </button>
           </div>
         </header>
 
@@ -324,10 +328,14 @@ export default function CompanyDashboard() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-white border border-slate-200 rounded-xl p-4">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Owner Info</p>
-                    <Row label="Phone"     value={ownerDetail.owner?.mobile_number} mono/>
-                    <Row label="Email"     value={ownerDetail.owner?.email}/>
-                    <Row label="Address"   value={ownerDetail.owner?.address}/>
-                    <Row label="Status"    value={ownerDetail.owner?.status}/>
+                    <Row label="Owner ID"   value={`#${ownerDetail.owner?.id}`} mono/>
+                    <Row label="Owner Code" value={ownerDetail.owner?.owner_code} mono/>
+                    <Row label="Phone"      value={ownerDetail.owner?.mobile_number} mono/>
+                    <Row label="Email"      value={ownerDetail.owner?.email}/>
+                    <Row label="Business"   value={ownerDetail.owner?.business_name}/>
+                    <Row label="Address"    value={ownerDetail.owner?.address}/>
+                    <Row label="Joined"     value={fmtDate(ownerDetail.owner?.created_at)}/>
+                    <Row label="Status"     value={ownerDetail.owner?.status}/>
                     <Row label="Incentives" value={ownerDetail.incentive_rules?.is_enabled ? `${ownerDetail.incentive_rules?.rules?.length||0} rules active` : 'Disabled'}/>
                   </div>
                   <div className="bg-white border border-slate-200 rounded-xl p-4">
@@ -340,6 +348,50 @@ export default function CompanyDashboard() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* All Vehicles — complete table */}
+              {ownerDetail?.vehicles?.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">All Vehicles ({ownerDetail.vehicles.length})</p>
+                    <div className="flex gap-3 text-[9px] text-slate-400">
+                      <span>{ownerDetail.vehicles.filter(v=>v.driver_id).length} assigned</span>
+                      <span>{ownerDetail.vehicles.filter(v=>!v.driver_id).length} free</span>
+                    </div>
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead><tr className="border-b border-slate-100 bg-slate-50/50">
+                      {['Vehicle','Model/Type','Status','Driver','Assigned Since','Days','Rent/day','Earned','Total Assignments','Ins/FC Expiry'].map(h=><th key={h} className="text-left px-3 py-2.5 text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">{h}</th>)}
+                    </tr></thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {ownerDetail.vehicles.map((v,i)=>(
+                        <tr key={i} className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2.5 font-black text-blue-600 whitespace-nowrap">{v.vehicle_number}</td>
+                          <td className="px-3 py-2.5"><p className="text-slate-700">{v.vehicle_model}</p><p className="text-slate-400 text-[9px]">{v.vehicle_type||'—'}</p></td>
+                          <td className="px-3 py-2.5">
+                            <Badge v={v.driver_id ? 'Assigned' : 'Free'}
+                              blue={!!v.driver_id} green={!v.driver_id}/>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {v.driver_name
+                              ? <div><p className="font-black text-slate-800">{v.driver_name}</p><p className="text-slate-400 text-[9px] font-mono">{v.driver_mobile} · {v.driver_code}</p></div>
+                              : <span className="text-slate-400">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{v.assigned_since ? fmtDate(v.assigned_since) : '—'}</td>
+                          <td className="px-3 py-2.5 font-black text-slate-700 text-center">{v.days_assigned||'—'}</td>
+                          <td className="px-3 py-2.5 font-black text-slate-700">₹{v.daily_rent||0}</td>
+                          <td className="px-3 py-2.5 font-black text-blue-600">{v.earned_from_driver ? fmt(v.earned_from_driver) : '—'}</td>
+                          <td className="px-3 py-2.5 text-center text-slate-600">{v.total_assignments||0}</td>
+                          <td className="px-3 py-2.5">
+                            <p className="text-[9px] text-slate-500">Ins: {fmtDate(v.insurance_expiry)}</p>
+                            <p className="text-[9px] text-slate-500">FC: {fmtDate(v.fitness_expiry)}</p>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
@@ -425,15 +477,23 @@ export default function CompanyDashboard() {
                     {/* Profile */}
                     <div className="bg-white border border-slate-200 rounded-xl p-4">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Profile</p>
-                      <Row label="Name"       value={driverDetail.driver?.full_name}/>
-                      <Row label="Mobile"     value={driverDetail.driver?.mobile_number} mono/>
+                      <Row label="Driver ID"   value={`#${driverDetail.driver?.id}`} mono/>
+                      <Row label="Name"        value={driverDetail.driver?.full_name}/>
+                      <Row label="Mobile"      value={driverDetail.driver?.mobile_number} mono/>
                       <Row label="Driver Code" value={driverDetail.driver?.driver_code} mono/>
-                      <Row label="DOB"        value={fmtDate(driverDetail.driver?.date_of_birth)}/>
+                      <Row label="DOB"         value={fmtDate(driverDetail.driver?.date_of_birth)}/>
                       <Row label="License No." value={driverDetail.driver?.driving_license_number} mono/>
-                      <Row label="DL Expiry"  value={fmtDate(driverDetail.driver?.driving_license_expiry)}/>
-                      <Row label="Advance Bal." value={fmt(driverDetail.driver?.advance_balance)}/>
-                      <Row label="Rent Type"  value={driverDetail.driver?.rent_type}/>
-                      <Row label="Joined"     value={fmtDate(driverDetail.driver?.created_at)}/>
+                      <Row label="DL Expiry"   value={fmtDate(driverDetail.driver?.driving_license_expiry)}/>
+                      <Row label="Rent Type"   value={driverDetail.driver?.rent_type}/>
+                      <Row label="Joined"      value={fmtDate(driverDetail.driver?.created_at)}/>
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Owner</p>
+                        <Row label="Owner ID"   value={`#${driverDetail.driver?.owner_id}`} mono/>
+                        <Row label="Name"       value={driverDetail.driver?.owner_name}/>
+                        <Row label="Phone"      value={driverDetail.driver?.owner_phone} mono/>
+                        <Row label="Code"       value={driverDetail.driver?.owner_code} mono/>
+                        <Row label="Business"   value={driverDetail.driver?.owner_business}/>
+                      </div>
                     </div>
 
                     {/* Current vehicle + docs */}
