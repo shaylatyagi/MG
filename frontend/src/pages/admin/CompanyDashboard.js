@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/CompanyDashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, ChevronLeft, Building2, Users, Truck, Wallet, TrendingUp, Upload, X, Search, CheckCircle, Shield, Activity, RefreshCw, Clock, CreditCard, Bell, LogOut } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Building2, Users, Truck, Wallet, TrendingUp, Upload, X, Search, CheckCircle, Shield, Activity, RefreshCw, Clock, CreditCard, Bell, LogOut, FileText } from 'lucide-react';
 
 const API = 'https://mg-qw5s.onrender.com';
 const fmt  = (n) => `₹${parseFloat(n||0).toLocaleString('en-IN')}`;
@@ -33,6 +33,21 @@ export default function CompanyDashboard() {
   const [q, setQ]                   = useState('');
 
   const [showDoc, setShowDoc]       = useState(false);
+  const [sideOpen, setSideOpen]     = useState(false);
+
+  // Intercept browser back button — don't let it logout
+  useEffect(() => {
+    const onPop = (e) => {
+      if (['owners','drivers','driver-detail'].includes(panel)) {
+        e.preventDefault();
+        goBack();
+        window.history.pushState(null, '', window.location.pathname);
+      }
+    };
+    window.history.pushState(null, '', window.location.pathname);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [panel]);
   const [docTarget, setDocTarget]   = useState(null);
   const [showAddCo, setShowAddCo]   = useState(false);
   const [newCo, setNewCo]           = useState({name:'',cin:'',city:''});
@@ -142,13 +157,16 @@ export default function CompanyDashboard() {
     {id:'kyc',icon:'◷',label:'KYC Desk'},
     {id:'audit',icon:'◑',label:'Audit Logs'},
   ];
-  const hierarchyPanels = ['overview','owners','drivers','driver-detail'];
+  const hierarchyPanels = ['owners','drivers','driver-detail'];
 
   return (
     <div className="h-screen w-screen overflow-hidden flex bg-slate-50 font-sans">
 
+      {/* Mobile overlay */}
+      {sideOpen && <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={()=>setSideOpen(false)}/>}
+
       {/* Sidebar */}
-      <aside className="w-52 bg-slate-950 flex flex-col shrink-0">
+      <aside className={`fixed lg:static inset-y-0 left-0 w-52 bg-slate-950 flex flex-col shrink-0 z-40 transition-transform duration-200 ${sideOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="px-4 py-4 border-b border-slate-800 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">MG</div>
           <div><p className="text-white font-black text-sm">MobilityGrid</p><p className="text-[9px] text-slate-500 uppercase tracking-widest">Admin</p></div>
@@ -171,16 +189,21 @@ export default function CompanyDashboard() {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-1.5 text-xs">
-            <button onClick={()=>{setPanel('overview');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}} className="font-black text-slate-400 hover:text-blue-600 transition">Platform</button>
+        <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 text-xs min-w-0 flex-1 overflow-hidden mr-2">
+            <button onClick={()=>setSideOpen(!sideOpen)} className="lg:hidden p-1.5 rounded-lg border border-slate-200 text-slate-500 shrink-0">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+            <button onClick={()=>{setPanel('overview');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}} className="font-black text-slate-400 hover:text-blue-600 transition shrink-0">Platform</button>
             {crumbs.map((b,i)=>(
               <React.Fragment key={i}>
-                <ChevronRight size={11} className="text-slate-300"/>
+                <ChevronRight size={11} className="text-slate-300 shrink-0"/>
                 <button onClick={()=>{
                   if(b.level==='company'){setPanel('owners');setSelOwner(null);setSelDriver(null);setCrumbs([b]);}
                   else if(b.level==='owner'){setPanel('drivers');setSelDriver(null);setCrumbs(p=>p.filter(x=>x.level!=='driver'));}
-                }} className={`font-black transition max-w-[180px] truncate ${i===crumbs.length-1?'text-slate-800':'text-slate-400 hover:text-blue-600'}`}>{b.label}</button>
+                }} className={`font-black transition truncate max-w-[120px] sm:max-w-[200px] ${i===crumbs.length-1?'text-slate-800':'text-slate-400 hover:text-blue-600'}`}>{b.label}</button>
               </React.Fragment>
             ))}
           </div>
@@ -194,7 +217,7 @@ export default function CompanyDashboard() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
 
           {/* ── OVERVIEW ─────────────────────────────────────────── */}
           {panel==='overview' && (
@@ -293,7 +316,7 @@ export default function CompanyDashboard() {
                   </div>
                 )}
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
                     <thead><tr className="border-b border-slate-100 bg-slate-50/80">
                       {['Owner','Joined','Drivers','Vehicles','Today','Month','Total Wallet',''].map(h=><th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider">{h}</th>)}
                     </tr></thead>
@@ -335,7 +358,7 @@ export default function CompanyDashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </table></div>
                   {filt(owners).length===0&&!error&&<div className="py-10 text-center text-sm text-slate-400">No owners found — check if SQL ran: <code className="bg-slate-100 px-1 rounded">UPDATE public.owners SET company_id=1 WHERE company_id IS NULL</code></div>}
                 </div>
                 </>
@@ -406,7 +429,7 @@ export default function CompanyDashboard() {
                   </div>
                   <table className="w-full text-xs">
                     <thead><tr className="border-b border-slate-100 bg-slate-50/50">
-                      {['Vehicle','Model/Type','Status','Driver','Assigned Since','Days','Rent/day','Earned','Total Assignments','Ins/FC Expiry'].map(h=><th key={h} className="text-left px-3 py-2.5 text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">{h}</th>)}
+                      {['Vehicle','Model/Type','Status','Driver','Assigned Since','Days','Rent/day','Earned','Total Assignments','Ins/FC Expiry','Docs'].map(h=><th key={h} className="text-left px-3 py-2.5 text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">{h}</th>)}
                     </tr></thead>
                     <tbody className="divide-y divide-slate-50">
                       {ownerDetail.vehicles.map((v,i)=>(
@@ -441,6 +464,12 @@ export default function CompanyDashboard() {
                             <p className="text-[9px] text-slate-500">Ins: {fmtDate(v.insurance_expiry)}</p>
                             <p className="text-[9px] text-slate-500">FC: {fmtDate(v.fitness_expiry)}</p>
                           </td>
+                          <td className="px-3 py-2.5">
+                            <button onClick={()=>{setDocTarget({...v,level:'vehicle',full_name:v.vehicle_number});setShowDoc(true);}}
+                              className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition">
+                              <Upload size={11}/>
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -456,7 +485,7 @@ export default function CompanyDashboard() {
 
               {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading drivers...</div>:(
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
                     <thead><tr className="border-b border-slate-100 bg-slate-50/80">
                       {['Driver','Joined','Vehicle / Since','Rent','Paid Total','Today','Wallet','Active Days',''].map(h=><th key={h} className="text-left px-3 py-3 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}
                     </tr></thead>
@@ -495,7 +524,7 @@ export default function CompanyDashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </table></div>
                   {filt(drivers).length===0&&<div className="py-10 text-center text-sm text-slate-400">No drivers</div>}
                 </div>
               )}
@@ -741,36 +770,132 @@ export default function CompanyDashboard() {
       )}
 
       {/* Doc Upload Modal */}
-      {showDoc&&docTarget&&(()=>{
-        const types = {company:['GST_CERTIFICATE','PAN_CARD','INCORPORATION_CERT','BANK_STATEMENT','AGREEMENT'],owner:['AADHAAR','PAN_CARD','BANK_CHEQUE','BUSINESS_REG','GST'],driver:['AADHAAR','PAN_CARD','DRIVING_LICENSE','BANK_CHEQUE','PROFILE_PHOTO']}[docTarget.level]||[];
-        let docType='',file=null,uploading=false;
-        return (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-              <div className="px-5 py-4 border-b flex justify-between"><div><p className="font-black text-slate-800">Upload Document</p><p className="text-xs text-slate-400 mt-0.5 capitalize">{docTarget.level}: {docTarget.full_name||docTarget.name}</p></div><button onClick={()=>setShowDoc(false)}><X size={17} className="text-slate-400"/></button></div>
-              <div className="p-5 space-y-4">
-                <select onChange={e=>docType=e.target.value} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:outline-none focus:border-blue-500">
-                  <option value="">— Select type —</option>
-                  {types.map(t=><option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
-                </select>
-                <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
-                  <Upload size={18} className="text-slate-400 mb-1"/><p className="text-xs text-slate-400">Click to upload PDF/Image</p>
-                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>file=e.target.files[0]}/>
-                </label>
-                <div className="flex gap-3">
-                  <button onClick={()=>setShowDoc(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
-                  <button onClick={async()=>{
-                    if(!file||!docType) return alert('Select type and file');
-                    const fd=new FormData(); fd.append('file',file); fd.append('doc_type',docType); fd.append('user_type',docTarget.level.toUpperCase()); fd.append('user_id',String(docTarget.id));
-                    const r=await fetch(`${API}/api/uploads/upload`,{method:'POST',body:fd}); const d=await r.json();
-                    if(d.success){addLog(`Doc: ${docType} for ${docTarget.full_name||docTarget.name}`);alert('✅ Uploaded!');setShowDoc(false);}else alert(d.message||'Failed');
-                  }} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 transition">Upload</button>
+      {showDoc && docTarget && <DocModal target={docTarget} onClose={()=>setShowDoc(false)} addLog={addLog}/>}
+    </div>
+  );
+}
+
+// ── Document Upload Modal (with preview) ─────────────────────────────────────
+function DocModal({ target, onClose, addLog }) {
+  const API = 'https://mg-qw5s.onrender.com';
+  const types = {
+    company: ['GST_CERTIFICATE','PAN_CARD','INCORPORATION_CERT','BANK_STATEMENT','AGREEMENT'],
+    owner:   ['AADHAAR','PAN_CARD','BANK_CHEQUE','BUSINESS_REG','GST'],
+    driver:  ['AADHAAR','PAN_CARD','DRIVING_LICENSE','BANK_CHEQUE','PROFILE_PHOTO'],
+    vehicle: ['RC_BOOK','INSURANCE','FITNESS_CERT','PERMIT','PHOTO'],
+  }[target.level] || ['AADHAAR','PAN_CARD','PHOTO'];
+
+  const [docType, setDocType] = useState('');
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(false);
+
+  const onFile = (f) => {
+    if (!f) return;
+    setFile(f);
+    if (f.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => setPreview(e.target.result);
+      reader.readAsDataURL(f);
+    } else {
+      setPreview('pdf');
+    }
+  };
+
+  const upload = async () => {
+    if (!file || !docType) return alert('Select document type and file');
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('doc_type', docType);
+    fd.append('user_type', target.level.toUpperCase());
+    fd.append('user_id', String(target.id));
+    try {
+      const r = await fetch(`${API}/api/uploads/upload`, { method:'POST', body:fd });
+      const d = await r.json();
+      if (d.success) {
+        setUploaded(true);
+        addLog(`Doc: ${docType} for ${target.full_name||target.name||target.vehicle_number}`);
+        setTimeout(onClose, 1500);
+      } else alert(d.message || 'Upload failed');
+    } catch { alert('Network error'); }
+    setUploading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+        <div className="px-5 py-4 border-b flex justify-between items-start">
+          <div>
+            <p className="font-black text-slate-800">Upload Document</p>
+            <p className="text-xs text-slate-400 mt-0.5 capitalize">
+              {target.level}: <span className="font-black text-slate-600">{target.full_name||target.name||target.vehicle_number}</span>
+            </p>
+          </div>
+          <button onClick={onClose}><X size={17} className="text-slate-400"/></button>
+        </div>
+
+        {uploaded ? (
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle size={24} className="text-blue-600"/>
+            </div>
+            <p className="font-black text-slate-800">Uploaded!</p>
+            <p className="text-xs text-slate-400 mt-1">Document saved successfully</p>
+          </div>
+        ) : (
+          <div className="p-5 space-y-4">
+            <select value={docType} onChange={e=>setDocType(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:outline-none focus:border-blue-500">
+              <option value="">— Select document type —</option>
+              {types.map(t=><option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+            </select>
+
+            {/* File picker + preview */}
+            <label className={`block w-full border-2 border-dashed rounded-xl cursor-pointer transition overflow-hidden ${preview ? 'border-blue-300' : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50'}`}>
+              {preview === 'pdf' ? (
+                <div className="flex items-center gap-3 p-4">
+                  <div className="w-10 h-10 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                    <FileText size={18} className="text-red-500"/>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-slate-700">{file?.name}</p>
+                    <p className="text-[10px] text-slate-400">{(file?.size/1024).toFixed(0)} KB · PDF</p>
+                  </div>
                 </div>
-              </div>
+              ) : preview ? (
+                <div className="relative">
+                  <img src={preview} alt="preview" className="w-full h-40 object-contain bg-slate-50"/>
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-3 py-1.5">
+                    <p className="text-[10px] text-white font-black truncate">{file?.name}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-24">
+                  <Upload size={18} className="text-slate-400 mb-1"/>
+                  <p className="text-xs text-slate-400">Click to select file</p>
+                  <p className="text-[9px] text-slate-300 mt-0.5">PDF, JPG, PNG</p>
+                </div>
+              )}
+              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>onFile(e.target.files[0])}/>
+            </label>
+
+            {preview && (
+              <button onClick={()=>{setFile(null);setPreview(null);}}
+                className="text-[10px] text-slate-400 hover:text-red-500 transition">✕ Remove file</button>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
+              <button onClick={upload} disabled={uploading||!file||!docType}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 disabled:opacity-50 transition">
+                {uploading ? 'Uploading...' : 'Upload'}
+              </button>
             </div>
           </div>
-        );
-      })()}
+        )}
+      </div>
     </div>
   );
 }
