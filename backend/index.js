@@ -41,7 +41,7 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);
-app.use('/api/admin', require('./src/routes/admin'));  // ← confirm karo ye hai
+app.use('/api/admin', require('./src/routes/admin'));
 // In index.js
 app.use('/api/owner', ownerRoutes);
 const adminRoutes = require('./src/routes/admin');

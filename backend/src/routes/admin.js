@@ -95,29 +95,64 @@ router.post('/companies', async (req, res) => {
 router.get('/companies/:companyId/owners', async (req, res) => {
   try {
     const { companyId } = req.params;
-    const result = await pool.query(`
-      SELECT
-        o.id, o.full_name, o.mobile_number, o.owner_code, o.business_name,
-        o.email, o.address, o.status, o.created_at,
-        COUNT(DISTINCT d.id)::int                    as total_drivers,
-        COUNT(DISTINCT CASE WHEN d.assigned_vehicle_id IS NOT NULL THEN d.id END)::int as active_drivers,
-        COUNT(DISTINCT v.id)::int                    as total_vehicles,
-        COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int           as assigned_vehicles,
-        COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0)          as collection_today,
-        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month,
-        COALESCE(SUM(mo.order_amount),0)             as collection_total,
-        COALESCE(SUM(d.wallet_balance),0)            as total_wallet_balance
-      FROM public.owners o
-      LEFT JOIN public.drivers   d  ON d.owner_code=o.owner_code
-      LEFT JOIN public.vehicles  v  ON v.owner_id=o.id
-      LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
-      WHERE (o.company_id = $1)
-         OR (o.company_id IS NULL)   -- show unlinked owners too (fallback)
-      GROUP BY o.id
-      ORDER BY collection_today DESC, o.full_name`,
-    [companyId]);
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+
+    // Step 1: Simple fetch — no complex JOINs that might fail
+    const ownersRes = await pool.query(`
+      SELECT id, full_name, mobile_number, owner_code, business_name,
+             email, address, status, created_at, company_id
+      FROM public.owners
+      WHERE company_id = $1 OR company_id IS NULL
+      ORDER BY full_name
+    `, [companyId]);
+
+    if (ownersRes.rows.length === 0) {
+      return res.json([]);
+    }
+
+    // Step 2: Enrich each owner with stats
+    const enriched = await Promise.all(ownersRes.rows.map(async (o) => {
+      try {
+        const [dStats, vStats, colStats] = await Promise.all([
+          pool.query(
+            `SELECT COUNT(*)::int as total_drivers FROM public.drivers WHERE owner_code=$1`,
+            [o.owner_code]
+          ),
+          pool.query(
+            `SELECT COUNT(*)::int as total_vehicles,
+                    COUNT(CASE WHEN driver_id IS NOT NULL THEN 1 END)::int as assigned_vehicles
+             FROM public.vehicles WHERE owner_id=$1`,
+            [o.id]
+          ).catch(() => ({ rows: [{ total_vehicles: 0, assigned_vehicles: 0 }] })),
+          pool.query(
+            `SELECT
+               COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE THEN mo.order_amount END),0) as collection_today,
+               COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month,
+               COALESCE(SUM(mo.order_amount),0) as collection_total
+             FROM public.ms_orders mo
+             JOIN public.drivers d ON d.mobile_number=mo.payer_mobile
+             WHERE d.owner_code=$1 AND mo.transaction_status='SUCCESS'`,
+            [o.owner_code]
+          ).catch(() => ({ rows: [{ collection_today: 0, collection_month: 0, collection_total: 0 }] })),
+        ]);
+        return {
+          ...o,
+          total_drivers:    dStats.rows[0]?.total_drivers    || 0,
+          total_vehicles:   vStats.rows[0]?.total_vehicles   || 0,
+          assigned_vehicles: vStats.rows[0]?.assigned_vehicles || 0,
+          collection_today: colStats.rows[0]?.collection_today  || 0,
+          collection_month: colStats.rows[0]?.collection_month  || 0,
+          collection_total: colStats.rows[0]?.collection_total  || 0,
+        };
+      } catch {
+        return { ...o, total_drivers: 0, total_vehicles: 0, collection_today: 0, collection_month: 0, collection_total: 0 };
+      }
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    console.error('owners by company error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── OWNER FULL DETAIL ────────────────────────────────────────────────────────
