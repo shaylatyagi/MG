@@ -9,7 +9,7 @@ const app = express();
 app.use(cors({
   origin: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],  // ← sirf ye add karo
   credentials: true,
 }));
 app.use(express.json());
