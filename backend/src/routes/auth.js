@@ -46,7 +46,7 @@ router.post('/send-otp', async (req, res) => {
       [phone_number, otp]
     );
 
-    console.log(`OTP for ${phone_number}: ${otp}`);
+    if (process.env.NODE_ENV !== 'production') console.log(`OTP for ${phone}: ${otp}`);
 
     res.json({ success: true, message: 'OTP generated', otp }); // ✅ OTP return
   } catch (err) {

@@ -41,9 +41,21 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/payment', paymentRoutes);
-app.use('/api/admin', require('./src/routes/admin'));
+app.use('/api/admin', (req, res, next) => {
+  const key = req.headers['x-admin-key'];
+  if (key !== process.env.ADMIN_SECRET_KEY) 
+    return res.status(403).json({ error: 'Forbidden' });
+  next();
+}, require('./src/routes/admin'));
 // In index.js
 app.use('/api/owner', ownerRoutes);
+const rateLimit = require('express-rate-limit');
+
+app.use('/api/auth/send-otp', rateLimit({
+  windowMs: 10 * 60 * 1000,  // 10 minutes
+  max: 5,
+  message: { error: 'Too many OTP requests, try after 10 minutes' }
+}));
 const adminRoutes = require('./src/routes/admin');
 app.use('/api/admin', adminRoutes);
 const assignmentRoutes = require('./src/routes/assignment');

@@ -40,10 +40,12 @@ export default function CompanyDashboard() {
   const addLog = t => setLogs(p=>[`[${new Date().toISOString()}] ${t}`,...p]);
 
   const get = async (url) => {
-    const r = await fetch(`${API}${url}`);
-    if (!r.ok) throw new Error(`${r.status}`);
-    return r.json();
-  };
+  const r = await fetch(`${API}${url}`, {
+    headers: { 'x-admin-key': 'mg_admin_2026_secret' }
+  });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+};
 
   const loadPStats   = useCallback(async () => { try { setPStats(await get('/api/admin/platform-stats')); } catch {} }, []);
   const loadCompanies= useCallback(async () => { setLoading(true); try { const d=await get('/api/admin/companies'); setCompanies(Array.isArray(d)?d:[]); } catch { setCompanies([]); } setLoading(false); }, []);
