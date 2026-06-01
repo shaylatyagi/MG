@@ -79,8 +79,15 @@ router.post('/companies', async (req, res) => {
   try {
     const { name, cin, city } = req.body;
     if (!name) return res.status(400).json({ error: 'Name required' });
-    const r = await pool.query(`INSERT INTO public.companies(name,cin,city) VALUES($1,$2,$3) RETURNING *`, [name, cin||null, city||null]);
-    res.json({ success: true, company: r.rows[0] });
+    // Insert first, then update code with the id
+    const r = await pool.query(
+      `INSERT INTO public.companies(name,cin,city) VALUES($1,$2,$3) RETURNING *`,
+      [name, cin||null, city||null]
+    );
+    const co = r.rows[0];
+    const code = name.replace(/[^a-zA-Z]/g,'').slice(0,4).toUpperCase() + co.id;
+    await pool.query(`UPDATE public.companies SET company_code=$1 WHERE id=$2`, [code, co.id]);
+    res.json({ success: true, company: { ...co, company_code: code } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -104,7 +111,8 @@ router.get('/companies/:companyId/owners', async (req, res) => {
       LEFT JOIN public.drivers   d  ON d.owner_code=o.owner_code
       LEFT JOIN public.vehicles  v  ON v.owner_id=o.id
       LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
-      WHERE o.company_id=$1 OR (o.company_id IS NULL AND $1::int=1)
+      WHERE (o.company_id = $1)
+         OR (o.company_id IS NULL)   -- show unlinked owners too (fallback)
       GROUP BY o.id
       ORDER BY collection_today DESC, o.full_name`,
     [companyId]);

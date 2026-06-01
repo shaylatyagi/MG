@@ -204,7 +204,16 @@ export default function CompanyDashboard() {
                           <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center"><Building2 size={14} className="text-blue-600"/></div>
                           <div>
                             <p className="font-black text-slate-800">{c.name}</p>
-                            <p className="text-[10px] text-slate-400">{c.cin||'No CIN'} · {c.city||'—'} · Added {fmtDate(c.created_at)}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[9px] text-slate-400 font-mono">ID #{c.id}</span>
+                              <span className="text-slate-200">·</span>
+                              <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{c.company_code || '—'}</span>
+                              <span className="text-slate-200">·</span>
+                              <span className="text-[9px] text-slate-400">{c.cin || 'No CIN'}</span>
+                              <span className="text-slate-200">·</span>
+                              <span className="text-[9px] text-slate-400">{c.city || '—'}</span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-0.5">Joined: {fmtDate(c.created_at)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-5">
@@ -233,7 +242,18 @@ export default function CompanyDashboard() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <button onClick={goBack} className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><ChevronLeft size={15}/></button>
-                  <div><h2 className="text-base font-black text-slate-800">{selCompany.name}</h2><p className="text-[10px] text-slate-400">{owners.length} owners · {selCompany.city}</p></div>
+                  <div>
+                    <h2 className="text-base font-black text-slate-800">{selCompany.name}</h2>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] text-slate-400 font-mono">ID #{selCompany.id}</span>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-[9px] font-black text-blue-600">{selCompany.company_code}</span>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-[9px] text-slate-400">{selCompany.cin || 'No CIN'}</span>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-[9px] text-slate-400">Joined {fmtDate(selCompany.created_at)}</span>
+                    </div>
+                  </div>
                 </div>
                 {UpBtn({...selCompany,level:'company',full_name:selCompany.name})}
               </div>
