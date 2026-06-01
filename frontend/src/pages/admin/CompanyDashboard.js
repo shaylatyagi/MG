@@ -39,13 +39,18 @@ export default function CompanyDashboard() {
   const [logs, setLogs]             = useState([`[${new Date().toISOString()}] Session started`]);
   const addLog = t => setLogs(p=>[`[${new Date().toISOString()}] ${t}`,...p]);
 
+  const ADMIN_KEY = 'mg_admin_2026_secret';  // Render env se match karna chahiye
+
   const get = async (url) => {
-  const r = await fetch(`${API}${url}`, {
-    headers: { 'x-admin-key': 'mg_admin_2026_secret' }
-  });
-  if (!r.ok) throw new Error(`${r.status}`);
-  return r.json();
-};
+    const r = await fetch(`${API}${url}`, {
+      headers: { 'x-admin-key': ADMIN_KEY }
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${r.status}`);
+    }
+    return r.json();
+  };
 
   const loadPStats   = useCallback(async () => { try { setPStats(await get('/api/admin/platform-stats')); } catch {} }, []);
   const loadCompanies= useCallback(async () => { setLoading(true); try { const d=await get('/api/admin/companies'); setCompanies(Array.isArray(d)?d:[]); } catch { setCompanies([]); } setLoading(false); }, []);

@@ -324,9 +324,9 @@ router.get('/drivers/:driverId', async (req, res) => {
           COALESCE(SUM(mo.order_amount),0)   as total_paid,
           COUNT(DISTINCT mo.id)::int          as total_transactions,
           MAX(mo.order_completion_date)       as last_payment_date,
-          COALESCE(SUM(CASE WHEN DATE(mo.order_completion_date)=CURRENT_DATE
+          COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE
                        THEN mo.order_amount END),0) as paid_today,
-          COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_completion_date)=DATE_TRUNC('month',NOW())
+          COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW())
                        THEN mo.order_amount END),0) as paid_month
         FROM public.drivers d
         LEFT JOIN public.owners  o   ON o.owner_code  = d.owner_code
