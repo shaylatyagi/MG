@@ -2632,22 +2632,19 @@ const ProfileTab = () => (
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Permissions</p>
               <div className="space-y-0 mb-4">
                 {[
-                  {key:'assign_vehicles', label:'Assign / Unassign Vehicles', def: true},
-                  {key:'record_cash',     label:'Record Cash Payments',       def: true},
-                  {key:'view_financials', label:'View Collections & Ledger',  def: false},
-                  {key:'add_drivers',     label:'Add New Drivers',            def: false},
-                ].map(({key, label, def}) => {
-                  const [on, setOn] = React.useState(def);
-                  return (
-                    <div key={key} className="flex items-center justify-between py-2 border-b border-slate-50">
-                      <span className="text-xs text-slate-600">{label}</span>
-                      <button onClick={() => setOn(!on)}
-                        className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${on?'bg-blue-600':'bg-slate-200'}`}>
-                        <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 shadow transition-all ${on?'right-0.5':'left-0.5'}`}/>
-                      </button>
-                    </div>
-                  );
-                })}
+                  {key:'assign_vehicles', label:'Assign / Unassign Vehicles'},
+                  {key:'record_cash',     label:'Record Cash Payments'},
+                  {key:'view_financials', label:'View Collections & Ledger'},
+                  {key:'add_drivers',     label:'Add New Drivers'},
+                ].map(({key, label}) => (
+                  <div key={key} className="flex items-center justify-between py-2 border-b border-slate-50">
+                    <span className="text-xs text-slate-600">{label}</span>
+                    <button onClick={() => setNewManager(p => ({...p, permissions:{...p.permissions,[key]:!p.permissions[key]}}))}
+                      className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${newManager.permissions[key]?'bg-blue-600':'bg-slate-200'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 shadow transition-all ${newManager.permissions[key]?'right-0.5':'left-0.5'}`}/>
+                    </button>
+                  </div>
+                ))}
               </div>
 
               {/* Upgrade CTA after they've explored */}
