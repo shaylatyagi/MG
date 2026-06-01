@@ -416,11 +416,19 @@ export default function CompanyDashboard() {
                               : <span className="text-slate-400">—</span>}
                           </td>
                           <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
-                            {v.assigned_since ? fmtDate(v.assigned_since) : v.driver_id ? <span className="text-[9px] text-amber-500">Pre-history</span> : '—'}
+                            {v.assigned_since
+                              ? fmtDate(v.assigned_since)
+                              : v.driver_id
+                              ? <span className="text-[9px] text-slate-400 italic">Run backfill SQL</span>
+                              : '—'}
                           </td>
-                          <td className="px-3 py-2.5 font-black text-slate-700 text-center">{v.days_assigned ?? (v.driver_id ? '?' : '—')}</td>
+                          <td className="px-3 py-2.5 font-black text-slate-700 text-center">
+                            {v.days_assigned != null ? v.days_assigned : v.driver_id ? '—' : '—'}
+                          </td>
                           <td className="px-3 py-2.5 font-black text-slate-700">₹{v.daily_rent||0}</td>
-                          <td className="px-3 py-2.5 font-black text-blue-600">{v.earned_from_driver != null ? fmt(v.earned_from_driver) : v.driver_id ? '?' : '—'}</td>
+                          <td className="px-3 py-2.5 font-black text-blue-600">
+                            {v.earned_from_driver != null ? fmt(v.earned_from_driver) : '—'}
+                          </td>
                           <td className="px-3 py-2.5 text-center text-slate-600">{v.total_assignments||0}</td>
                           <td className="px-3 py-2.5">
                             <p className="text-[9px] text-slate-500">Ins: {fmtDate(v.insurance_expiry)}</p>

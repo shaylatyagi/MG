@@ -62,9 +62,32 @@ router.get('/companies', async (req, res) => {
         COUNT(DISTINCT o.id)::int  as owners,
         COUNT(DISTINCT d.id)::int  as drivers,
         COUNT(DISTINCT v.id)::int  as vehicles,
-        COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0)          as collection_today,
-        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month,
-        COALESCE(SUM(mo.order_amount),0) as collection_total
+        (SELECT COALESCE(SUM(mo2.order_amount),0)
+         FROM public.ms_orders mo2
+         WHERE mo2.payer_mobile IN (
+           SELECT d2.mobile_number FROM public.drivers d2
+           JOIN public.owners o2 ON o2.owner_code=d2.owner_code
+           WHERE o2.company_id=c.id OR o2.company_id IS NULL
+         ) AND mo2.transaction_status='SUCCESS'
+           AND DATE(mo2.order_initiation_date)=CURRENT_DATE
+        ) as collection_today,
+        (SELECT COALESCE(SUM(mo2.order_amount),0)
+         FROM public.ms_orders mo2
+         WHERE mo2.payer_mobile IN (
+           SELECT d2.mobile_number FROM public.drivers d2
+           JOIN public.owners o2 ON o2.owner_code=d2.owner_code
+           WHERE o2.company_id=c.id OR o2.company_id IS NULL
+         ) AND mo2.transaction_status='SUCCESS'
+           AND DATE_TRUNC('month',mo2.order_initiation_date)=DATE_TRUNC('month',NOW())
+        ) as collection_month,
+        (SELECT COALESCE(SUM(mo2.order_amount),0)
+         FROM public.ms_orders mo2
+         WHERE mo2.payer_mobile IN (
+           SELECT d2.mobile_number FROM public.drivers d2
+           JOIN public.owners o2 ON o2.owner_code=d2.owner_code
+           WHERE o2.company_id=c.id OR o2.company_id IS NULL
+         ) AND mo2.transaction_status='SUCCESS'
+        ) as collection_total
       FROM public.companies c
       LEFT JOIN public.owners  o  ON o.company_id=c.id AND o.status='ACTIVE'
       LEFT JOIN public.drivers d  ON d.owner_code=o.owner_code
@@ -72,7 +95,6 @@ router.get('/companies', async (req, res) => {
         v.owner_id = o.id
         OR EXISTS(SELECT 1 FROM public.drivers dd WHERE dd.id=v.driver_id AND dd.owner_code=o.owner_code)
       )
-      LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
       GROUP BY c.id ORDER BY c.created_at DESC`);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -146,12 +168,13 @@ router.get('/companies/:companyId/owners', async (req, res) => {
       try {
         const cRes = await pool.query(`
           SELECT
-            COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0)          as today,
+            COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0) as today,
             COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as month,
             COALESCE(SUM(mo.order_amount),0) as total
           FROM public.ms_orders mo
-          JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
-          WHERE d.owner_code = $1 AND mo.transaction_status = 'SUCCESS'
+          WHERE mo.payer_mobile IN (
+            SELECT mobile_number FROM public.drivers WHERE owner_code = $1
+          ) AND mo.transaction_status = 'SUCCESS'
         `, [o.owner_code]);
         stats.collection_today = parseFloat(cRes.rows[0]?.today || 0);
         stats.collection_month = parseFloat(cRes.rows[0]?.month || 0);
@@ -175,17 +198,33 @@ router.get('/owners/:ownerId', async (req, res) => {
     const [ownerR, incentiveR, vehiclesR, recentR] = await Promise.all([
       pool.query(`
         SELECT o.*,
-          COUNT(DISTINCT d.id)::int as total_drivers,
-          COUNT(DISTINCT v.id)::int as total_vehicles,
-          COUNT(DISTINCT CASE WHEN v.driver_id IS NOT NULL THEN v.id END)::int as assigned_vehicles,
-          COALESCE(SUM(mo.order_amount),0) as collection_total,
-          COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0) as collection_today,
-          COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0) as collection_month
+          (SELECT COUNT(*)::int FROM public.drivers d WHERE d.owner_code=o.owner_code) as total_drivers,
+          (SELECT COUNT(*)::int FROM public.drivers d WHERE d.owner_code=o.owner_code
+           AND EXISTS(SELECT 1 FROM public.vehicles v WHERE v.driver_id=d.id)) as active_drivers,
+          (SELECT COUNT(*)::int FROM public.vehicles v
+           WHERE v.owner_id=o.id
+             OR EXISTS(SELECT 1 FROM public.drivers dx WHERE dx.id=v.driver_id AND dx.owner_code=o.owner_code)
+          ) as total_vehicles,
+          (SELECT COUNT(*)::int FROM public.vehicles v
+           WHERE v.driver_id IS NOT NULL
+             AND (v.owner_id=o.id OR EXISTS(SELECT 1 FROM public.drivers dx WHERE dx.id=v.driver_id AND dx.owner_code=o.owner_code))
+          ) as assigned_vehicles,
+          (SELECT COALESCE(SUM(mo.order_amount),0) FROM public.ms_orders mo
+           WHERE mo.payer_mobile IN (SELECT mobile_number FROM public.drivers WHERE owner_code=o.owner_code)
+           AND mo.transaction_status='SUCCESS'
+          ) as collection_total,
+          (SELECT COALESCE(SUM(mo.order_amount),0) FROM public.ms_orders mo
+           WHERE mo.payer_mobile IN (SELECT mobile_number FROM public.drivers WHERE owner_code=o.owner_code)
+           AND mo.transaction_status='SUCCESS'
+           AND DATE(mo.order_initiation_date)=CURRENT_DATE
+          ) as collection_today,
+          (SELECT COALESCE(SUM(mo.order_amount),0) FROM public.ms_orders mo
+           WHERE mo.payer_mobile IN (SELECT mobile_number FROM public.drivers WHERE owner_code=o.owner_code)
+           AND mo.transaction_status='SUCCESS'
+           AND DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW())
+          ) as collection_month
         FROM public.owners o
-        LEFT JOIN public.drivers d ON d.owner_code=o.owner_code
-        LEFT JOIN public.vehicles v ON v.driver_id IS NOT NULL AND EXISTS(SELECT 1 FROM public.drivers dd WHERE dd.id=v.driver_id AND dd.owner_code=o.owner_code)
-        LEFT JOIN public.ms_orders mo ON mo.payer_mobile=d.mobile_number AND mo.transaction_status='SUCCESS'
-        WHERE o.id=$1 GROUP BY o.id`, [ownerId]),
+        WHERE o.id=$1`, [ownerId]),
       pool.query(`SELECT * FROM public.owner_incentive_rules WHERE owner_id=$1`, [ownerId]).catch(()=>({rows:[]})),
       pool.query(`
         SELECT
