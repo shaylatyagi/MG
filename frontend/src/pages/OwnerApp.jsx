@@ -1350,6 +1350,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
     if (isYesterday) return `Yesterday ${time}`;
     return `${d.toLocaleDateString('en-IN', {day:'2-digit', month:'short'})} ${time}`;
   };
+  const addDriver = async () => {
     if (!newDriver.name || !newDriver.phone) {
       alert('Please fill name and phone');
       return;
@@ -3577,3 +3578,4 @@ const ProfileTab = () => (
       </div>
     </div>
   );
+}
