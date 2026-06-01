@@ -16,7 +16,7 @@ const timeSince = (d) => {
 };
 
 export default function CompanyDashboard() {
-  const [panel, setPanel]           = useState('overview');
+  const [panel, setPanel]           = useState('companies');
   const [crumbs, setCrumbs]         = useState([]);
   const [selCompany, setSelCompany] = useState(null);
   const [selOwner, setSelOwner]     = useState(null);
@@ -101,7 +101,7 @@ export default function CompanyDashboard() {
   const goBack = useCallback(() => {
     if (panel==='driver-detail') { setPanel('drivers'); setSelDriver(null); setCrumbs(p=>p.filter(x=>x.level!=='driver')); }
     else if (panel==='drivers')  { setPanel('owners');  setSelOwner(null);  setCrumbs(p=>p.filter(x=>x.level!=='owner')); }
-    else if (panel==='owners')   { setPanel('overview'); setSelCompany(null); setCrumbs([]); }
+    else if (panel==='owners')   { setPanel('companies'); setSelCompany(null); setCrumbs([]); }
   }, [panel]);
 
   // Intercept browser back — don't logout
@@ -151,28 +151,45 @@ export default function CompanyDashboard() {
   );
 
   const SideItems = [
-    {id:'overview',icon:'▦',label:'Overview'},
-    {id:'hierarchy',icon:'◈',label:'Fleet Hierarchy'},
-    {id:'finance',icon:'◎',label:'Financials'},
-    {id:'kyc',icon:'◷',label:'KYC Desk'},
-    {id:'audit',icon:'◑',label:'Audit Logs'},
+    {id:'overview', icon:'▦', label:'Overview'},
+    {id:'companies',icon:'◈', label:'Fleet Hierarchy'},
+    {id:'finance',  icon:'◎', label:'Financials'},
+    {id:'kyc',      icon:'◷', label:'KYC Desk'},
+    {id:'audit',    icon:'◑', label:'Audit Logs'},
   ];
-  const hierarchyPanels = ['owners','drivers','driver-detail'];
+  const hierarchyPanels = ['companies','owners','drivers','driver-detail'];
 
   return (
     <div className="h-screen w-screen overflow-hidden flex bg-slate-50 font-sans">
 
       {/* Mobile overlay */}
-      {sideOpen && <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={()=>setSideOpen(false)}/>}
+      {sideOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30"
+          style={{display: window.innerWidth >= 1024 ? 'none' : 'block'}}
+          onClick={()=>setSideOpen(false)}
+        />
+      )}
 
       {/* Sidebar */}
-      <aside className={`fixed lg:static inset-y-0 left-0 w-52 bg-slate-950 flex flex-col shrink-0 z-40 transition-transform duration-200 ${sideOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside style={{
+        width: '208px',
+        flexShrink: 0,
+        position: window.innerWidth >= 1024 ? 'static' : 'fixed',
+        top: 0, left: 0, bottom: 0,
+        transform: (window.innerWidth >= 1024 || sideOpen) ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.2s ease',
+        zIndex: 40,
+      }} className="bg-slate-950 flex flex-col">
         <div className="px-4 py-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">MG</div>
             <div><p className="text-white font-black text-sm">MobilityGrid</p><p className="text-[9px] text-slate-500 uppercase tracking-widest">Admin</p></div>
           </div>
-          <button onClick={()=>setSideOpen(false)} className="lg:hidden text-slate-500 hover:text-white transition p-1">
+          <button
+            onClick={()=>setSideOpen(false)}
+            style={{display: window.innerWidth >= 1024 ? 'none' : 'block'}}
+            className="text-slate-500 hover:text-white transition p-1">
             <X size={16}/>
           </button>
         </div>
@@ -181,9 +198,11 @@ export default function CompanyDashboard() {
             const active = item.id==='hierarchy' ? hierarchyPanels.includes(panel) : panel===item.id;
             return <button key={item.id}
               onClick={()=>{
-                setSideOpen(false); // ← close on mobile
-                if(item.id==='hierarchy'){setPanel('overview');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}
-                else setPanel(item.id);
+                setSideOpen(false);
+                if(item.id==='companies'){
+                  setPanel('companies'); setCrumbs([]); setSelCompany(null); setSelOwner(null); setSelDriver(null);
+                  loadCompanies();
+                } else { setPanel(item.id); }
               }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition ${active?'bg-blue-600 text-white':'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
               <span>{item.icon}</span>{item.label}
@@ -200,12 +219,15 @@ export default function CompanyDashboard() {
         {/* Header */}
         <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-xs min-w-0 flex-1 overflow-hidden mr-2">
-            <button onClick={()=>setSideOpen(!sideOpen)} className="lg:hidden p-1.5 rounded-lg border border-slate-200 text-slate-500 shrink-0">
+            <button
+              onClick={()=>setSideOpen(!sideOpen)}
+              style={{display: window.innerWidth >= 1024 ? 'none' : 'flex'}}
+              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 items-center justify-center shrink-0">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
             </button>
-            <button onClick={()=>{setPanel('overview');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}} className="font-black text-slate-400 hover:text-blue-600 transition shrink-0">Platform</button>
+            <button onClick={()=>{setPanel('companies');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}} className="font-black text-slate-400 hover:text-blue-600 transition shrink-0">Platform</button>
             {crumbs.map((b,i)=>(
               <React.Fragment key={i}>
                 <ChevronRight size={11} className="text-slate-300 shrink-0"/>
@@ -228,8 +250,27 @@ export default function CompanyDashboard() {
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
 
-          {/* ── OVERVIEW ─────────────────────────────────────────── */}
+          {/* ── OVERVIEW (stats) ──────────────────────────────────── */}
           {panel==='overview' && (
+            <div className="space-y-5 max-w-4xl">
+              <div><h2 className="text-base font-black text-slate-800">Platform Overview</h2><p className="text-xs text-slate-400">Live stats</p></div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <Stat label="Companies"  value={pStats.total_companies||0}                    icon={Building2}/>
+                <Stat label="Owners"     value={pStats.total_owners||0}                       icon={Shield}/>
+                <Stat label="Drivers"    value={(pStats.total_drivers||0).toLocaleString()}   icon={Users} blue/>
+                <Stat label="Vehicles"   value={(pStats.total_vehicles||0).toLocaleString()}  icon={Truck}/>
+                <Stat label="Today"      value={fmt(pStats.collection_today)}                 icon={Wallet} blue sub="online"/>
+                <Stat label="This Month" value={fmt(pStats.collection_month)}                 icon={TrendingUp} sub="online"/>
+              </div>
+              <button onClick={()=>{ setPanel('companies'); loadCompanies(); }}
+                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-black hover:bg-blue-700 transition flex items-center gap-2">
+                <Building2 size={13}/> Open Fleet Hierarchy →
+              </button>
+            </div>
+          )}
+
+          {/* ── FLEET HIERARCHY — COMPANIES ───────────────────────── */}
+          {panel==='companies' && (
             <div className="space-y-5 max-w-5xl">
               <div className="flex items-center justify-between">
                 <div><h2 className="text-base font-black text-slate-800">Platform Overview</h2><p className="text-xs text-slate-400">All data live from DB</p></div>
@@ -710,32 +751,7 @@ export default function CompanyDashboard() {
 
           {/* ── FINANCE ──────────────────────────────────────────── */}
           {panel==='finance'&&(
-            <div className="space-y-5 max-w-5xl">
-              <h2 className="text-base font-black text-slate-800">Financial Monitor</h2>
-              <div className="grid grid-cols-3 gap-4">
-                <Stat label="Today"      value={fmt(pStats.collection_today)}  blue icon={Wallet}/>
-                <Stat label="This Month" value={fmt(pStats.collection_month)}  icon={TrendingUp}/>
-                <Stat label="All Time"   value={fmt(pStats.collection_total)}  icon={TrendingUp}/>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Company Breakdown</p></div>
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b border-slate-100">{['Company','Today','Month','All Time','Owners','Drivers'].map(h=><th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}</tr></thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {companies.map((c,i)=>(
-                      <tr key={i} onClick={()=>drillCompany(c)} className="hover:bg-blue-50/20 cursor-pointer transition">
-                        <td className="px-4 py-3 font-black text-slate-800">{c.name}</td>
-                        <td className="px-4 py-3 font-black text-blue-600">{fmt(c.collection_today)}</td>
-                        <td className="px-4 py-3 font-black text-slate-700">{fmt(c.collection_month)}</td>
-                        <td className="px-4 py-3 font-black text-slate-700">{fmt(c.collection_total)}</td>
-                        <td className="px-4 py-3 text-slate-600">{parseInt(c.owners||0)}</td>
-                        <td className="px-4 py-3 text-slate-600">{parseInt(c.drivers||0)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <FinancePanel API={API} ADMIN_KEY={ADMIN_KEY} fmt={fmt} fmtDate={fmtDate} fmtTime={fmtTime} pStats={pStats} companies={companies} drillCompany={drillCompany}/>
           )}
 
           {/* ── KYC ──────────────────────────────────────────────── */}
@@ -784,7 +800,251 @@ export default function CompanyDashboard() {
   );
 }
 
-// ── Document Upload Modal (with preview) ─────────────────────────────────────
+// ── Finance Panel — PayYantra style ──────────────────────────────────────────
+function FinancePanel({ API, ADMIN_KEY, fmt, fmtDate, fmtTime, pStats, companies, drillCompany }) {
+  const [txns, setTxns] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('ALL');
+  const [mode, setMode] = useState('ALL');
+  const [datePreset, setDatePreset] = useState('this_month');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [perPage, setPerPage] = useState(10);
+  const [page, setPage] = useState(1);
+
+  const getDateRange = (preset) => {
+    const today = new Date();
+    const fmt = d => d.toISOString().split('T')[0];
+    if (preset==='today')      return { from: fmt(today), to: fmt(today) };
+    if (preset==='yesterday')  { const y=new Date(today); y.setDate(y.getDate()-1); return { from: fmt(y), to: fmt(y) }; }
+    if (preset==='last7')      { const s=new Date(today); s.setDate(s.getDate()-6); return { from: fmt(s), to: fmt(today) }; }
+    if (preset==='this_month') { return { from: fmt(new Date(today.getFullYear(),today.getMonth(),1)), to: fmt(today) }; }
+    if (preset==='last_month') {
+      const s=new Date(today.getFullYear(),today.getMonth()-1,1);
+      const e=new Date(today.getFullYear(),today.getMonth(),0);
+      return { from: fmt(s), to: fmt(e) };
+    }
+    return { from: dateFrom, to: dateTo };
+  };
+
+  const fetchTxns = async () => {
+    setLoading(true); setPage(1);
+    const range = getDateRange(datePreset);
+    const params = new URLSearchParams({
+      ...(search && { search }),
+      ...(status !== 'ALL' && { status }),
+      ...(mode !== 'ALL' && { mode }),
+      dateFrom: range.from,
+      dateTo: range.to,
+    });
+    try {
+      const r = await fetch(`${API}/api/admin/transactions?${params}`, {
+        headers: { 'x-admin-key': ADMIN_KEY }
+      });
+      const d = await r.json();
+      setTxns(Array.isArray(d) ? d : []);
+    } catch { setTxns([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchTxns(); }, [datePreset]);
+
+  const totalAmt   = txns.reduce((s,t) => s + parseFloat(t.order_amount||0), 0);
+  const successAmt = txns.filter(t=>t.transaction_status==='SUCCESS').reduce((s,t) => s + parseFloat(t.order_amount||0), 0);
+  const paginated  = txns.slice((page-1)*perPage, page*perPage);
+  const totalPages = Math.ceil(txns.length / perPage);
+
+  const presets = [
+    {id:'today',label:'Today'},
+    {id:'yesterday',label:'Yesterday'},
+    {id:'last7',label:'Last 7 Days'},
+    {id:'this_month',label:'This Month'},
+    {id:'last_month',label:'Last Month'},
+    {id:'custom',label:'Custom'},
+  ];
+
+  const statusColor = (s) => ({
+    SUCCESS:'bg-emerald-50 text-emerald-700 border-emerald-200',
+    FAILED:'bg-red-50 text-red-600 border-red-200',
+    INITIATED:'bg-amber-50 text-amber-700 border-amber-200',
+    PENDING:'bg-slate-50 text-slate-500 border-slate-200',
+  }[s] || 'bg-slate-50 text-slate-500 border-slate-200');
+
+  return (
+    <div className="space-y-4 max-w-7xl">
+      <h2 className="text-base font-black text-slate-800">Transactions</h2>
+
+      {/* Date presets */}
+      <div className="flex flex-wrap gap-2">
+        {presets.map(p => (
+          <button key={p.id} onClick={() => setDatePreset(p.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black border transition ${datePreset===p.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}>
+            {p.label}
+          </button>
+        ))}
+        {datePreset==='custom' && (
+          <div className="flex items-center gap-2">
+            <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
+              className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"/>
+            <span className="text-slate-400 text-xs">to</span>
+            <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
+              className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"/>
+            <button onClick={fetchTxns} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-black hover:bg-blue-700 transition">Apply</button>
+          </div>
+        )}
+      </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Collection</p>
+          <p className="text-xl font-black text-slate-800">{fmt(totalAmt)}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Received</p>
+          <p className="text-xl font-black text-blue-600">{fmt(successAmt)}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Txns</p>
+          <p className="text-xl font-black text-slate-800">{txns.length}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Success Rate</p>
+          <p className="text-xl font-black text-slate-800">
+            {txns.length ? Math.round(txns.filter(t=>t.transaction_status==='SUCCESS').length/txns.length*100) : 0}%
+          </p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&fetchTxns()}
+            placeholder="Search Txn ID / Order ID / Mobile No."
+            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-white"/>
+        </div>
+        <select value={status} onChange={e=>setStatus(e.target.value)}
+          className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-black bg-white focus:outline-none">
+          <option value="ALL">All Status</option>
+          <option value="SUCCESS">Success</option>
+          <option value="FAILED">Failed</option>
+          <option value="INITIATED">Initiated</option>
+          <option value="PENDING">Pending</option>
+        </select>
+        <select value={mode} onChange={e=>setMode(e.target.value)}
+          className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-black bg-white focus:outline-none">
+          <option value="ALL">All Modes</option>
+          <option value="UPI">UPI</option>
+          <option value="CARD">Card</option>
+          <option value="NETBANKING">Net Banking</option>
+          <option value="WALLET">Wallet</option>
+          <option value="CASH">Cash</option>
+        </select>
+        <button onClick={fetchTxns}
+          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 transition flex items-center gap-1.5">
+          <Search size={12}/> Search
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            Showing {paginated.length} of {txns.length} transactions
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-slate-400">Per page:</span>
+            <select value={perPage} onChange={e=>{setPerPage(Number(e.target.value));setPage(1);}}
+              className="border border-slate-200 rounded-lg px-2 py-1 text-[10px] bg-white focus:outline-none">
+              {[10,25,50,100].map(n=><option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        </div>
+        {loading ? (
+          <div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading...</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[900px]">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {['PY Txn ID','Order ID','Date & Time','Driver','Mobile','Amount','Mode','Status','Action'].map(h=>(
+                    <th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {paginated.length===0 ? (
+                  <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">No transactions found</td></tr>
+                ) : paginated.map((tx,i) => (
+                  <tr key={i} className="hover:bg-slate-50/50 transition">
+                    <td className="px-4 py-3 font-mono text-[10px] text-slate-600 whitespace-nowrap">{tx.pg_transaction_id||'—'}</td>
+                    <td className="px-4 py-3 font-mono text-[10px] text-slate-500 whitespace-nowrap">{(tx.order_id||'').slice(0,12)}...</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="font-black text-slate-700">{fmtDate(tx.order_initiation_date)}</p>
+                      <p className="text-slate-400">{fmtTime(tx.order_initiation_date)}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-black text-slate-800">{tx.driver_name||tx.payer_name||'—'}</p>
+                      <p className="text-[9px] text-slate-400">{tx.driver_code||''}</p>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-slate-600">{tx.payer_mobile}</td>
+                    <td className="px-4 py-3 font-black text-slate-800 whitespace-nowrap">₹{parseFloat(tx.order_amount||0).toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200">{tx.payment_mode||'N/A'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${statusColor(tx.transaction_status)}`}>
+                        {tx.transaction_status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button className="text-[9px] font-black text-blue-600 hover:text-blue-700">View</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+            <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}
+              className="text-xs font-black text-blue-600 disabled:text-slate-300 disabled:cursor-not-allowed">← Prev</button>
+            <span className="text-[10px] text-slate-400">Page {page} of {totalPages}</span>
+            <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}
+              className="text-xs font-black text-blue-600 disabled:text-slate-300 disabled:cursor-not-allowed">Next →</button>
+          </div>
+        )}
+      </div>
+
+      {/* Company breakdown */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Company Breakdown</p>
+        </div>
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-slate-100">{['Company','Today','Month','All Time','Owners','Drivers'].map(h=><th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}</tr></thead>
+          <tbody className="divide-y divide-slate-50">
+            {companies.map((c,i)=>(
+              <tr key={i} onClick={()=>drillCompany(c)} className="hover:bg-blue-50/20 cursor-pointer transition">
+                <td className="px-4 py-3 font-black text-slate-800">{c.name}</td>
+                <td className="px-4 py-3 font-black text-blue-600">{fmt(c.collection_today)}</td>
+                <td className="px-4 py-3 font-black text-slate-700">{fmt(c.collection_month)}</td>
+                <td className="px-4 py-3 font-black text-slate-700">{fmt(c.collection_total)}</td>
+                <td className="px-4 py-3 text-slate-600">{parseInt(c.owners||0)}</td>
+                <td className="px-4 py-3 text-slate-600">{parseInt(c.drivers||0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 function DocModal({ target, onClose, addLog }) {
   const API = 'https://mg-qw5s.onrender.com';
   const types = {

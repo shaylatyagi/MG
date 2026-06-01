@@ -382,6 +382,55 @@ router.get('/drivers/:driverId', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── TRANSACTIONS (PayYantra style filtered view) ─────────────────────────────
+router.get('/transactions', async (req, res) => {
+  try {
+    const { search, status, mode, dateFrom, dateTo } = req.query;
+    const conditions = ['1=1'];
+    const params = [];
+    let i = 1;
+
+    if (search) {
+      conditions.push(`(mo.pg_transaction_id ILIKE $${i} OR mo.order_id::text ILIKE $${i} OR mo.payer_mobile ILIKE $${i} OR mo.order_number ILIKE $${i})`);
+      params.push(`%${search}%`); i++;
+    }
+    if (status && status !== 'ALL') {
+      conditions.push(`mo.transaction_status = $${i}`); params.push(status); i++;
+    }
+    if (mode && mode !== 'ALL') {
+      conditions.push(`mo.payment_mode = $${i}`); params.push(mode); i++;
+    }
+    if (dateFrom) {
+      conditions.push(`DATE(mo.order_initiation_date) >= $${i}`); params.push(dateFrom); i++;
+    }
+    if (dateTo) {
+      conditions.push(`DATE(mo.order_initiation_date) <= $${i}`); params.push(dateTo); i++;
+    }
+
+    const result = await pool.query(`
+      SELECT
+        mo.pg_transaction_id, mo.order_id, mo.order_number,
+        mo.order_initiation_date, mo.order_completion_date,
+        mo.payer_mobile, mo.payer_name,
+        mo.order_amount, mo.transaction_status, mo.payment_mode,
+        mo.bank_reference_number,
+        d.full_name as driver_name, d.driver_code,
+        o.full_name as owner_name, o.owner_code
+      FROM public.ms_orders mo
+      LEFT JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+      LEFT JOIN public.owners  o ON o.owner_code    = d.owner_code
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY mo.order_initiation_date DESC
+      LIMIT 500
+    `, params);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Transactions error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Assign owner to company
 router.post('/owners/:ownerId/assign-company', async (req, res) => {
   try {
