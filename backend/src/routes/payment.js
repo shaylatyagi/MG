@@ -879,18 +879,45 @@ router.post('/owner/notify-unpaid', async (req, res) => {
 });
 router.post('/owner/cash-payment', async (req, res) => {
   try {
-    const { driverPhone, driverName, amount, ownerId } = req.body;
+    const { driverPhone, driverName, amount, ownerId, purpose = 'RENT' } = req.body;
     if (!driverPhone || !amount) return res.status(400).json({ success: false, message: 'Missing fields' });
+
+    // Fetch driver + owner + vehicle details to populate ms_orders fully
+    const info = await pool.query(`
+      SELECT d.full_name, d.driver_code, d.owner_code,
+             v.vehicle_number,
+             o.id as owner_int_id
+      FROM public.drivers d
+      LEFT JOIN public.vehicles v ON v.driver_id = d.id
+      LEFT JOIN public.owners o ON o.owner_code = d.owner_code
+      WHERE d.mobile_number = $1 LIMIT 1
+    `, [driverPhone]);
+    const di = info.rows[0] || {};
 
     const { v4: uuidv4 } = require('uuid');
     const orderId = uuidv4();
     const orderNumber = `CASH-${Date.now()}-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
 
-    await pool.query(
-      `INSERT INTO ms_orders (order_id, order_number, order_amount, currency, payer_name, payer_mobile,
-         transaction_status, payment_mode, order_completion_date, order_initiation_date)
-       VALUES ($1,$2,$3,'INR',$4,$5,'SUCCESS','CASH',NOW(),NOW())`,
-      [orderId, orderNumber, parseFloat(amount), driverName, driverPhone]
+    await pool.query(`
+      INSERT INTO ms_orders (
+        order_id, order_number, pg_transaction_id,
+        order_amount, currency,
+        payer_name, payer_mobile,
+        transaction_status, payment_mode,
+        order_completion_date, order_initiation_date,
+        driver_code, owner_code, vehicle_number,
+        driver_full_name, purpose
+      ) VALUES ($1,$2,$3,$4,'INR',$5,$6,'SUCCESS','CASH',NOW(),NOW(),$7,$8,$9,$10,$11)`,
+      [
+        orderId, orderNumber, orderNumber,
+        parseFloat(amount),
+        di.full_name || driverName, driverPhone,
+        di.driver_code || null,
+        di.owner_code || null,
+        di.vehicle_number || null,
+        di.full_name || driverName,
+        purpose
+      ]
     );
 
     await pool.query(
@@ -900,13 +927,12 @@ router.post('/owner/cash-payment', async (req, res) => {
 
     await pool.query(
       `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
-       SELECT id, 'DRIVER', '💵 Cash Payment Recorded',
-              'Owner recorded your cash payment of ₹${amount}', NOW()
+       SELECT id, 'DRIVER', '💵 Cash Payment Recorded', $2, NOW()
        FROM public.drivers WHERE mobile_number = $1`,
-      [driverPhone]
+      [driverPhone, `Owner recorded your cash payment of ₹${amount}`]
     ).catch(()=>{});
 
-    res.json({ success: true, message: 'Cash payment recorded!' });
+    res.json({ success: true, message: 'Cash payment recorded!', order_number: orderNumber });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1312,14 +1338,16 @@ router.post('/create-order', async (req, res) => {
       });
     }
 
-    // ✅ FIX 3: DB mein pg_transaction_id bhi save karo
+    // ✅ DB mein save karo — purpose aur owner_id bhi
     await pool.query(
       `INSERT INTO ms_orders 
         (order_id, order_number, order_amount, currency, payer_name, 
-         payer_mobile, transaction_status, pg_transaction_id, order_initiation_date)
-       VALUES ($1, $2, $3, 'INR', $4, $5, 'PENDING', $6, NOW())`,
+         payer_mobile, transaction_status, pg_transaction_id, order_initiation_date,
+         purpose, payment_mode)
+       VALUES ($1, $2, $3, 'INR', $4, $5, 'PENDING', $6, NOW(), $7, 'ONLINE')
+       ON CONFLICT (order_id) DO NOTHING`,
       [orderId, orderNumber, parseFloat(amount), 
-       customerName || 'Driver', customerPhone, pgTxnId || null]
+       customerName || 'Driver', customerPhone, pgTxnId || null, purpose || 'RENT']
     );
 
     // Response mein ye sab fields return karo
