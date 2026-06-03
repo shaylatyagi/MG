@@ -2615,19 +2615,6 @@ const generateDailyRentEntries = async () => {
     console.error('Daily rent error:', err.message);
   }
 };
-
-// Midnight pe chalao
-const scheduleDailyRent = () => {
-  const midnight = new Date();
-  midnight.setHours(24, 0, 0, 0);
-  const ms = midnight - new Date();
-  setTimeout(() => {
-    generateDailyRentEntries();
-    setInterval(generateDailyRentEntries, 24*60*60*1000);
-  }, ms);
-  console.log(`⏰ Daily rent scheduler set`);
-};
-
 scheduleDailyRent();
 
 // Manual trigger for testing

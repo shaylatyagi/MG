@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 //To connect DB
 require('./src/config/db');
+require('./src/services/scheduler.service'); 
 const pool = require('./src/config/db');
 const app = express();
 // CORS fixed
