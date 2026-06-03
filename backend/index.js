@@ -41,7 +41,16 @@ const uploadRoutes = require('./src/routes/uploads');
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
-app.use('/api/payment', paymentRoutes);
+const { verifyToken } = require('./src/middleware/auth.middleware');
+
+app.use('/api/payment',    verifyToken, require('./src/routes/payment'));
+app.use('/api/assignment', verifyToken, require('./src/routes/assignment'));
+
+// Auth routes pe JWT nahi lagega — wahan login hota hai
+app.use('/api/auth', require('./src/routes/auth'));
+
+// Admin pe admin key already hai — theek hai
+app.use('/api/admin', verifyAdmin, require('./src/routes/admin'));
 app.use('/api/admin', (req, res, next) => {
   const key = req.headers['x-admin-key'] || req.query.admin_key;
   const expected = process.env.ADMIN_SECRET_KEY || 'mg_admin_2026_secret';
@@ -62,7 +71,6 @@ app.use('/api/auth/send-otp', rateLimit({
 const adminRoutes = require('./src/routes/admin');
 app.use('/api/admin', adminRoutes);
 const assignmentRoutes = require('./src/routes/assignment');
-app.use('/api/assignment', assignmentRoutes);
 
 // Check Health
 app.get('/', (req, res) => {
