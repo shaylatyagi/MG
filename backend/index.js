@@ -41,7 +41,7 @@ const uploadRoutes = require('./src/routes/uploads');
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
-const { verifyToken } = require('./src/middleware/auth.middleware');
+const { verifyToken, verifyAdmin } = require('./src/middleware/auth.middleware');
 
 app.use('/api/payment',    verifyToken, require('./src/routes/payment'));
 app.use('/api/assignment', verifyToken, require('./src/routes/assignment'));
