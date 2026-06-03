@@ -12,6 +12,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],  // ← sirf ye add karo
   credentials: true,
 }));
+const { errorMiddleware, notFoundMiddleware } = require('./src/middleware/error.middleware');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // DEDICATED DRIVERS LIST ROUTE - ADD THIS AT THE TOP, BEFORE OTHER ROUTES
@@ -108,6 +109,8 @@ app.use((req, res) => {
 });
 // SERVER START
 const PORT = process.env.PORT || 5000;
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Base URL: http://localhost:${PORT}`);
