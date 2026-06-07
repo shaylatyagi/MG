@@ -5,13 +5,11 @@ import { api, fmt } from '@/lib/api';
 
 interface Driver {
   id: number;
-  full_name: string;
-  mobile_number: string;
-  driver_code: string;
+  name: string;
+  phone_number: string;
   status: string;
   kyc_status: string | null;
   wallet_balance: number;
-  rent_amount: number | null;
   vehicle_number: string | null;
   owner_name: string | null;
   company_name: string | null;
@@ -37,11 +35,10 @@ export default function DriversPage() {
 
   const filtered = drivers.filter(d => {
     const matchSearch =
-      d.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      d.mobile_number?.includes(search) ||
-      d.driver_code?.toLowerCase().includes(search.toLowerCase()) ||
+      d.name?.toLowerCase().includes(search.toLowerCase()) ||
+      d.phone_number?.includes(search) ||
       (d.owner_name || '').toLowerCase().includes(search.toLowerCase());
-    const matchKyc = kycFilter === 'ALL' || d.kyc_status === kycFilter || (kycFilter === 'NOT_STARTED' && !d.kyc_status);
+    const matchKyc = kycFilter === 'ALL' || d.kyc_status === kycFilter;
     return matchSearch && matchKyc;
   });
 
@@ -67,11 +64,10 @@ export default function DriversPage() {
           className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
         >
           <option value="ALL">All KYC</option>
-          <option value="VERIFIED">Verified</option>
+          <option value="APPROVED">Approved</option>
           <option value="PENDING">Pending</option>
-          <option value="SUBMITTED">Submitted</option>
+          <option value="PARTIAL">Partial</option>
           <option value="REJECTED">Rejected</option>
-          <option value="NOT_STARTED">Not Started</option>
         </select>
       </div>
 
@@ -108,8 +104,8 @@ export default function DriversPage() {
               {filtered.map(d => (
                 <tr key={d.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">{d.full_name}</p>
-                    <p className="text-xs text-slate-400">{d.mobile_number} · {d.driver_code}</p>
+                    <p className="font-medium text-slate-900">{d.name}</p>
+                    <p className="text-xs text-slate-400">{d.phone_number}</p>
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-slate-700">{d.owner_name || '—'}</p>

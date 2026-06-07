@@ -5,13 +5,13 @@ import StatCard from '@/components/admin/StatCard';
 import { api, fmt } from '@/lib/api';
 
 interface PlatformStats {
-  total_companies: number;
-  total_owners: number;
-  total_drivers: number;
-  total_vehicles: number;
-  collection_today: number;
-  collection_month: number;
-  collection_total: number;
+  total_companies:  number;
+  total_owners:     number;
+  total_drivers:    number;
+  total_vehicles:   number;
+  collection_today:  number;
+  collection_month:  number;
+  collection_total:  number;
 }
 
 interface KycSummaryItem {
@@ -34,8 +34,9 @@ export default function DashboardPage() {
     }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
+  // Spec schema KYC statuses: PENDING | PARTIAL | APPROVED | REJECTED
   const pendingKyc = kycSummary
-    .filter(k => ['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'NOT_STARTED'].includes(k.status))
+    .filter(k => ['PENDING', 'PARTIAL'].includes(k.status))
     .reduce((sum, k) => sum + k.count, 0);
 
   if (loading) {
@@ -77,8 +78,8 @@ export default function DashboardPage() {
       <section>
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Collections (UPI)</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard label="Today"      value={fmt.inr(stats?.collection_today)}  color="green"  sub="verified UPI payments" />
-          <StatCard label="This Month" value={fmt.inr(stats?.collection_month)}  color="blue"   sub="rolling 30 days" />
+          <StatCard label="Today"      value={fmt.inr(stats?.collection_today)}   color="green"   sub="verified UPI payments" />
+          <StatCard label="This Month" value={fmt.inr(stats?.collection_month)}  color="blue"    sub="current month" />
           <StatCard label="All Time"   value={fmt.inr(stats?.collection_total)}  color="default" sub="total platform GMV" />
         </div>
       </section>
@@ -107,9 +108,9 @@ export default function DashboardPage() {
                   <tr key={row.status} className="border-b border-slate-50 last:border-0">
                     <td className="px-4 py-2.5">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        row.status === 'VERIFIED'      ? 'bg-green-100 text-green-800' :
-                        row.status === 'REJECTED'      ? 'bg-red-100 text-red-800'    :
-                        row.status === 'NOT_STARTED'   ? 'bg-slate-100 text-slate-600' :
+                        row.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                        row.status === 'REJECTED' ? 'bg-red-100 text-red-800'    :
+                        row.status === 'PARTIAL'  ? 'bg-blue-100 text-blue-800'  :
                         'bg-yellow-100 text-yellow-800'
                       }`}>
                         {row.status}

@@ -52,7 +52,9 @@ router.post('/send-otp', async (req, res) => {
   try {
     const userRes = await pool.query(
       `SELECT id, full_name FROM public.drivers WHERE mobile_number = $1
-       UNION SELECT id, full_name FROM public.owners WHERE mobile_number = $1 LIMIT 1`,
+       UNION SELECT id, full_name FROM public.owners WHERE mobile_number = $1
+       UNION SELECT id, full_name FROM public.managers WHERE mobile_number = $1 AND status = 'ACTIVE'
+       LIMIT 1`,
       [phone_number]
     );
     if (!userRes.rows[0])
@@ -98,10 +100,31 @@ router.post('/verify-otp', async (req, res) => {
       "SELECT *, 'DRIVER' as role FROM public.drivers WHERE mobile_number = $1 LIMIT 1",
       [phone_number]
     );
+    if (driverRes.rows[0] && driverRes.rows[0].status === 'INACTIVE') {
+      return res.status(403).json({ success: false, message: 'Account deactivated. Contact your fleet owner.' });
+    }
     const ownerRes = await pool.query(
       "SELECT *, 'OWNER' as role FROM public.owners WHERE mobile_number = $1 LIMIT 1",
       [phone_number]
     );
+    // Check manager table if not driver or owner
+    if (!driverRes.rows[0] && !ownerRes.rows[0]) {
+      const mgrRes = await pool.query(
+        `SELECT m.*, o.owner_code FROM public.managers m
+         LEFT JOIN public.owners o ON o.id = m.owner_id
+         WHERE m.mobile_number = $1 AND m.status = 'ACTIVE' LIMIT 1`,
+        [phone_number]
+      );
+      if (mgrRes.rows[0]) {
+        const mgr = mgrRes.rows[0];
+        const perms = typeof mgr.permissions === 'string' ? JSON.parse(mgr.permissions) : (mgr.permissions || {});
+        const token = generateToken({ id: mgr.id, phone_number: mgr.mobile_number, role: 'MANAGER', owner_id: mgr.owner_id, permissions: perms });
+        return res.json({
+          success: true, token,
+          user: { id: mgr.id, full_name: mgr.full_name, mobile_number: mgr.mobile_number, role: 'MANAGER', owner_id: mgr.owner_id, owner_code: mgr.owner_code || null, permissions: perms }
+        });
+      }
+    }
     const user = driverRes.rows[0] || ownerRes.rows[0];
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null });

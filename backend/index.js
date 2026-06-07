@@ -44,9 +44,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 const { verifyToken, verifyAdmin } = require('./src/middleware/auth.middleware');
 
-app.use('/api/payment',       verifyToken, require('./src/routes/payment'));
-app.use('/api/assignment',    verifyToken, require('./src/routes/assignment'));
-// Payment Links — webhook + public GET are unprotected; POST/list use verifyToken inside route
+app.use('/api/payment',    verifyToken, require('./src/routes/payment'));
+app.use('/api/assignment', verifyToken, require('./src/routes/assignment'));
+// Payment Links — public webhook + GET; POST/list auth handled inside route
 app.use('/api/payment-links', require('./src/routes/paymentLinks'));
 
 // Auth routes pe JWT nahi lagega — wahan login hota hai

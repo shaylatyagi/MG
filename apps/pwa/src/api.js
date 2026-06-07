@@ -1,8 +1,10 @@
 // src/api.js — per DevSpec §9.3
 import axios from 'axios';
 
+// Dev:  VITE_API_URL unset → baseURL='' → Vite proxy forwards /api/* to localhost:5000
+// Prod: set VITE_API_URL=https://your-backend.com in deployment environment
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || '',
   timeout: 15000,
 });
 

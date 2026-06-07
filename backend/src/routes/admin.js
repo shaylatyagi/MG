@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/db');
+const { logAudit } = require('../utils/audit');
 
 // ─── EXISTING ROUTES (unchanged) ─────────────────────────────────────────────
 router.get('/tenants', async (req, res) => {
@@ -469,6 +470,8 @@ router.patch('/companies/:id/status', async (req, res) => {
       [status, req.params.id]
     );
     if (!r.rows[0]) return res.status(404).json({ error: 'Company not found' });
+    // ADM-06: Audit log
+    logAudit('COMPANY_STATUS_CHANGED', 'company', req.params.id, req.headers['x-admin-phone'] || 'admin', { new_status: status });
     res.json({ success: true, company: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -520,12 +523,19 @@ router.patch('/kyc/:driverId/approve', async (req, res) => {
       [req.params.driverId]
     );
     if (!r.rows[0]) return res.status(404).json({ error: 'Driver not found' });
-    // Best-effort: update driver_documents if that table exists
     await pool.query(
       `UPDATE public.driver_documents SET status='APPROVED', reviewed_at=NOW()
        WHERE driver_id=$1 AND status IN ('PENDING','SUBMITTED','UNDER_REVIEW')`,
       [req.params.driverId]
     ).catch(() => {});
+    // KYC-07: Notify driver
+    await pool.query(
+      `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+       VALUES ($1, 'DRIVER', '✅ KYC Approved', 'Your documents have been verified. You can now be assigned a vehicle.', NOW())`,
+      [req.params.driverId]
+    ).catch(() => {});
+    // ADM-06: Audit log
+    logAudit('KYC_APPROVED', 'driver', req.params.driverId, req.headers['x-admin-phone'] || 'admin', { driver_name: r.rows[0]?.full_name });
     res.json({ success: true, driver: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -547,6 +557,14 @@ router.patch('/kyc/:driverId/reject', async (req, res) => {
        WHERE driver_id=$1 AND status IN ('PENDING','SUBMITTED','UNDER_REVIEW')`,
       [req.params.driverId, reason]
     ).catch(() => {});
+    // KYC-07: Notify driver
+    await pool.query(
+      `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+       VALUES ($1, 'DRIVER', '❌ KYC Rejected', $2, NOW())`,
+      [req.params.driverId, `Your KYC was rejected: ${reason}. Please re-upload correct documents.`]
+    ).catch(() => {});
+    // ADM-06: Audit log
+    logAudit('KYC_REJECTED', 'driver', req.params.driverId, req.headers['x-admin-phone'] || 'admin', { driver_name: r.rows[0]?.full_name, reason });
     res.json({ success: true, driver: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -575,6 +593,31 @@ router.get('/kyc/all', async (req, res) => {
     `, params);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ADM-06: GET audit log — most recent 200 entries (filterable by action/entity_type)
+router.get('/audit-log', async (req, res) => {
+  try {
+    const { action, entity_type, limit = 100 } = req.query;
+    const conditions = [];
+    const params = [];
+    if (action)      { params.push(action);      conditions.push(`action = $${params.length}`); }
+    if (entity_type) { params.push(entity_type); conditions.push(`entity_type = $${params.length}`); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    params.push(Math.min(200, parseInt(limit, 10) || 100));
+
+    const result = await pool.query(
+      `SELECT id, action, entity_type, entity_id, performed_by, details, created_at
+       FROM public.admin_audit_log
+       ${where}
+       ORDER BY created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+    res.json({ success: true, logs: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

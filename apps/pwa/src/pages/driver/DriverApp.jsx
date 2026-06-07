@@ -1,25 +1,23 @@
 // src/pages/driver/DriverApp.jsx — per DevSpec §9.5
-import { useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import BottomNav        from '../../components/BottomNav';
 import DriverWalletTab  from './DriverWalletTab';
 import DriverPayTab     from './DriverPayTab';
 import DriverKYCTab     from './DriverKYCTab';
 import DriverChatTab    from './DriverChatTab';
 
-const TABS = {
-  wallet: DriverWalletTab,
-  pay:    DriverPayTab,
-  kyc:    DriverKYCTab,
-  chat:   DriverChatTab,
-};
-
 export default function DriverApp() {
-  const [tab, setTab] = useState('wallet');
-  const Tab = TABS[tab];
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
-      <Tab />
-      <BottomNav tabs={['wallet', 'pay', 'kyc', 'chat']} active={tab} onChange={setTab} />
+      <Routes>
+        <Route index element={<Navigate to="wallet" replace />} />
+        <Route path="wallet" element={<DriverWalletTab />} />
+        <Route path="pay"    element={<DriverPayTab />} />
+        <Route path="kyc"    element={<DriverKYCTab />} />
+        <Route path="chat"   element={<DriverChatTab />} />
+        <Route path="*"      element={<Navigate to="wallet" replace />} />
+      </Routes>
+      <BottomNav tabs={['wallet', 'pay', 'kyc', 'chat']} />
     </div>
   );
 }

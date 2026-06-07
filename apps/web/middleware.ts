@@ -8,7 +8,11 @@ const ROLE_PATHS: Record<string, string> = {
 };
 
 export function middleware(req: NextRequest) {
-  const token      = req.cookies.get('mg_token')?.value;
+  // Admin uses mg_admin_token; owner uses mg_token
+  const isAdmin   = req.nextUrl.pathname.startsWith('/admin');
+  const token      = isAdmin
+    ? req.cookies.get('mg_admin_token')?.value
+    : req.cookies.get('mg_token')?.value;
   const { pathname } = req.nextUrl;
 
   if (pathname.startsWith('/login')) return NextResponse.next();

@@ -29,3 +29,23 @@ export const saveToken = (token: string) => {
 export const clearToken = () => {
   document.cookie = 'mg_token=; path=/; max-age=0';
 };
+
+// Admin auth helpers — saves JWT + optional admin key as cookies (read by middleware)
+export const saveAdminToken = (token: string, adminKey?: string) => {
+  const maxAge = 60 * 60 * 24 * 30; // 30 days
+  document.cookie = `mg_admin_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  if (adminKey) {
+    document.cookie = `mg_admin_key=${encodeURIComponent(adminKey)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  }
+};
+
+export const clearAdminToken = () => {
+  document.cookie = 'mg_admin_token=; path=/; max-age=0';
+  document.cookie = 'mg_admin_key=; path=/; max-age=0';
+};
+
+export const getAdminToken = (): string | null => {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.match(/(?:^|; )mg_admin_token=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+};

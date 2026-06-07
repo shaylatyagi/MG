@@ -25,5 +25,15 @@ export default defineConfig({
       manifest: false, // Using public/manifest.json
     }),
   ],
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    proxy: {
+      // Forward all /api calls to the backend during local dev.
+      // In production VITE_API_URL is set so this proxy is bypassed.
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
 });

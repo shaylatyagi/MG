@@ -14,9 +14,13 @@ class ErrorBoundary extends Component {
             </div>
             <h2 className="text-lg font-bold text-gray-900 mb-2">Something went wrong</h2>
             <p className="text-sm text-gray-500 mb-4">{this.state.error?.message || 'Unknown error'}</p>
-            <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.reload(); }}
+            <button onClick={() => window.location.reload()}
               className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">
-              Clear & Retry
+              Retry
+            </button>
+            <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.href = '/admin'; }}
+              className="mt-2 text-sm text-gray-400 hover:text-gray-600 underline block mx-auto">
+              Logout
             </button>
           </div>
         </div>
@@ -124,7 +128,8 @@ function LoginPage({ onLogin }) {
         body: JSON.stringify({ phone_number: phone, otp, admin_secret: secret }),
       });
       setToken(data.token);
-      onLogin();
+      // Hard reload — ensures localStorage token is read fresh, avoids ErrorBoundary loop
+      window.location.href = '/admin/dashboard';
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
   };
@@ -149,8 +154,9 @@ function LoginPage({ onLogin }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Admin Phone Number</label>
               <input
-                type="tel" value={phone} onChange={e => setPhone(e.target.value)} required
-                placeholder="9876543210"
+                type="tel" value={phone}
+                onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                required placeholder="10-digit mobile number"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
               />
             </div>
@@ -214,7 +220,10 @@ function Dashboard() {
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>;
 
   const s = stats || {};
-  const k = kyc || {};
+  // kyc/summary returns [{status, count}] array — convert to {STATUS: count} object
+  const k = Array.isArray(kyc)
+    ? kyc.reduce((acc, row) => { acc[row.status] = row.count; return acc; }, {})
+    : (kyc || {});
   const pending = (k.PENDING || 0) + (k.SUBMITTED || 0) + (k.UNDER_REVIEW || 0);
 
   return (
@@ -235,9 +244,10 @@ function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="GMV Today" value={fmt(s.gmv_today)} color="green" />
-        <StatCard label="GMV This Month" value={fmt(s.gmv_month)} color="blue" />
-        <StatCard label="GMV All Time" value={fmt(s.gmv_total)} color="indigo" />
+        {/* platform-stats returns collection_today/month/all_time */}
+        <StatCard label="Collection Today" value={fmt(s.collection_today || s.gmv_today)} color="green" />
+        <StatCard label="Collection This Month" value={fmt(s.collection_month || s.gmv_month)} color="blue" />
+        <StatCard label="Collection All Time" value={fmt(s.collection_total || s.gmv_total)} color="indigo" />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border p-6">

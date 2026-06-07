@@ -6,17 +6,18 @@ import { api, fmt } from '@/lib/api';
 
 interface Company {
   id: number;
-  name: string;
-  company_code: string;
-  status: string;
-  city: string | null;
-  cin: string | null;
-  created_at: string;
-  owners: number;
-  drivers: number;
-  vehicles: number;
-  collection_today: number;
-  collection_month: number;
+  company_name:   string;
+  company_code:   string;
+  company_status: string;
+  city:           string | null;
+  cin:            string | null;
+  created_at:     string;
+  owner_count:    number;
+  driver_count:   number;
+  vehicle_count:  number;
+  collection_today:  number;
+  collection_month:  number;
+  total_revenue:     number;
 }
 
 export default function CompaniesPage() {
@@ -45,11 +46,11 @@ export default function CompaniesPage() {
   useEffect(() => { load(); }, []);
 
   const toggleStatus = async (co: Company) => {
-    const next = co.status === 'Active' ? 'Inactive' : 'Active';
+    const next = co.company_status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
     setToggling(co.id);
     try {
       await api.patch(`/api/admin/companies/${co.id}/status`, { status: next });
-      setCompanies(cs => cs.map(c => c.id === co.id ? { ...c, status: next } : c));
+      setCompanies(cs => cs.map(c => c.id === co.id ? { ...c, company_status: next } : c));
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Failed to update');
     } finally {
@@ -61,7 +62,7 @@ export default function CompaniesPage() {
     e.preventDefault();
     setAdding(true);
     try {
-      await api.post('/api/admin/companies', newCo);
+      await api.post('/api/admin/companies', { company_name: newCo.name, cin: newCo.cin, city: newCo.city });
       setShowAdd(false);
       setNewCo({ name: '', cin: '', city: '' });
       load();
@@ -73,7 +74,7 @@ export default function CompaniesPage() {
   };
 
   const filtered = companies.filter(c =>
-    c.name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.company_name?.toLowerCase().includes(search.toLowerCase()) ||
     c.company_code?.toLowerCase().includes(search.toLowerCase()) ||
     c.city?.toLowerCase().includes(search.toLowerCase())
   );
@@ -84,7 +85,7 @@ export default function CompaniesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Companies</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{companies.length} fleet operators on platform</p>
+          <p className="text-slate-500 text-sm mt-0.5">{companies.length} fleet operator{companies.length !== 1 ? 's' : ''} on platform</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
@@ -138,16 +139,16 @@ export default function CompaniesPage() {
                 <tr key={co.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <Link href={`/admin/companies/${co.id}`} className="font-medium text-slate-900 hover:text-indigo-600">
-                      {co.name}
+                      {co.company_name}
                     </Link>
                     {co.city && <p className="text-xs text-slate-400">{co.city}</p>}
                   </td>
                   <td className="px-4 py-3 text-slate-500 font-mono text-xs">{co.company_code}</td>
                   <td className="px-4 py-3 text-center">
-                    <Badge status={co.status || 'Active'} />
+                    <Badge status={co.company_status || 'ACTIVE'} />
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-700">{co.owners}</td>
-                  <td className="px-4 py-3 text-right text-slate-700">{co.drivers}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{co.owner_count}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{co.driver_count}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{fmt.inr(co.collection_today)}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{fmt.inr(co.collection_month)}</td>
                   <td className="px-4 py-3 text-right">
@@ -162,12 +163,12 @@ export default function CompaniesPage() {
                         onClick={() => toggleStatus(co)}
                         disabled={toggling === co.id}
                         className={`text-xs font-medium px-2 py-1 rounded ${
-                          co.status === 'Active'
+                          co.company_status === 'ACTIVE'
                             ? 'text-red-600 hover:bg-red-50'
                             : 'text-green-600 hover:bg-green-50'
                         } disabled:opacity-50`}
                       >
-                        {toggling === co.id ? '…' : co.status === 'Active' ? 'Deactivate' : 'Activate'}
+                        {toggling === co.id ? '…' : co.company_status === 'ACTIVE' ? 'Suspend' : 'Activate'}
                       </button>
                     </div>
                   </td>

@@ -10,6 +10,7 @@ import PaymentResult from './pages/PaymentResult';
 import PartnerHub from './pages/PartnerHub';
 import AdminPanel from './pages/admin/CompanyDashboard';
 import PaymentLinkPage from './pages/PaymentLinkPage';
+import ManagerApp from './pages/ManagerApp';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/owner/*" element={<OwnerApp />} />
         <Route path="/driver/*" element={<DriverPWA />} />
+        <Route path="/manager/*" element={<ManagerApp />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/payment-result" element={<PaymentResult />} />
         <Route path="/admin/*" element={<AdminPanel />} />

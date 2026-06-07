@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="description" content="MobilityGrid — The operating system for India's fleet economy. Digital rent collection, driver KYC, fleet management built for the gig workforce."/>
+  <title>MobilityGrid — Fleet Operating System for India</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --indigo:     #4f46e5;
+      --indigo-d:   #4338ca;
+      --indigo-l:   #6366f1;
+      --indigo-xs:  rgba(79,70,229,0.08);
+      --slate-950:  #040712;
+      --slate-900:  #0f172a;
+      --slate-800:  #1e293b;
+      --slate-700:  #334155;
+      --slate-600:  #475569;
+      --slate-400:  #94a3b8;
+      --slate-300:  #cbd5e1;
+      --slate-200:  #e2e8f0;
+      --slate-100:  #f1f5f9;
+      --slate-50:   #f8fafc;
+      --white:      #ffffff;
+      --gold:       #c4965a;
+      --gold-l:     #d9ae74;
+      --green:      #22c55e;
+      --amber:      #f59e0b;
+      --red:        #ef4444;
+
+      --r-sm:  8px;
+      --r-md:  12px;
+      --r-lg:  16px;
+      --r-xl:  20px;
+      --r-2xl: 24px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--white);
+      color: var(--slate-900);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── UTILITIES ─────────────────────────────── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .container-wide { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
+
+    .tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; padding: 5px 12px; border-radius: 100px;
+    }
+    .tag-indigo { background: var(--indigo-xs); color: var(--indigo); }
+    .tag-gold   { background: rgba(196,150,90,0.12); color: var(--gold); }
+    .tag-slate  { background: var(--slate-100); color: var(--slate-600); }
+
+    .section-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--indigo); margin-bottom: 14px;
+    }
+    .section-label-light { color: rgba(167,139,250,0.9); }
+
+    h2.display {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(34px, 4.5vw, 58px);
+      font-weight: 400; line-height: 1.1; letter-spacing: -0.015em;
+    }
+    h2.display em { font-style: italic; color: var(--gold); }
+
+    h2.display-light { color: var(--white); }
+    h2.display-light em { color: var(--gold-l); }
+
+    h3.title {
+      font-size: clamp(22px, 2.5vw, 28px);
+      font-weight: 700; line-height: 1.25; letter-spacing: -0.01em;
+    }
+
+    .body-lg { font-size: 17px; line-height: 1.75; color: var(--slate-600); font-weight: 400; }
+    .body-md { font-size: 15px; line-height: 1.7;  color: var(--slate-600); font-weight: 400; }
+    .body-sm { font-size: 13px; line-height: 1.65; color: var(--slate-500); font-weight: 400; }
+
+    .divider { border: none; border-top: 1px solid var(--slate-200); }
+
+    /* ─── BUTTONS ─────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+      border-radius: var(--r-sm); padding: 12px 24px; cursor: pointer;
+      border: none; text-decoration: none; transition: all 0.18s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--indigo); color: var(--white);
+      box-shadow: 0 1px 2px rgba(79,70,229,0.3), 0 0 0 0 rgba(79,70,229,0);
+    }
+    .btn-primary:hover {
+      background: var(--indigo-d);
+      box-shadow: 0 4px 12px rgba(79,70,229,0.4);
+      transform: translateY(-1px);
+    }
+    .btn-outline {
+      background: transparent; color: var(--slate-700);
+      border: 1px solid var(--slate-300);
+    }
+    .btn-outline:hover { background: var(--slate-50); border-color: var(--slate-400); }
+    .btn-outline-light {
+      background: rgba(255,255,255,0.08); color: var(--white);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .btn-outline-light:hover { background: rgba(255,255,255,0.14); }
+    .btn-lg { padding: 15px 32px; font-size: 15px; border-radius: 10px; }
+    .btn-sm { padding: 9px 18px; font-size: 13px; }
+
+    /* ─── NAV ─────────────────────────────────── */
+    #nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      padding: 0 24px; height: 64px;
+      display: flex; align-items: center;
+      transition: all 0.3s;
+    }
+    #nav.scrolled {
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid var(--slate-200);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto; width: 100%;
+      display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .nav-mark { width: 36px; height: 36px; flex-shrink: 0; }
+
+    /* Wordmark adapts: white on dark hero, dark after scroll */
+    .nav-wordmark { font-size: 18px; font-weight: 800; letter-spacing: -0.03em; color: var(--white); transition: color 0.3s; }
+    .nav-wordmark span { color: var(--gold-l); transition: color 0.3s; }
+    #nav.scrolled .nav-wordmark { color: var(--slate-900); }
+    #nav.scrolled .nav-wordmark span { color: var(--indigo); }
+
+    .nav-links { display: flex; align-items: center; gap: 2px; }
+    .nav-link {
+      font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.72);
+      text-decoration: none; padding: 7px 12px; border-radius: var(--r-sm);
+      transition: all 0.2s;
+    }
+    .nav-link:hover { color: var(--white); background: rgba(255,255,255,0.08); }
+    /* After scroll: dark links */
+    #nav.scrolled .nav-link { color: var(--slate-600); }
+    #nav.scrolled .nav-link:hover { color: var(--slate-900); background: var(--slate-100); }
+
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .btn-launch {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+      color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: var(--r-sm); padding: 9px 18px; cursor: pointer;
+      text-decoration: none; transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-launch:hover { background: rgba(255,255,255,0.14); color: var(--white); border-color: rgba(255,255,255,0.3); }
+    /* After scroll: dark version */
+    #nav.scrolled .btn-launch {
+      color: var(--slate-700); background: var(--white);
+      border-color: var(--slate-300);
+    }
+    #nav.scrolled .btn-launch:hover { background: var(--slate-50); color: var(--slate-900); }
+    .btn-launch-icon { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
+
+    /* ─── HERO ─────────────────────────────────── */
+    .hero {
+      background: var(--slate-900);
+      padding: 140px 24px 0;
+      position: relative; overflow: hidden; min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* grid lines bg */
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(79,70,229,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,70,229,0.06) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none;
+    }
+    /* radial glow */
+    .hero::after {
+      content: '';
+      position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+      width: 900px; height: 700px;
+      background: radial-gradient(ellipse, rgba(79,70,229,0.22) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-content { position: relative; z-index: 1; text-align: center; padding-bottom: 60px; }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(79,70,229,0.12); border: 1px solid rgba(79,70,229,0.25);
+      border-radius: 100px; padding: 6px 14px; margin-bottom: 40px;
+    }
+    .hero-badge-dot { width: 6px; height: 6px; background: var(--indigo-l); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+    .hero-badge-text { font-size: 12px; font-weight: 600; color: rgba(167,139,250,0.9); letter-spacing: 0.04em; }
+
+    .hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(50px, 8vw, 110px);
+      font-weight: 400; line-height: 1.0; letter-spacing: -0.025em;
+      color: var(--white); margin-bottom: 28px;
+    }
+    .hero h1 em { font-style: italic; color: var(--gold-l); }
+    .hero h1 .line-break { display: block; }
+
+    .hero-sub {
+      font-size: clamp(16px, 2vw, 20px); font-weight: 400; line-height: 1.7;
+      color: var(--slate-300); max-width: 600px; margin: 0 auto 44px;
+    }
+    .hero-ctas { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+
+    /* product preview */
+    .hero-preview {
+      position: relative; z-index: 1;
+      margin: 60px auto 0; max-width: 1100px;
+    }
+    .preview-glow {
+      position: absolute; bottom: -60px; left: 50%; transform: translateX(-50%);
+      width: 70%; height: 100px;
+      background: radial-gradient(ellipse, rgba(79,70,229,0.35) 0%, transparent 70%);
+      filter: blur(20px);
+    }
+
+    /* Browser mockup */
+    .browser-mock {
+      background: var(--slate-800);
+      border-radius: 12px 12px 0 0;
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05);
+    }
+    .browser-bar {
+      background: var(--slate-900);
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .browser-dots { display: flex; gap: 6px; }
+    .browser-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .browser-url {
+      flex: 1; background: rgba(255,255,255,0.06);
+      border-radius: 6px; padding: 5px 12px;
+      font-size: 11px; color: var(--slate-500);
+    }
+
+    /* admin UI mockup inside browser */
+    .admin-mock {
+      display: grid; grid-template-columns: 200px 1fr;
+      min-height: 420px; background: var(--slate-50);
+    }
+    .admin-sidebar-mock {
+      background: var(--slate-900);
+      padding: 20px 12px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .mock-logo-row { padding: 4px 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 8px; }
+    .mock-logo-name { font-size: 13px; font-weight: 700; color: var(--white); }
+    .mock-logo-sub  { font-size: 10px; color: var(--slate-500); margin-top: 2px; }
+    .mock-nav-item  {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 7px; cursor: default;
+      font-size: 12px; font-weight: 500; color: var(--slate-400);
+    }
+    .mock-nav-item.active { background: var(--indigo); color: var(--white); }
+    .mock-nav-icon { width: 14px; height: 14px; border-radius: 3px; background: currentColor; opacity: 0.5; flex-shrink: 0; }
+    .admin-main-mock { padding: 24px; overflow: hidden; }
+    .mock-page-title { font-size: 17px; font-weight: 700; color: var(--slate-900); margin-bottom: 4px; }
+    .mock-page-sub   { font-size: 11px; color: var(--slate-500); margin-bottom: 20px; }
+    .mock-stats-row  { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+    .mock-stat {
+      background: var(--white); border: 1px solid var(--slate-200);
+      border-radius: 10px; padding: 14px;
+    }
+    .mock-stat-val { font-size: 18px; font-weight: 700; color: var(--slate-900); }
+    .mock-stat-val.green { color: #16a34a; }
+    .mock-stat-val.blue  { color: var(--indigo); }
+    .mock-stat-lbl { font-size: 10px; color: var(--slate-500); margin-top: 2px; }
+    .mock-table {
+      background: var(--white); border: 1px solid var(--slate-200);
+      border-radius: 10px; overflow: hidden;
+    }
+    .mock-table-hdr {
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+      padding: 10px 14px; background: var(--slate-50);
+      border-bottom: 1px solid var(--slate-200);
+    }
+    .mock-th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--slate-400); }
+    .mock-table-row {
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+      padding: 10px 14px; border-bottom: 1px solid var(--slate-100); align-items: center;
+    }
+    .mock-table-row:last-child { border-bottom: none; }
+    .mock-td { font-size: 11px; color: var(--slate-700); }
+    .mock-badge {
+      display: inline-block; font-size: 9px; font-weight: 600;
+      padding: 2px 7px; border-radius: 4px;
+    }
+    .mock-badge.green  { background: #dcfce7; color: #15803d; }
+    .mock-badge.amber  { background: #fef3c7; color: #92400e; }
+    .mock-badge.indigo { background: #ede9fe; color: #6d28d9; }
+
+    /* ─── TRUST BAR ─────────────────────────────── */
+    .trust-bar {
+      background: var(--slate-900);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 24px;
+    }
+    .trust-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: center;
+      gap: 48px; flex-wrap: wrap;
+    }
+    .trust-label { font-size: 11px; font-weight: 600; color: var(--slate-300); letter-spacing: 0.08em; white-space: nowrap; text-transform: uppercase; }
+    .trust-divider { width: 1px; height: 24px; background: rgba(255,255,255,0.12); flex-shrink: 0; }
+    .trust-stat { text-align: center; }
+    .trust-stat-val { font-size: 20px; font-weight: 700; color: var(--white); }
+    .trust-stat-lbl { font-size: 11px; color: var(--slate-400); margin-top: 3px; font-weight: 400; }
+
+    /* ─── VISION & MISSION ──────────────────────── */
+    .vm-section {
+      padding: 100px 24px;
+      background: var(--white);
+    }
+    .vm-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 80px; align-items: center;
+    }
+    .vm-card {
+      background: var(--slate-900);
+      border-radius: var(--r-2xl);
+      padding: 48px 44px;
+      position: relative; overflow: hidden;
+    }
+    .vm-card::before {
+      content: '';
+      position: absolute; top: -80px; right: -80px;
+      width: 220px; height: 220px;
+      background: radial-gradient(circle, rgba(79,70,229,0.25), transparent 70%);
+    }
+    .vm-card-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(79,70,229,0.15); border: 1px solid rgba(79,70,229,0.3);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 24px;
+    }
+    .vm-card h3 { font-size: 22px; font-weight: 700; color: var(--white); margin-bottom: 14px; }
+    .vm-card p  { font-size: 15px; line-height: 1.75; color: var(--slate-300); }
+
+    .vm-text {}
+    .vm-text p { font-size: 16px; line-height: 1.8; color: var(--slate-600); margin-bottom: 20px; }
+    .vm-text p:last-child { margin-bottom: 0; }
+    .vm-text strong { color: var(--slate-900); font-weight: 600; }
+
+    /* ─── THREE GAPS ─────────────────────────────── */
+    .gaps-section {
+      padding: 100px 24px;
+      background: var(--slate-50);
+      border-top: 1px solid var(--slate-200);
+      border-bottom: 1px solid var(--slate-200);
+    }
+    .gaps-header { text-align: center; max-width: 640px; margin: 0 auto 64px; }
+    .gaps-header p { font-size: 17px; line-height: 1.75; color: var(--slate-600); margin-top: 18px; }
+
+    .gaps-grid {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 24px;
+    }
+    .gap-card {
+      background: var(--white);
+      border: 1px solid var(--slate-200);
+      border-radius: var(--r-xl);
+      padding: 36px 32px;
+      position: relative;
+      transition: all 0.25s;
+    }
+    .gap-card:hover {
+      border-color: var(--indigo);
+      box-shadow: 0 8px 32px rgba(79,70,229,0.1);
+      transform: translateY(-3px);
+    }
+    .gap-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 72px; font-weight: 300; line-height: 1;
+      color: var(--slate-100); position: absolute; top: 20px; right: 24px;
+      pointer-events: none; transition: color 0.25s;
+    }
+    .gap-card:hover .gap-num { color: rgba(79,70,229,0.08); }
+    .gap-icon-wrap {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: var(--indigo-xs); border: 1px solid rgba(79,70,229,0.15);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+    .gap-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--indigo); margin-bottom: 8px; }
+    .gap-title { font-size: 18px; font-weight: 700; color: var(--slate-900); margin-bottom: 12px; line-height: 1.3; }
+    .gap-body  { font-size: 14px; line-height: 1.75; color: var(--slate-500); }
+
+    /* ─── PRODUCT SECTION ────────────────────────── */
+    .product-section {
+      padding: 100px 24px;
+      background: var(--white);
+    }
+    .product-header { text-align: center; max-width: 640px; margin: 0 auto 64px; }
+    .product-header p { font-size: 17px; line-height: 1.75; color: var(--slate-600); margin-top: 18px; }
+
+    .product-tabs {
+      display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+    .ptab {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: var(--r-md);
+      border: 1px solid var(--slate-200); background: var(--white);
+      font-size: 14px; font-weight: 600; color: var(--slate-600);
+      cursor: pointer; transition: all 0.2s;
+    }
+    .ptab:hover { border-color: var(--indigo); color: var(--indigo); }
+    .ptab.active { background: var(--indigo); border-color: var(--indigo); color: var(--white); }
+    .ptab-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+
+    .product-panels {}
+    .product-panel { display: none; }
+    .product-panel.active { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    .panel-content {}
+    .panel-content .tag { margin-bottom: 20px; }
+    .panel-content h3 { font-size: clamp(24px,3vw,36px); font-weight: 700; letter-spacing: -0.02em; color: var(--slate-900); margin-bottom: 16px; line-height: 1.2; }
+    .panel-content p  { font-size: 16px; line-height: 1.8; color: var(--slate-600); margin-bottom: 28px; }
+    .panel-features { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .panel-feature {
+      display: flex; align-items: flex-start; gap: 12px;
+      font-size: 14px; color: var(--slate-700); line-height: 1.6;
+    }
+    .pf-check {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #dcfce7; border: 1px solid #bbf7d0;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .pf-check svg { width: 10px; height: 10px; color: #16a34a; }
+    .panel-visual {}
+
+    /* phone mockup */
+    .phone-mock {
+      width: 260px; margin: 0 auto;
+      background: var(--slate-900);
+      border-radius: 36px;
+      border: 8px solid var(--slate-800);
+      box-shadow: 0 32px 64px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05);
+      overflow: hidden;
+      position: relative;
+    }
+    .phone-notch {
+      background: var(--slate-900); height: 28px;
+      display: flex; justify-content: center; align-items: center;
+      position: relative; z-index: 1;
+    }
+    .phone-notch-bar { width: 80px; height: 4px; background: var(--slate-700); border-radius: 2px; }
+    .phone-screen { background: var(--slate-50); }
+    .phone-header {
+      background: var(--slate-900); padding: 14px 16px 16px;
+      border-bottom: 1px solid var(--slate-800);
+    }
+    .ph-name  { font-size: 13px; font-weight: 700; color: var(--white); }
+    .ph-role  { font-size: 10px; color: var(--slate-500); margin-top: 1px; }
+    .phone-body { padding: 14px; }
+    .wallet-card {
+      background: linear-gradient(135deg, var(--indigo) 0%, #7c3aed 100%);
+      border-radius: 12px; padding: 16px;
+      margin-bottom: 12px;
+    }
+    .wc-label { font-size: 9px; color: rgba(255,255,255,0.65); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+    .wc-amount{ font-size: 22px; font-weight: 700; color: var(--white); }
+    .wc-due   { font-size: 10px; color: rgba(255,255,255,0.75); margin-top: 4px; }
+    .wc-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .wc-btn {
+      flex: 1; padding: 7px 4px; border-radius: 8px;
+      background: rgba(255,255,255,0.18); font-size: 10px; font-weight: 600;
+      color: var(--white); text-align: center;
+    }
+    .phone-list-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--slate-200);
+    }
+    .phone-list-item:last-child { border-bottom: none; }
+    .pli-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--indigo-xs); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pli-main { flex: 1; min-width: 0; }
+    .pli-title { font-size: 11px; font-weight: 600; color: var(--slate-800); }
+    .pli-sub   { font-size: 9px; color: var(--slate-500); margin-top: 1px; }
+    .pli-amount{ font-size: 11px; font-weight: 700; color: var(--slate-800); text-align: right; flex-shrink: 0; }
+    .pli-amount.green { color: #16a34a; }
+    .phone-bottom-nav {
+      display: flex; background: var(--white);
+      border-top: 1px solid var(--slate-200); padding: 8px 0;
+    }
+    .pbn-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+      font-size: 8px; font-weight: 500; color: var(--slate-400); cursor: default;
+    }
+    .pbn-item.active { color: var(--indigo); }
+    .pbn-icon { width: 16px; height: 16px; border-radius: 4px; background: currentColor; opacity: 0.3; }
+    .pbn-item.active .pbn-icon { opacity: 1; }
+
+    /* owner dashboard mockup */
+    .owner-mock {
+      background: var(--white);
+      border: 1px solid var(--slate-200);
+      border-radius: var(--r-xl);
+      overflow: hidden;
+      box-shadow: 0 20px 48px rgba(0,0,0,0.08);
+    }
+    .om-header {
+      background: var(--slate-900); padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .om-title { font-size: 14px; font-weight: 700; color: var(--white); }
+    .om-sub { font-size: 10px; color: var(--slate-500); margin-top: 1px; }
+    .om-badge { font-size: 10px; font-weight: 600; background: rgba(34,197,94,0.15); color: #16a34a; padding: 3px 8px; border-radius: 6px; }
+    .om-body { padding: 16px; }
+    .om-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px; }
+    .om-stat { background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 8px; padding: 12px; }
+    .om-stat-val { font-size: 16px; font-weight: 700; color: var(--slate-900); }
+    .om-stat-val.indigo { color: var(--indigo); }
+    .om-stat-val.green  { color: #16a34a; }
+    .om-stat-lbl { font-size: 9px; color: var(--slate-500); margin-top: 1px; }
+    .om-driver-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border: 1px solid var(--slate-200); border-radius: 8px;
+      margin-bottom: 6px;
+    }
+    .om-driver-row:last-child { margin-bottom: 0; }
+    .om-avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--indigo); font-size: 11px; font-weight: 700;
+      color: var(--white); display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .om-driver-name { font-size: 11px; font-weight: 600; color: var(--slate-800); }
+    .om-driver-sub  { font-size: 9px; color: var(--slate-500); }
+    .om-driver-amt  { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--slate-800); }
+    .om-driver-status { font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 4px; margin-left: 6px; }
+    .om-driver-status.paid    { background: #dcfce7; color: #15803d; }
+    .om-driver-status.pending { background: #fef3c7; color: #92400e; }
+
+    /* ─── FEATURES ─────────────────────────────── */
+    .features-section {
+      padding: 100px 24px;
+      background: var(--slate-900);
+    }
+    .features-header { text-align: center; max-width: 600px; margin: 0 auto 64px; }
+    .features-header p { font-size: 17px; line-height: 1.75; color: var(--slate-300); margin-top: 18px; }
+
+    .features-grid {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 1px; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--r-xl); overflow: hidden;
+    }
+    .feature-cell {
+      background: var(--slate-900); padding: 36px 32px;
+      transition: background 0.2s;
+    }
+    .feature-cell:hover { background: var(--slate-800); }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(79,70,229,0.15); border: 1px solid rgba(79,70,229,0.25);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px; font-size: 20px;
+    }
+    .feature-title { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 10px; }
+    .feature-body  { font-size: 14px; line-height: 1.75; color: var(--slate-300); }
+
+    /* ─── HOW IT WORKS ─────────────────────────── */
+    .how-section { padding: 100px 24px; background: var(--white); }
+    .how-header { text-align: center; max-width: 600px; margin: 0 auto 64px; }
+    .how-header p { font-size: 17px; line-height: 1.75; color: var(--slate-600); margin-top: 18px; }
+
+    .how-steps {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      gap: 0; position: relative;
+    }
+    .how-steps::before {
+      content: ''; position: absolute;
+      top: 28px; left: 15%; right: 15%;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--slate-200), var(--slate-200), transparent);
+      z-index: 0;
+    }
+    .how-step { text-align: center; padding: 0 20px; position: relative; z-index: 1; }
+    .how-step-num {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--white); border: 2px solid var(--slate-200);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px; font-weight: 400; color: var(--slate-400);
+      transition: all 0.3s;
+    }
+    .how-step:hover .how-step-num {
+      border-color: var(--indigo); color: var(--indigo);
+      box-shadow: 0 0 0 6px var(--indigo-xs);
+    }
+    .how-step h4 { font-size: 15px; font-weight: 700; color: var(--slate-900); margin-bottom: 8px; }
+    .how-step p  { font-size: 13px; line-height: 1.7; color: var(--slate-500); }
+
+    /* ─── FOR WHOM ─────────────────────────────── */
+    .for-section { padding: 100px 24px; background: var(--slate-50); }
+    .for-header { text-align: center; max-width: 600px; margin: 0 auto 56px; }
+    .for-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+    .for-card {
+      background: var(--white); border: 1px solid var(--slate-200);
+      border-radius: var(--r-xl); padding: 36px 28px;
+      transition: all 0.25s;
+    }
+    .for-card:hover {
+      border-color: var(--indigo);
+      box-shadow: 0 10px 32px rgba(79,70,229,0.1);
+      transform: translateY(-3px);
+    }
+    .for-avatar {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin-bottom: 20px;
+    }
+    .for-card h4 { font-size: 17px; font-weight: 700; color: var(--slate-900); margin-bottom: 8px; }
+    .for-card .sub { font-size: 12px; color: var(--indigo); font-weight: 600; letter-spacing: 0.04em; margin-bottom: 14px; }
+    .for-card p { font-size: 14px; line-height: 1.75; color: var(--slate-500); margin-bottom: 20px; }
+    .for-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .for-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--slate-700); }
+    .for-bullet { width: 5px; height: 5px; border-radius: 50%; background: var(--indigo); flex-shrink: 0; }
+
+    /* ─── SIGNUP ────────────────────────────────── */
+    .signup-section {
+      padding: 100px 24px;
+      background: var(--slate-900);
+      position: relative; overflow: hidden;
+    }
+    .signup-section::before {
+      content: '';
+      position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 400px;
+      background: radial-gradient(ellipse, rgba(79,70,229,0.2) 0%, transparent 70%);
+    }
+    .signup-inner { position: relative; z-index: 1; }
+    .signup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; }
+
+    .signup-left h2 { color: var(--white); margin-bottom: 18px; }
+    .signup-left p { font-size: 16px; line-height: 1.8; color: var(--slate-300); margin-bottom: 36px; }
+    .signup-promises { display: flex; flex-direction: column; gap: 14px; }
+    .sp-item { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--slate-200); font-weight: 400; }
+    .sp-dot  { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+
+    .form-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--r-xl); padding: 40px 36px;
+      backdrop-filter: blur(10px);
+    }
+    .form-title { font-size: 18px; font-weight: 700; color: var(--white); margin-bottom: 6px; }
+    .form-sub   { font-size: 13px; color: var(--slate-300); margin-bottom: 28px; }
+
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--slate-300); margin-bottom: 7px;
+    }
+    .field input, .field select {
+      width: 100%; font-family: 'Inter', sans-serif;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--r-sm); padding: 11px 14px;
+      font-size: 14px; color: var(--white); outline: none;
+      transition: border-color 0.2s; -webkit-appearance: none;
+    }
+    .field input::placeholder { color: var(--slate-600); }
+    .field input:focus, .field select:focus { border-color: var(--indigo); background: rgba(79,70,229,0.08); }
+    .field select option { background: var(--slate-800); color: var(--white); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .form-submit {
+      width: 100%; margin-top: 20px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
+      color: var(--white); background: var(--indigo);
+      border: none; border-radius: var(--r-sm);
+      padding: 14px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .form-submit:hover { background: var(--indigo-d); transform: translateY(-1px); }
+    .form-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .form-note { font-size: 11px; color: var(--slate-500); text-align: center; margin-top: 14px; line-height: 1.6; }
+
+    .success-card { text-align: center; padding: 40px 20px; display: none; }
+    .success-card.show { display: block; }
+    .success-icon { font-size: 48px; margin-bottom: 16px; display: block; }
+    .success-title { font-size: 22px; font-weight: 700; color: var(--white); margin-bottom: 10px; }
+    .success-body  { font-size: 14px; color: var(--slate-300); line-height: 1.75; }
+
+    /* ─── FOOTER ──────────────────────────────── */
+    footer {
+      background: #060913;
+      padding: 0 24px 0;
+    }
+    /* Top accent bar */
+    .footer-accent {
+      height: 3px;
+      background: linear-gradient(to right, var(--indigo), #7c3aed, var(--gold));
+    }
+    .footer-inner { padding: 64px 0 0; }
+    .footer-top {
+      display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr;
+      gap: 56px; padding-bottom: 52px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .footer-brand {}
+    .footer-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .footer-logo-mark { width: 38px; height: 38px; flex-shrink: 0; }
+    .footer-wordmark { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; color: var(--white); }
+    .footer-wordmark span { color: #818cf8; }
+    .footer-tagline { font-size: 14px; line-height: 1.75; color: var(--slate-300); max-width: 260px; margin-bottom: 20px; }
+    .footer-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(79,70,229,0.15); border: 1px solid rgba(79,70,229,0.3);
+      border-radius: 6px; padding: 7px 14px;
+    }
+    .footer-badge-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
+    .footer-badge-text { font-size: 12px; font-weight: 600; color: var(--slate-300); letter-spacing: 0.02em; }
+
+    .footer-col {}
+    .footer-col-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--white);
+      margin-bottom: 18px; padding-bottom: 10px;
+      border-bottom: 1px solid rgba(79,70,229,0.4);
+    }
+    .footer-links { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+    .footer-link {
+      font-size: 14px; color: var(--slate-300); text-decoration: none;
+      transition: color 0.15s; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .footer-link::before {
+      content: ''; width: 0; height: 1px; background: var(--indigo-l);
+      transition: width 0.2s; flex-shrink: 0;
+    }
+    .footer-link:hover { color: var(--white); }
+    .footer-link:hover::before { width: 8px; }
+
+    .footer-bottom {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px;
+      padding: 24px 0;
+    }
+    .footer-copy { font-size: 13px; color: var(--slate-400); }
+    .footer-by   { font-size: 13px; color: var(--slate-400); display: flex; align-items: center; gap: 8px; }
+    .footer-by strong { color: var(--slate-200); font-weight: 600; }
+    .footer-india { font-size: 16px; }
+
+    /* ─── RESPONSIVE ──────────────────────────── */
+    @media (max-width: 1024px) {
+      .vm-grid        { grid-template-columns: 1fr; gap: 40px; }
+      .gaps-grid      { grid-template-columns: 1fr; }
+      .features-grid  { grid-template-columns: repeat(2,1fr); }
+      .how-steps      { grid-template-columns: repeat(2,1fr); gap: 32px; }
+      .how-steps::before { display: none; }
+      .for-grid       { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+      .signup-grid    { grid-template-columns: 1fr; gap: 48px; }
+      .footer-top     { grid-template-columns: 1fr 1fr; gap: 32px; }
+      .footer-brand   { grid-column: 1 / -1; }
+      .admin-mock     { grid-template-columns: 160px 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      #nav { padding: 0 16px; }
+      .nav-links  { display: none; }
+      .hero { padding: 120px 16px 0; }
+      .hero h1 { font-size: 44px; }
+      .admin-sidebar-mock { display: none; }
+      .admin-mock { grid-template-columns: 1fr; }
+      .mock-stats-row { grid-template-columns: repeat(2,1fr); }
+      .mock-table-hdr, .mock-table-row { grid-template-columns: 2fr 1fr 1fr; }
+      .mock-table-hdr > *:last-child, .mock-table-row > *:last-child { display: none; }
+      .product-panel.active { grid-template-columns: 1fr; gap: 40px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .how-steps  { grid-template-columns: 1fr; max-width: 320px; margin: 0 auto; }
+      .field-row  { grid-template-columns: 1fr; }
+      .footer-top { grid-template-columns: 1fr; gap: 28px; }
+      .footer-bottom { flex-direction: column; align-items: flex-start; }
+    }
+
+    @media (max-width: 480px) {
+      .hero h1 { font-size: 36px; }
+      .hero-ctas { flex-direction: column; width: 100%; }
+      .hero-ctas .btn { width: 100%; justify-content: center; }
+      .form-card { padding: 28px 20px; }
+      .trust-inner { gap: 24px; }
+      .trust-divider { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── NAV ─────────────────────────────────────────────────────────── -->
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <!-- MG mark: solid indigo container — readable on ANY background -->
+      <svg class="nav-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="36" height="36" rx="9" fill="#4f46e5"/>
+        <!-- 3×3 grid dots -->
+        <circle cx="10" cy="10" r="1.8" fill="white" opacity="0.45"/>
+        <circle cx="18" cy="10" r="1.8" fill="white" opacity="0.45"/>
+        <circle cx="26" cy="10" r="1.8" fill="white" opacity="0.45"/>
+        <circle cx="10" cy="18" r="1.8" fill="white" opacity="0.45"/>
+        <circle cx="26" cy="18" r="1.8" fill="white" opacity="0.45"/>
+        <circle cx="10" cy="26" r="1.8" fill="white" opacity="0.45"/>
+        <circle cx="18" cy="26" r="1.8" fill="white" opacity="0.45"/>
+        <circle cx="26" cy="26" r="1.8" fill="white" opacity="0.45"/>
+        <!-- center hub: larger, bright -->
+        <circle cx="18" cy="18" r="4" fill="white"/>
+        <!-- M glyph in center -->
+        <text x="18" y="21.5" font-family="'Georgia',serif" font-weight="900" font-size="7" fill="#4f46e5" text-anchor="middle">M</text>
+        <!-- spoke lines from center to each corner dot -->
+        <line x1="18" y1="14" x2="10" y2="10"  stroke="white" stroke-width="0.9" opacity="0.3"/>
+        <line x1="18" y1="14" x2="18" y2="10"  stroke="white" stroke-width="0.9" opacity="0.3"/>
+        <line x1="18" y1="14" x2="26" y2="10"  stroke="white" stroke-width="0.9" opacity="0.3"/>
+        <line x1="22" y1="18" x2="26" y2="18"  stroke="white" stroke-width="0.9" opacity="0.3"/>
+        <line x1="18" y1="22" x2="26" y2="26"  stroke="white" stroke-width="0.9" opacity="0.3"/>
+        <line x1="18" y1="22" x2="18" y2="26"  stroke="white" stroke-width="0.9" opacity="0.3"/>
+        <line x1="18" y1="22" x2="10" y2="26"  stroke="white" stroke-width="0.9" opacity="0.3"/>
+        <line x1="14" y1="18" x2="10" y2="18"  stroke="white" stroke-width="0.9" opacity="0.3"/>
+      </svg>
+      <span class="nav-wordmark">Mobility<span>Grid</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="#vision"   class="nav-link">Vision</a>
+      <a href="#gaps"     class="nav-link">The Problem</a>
+      <a href="#product"  class="nav-link">Product</a>
+      <a href="#how"      class="nav-link">How it Works</a>
+    </div>
+    <div class="nav-actions">
+      <a href="#signup" class="btn btn-primary btn-sm">Get Early Access</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── HERO ─────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-content container">
+    <div class="hero-badge">
+      <div class="hero-badge-dot"></div>
+      <span class="hero-badge-text">Now in private beta &nbsp;·&nbsp; Onboarding fleets across India</span>
+    </div>
+
+    <h1>
+      The Operating<br/>
+      System for India's<br/>
+      <em>Fleet Economy</em>
+    </h1>
+
+    <p class="hero-sub">
+      Digital rent collection, driver KYC, fleet management, and earnings tracking — built from the ground up for how India's gig workforce actually lives and works.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="#signup" class="btn btn-primary btn-lg">Get Early Access</a>
+      <a href="#product" class="btn btn-outline-light btn-lg">See the Product</a>
+    </div>
+  </div>
+
+  <!-- Admin dashboard preview -->
+  <div class="hero-preview container-wide">
+    <div class="preview-glow"></div>
+    <div class="browser-mock">
+      <div class="browser-bar">
+        <div class="browser-dots">
+          <div class="browser-dot" style="background:#ef4444"></div>
+          <div class="browser-dot" style="background:#f59e0b"></div>
+          <div class="browser-dot" style="background:#22c55e"></div>
+        </div>
+        <div class="browser-url">app.mobilitygrid.in/admin/dashboard</div>
+      </div>
+      <div class="admin-mock">
+        <div class="admin-sidebar-mock">
+          <div class="mock-logo-row">
+            <div class="mock-logo-name">MobilityGrid</div>
+            <div class="mock-logo-sub">Super Admin</div>
+          </div>
+          <div class="mock-nav-item active"><div class="mock-nav-icon"></div> Dashboard</div>
+          <div class="mock-nav-item"><div class="mock-nav-icon"></div> Companies</div>
+          <div class="mock-nav-item"><div class="mock-nav-icon"></div> KYC Review</div>
+          <div class="mock-nav-item"><div class="mock-nav-icon"></div> All Drivers</div>
+        </div>
+        <div class="admin-main-mock">
+          <div class="mock-page-title">Platform Overview</div>
+          <div class="mock-page-sub">Sunday, 7 June 2026</div>
+          <div class="mock-stats-row">
+            <div class="mock-stat"><div class="mock-stat-val">24</div><div class="mock-stat-lbl">Companies</div></div>
+            <div class="mock-stat"><div class="mock-stat-val blue">312</div><div class="mock-stat-lbl">Fleet Owners</div></div>
+            <div class="mock-stat"><div class="mock-stat-val">1,840</div><div class="mock-stat-lbl">Drivers</div></div>
+            <div class="mock-stat"><div class="mock-stat-val green">₹8.4L</div><div class="mock-stat-lbl">This Month</div></div>
+          </div>
+          <div class="mock-table">
+            <div class="mock-table-hdr">
+              <span class="mock-th">Company</span>
+              <span class="mock-th">Drivers</span>
+              <span class="mock-th">Collection</span>
+              <span class="mock-th">Status</span>
+            </div>
+            <div class="mock-table-row">
+              <span class="mock-td">Rajesh EV Fleet</span>
+              <span class="mock-td">48</span>
+              <span class="mock-td">₹96,000</span>
+              <span class="mock-td"><span class="mock-badge green">Active</span></span>
+            </div>
+            <div class="mock-table-row">
+              <span class="mock-td">Metro Autos Pvt</span>
+              <span class="mock-td">22</span>
+              <span class="mock-td">₹41,800</span>
+              <span class="mock-td"><span class="mock-badge amber">KYC Pending</span></span>
+            </div>
+            <div class="mock-table-row">
+              <span class="mock-td">CityRide Solutions</span>
+              <span class="mock-td">76</span>
+              <span class="mock-td">₹1.52L</span>
+              <span class="mock-td"><span class="mock-badge indigo">Reviewing</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── TRUST BAR ─────────────────────────────────────────────────────── -->
+<div class="trust-bar">
+  <div class="trust-inner">
+    <span class="trust-label">Built for India's fleet economy</span>
+    <div class="trust-divider"></div>
+    <div class="trust-stat"><div class="trust-stat-val">Any Scale</div><div class="trust-stat-lbl">Small fleet to enterprise</div></div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat"><div class="trust-stat-val">UPI</div><div class="trust-stat-lbl">Verified digital collections</div></div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat"><div class="trust-stat-val">Real-time</div><div class="trust-stat-lbl">Live fleet visibility</div></div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat"><div class="trust-stat-val">EN / HI</div><div class="trust-stat-lbl">Multi-language support</div></div>
+    <div class="trust-divider"></div>
+    <div class="trust-stat"><div class="trust-stat-val">24 hrs</div><div class="trust-stat-lbl">Fleet onboarding time</div></div>
+  </div>
+</div>
+
+<!-- ─── VISION & MISSION ──────────────────────────────────────────────── -->
+<section class="vm-section" id="vision">
+  <div class="container">
+    <div class="vm-grid">
+      <div>
+        <div class="vm-grid" style="grid-template-columns:1fr; gap:20px;">
+          <div class="vm-card">
+            <div class="vm-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round">
+                <circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3m-3.5-6.5-2.12 2.12M6.62 17.38l-2.12 2.12M17.38 17.38l2.12 2.12M4.5 6.5l2.12 2.12"/>
+              </svg>
+            </div>
+            <h3>Our Vision</h3>
+            <p>A world where every fleet operator and gig worker in India has the infrastructure, visibility, and tools to build a financially secure livelihood — on their own terms.</p>
+          </div>
+          <div class="vm-card" style="background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);">
+            <div class="vm-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <h3>Our Mission</h3>
+            <p>To close the three structural gaps — Time, Payment, and Asset — that hold India's gig workforce back, by building an operating ecosystem designed entirely around how they actually earn and live.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="vm-text">
+        <p class="section-label">Why We Exist</p>
+        <h2 class="display" style="margin-bottom:24px;">Most people see the <em>convenience.</em></h2>
+        <p>Every day, millions of drivers, riders, and logistics workers power the Indian city — delivering food, ferrying passengers, moving goods. They are the circulatory system of the modern urban economy.</p>
+        <p>Yet the infrastructure built around them was never truly designed for <strong>how they live and work</strong>. Fleet operators — often small business owners managing 5 to 500 vehicles — carry enormous operational weight on fragmented, manual systems: WhatsApp messages, paper ledgers, and disconnected spreadsheets.</p>
+        <p>We spent months listening to the ground truth. What we found is not a technology problem. It is a <strong>design problem</strong>. The products built for this workforce were designed around the platform's convenience, not the person doing the work.</p>
+        <p>MobilityGrid is our answer to that.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── THREE GAPS ─────────────────────────────────────────────────────── -->
+<section class="gaps-section" id="gaps">
+  <div class="container">
+    <div class="gaps-header">
+      <p class="section-label">The Problem</p>
+      <h2 class="display">Three gaps that define the challenge</h2>
+      <p>Through months of direct research, we identified three structural mismatches that compound into a system that consistently fails both the operator and the driver.</p>
+    </div>
+
+    <div class="gaps-grid">
+      <div class="gap-card">
+        <span class="gap-num">01</span>
+        <div class="gap-icon-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+        </div>
+        <div class="gap-label">Time Gap</div>
+        <div class="gap-title">Daily earners in a monthly financial system</div>
+        <div class="gap-body">A driver earns every day. But traditional financial models — collections, credit, settlements — are built around monthly behaviour. This mismatch creates constant friction, missed collections, and an inability to plan with any certainty on either side.</div>
+      </div>
+
+      <div class="gap-card">
+        <span class="gap-num">02</span>
+        <div class="gap-icon-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round">
+            <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+          </svg>
+        </div>
+        <div class="gap-label">Payment Gap</div>
+        <div class="gap-title">Fluid income, rigid collection systems</div>
+        <div class="gap-body">A driver deals in variable, fluid cash flows. Yet rent collection, deposits, and dues are handled through rigid automated systems or paper records that force friction. The result: disputes, defaults, and a breakdown of trust between operator and driver.</div>
+      </div>
+
+      <div class="gap-card">
+        <span class="gap-num">03</span>
+        <div class="gap-icon-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </div>
+        <div class="gap-label">Asset Gap</div>
+        <div class="gap-title">A vehicle is their livelihood, not their own</div>
+        <div class="gap-body">The vehicle is a driver's primary tool of income. Yet access, payments, assignments, and documentation remain fragmented across WhatsApp, paper agreements, and disconnected systems. One unexpected event can erase weeks of earnings with no safety net.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRODUCT ──────────────────────────────────────────────────────── -->
+<section class="product-section" id="product">
+  <div class="container">
+    <div class="product-header">
+      <p class="section-label">The Platform</p>
+      <h2 class="display">One ecosystem. <em>Three stakeholders.</em></h2>
+      <p>MobilityGrid is not a single app — it is a coordinated operating system with purpose-built interfaces for every actor in the fleet economy.</p>
+    </div>
+
+    <div class="product-tabs">
+      <button class="ptab active" onclick="switchTab('admin')">
+        <span class="ptab-dot"></span> Super Admin Console
+      </button>
+      <button class="ptab" onclick="switchTab('owner')">
+        <span class="ptab-dot"></span> Fleet Owner Dashboard
+      </button>
+      <button class="ptab" onclick="switchTab('driver')">
+        <span class="ptab-dot"></span> Driver Terminal
+      </button>
+    </div>
+
+    <div class="product-panels">
+
+      <!-- Admin panel -->
+      <div class="product-panel active" id="panel-admin">
+        <div class="panel-content">
+          <span class="tag tag-indigo">Super Admin</span>
+          <h3>Full platform oversight from one console</h3>
+          <p>The Super Admin Console gives the MobilityGrid team complete visibility over every company, fleet owner, driver, and payment on the platform — with tools to onboard, approve, and monitor at scale.</p>
+          <ul class="panel-features">
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Company onboarding and fleet operator management
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Driver KYC review queue — approve Aadhaar, PAN, DL, Bank
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Real-time platform GMV and collections dashboard
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Cross-fleet driver and vehicle registry
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Role-based access — admin, manager, read-only
+            </li>
+          </ul>
+        </div>
+        <div class="panel-visual">
+          <div class="browser-mock" style="box-shadow:0 20px 48px rgba(0,0,0,0.15);">
+            <div class="browser-bar">
+              <div class="browser-dots">
+                <div class="browser-dot" style="background:#ef4444"></div>
+                <div class="browser-dot" style="background:#f59e0b"></div>
+                <div class="browser-dot" style="background:#22c55e"></div>
+              </div>
+              <div class="browser-url" style="color:#475569;">app.mobilitygrid.in/admin/kyc</div>
+            </div>
+            <div class="admin-mock" style="min-height:280px;">
+              <div class="admin-sidebar-mock">
+                <div class="mock-logo-row">
+                  <div class="mock-logo-name">MobilityGrid</div>
+                  <div class="mock-logo-sub">Super Admin</div>
+                </div>
+                <div class="mock-nav-item"><div class="mock-nav-icon"></div> Dashboard</div>
+                <div class="mock-nav-item"><div class="mock-nav-icon"></div> Companies</div>
+                <div class="mock-nav-item active"><div class="mock-nav-icon"></div> KYC Review</div>
+                <div class="mock-nav-item"><div class="mock-nav-icon"></div> All Drivers</div>
+              </div>
+              <div class="admin-main-mock" style="padding:16px;">
+                <div class="mock-page-title">KYC Review Queue</div>
+                <div class="mock-page-sub">14 pending · 3 under review</div>
+                <div class="mock-table" style="margin-top:12px;">
+                  <div class="mock-table-hdr">
+                    <span class="mock-th">Driver</span>
+                    <span class="mock-th">Document</span>
+                    <span class="mock-th">Status</span>
+                    <span class="mock-th">Action</span>
+                  </div>
+                  <div class="mock-table-row">
+                    <span class="mock-td">Santosh Kumar</span>
+                    <span class="mock-td">Aadhaar</span>
+                    <span class="mock-td"><span class="mock-badge amber">Pending</span></span>
+                    <span class="mock-td" style="color:#4f46e5;font-weight:600;font-size:11px;">Review →</span>
+                  </div>
+                  <div class="mock-table-row">
+                    <span class="mock-td">Pradeep Yadav</span>
+                    <span class="mock-td">DL + PAN</span>
+                    <span class="mock-td"><span class="mock-badge indigo">Review</span></span>
+                    <span class="mock-td" style="color:#4f46e5;font-weight:600;font-size:11px;">Review →</span>
+                  </div>
+                  <div class="mock-table-row">
+                    <span class="mock-td">Ramesh Singh</span>
+                    <span class="mock-td">Bank A/C</span>
+                    <span class="mock-td"><span class="mock-badge green">Verified</span></span>
+                    <span class="mock-td" style="color:#94a3b8;font-size:11px;">Done</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Owner panel -->
+      <div class="product-panel" id="panel-owner">
+        <div class="panel-content">
+          <span class="tag tag-gold">Fleet Owner</span>
+          <h3>Complete fleet visibility, zero spreadsheets</h3>
+          <p>The Fleet Owner Dashboard replaces WhatsApp groups, paper ledgers, and Excel files with a single source of truth — so every operator knows exactly who has paid, who hasn't, and what their fleet is worth today.</p>
+          <ul class="panel-features">
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Live dashboard — vehicles, drivers, outstanding dues
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              UPI payment links — send directly to driver via WhatsApp
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Transaction history with driver-wise breakdown
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Driver onboarding with agreement upload and address verification
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Vehicle assignment and daily rent tracking
+            </li>
+          </ul>
+        </div>
+        <div class="panel-visual">
+          <div class="owner-mock">
+            <div class="om-header">
+              <div>
+                <div class="om-title">Fleet Dashboard</div>
+                <div class="om-sub">June 2026 · 23 active drivers</div>
+              </div>
+              <div class="om-badge">● Live</div>
+            </div>
+            <div class="om-body">
+              <div class="om-stats">
+                <div class="om-stat">
+                  <div class="om-stat-val indigo">₹46,200</div>
+                  <div class="om-stat-lbl">Collected · June</div>
+                </div>
+                <div class="om-stat">
+                  <div class="om-stat-val" style="color:#dc2626;">₹8,400</div>
+                  <div class="om-stat-lbl">Outstanding</div>
+                </div>
+                <div class="om-stat">
+                  <div class="om-stat-val green">19 / 23</div>
+                  <div class="om-stat-lbl">Paid this month</div>
+                </div>
+              </div>
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:10px;">Recent Drivers</div>
+              <div class="om-driver-row">
+                <div class="om-avatar">RK</div>
+                <div><div class="om-driver-name">Ravi Kumar</div><div class="om-driver-sub">KA 01 EV 2201</div></div>
+                <div class="om-driver-amt">₹2,000<span class="om-driver-status paid">Paid</span></div>
+              </div>
+              <div class="om-driver-row">
+                <div class="om-avatar" style="background:#7c3aed;">SP</div>
+                <div><div class="om-driver-name">Suresh Patil</div><div class="om-driver-sub">KA 05 EV 1148</div></div>
+                <div class="om-driver-amt">₹2,000<span class="om-driver-status pending">Due</span></div>
+              </div>
+              <div class="om-driver-row">
+                <div class="om-avatar" style="background:#0f766e;">MR</div>
+                <div><div class="om-driver-name">Mohan Reddy</div><div class="om-driver-sub">KA 02 EV 0890</div></div>
+                <div class="om-driver-amt">₹1,800<span class="om-driver-status paid">Paid</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Driver panel -->
+      <div class="product-panel" id="panel-driver">
+        <div class="panel-content">
+          <span class="tag tag-slate">Driver</span>
+          <h3>Your earnings, your vehicle, your future</h3>
+          <p>The Driver Terminal is a mobile-first PWA designed for low-end Android devices and 2G/3G networks. It gives every driver full transparency into their financial relationship with their fleet — in English and Hindi.</p>
+          <ul class="panel-features">
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Wallet balance, daily dues, and outstanding amount
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Pay rent instantly via UPI — any amount, any time
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Private earnings tracker — only visible to the driver
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              KYC document upload — Aadhaar, PAN, Driving Licence
+            </li>
+            <li class="panel-feature">
+              <span class="pf-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,6 5,9 10,3"/></svg></span>
+              Full transaction history with downloadable receipts
+            </li>
+          </ul>
+        </div>
+        <div class="panel-visual" style="display:flex;justify-content:center;">
+          <div class="phone-mock">
+            <div class="phone-notch">
+              <div class="phone-notch-bar"></div>
+            </div>
+            <div class="phone-screen">
+              <div class="phone-header">
+                <div class="ph-name">Driver Terminal</div>
+                <div class="ph-role">Santosh Kumar · KA 01 EV 2201</div>
+              </div>
+              <div class="phone-body">
+                <div class="wallet-card">
+                  <div class="wc-label">Wallet Balance</div>
+                  <div class="wc-amount">₹1,240</div>
+                  <div class="wc-due">Due this cycle: ₹2,000</div>
+                  <div class="wc-actions">
+                    <div class="wc-btn">Pay Now</div>
+                    <div class="wc-btn">Withdraw</div>
+                    <div class="wc-btn">History</div>
+                  </div>
+                </div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:8px;">My Earnings · June</div>
+                <div class="phone-list-item">
+                  <div class="pli-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M12 2v20m5-17H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                  </div>
+                  <div class="pli-main">
+                    <div class="pli-title">Today's Earnings</div>
+                    <div class="pli-sub">3 trips · 7 hrs active</div>
+                  </div>
+                  <div class="pli-amount green">+₹820</div>
+                </div>
+                <div class="phone-list-item">
+                  <div class="pli-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                  </div>
+                  <div class="pli-main">
+                    <div class="pli-title">Rent paid · Jun 5</div>
+                    <div class="pli-sub">UPI · MobilityGrid</div>
+                  </div>
+                  <div class="pli-amount" style="color:#dc2626;">−₹2,000</div>
+                </div>
+                <div class="phone-list-item">
+                  <div class="pli-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  </div>
+                  <div class="pli-main">
+                    <div class="pli-title">Month total</div>
+                    <div class="pli-sub">June 1 – 7</div>
+                  </div>
+                  <div class="pli-amount green">₹5,240</div>
+                </div>
+              </div>
+              <div class="phone-bottom-nav">
+                <div class="pbn-item active"><div class="pbn-icon"></div>Home</div>
+                <div class="pbn-item"><div class="pbn-icon"></div>Wallet</div>
+                <div class="pbn-item"><div class="pbn-icon"></div>Pay</div>
+                <div class="pbn-item"><div class="pbn-icon"></div>KYC</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── FEATURES ─────────────────────────────────────────────────────── -->
+<section class="features-section">
+  <div class="container">
+    <div class="features-header">
+      <p class="section-label section-label-light">Platform Capabilities</p>
+      <h2 class="display display-light">Everything the fleet economy needs,<br/><em>nothing it doesn't</em></h2>
+      <p>Every feature was built from direct research with fleet operators and drivers across India — not from assumptions.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-cell">
+        <div class="feature-icon">💳</div>
+        <div class="feature-title">UPI Rent Collection</div>
+        <div class="feature-body">Verified digital payments via MobilityGrid. Drivers pay through any UPI app. Owners see collections in real-time with a full audit trail.</div>
+      </div>
+      <div class="feature-cell">
+        <div class="feature-icon">🪪</div>
+        <div class="feature-title">Driver KYC & Verification</div>
+        <div class="feature-body">Aadhaar OTP, PAN, Driving Licence, and Bank Account verification — managed through an admin review queue with approve/reject workflow.</div>
+      </div>
+      <div class="feature-cell">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">Live Fleet Dashboard</div>
+        <div class="feature-body">Real-time visibility across your entire fleet. See which vehicles are active, which drivers owe rent, and total collections at a glance.</div>
+      </div>
+      <div class="feature-cell">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-title">Private Earnings Tracker</div>
+        <div class="feature-body">Drivers log daily earnings visible only to themselves — not the fleet owner. Financial privacy that builds trust and encourages transparency on dues.</div>
+      </div>
+      <div class="feature-cell">
+        <div class="feature-icon">📁</div>
+        <div class="feature-title">Compliance Vault</div>
+        <div class="feature-body">Store driver agreements, vehicle RC copies, insurance documents, and KYC files — organised, searchable, and always accessible.</div>
+      </div>
+      <div class="feature-cell">
+        <div class="feature-icon">🌐</div>
+        <div class="feature-title">Hindi + English Interface</div>
+        <div class="feature-body">The Driver Terminal switches between English and Hindi with a single tap — built for the reality that most drivers are more comfortable in their regional language.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── HOW IT WORKS ─────────────────────────────────────────────────── -->
+<section class="how-section" id="how">
+  <div class="container">
+    <div class="how-header">
+      <p class="section-label">How It Works</p>
+      <h2 class="display">Up and running in <em>four steps</em></h2>
+      <p>From fleet onboarding to your first digital rent collection — the entire process is designed to be simple, fast, and reliable.</p>
+    </div>
+
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-step-num">1</div>
+        <h4>Admin onboards your company</h4>
+        <p>The MobilityGrid team verifies and activates your fleet on the platform. Usually under 24 hours.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">2</div>
+        <h4>Add your vehicles and drivers</h4>
+        <p>Set vehicle details, assign drivers, and set daily rent amounts directly from the owner dashboard.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">3</div>
+        <h4>Drivers complete KYC</h4>
+        <p>Drivers upload documents through the PWA. Admin reviews and approves — unlocking vehicle assignment.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">4</div>
+        <h4>Collections run digitally</h4>
+        <p>Drivers pay rent via UPI. You see every payment in real-time with zero manual reconciliation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOR WHOM ─────────────────────────────────────────────────────── -->
+<section class="for-section">
+  <div class="container">
+    <div class="for-header">
+      <p class="section-label">Built For</p>
+      <h2 class="display">Purpose-built for <em>every stakeholder</em></h2>
+    </div>
+    <div class="for-grid">
+      <div class="for-card">
+        <div class="for-avatar" style="background:#ede9fe;">🚗</div>
+        <h4>Fleet Owners</h4>
+        <p class="sub">Any fleet, any size</p>
+        <p>Replace WhatsApp reminders and paper ledgers with a real-time dashboard. Know exactly what you're owed, who has paid, and what your fleet is worth — right now.</p>
+        <ul class="for-list">
+          <li class="for-item"><span class="for-bullet"></span>Zero manual reconciliation</li>
+          <li class="for-item"><span class="for-bullet"></span>UPI-verified rent collections</li>
+          <li class="for-item"><span class="for-bullet"></span>Driver and vehicle registry at any scale</li>
+        </ul>
+      </div>
+      <div class="for-card">
+        <div class="for-avatar" style="background:#fef3c7;">🧑‍💼</div>
+        <h4>Fleet Managers</h4>
+        <p class="sub">Day-to-day operations</p>
+        <p>Handle daily vehicle assignments, record cash collections, and track driver activity — without needing access to financial controls reserved for the owner.</p>
+        <ul class="for-list">
+          <li class="for-item"><span class="for-bullet"></span>Role-limited access controls</li>
+          <li class="for-item"><span class="for-bullet"></span>Vehicle and driver assignment</li>
+          <li class="for-item"><span class="for-bullet"></span>Cash collection recording</li>
+        </ul>
+      </div>
+      <div class="for-card">
+        <div class="for-avatar" style="background:#dcfce7;">🛺</div>
+        <h4>Drivers</h4>
+        <p class="sub">Gig workers, daily earners</p>
+        <p>See your dues, track your earnings, pay rent with a tap, and keep your documents in order — all from a phone that works even on 2G.</p>
+        <ul class="for-list">
+          <li class="for-item"><span class="for-bullet"></span>Private earnings tracker</li>
+          <li class="for-item"><span class="for-bullet"></span>UPI payment in one tap</li>
+          <li class="for-item"><span class="for-bullet"></span>English and Hindi UI</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── SIGNUP ────────────────────────────────────────────────────────── -->
+<section class="signup-section" id="signup">
+  <div class="container signup-inner">
+    <div class="signup-grid">
+      <div class="signup-left">
+        <p class="section-label section-label-light" style="margin-bottom:16px;">Expression of Interest</p>
+        <h2 class="display display-light">Be part of<br/><em>what comes next.</em></h2>
+        <p>We are in active development and speaking with fleet operators, managers, and drivers across India. If you operate a fleet or work within the ecosystem, we want to hear from you first.</p>
+        <div class="signup-promises">
+          <div class="sp-item"><span class="sp-dot"></span>Our team reaches out within 24 hours</div>
+          <div class="sp-item"><span class="sp-dot"></span>This is a conversation, not a sales call</div>
+          <div class="sp-item"><span class="sp-dot"></span>Early participants shape the product roadmap</div>
+          <div class="sp-item"><span class="sp-dot"></span>Your details are never shared with third parties</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="success-card" id="successCard">
+          <span class="success-icon">✦</span>
+          <div class="success-title">You're on the list.</div>
+          <div class="success-body">Thank you for your interest in MobilityGrid.<br/>Our team will reach out on WhatsApp within 24 hours.<br/><br/>You are now part of building the infrastructure that India's fleet economy deserves.</div>
+        </div>
+
+        <div class="form-card" id="formCard">
+          <div class="form-title">Express Your Interest</div>
+          <div class="form-sub">Takes 60 seconds. No commitment required.</div>
+
+          <form id="signupForm">
+            <div class="field-row">
+              <div class="field">
+                <label>Full Name</label>
+                <input type="text" id="f_name" placeholder="Your name" required/>
+              </div>
+              <div class="field">
+                <label>WhatsApp Number</label>
+                <input type="tel" id="f_phone" placeholder="10-digit number" maxlength="10" required/>
+              </div>
+            </div>
+            <div class="field">
+              <label>Organisation / Fleet Name</label>
+              <input type="text" id="f_company" placeholder="Your company or fleet" required/>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>Your Role</label>
+                <select id="f_role" required>
+                  <option value="" disabled selected>Select role</option>
+                  <option>Fleet Owner / Operator</option>
+                  <option>Fleet Manager</option>
+                  <option>Driver / Rider</option>
+                  <option>Investor / Partner</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Fleet Size</label>
+                <select id="f_fleet">
+                  <option value="" disabled selected>Select range</option>
+                  <option>1 – 10 vehicles</option>
+                  <option>11 – 30 vehicles</option>
+                  <option>31 – 100 vehicles</option>
+                  <option>100+ vehicles</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>City</label>
+                <input type="text" id="f_city" placeholder="Where you operate"/>
+              </div>
+              <div class="field">
+                <label>Vehicle Type</label>
+                <select id="f_type">
+                  <option value="" disabled selected>Select type</option>
+                  <option>EV / Electric</option>
+                  <option>Auto-Rickshaw</option>
+                  <option>Cab / Car</option>
+                  <option>Truck / Commercial</option>
+                  <option>Two-Wheeler</option>
+                  <option>Mixed Fleet</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="form-submit" id="submitBtn">
+              Submit Expression of Interest →
+            </button>
+            <div class="form-note">By submitting you agree to be contacted by the MobilityGrid team. We do not share your information.</div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ───────────────────────────────────────────────────────── -->
+<footer>
+  <div class="footer-accent"></div>
+  <div class="container footer-inner">
+    <div class="footer-top">
+
+      <!-- Brand column -->
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <!-- Same solid-bg mark — always visible on dark footer -->
+          <svg class="footer-logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="36" height="36" rx="9" fill="#4f46e5"/>
+            <circle cx="10" cy="10" r="1.8" fill="white" opacity="0.45"/>
+            <circle cx="18" cy="10" r="1.8" fill="white" opacity="0.45"/>
+            <circle cx="26" cy="10" r="1.8" fill="white" opacity="0.45"/>
+            <circle cx="10" cy="18" r="1.8" fill="white" opacity="0.45"/>
+            <circle cx="26" cy="18" r="1.8" fill="white" opacity="0.45"/>
+            <circle cx="10" cy="26" r="1.8" fill="white" opacity="0.45"/>
+            <circle cx="18" cy="26" r="1.8" fill="white" opacity="0.45"/>
+            <circle cx="26" cy="26" r="1.8" fill="white" opacity="0.45"/>
+            <circle cx="18" cy="18" r="4" fill="white"/>
+            <text x="18" y="21.5" font-family="'Georgia',serif" font-weight="900" font-size="7" fill="#4f46e5" text-anchor="middle">M</text>
+            <line x1="18" y1="14" x2="10" y2="10" stroke="white" stroke-width="0.9" opacity="0.3"/>
+            <line x1="18" y1="14" x2="18" y2="10" stroke="white" stroke-width="0.9" opacity="0.3"/>
+            <line x1="18" y1="14" x2="26" y2="10" stroke="white" stroke-width="0.9" opacity="0.3"/>
+            <line x1="22" y1="18" x2="26" y2="18" stroke="white" stroke-width="0.9" opacity="0.3"/>
+            <line x1="18" y1="22" x2="26" y2="26" stroke="white" stroke-width="0.9" opacity="0.3"/>
+            <line x1="18" y1="22" x2="18" y2="26" stroke="white" stroke-width="0.9" opacity="0.3"/>
+            <line x1="18" y1="22" x2="10" y2="26" stroke="white" stroke-width="0.9" opacity="0.3"/>
+            <line x1="14" y1="18" x2="10" y2="18" stroke="white" stroke-width="0.9" opacity="0.3"/>
+          </svg>
+          <span class="footer-wordmark">Mobility<span>Grid</span></span>
+        </div>
+        <p class="footer-tagline">The operating system for India's fleet economy — built for every operator, manager, and driver, at any scale.</p>
+        <div class="footer-badge">
+          <div class="footer-badge-dot"></div>
+          <span class="footer-badge-text">India's Fleet Operating System</span>
+        </div>
+      </div>
+
+      <!-- Product column -->
+      <div class="footer-col">
+        <div class="footer-col-title">Product</div>
+        <ul class="footer-links">
+          <li><a href="#product" class="footer-link">Super Admin Console</a></li>
+          <li><a href="#product" class="footer-link">Fleet Owner Dashboard</a></li>
+          <li><a href="#product" class="footer-link">Driver Terminal</a></li>
+          <li><a href="#product" class="footer-link">KYC &amp; Compliance</a></li>
+        </ul>
+      </div>
+
+      <!-- Company column -->
+      <div class="footer-col">
+        <div class="footer-col-title">Company</div>
+        <ul class="footer-links">
+          <li><a href="#vision" class="footer-link">Vision &amp; Mission</a></li>
+          <li><a href="#gaps"   class="footer-link">The Problem We Solve</a></li>
+          <li><a href="#how"    class="footer-link">How It Works</a></li>
+          <li><a href="#signup" class="footer-link">Get Early Access</a></li>
+        </ul>
+      </div>
+
+      <!-- Contact column -->
+      <div class="footer-col">
+        <div class="footer-col-title">Contact</div>
+        <ul class="footer-links">
+          <li><a href="mailto:hello@mobilitygrid.in" class="footer-link">hello@mobilitygrid.in</a></li>
+          <li><a class="footer-link">Bengaluru, India</a></li>
+          <li><a href="#signup" class="footer-link">Request a Demo</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2026 MobilityGrid. All rights reserved.</div>
+      <div class="footer-by">
+        Built with purpose in India <span class="footer-india">🇮🇳</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── Platform login URL ──────────────────────────────────────────────
+  // Update this to the URL of your deployed platform login page
+  const PLATFORM_LOGIN_URL = 'https://mg-sandy.vercel.app/login'; // mg-sandy = your platform
+  // ───────────────────────────────────────────────────────────────────
+
+  function launchPlatform(e) {
+    e.preventDefault();
+    window.open(PLATFORM_LOGIN_URL, '_blank', 'noopener,noreferrer');
+  }
+
+  // nav scroll
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40);
+  }, { passive: true });
+
+  // product tabs
+  function switchTab(id) {
+    document.querySelectorAll('.ptab').forEach((t, i) => {
+      const ids = ['admin','owner','driver'];
+      t.classList.toggle('active', ids[i] === id);
+    });
+    document.querySelectorAll('.product-panel').forEach(p => {
+      p.classList.toggle('active', p.id === 'panel-' + id);
+    });
+  }
+
+  // form submit
+  document.getElementById('signupForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const phone = document.getElementById('f_phone').value.trim();
+    if (!/^\d{10}$/.test(phone)) {
+      alert('Please enter a valid 10-digit WhatsApp number.');
+      return;
+    }
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    const payload = {
+      name:    document.getElementById('f_name').value.trim(),
+      phone,
+      company: document.getElementById('f_company').value.trim(),
+      role:    document.getElementById('f_role').value,
+      fleet:   document.getElementById('f_fleet').value,
+      city:    document.getElementById('f_city').value.trim(),
+      type:    document.getElementById('f_type').value,
+      ts:      new Date().toISOString(),
+    };
+
+    try {
+      await fetch('https://mg-qw5s.onrender.com/api/auth/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (_) {}
+
+    document.getElementById('formCard').style.display = 'none';
+    const s = document.getElementById('successCard');
+    s.classList.add('show');
+    s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+</script>
+</body>
+</html>

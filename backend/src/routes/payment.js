@@ -1,12 +1,11 @@
-require('dotenv').config(); //read backend .env fileyou 
+require('dotenv').config();
 
 const express = require('express');
-
 const router = express.Router();
-
 const { v4: uuidv4 } = require('uuid');
-
 const pool = require('../config/db');
+const { verifyToken, requirePermission } = require('../middleware/auth');
+const { logAudit } = require('../utils/audit');
 // ─── ASSIGNMENT HISTORY HELPER ───────────────────────────────────────
 const logAssignment = async (driverId, vehicleId, ownerId, dailyRent, rentType) => {
   try {
@@ -747,29 +746,34 @@ router.post('/owner/ledger-entry', async (req, res) => {
     if (!driverCheck.rows[0]) 
       return res.status(403).json({ error: 'Driver does not belong to this owner' });
 
-    // Entry insert karo
-    await pool.query(
-      `INSERT INTO public.driver_ledger 
-       (driver_id, owner_id, entry_type, amount, description, created_by)
-       VALUES ($1, $2, $3, $4, $5, 'OWNER')`,
-      [driverId, ownerId, entryType, amount, description || '']
-    );
-
-    // Advance ya repair credit hone pe driver balance update
-    if (['ADVANCE_CREDIT', 'REPAIR_CREDIT', 'REFUND'].includes(entryType)) {
-      await pool.query(
-        `UPDATE public.drivers SET advance_balance = COALESCE(advance_balance, 0) + $1 WHERE id = $2`,
-        [amount, driverId]
+    // Atomic: ledger insert + balance update together
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO public.driver_ledger
+         (driver_id, owner_id, entry_type, amount, description, created_by)
+         VALUES ($1, $2, $3, $4, $5, 'OWNER')`,
+        [driverId, ownerId, entryType, amount, description || '']
       );
-    }
-    // Damage ya penalty pe advance se deduct karo pehle
-    if (['DAMAGE_CHARGE', 'PENALTY'].includes(entryType)) {
-      await pool.query(
-        `UPDATE public.drivers 
-         SET advance_balance = GREATEST(0, COALESCE(advance_balance, 0) - $1) 
-         WHERE id = $2`,
-        [amount, driverId]
-      );
+      if (['ADVANCE_CREDIT', 'REPAIR_CREDIT', 'REFUND'].includes(entryType)) {
+        await client.query(
+          `UPDATE public.drivers SET advance_balance = COALESCE(advance_balance, 0) + $1 WHERE id = $2`,
+          [amount, driverId]
+        );
+      }
+      if (['DAMAGE_CHARGE', 'PENALTY'].includes(entryType)) {
+        await client.query(
+          `UPDATE public.drivers SET advance_balance = GREATEST(0, COALESCE(advance_balance, 0) - $1) WHERE id = $2`,
+          [amount, driverId]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
     }
     // Notification bhejo driver ko
 const entryMessages = {
@@ -850,6 +854,70 @@ router.get('/owner/driver-ledger', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// WAL-07: CSV download for driver ledger
+router.get('/owner/driver-ledger/csv', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+
+    const ownerRes = await pool.query(
+      `SELECT owner_code FROM public.owners WHERE id = $1`, [ownerId]
+    );
+    const ownerCode = ownerRes.rows[0]?.owner_code;
+    if (!ownerCode) return res.status(404).json({ error: 'Owner not found' });
+
+    const result = await pool.query(`
+      SELECT
+        d.full_name,
+        d.mobile_number,
+        COALESCE(v.vehicle_number, 'Not Assigned') AS vehicle_number,
+        COALESCE(v.daily_rent, 0) AS daily_rent,
+        COALESCE(SUM(
+          CASE WHEN dl.entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND')
+          THEN dl.amount ELSE 0 END
+        ), 0) AS total_paid,
+        COALESCE(SUM(
+          CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY')
+          THEN dl.amount ELSE 0 END
+        ), 0) AS total_charged,
+        d.advance_balance,
+        d.security_deposit
+      FROM public.drivers d
+      LEFT JOIN public.vehicles v ON v.driver_id = d.id
+      LEFT JOIN public.driver_ledger dl ON dl.driver_id = d.id
+      WHERE d.owner_code = $1 AND d.status = 'ACTIVE'
+      GROUP BY d.id, d.full_name, d.mobile_number, d.advance_balance,
+               d.security_deposit, v.vehicle_number, v.daily_rent
+      ORDER BY d.full_name
+    `, [ownerCode]);
+
+    const header = ['Name', 'Mobile', 'Vehicle', 'Daily Rent', 'Total Paid', 'Total Charged', 'Pending', 'Advance', 'Security Deposit'];
+    const rows = result.rows.map(d => {
+      const pending = Math.max(0, parseFloat(d.total_charged) - parseFloat(d.total_paid));
+      return [
+        `"${d.full_name}"`,
+        d.mobile_number,
+        `"${d.vehicle_number}"`,
+        parseFloat(d.daily_rent || 0).toFixed(2),
+        parseFloat(d.total_paid || 0).toFixed(2),
+        parseFloat(d.total_charged || 0).toFixed(2),
+        pending.toFixed(2),
+        parseFloat(d.advance_balance || 0).toFixed(2),
+        parseFloat(d.security_deposit || 0).toFixed(2)
+      ].join(',');
+    });
+
+    const csv = [header.join(','), ...rows].join('\n');
+    const date = new Date().toISOString().split('T')[0];
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="ledger_${ownerCode}_${date}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('Ledger CSV error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/owner/notify-unpaid', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -945,7 +1013,7 @@ router.post('/owner/remind-overdue', async (req, res) => {
   }
 });
 
-router.post('/owner/cash-payment', async (req, res) => {
+router.post('/owner/cash-payment', verifyToken, requirePermission('record_cash'), async (req, res) => {
   try {
     const { driverPhone, driverName, amount, ownerId, purpose = 'RENT' } = req.body;
     if (!driverPhone || !amount) return res.status(400).json({ success: false, message: 'Missing fields' });
@@ -966,32 +1034,42 @@ router.post('/owner/cash-payment', async (req, res) => {
     const orderId = uuidv4();
     const orderNumber = `CASH-${Date.now()}-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
 
-    await pool.query(`
-      INSERT INTO ms_orders (
-        order_id, order_number, pg_transaction_id,
-        order_amount, currency,
-        payer_name, payer_mobile,
-        transaction_status, payment_mode,
-        order_completion_date, order_initiation_date,
-        driver_code, owner_code, vehicle_number,
-        driver_full_name, purpose
-      ) VALUES ($1,$2,$3,$4,'INR',$5,$6,'SUCCESS','CASH',NOW(),NOW(),$7,$8,$9,$10,$11)`,
-      [
-        orderId, orderNumber, orderNumber,
-        parseFloat(amount),
-        di.full_name || driverName, driverPhone,
-        di.driver_code || null,
-        di.owner_code || null,
-        di.vehicle_number || null,
-        di.full_name || driverName,
-        purpose
-      ]
-    );
-
-    await pool.query(
-      `UPDATE public.drivers SET wallet_balance = COALESCE(wallet_balance,0) + $1 WHERE mobile_number = $2`,
-      [parseFloat(amount), driverPhone]
-    );
+    // Atomic: ms_orders insert + wallet_balance update together
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`
+        INSERT INTO ms_orders (
+          order_id, order_number, pg_transaction_id,
+          order_amount, currency,
+          payer_name, payer_mobile,
+          transaction_status, payment_mode,
+          order_completion_date, order_initiation_date,
+          driver_code, owner_code, vehicle_number,
+          driver_full_name, purpose
+        ) VALUES ($1,$2,$3,$4,'INR',$5,$6,'SUCCESS','CASH',NOW(),NOW(),$7,$8,$9,$10,$11)`,
+        [
+          orderId, orderNumber, orderNumber,
+          parseFloat(amount),
+          di.full_name || driverName, driverPhone,
+          di.driver_code || null,
+          di.owner_code || null,
+          di.vehicle_number || null,
+          di.full_name || driverName,
+          purpose
+        ]
+      );
+      await client.query(
+        `UPDATE public.drivers SET wallet_balance = COALESCE(wallet_balance,0) + $1 WHERE mobile_number = $2`,
+        [parseFloat(amount), driverPhone]
+      );
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
 
     await pool.query(
       `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
@@ -1183,7 +1261,7 @@ router.post('/owner/add-driver', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to add driver: ' + err.message });
   }
 });
-router.get('/owner/transactions', async (req, res) => {
+router.get('/owner/transactions', verifyToken, requirePermission('view_collections'), async (req, res) => {
   try {
     const { ownerId } = req.query;
     // ownerId is numeric owner id — look up owner_code for matching
@@ -1207,7 +1285,7 @@ router.get('/owner/transactions', async (req, res) => {
               COALESCE(d.full_name, mo.payer_name, mo.driver_full_name) as driver_name,
               v.vehicle_number, mo.purpose
        FROM public.ms_orders mo
-       LEFT JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+       LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
        LEFT JOIN public.vehicles v ON v.driver_id = d.id
        WHERE mo.transaction_status IN ('SUCCESS', 'PENDING', 'FAILED')
        ${ownerFilter}
@@ -1281,8 +1359,18 @@ router.get('/owners/list', async (req, res) => {
     res.json({ owners: [] });
   }
 });
-router.get('/owner/drivers/list', async (req, res) => {
+router.get('/owner/drivers/list', verifyToken, requirePermission('view_drivers'), async (req, res) => {
   try {
+    const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50', 10)));
+    const offset = (page - 1) * limit;
+
+    // Total count
+    const countRes = await pool.query(
+      `SELECT COUNT(*) FROM public.drivers WHERE status = 'ACTIVE'`
+    );
+    const total = parseInt(countRes.rows[0].count, 10);
+
     const result = await pool.query(
       `SELECT d.id, d.full_name, d.mobile_number as phone_number,
               d.driver_code, d.wallet_balance, d.status, d.created_at,
@@ -1291,12 +1379,18 @@ router.get('/owner/drivers/list', async (req, res) => {
        FROM public.drivers d
        LEFT JOIN public.vehicles v ON v.driver_id = d.id
        WHERE d.status = 'ACTIVE'
-       ORDER BY d.full_name`
+       ORDER BY d.full_name
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
     );
-    res.json({ drivers: result.rows });
+
+    res.json({
+      drivers: result.rows,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+    });
   } catch (err) {
     console.error('Get drivers error:', err);
-    res.json({ drivers: [] });
+    res.json({ drivers: [], pagination: { page: 1, limit: 50, total: 0, pages: 0 } });
   }
 });
 
@@ -1371,22 +1465,16 @@ router.get('/owner/trend', async (req, res) => {
         `SELECT
            TO_CHAR(DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
            DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') AS date,
-           COALESCE(SUM(mo.order_amount), 0)::int AS online,
-           COALESCE((
-             SELECT SUM(le.amount) FROM public.driver_ledger le
-             JOIN public.drivers d2 ON d2.id = le.driver_id
-             WHERE d2.owner_code = $2
-               AND le.entry_type = 'CASH_PAYMENT'
-               AND DATE(le.created_at AT TIME ZONE 'Asia/Kolkata') = DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
-           ), 0)::int AS cash
+           COALESCE(SUM(CASE WHEN mo.payment_mode != 'CASH' THEN mo.order_amount ELSE 0 END), 0)::int AS online,
+           COALESCE(SUM(CASE WHEN mo.payment_mode = 'CASH' THEN mo.order_amount ELSE 0 END), 0)::int AS cash
          FROM public.ms_orders mo
-         JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
-         WHERE d.owner_code = $2
+         LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
+         WHERE (d.owner_code = $1 OR mo.owner_code = $1)
            AND mo.transaction_status = 'SUCCESS'
            AND mo.order_completion_date >= NOW() - INTERVAL '30 days'
          GROUP BY DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
          ORDER BY date ASC`,
-        [parseInt(ownerId), ownerCode]
+        [ownerCode]
       );
       rows = result.rows;
     } else {
@@ -1395,10 +1483,10 @@ router.get('/owner/trend', async (req, res) => {
         `SELECT
            TO_CHAR(DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
            DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') AS date,
-           COALESCE(SUM(mo.order_amount), 0)::int AS online,
-           0::int AS cash
+           COALESCE(SUM(CASE WHEN mo.payment_mode != 'CASH' THEN mo.order_amount ELSE 0 END), 0)::int AS online,
+           COALESCE(SUM(CASE WHEN mo.payment_mode = 'CASH' THEN mo.order_amount ELSE 0 END), 0)::int AS cash
          FROM public.ms_orders mo
-         JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+         LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
          WHERE d.owner_id = $1
            AND mo.transaction_status = 'SUCCESS'
            AND mo.order_completion_date >= NOW() - INTERVAL '30 days'
@@ -2072,7 +2160,7 @@ router.get('/driver/profile', async (req, res) => {
     res.status(500).json({ message: 'Failed' });
   }
 });
-router.get('/owner/sos-alerts', async (req, res) => {
+router.get('/owner/sos-alerts', verifyToken, requirePermission('sos_alerts'), async (req, res) => {
   try {
     const { ownerId } = req.query;
     const result = await pool.query(
@@ -2875,6 +2963,8 @@ router.post('/owner/managers/add', async (req, res) => {
        FROM public.drivers WHERE mobile_number=$1`,
       [mobileNumber]
     ).catch(() => {});
+    // ADM-06: Audit log
+    logAudit('MANAGER_CREATED', 'manager', r.rows[0]?.id, 'owner:' + ownerId, { full_name: fullName, mobile_number: mobileNumber, manager_code: code });
     res.json({ success: true, manager: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

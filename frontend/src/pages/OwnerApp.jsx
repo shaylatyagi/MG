@@ -2515,32 +2515,33 @@ const PaymentsTab = () => {
       </div>
 
       {/* Cash Payments — ALAG SECTION NICHE */}
-      {cashTx.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-4 py-3 border-b bg-emerald-50">
-            <h3 className="text-[10px] font-black text-emerald-700 uppercase">💵 {t.cashPaid}</h3>
-          </div>
-          <div className="divide-y max-h-64 overflow-y-auto">
-            {cashTx.map((tx, i) => (
-              <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
-                <div>
-                  <p className="text-xs font-black text-slate-800">{tx.driver_name || tx.payer_name}</p>
-                  <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
-                  <p className="text-[9px] text-slate-400 font-mono">
-                    {new Date(tx.order_completion_date || tx.order_initiation_date).toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-emerald-600">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                    💵 CASH
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="px-4 py-3 border-b bg-emerald-50 flex items-center justify-between">
+          <h3 className="text-[10px] font-black text-emerald-700 uppercase">💵 {t.cashPaid}</h3>
+          {cashTx.length > 0 && <span className="text-[10px] font-black text-emerald-600">₹{cashTotal.toLocaleString('en-IN')}</span>}
         </div>
-      )}
+        <div className="divide-y max-h-64 overflow-y-auto">
+          {cashTx.length === 0 ? (
+            <p className="text-[11px] text-slate-400 text-center py-6">No cash payments recorded yet</p>
+          ) : cashTx.map((tx, i) => (
+            <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+              <div>
+                <p className="text-xs font-black text-slate-800">{tx.driver_name || tx.payer_name}</p>
+                <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
+                <p className="text-[9px] text-slate-400 font-mono">
+                  {new Date(tx.order_completion_date || tx.order_initiation_date).toLocaleString()}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-black text-emerald-600">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                  💵 CASH
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
       <DriverLedgerSection ownerIdVal={ownerId()} tokenVal={token()} />
 
       {/* Transaction Detail Modal */}

@@ -77,7 +77,13 @@ export default function Login() {
       if (data.success) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        navigate(selectedRole.redirect);
+        const role = data.user?.role;
+        if (role === 'MANAGER') navigate('/manager/dashboard');
+        else if (selectedRole.type === 'admin') {
+          // CompanyDashboard reads mg_admin_token, not token
+          localStorage.setItem('mg_admin_token', data.token);
+          window.location.href = '/admin/dashboard';
+        } else navigate(selectedRole.redirect);
       } else { setError(data.message || 'OTP galat hai'); }
     } catch { setError('Network error.'); }
     setLoading(false);

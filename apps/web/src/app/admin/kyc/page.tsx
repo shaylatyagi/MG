@@ -3,24 +3,29 @@ import { useEffect, useState } from 'react';
 import Badge from '@/components/admin/Badge';
 import { api, fmt } from '@/lib/api';
 
+// KYC statuses per DevSpec schema: PENDING | PARTIAL | APPROVED | REJECTED
+const DOC_LABELS: Record<string, string> = {
+  aadhaar_front:    'Aadhaar (Front)',
+  aadhaar_back:     'Aadhaar (Back)',
+  pan:              'PAN',
+  driving_licence:  'Driving Licence',
+  bank_account:     'Bank Account',
+};
+
 interface KycDriver {
-  id: number;
-  full_name: string;
-  mobile_number: string;
-  driver_code: string;
-  kyc_status: string | null;
-  aadhaar_number: string | null;
-  pan_number: string | null;
-  driving_license_number: string | null;
-  driving_license_expiry: string | null;
-  kyc_rejection_reason: string | null;
-  owner_name: string | null;
-  owner_code: string | null;
-  company_name: string | null;
-  created_at: string;
+  id:            number;
+  name:          string;
+  phone_number:  string;
+  kyc_status:    string | null;
+  wallet_balance: number;
+  owner_name:    string | null;
+  company_name:  string | null;
+  vehicle_number: string | null;
+  uploaded_docs: string[];
+  created_at:    string;
 }
 
-const TABS = ['PENDING', 'VERIFIED', 'REJECTED', 'ALL'] as const;
+const TABS = ['PENDING', 'APPROVED', 'PARTIAL', 'REJECTED', 'ALL'] as const;
 type Tab = typeof TABS[number];
 
 export default function KycPage() {
@@ -42,6 +47,7 @@ export default function KycPage() {
       setDrivers(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
+      setDrivers([]);
     } finally {
       setLoading(false);
     }
@@ -63,9 +69,13 @@ export default function KycPage() {
 
   const reject = async () => {
     if (!rejectModal) return;
+    if (!rejectReason.trim()) {
+      alert('Please enter a rejection reason');
+      return;
+    }
     setActionId(rejectModal.id);
     try {
-      await api.patch(`/api/admin/kyc/${rejectModal.id}/reject`, { reason: rejectReason || 'Documents not acceptable' });
+      await api.patch(`/api/admin/kyc/${rejectModal.id}/reject`, { reason: rejectReason });
       setDrivers(ds => ds.filter(d => d.id !== rejectModal.id));
       setRejectModal(null);
       setRejectReason('');
@@ -77,11 +87,18 @@ export default function KycPage() {
   };
 
   const filtered = drivers.filter(d =>
-    d.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    d.mobile_number?.includes(search) ||
-    d.driver_code?.toLowerCase().includes(search.toLowerCase()) ||
-    d.owner_name?.toLowerCase().includes(search.toLowerCase())
+    d.name?.toLowerCase().includes(search.toLowerCase()) ||
+    d.phone_number?.includes(search) ||
+    (d.owner_name || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  const tabLabel = (t: Tab) => {
+    if (t === 'PENDING')  return 'Pending Review';
+    if (t === 'APPROVED') return 'Approved';
+    if (t === 'PARTIAL')  return 'Partial';
+    if (t === 'REJECTED') return 'Rejected';
+    return 'All';
+  };
 
   return (
     <div className="p-8 space-y-6">
@@ -93,7 +110,7 @@ export default function KycPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit flex-wrap">
         {TABS.map(t => (
           <button
             key={t}
@@ -102,7 +119,7 @@ export default function KycPage() {
               tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            {t === 'PENDING' ? 'Pending Review' : t === 'VERIFIED' ? 'Approved' : t === 'REJECTED' ? 'Rejected' : 'All'}
+            {tabLabel(t)}
           </button>
         ))}
       </div>
@@ -116,14 +133,13 @@ export default function KycPage() {
         className="w-full max-w-sm px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
       />
 
-      {/* Count */}
       {!loading && (
         <p className="text-sm text-slate-500">
           Showing {filtered.length} driver{filtered.length !== 1 ? 's' : ''}
         </p>
       )}
 
-      {/* List */}
+      {/* Driver cards */}
       {loading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
@@ -144,41 +160,34 @@ export default function KycPage() {
                 {/* Driver info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-slate-900">{driver.full_name}</p>
-                    <Badge status={driver.kyc_status || 'NOT_STARTED'} />
+                    <p className="font-semibold text-slate-900">{driver.name}</p>
+                    <Badge status={driver.kyc_status || 'PENDING'} />
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                    <span>📱 {driver.mobile_number}</span>
-                    <span>ID: {driver.driver_code}</span>
-                    {driver.owner_name && <span>Owner: {driver.owner_name}</span>}
+                    <span>📱 {driver.phone_number}</span>
+                    {driver.owner_name  && <span>Owner: {driver.owner_name}</span>}
                     {driver.company_name && <span>Co: {driver.company_name}</span>}
                     <span>Joined: {fmt.date(driver.created_at)}</span>
                   </div>
 
-                  {/* Documents */}
+                  {/* Uploaded documents */}
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <DocPill
-                      label="Aadhaar"
-                      value={driver.aadhaar_number}
-                    />
-                    <DocPill
-                      label="PAN"
-                      value={driver.pan_number}
-                    />
-                    <DocPill
-                      label="Driving License"
-                      value={driver.driving_license_number}
-                      sub={driver.driving_license_expiry
-                        ? `Exp: ${fmt.date(driver.driving_license_expiry)}`
-                        : undefined}
-                    />
+                    {(['aadhaar_front', 'aadhaar_back', 'pan', 'driving_licence', 'bank_account'] as const).map(docType => {
+                      const uploaded = driver.uploaded_docs?.includes(docType);
+                      return (
+                        <div
+                          key={docType}
+                          className={`px-2.5 py-1 rounded-lg text-xs border ${
+                            uploaded
+                              ? 'border-green-200 bg-green-50 text-green-700 font-medium'
+                              : 'border-slate-200 bg-slate-50 text-slate-400'
+                          }`}
+                        >
+                          {uploaded ? '✓ ' : '○ '}{DOC_LABELS[docType]}
+                        </div>
+                      );
+                    })}
                   </div>
-
-                  {driver.kyc_rejection_reason && (
-                    <p className="mt-2 text-xs text-red-600 bg-red-50 rounded px-2 py-1">
-                      Rejection reason: {driver.kyc_rejection_reason}
-                    </p>
-                  )}
                 </div>
 
                 {/* Actions */}
@@ -212,10 +221,12 @@ export default function KycPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Reject KYC</h2>
-              <p className="text-slate-500 text-sm mt-0.5">{rejectModal.full_name}</p>
+              <p className="text-slate-500 text-sm mt-0.5">{rejectModal.name}</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Reason for rejection</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Reason for rejection <span className="text-red-500">*</span>
+              </label>
               <textarea
                 value={rejectReason}
                 onChange={e => setRejectReason(e.target.value)}
@@ -233,7 +244,7 @@ export default function KycPage() {
               </button>
               <button
                 onClick={reject}
-                disabled={actionId !== null}
+                disabled={actionId !== null || !rejectReason.trim()}
                 className="flex-1 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {actionId !== null ? 'Rejecting…' : 'Confirm Reject'}
@@ -242,20 +253,6 @@ export default function KycPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function DocPill({ label, value, sub }: { label: string; value: string | null; sub?: string }) {
-  return (
-    <div className={`px-2.5 py-1 rounded-lg text-xs border ${
-      value ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-slate-50'
-    }`}>
-      <span className={value ? 'text-green-700 font-medium' : 'text-slate-400'}>
-        {value ? '✓ ' : '○ '}{label}
-      </span>
-      {value && <span className="text-slate-500 ml-1">{value}</span>}
-      {sub && <span className="block text-slate-400 mt-0.5">{sub}</span>}
     </div>
   );
 }

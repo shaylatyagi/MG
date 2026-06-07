@@ -1,169 +1,152 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import api from '../../api';
 
 export default function OwnerHandoverTab({ lang }) {
-  const [vehicleForm, setVehicleForm] = useState({ make: '', plate: '', frequency: 'daily', rent: '', deduction: '' });
-  const [driverForm, setDriverForm] = useState({ name: '', mobile: '', license: '', aadhaar: '' });
-  const [vehicleImages, setVehicleImages] = useState({ front: null, rear: null, left: null, dashboard: null });
-  const [docs, setDocs] = useState({ rc: null, insurance: null });
-  const [advanceAmount, setAdvanceAmount] = useState('');
-  const [vehicleDone, setVehicleDone] = useState(false);
-  const [driverDone, setDriverDone] = useState(false);
-  const [dispatchDone, setDispatchDone] = useState(false);
+  const [step, setStep]         = useState('vehicle'); // vehicle | driver | assign
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers]   = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [success, setSuccess]   = useState('');
 
-  const handleImageUpload = (angle, file) => {
-    if (file) setVehicleImages(prev => ({ ...prev, [angle]: file.name }));
+  const [vForm, setVForm] = useState({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '' });
+  const [dForm, setDForm] = useState({ name: '', phone_number: '', emergency_contact: '' });
+  const [aForm, setAForm] = useState({ driver_id: '', vehicle_id: '', deposit_amount: '0' });
+
+  const loadLists = useCallback(async () => {
+    try {
+      const [vRes, dRes] = await Promise.all([
+        api.get('/api/owner/vehicles'),
+        api.get('/api/owner/drivers'),
+      ]);
+      const vData = vRes.data?.data ?? vRes.data;
+      const dData = dRes.data?.data ?? dRes.data;
+      setVehicles(Array.isArray(vData) ? vData.filter(v => v.status === 'AVAILABLE') : []);
+      setDrivers(Array.isArray(dData) ? dData.filter(d => !d.vehicle_id) : []);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  useEffect(() => { if (step === 'assign') loadLists(); }, [step, loadLists]);
+
+  const submitVehicle = async (e) => {
+    e.preventDefault(); setError(''); setSuccess(''); setLoading(true);
+    try {
+      await api.post('/api/owner/vehicles', {
+        reg_number: vForm.reg_number.toUpperCase(), type: vForm.type,
+        rent_type: vForm.rent_type, daily_rent: parseFloat(vForm.daily_rent) || 0,
+        model: vForm.model || undefined,
+      });
+      setSuccess(lang === 'en' ? '✓ Vehicle registered!' : '✓ वाहन पंजीकृत!');
+      setVForm({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '' });
+    } catch (e) { setError(e.response?.data?.message || 'Failed'); }
+    finally { setLoading(false); }
   };
 
-  const handleDocUpload = (docKey, file) => {
-    if (file) setDocs(prev => ({ ...prev, [docKey]: file.name }));
+  const submitDriver = async (e) => {
+    e.preventDefault(); setError(''); setSuccess(''); setLoading(true);
+    if (!/^\d{10}$/.test(dForm.phone_number)) { setError('Phone must be 10 digits'); setLoading(false); return; }
+    try {
+      await api.post('/api/owner/drivers', { name: dForm.name.trim(), phone_number: dForm.phone_number, emergency_contact: dForm.emergency_contact || undefined });
+      setSuccess(lang === 'en' ? '✓ Driver onboarded!' : '✓ ड्राइवर ऑनबोर्ड!');
+      setDForm({ name: '', phone_number: '', emergency_contact: '' });
+    } catch (e) { setError(e.response?.data?.message || 'Failed'); }
+    finally { setLoading(false); }
   };
+
+  const submitAssign = async (e) => {
+    e.preventDefault(); setError(''); setSuccess(''); setLoading(true);
+    if (!aForm.driver_id || !aForm.vehicle_id) { setError('Select both driver and vehicle'); setLoading(false); return; }
+    try {
+      const v = vehicles.find(x => String(x.id) === String(aForm.vehicle_id));
+      await api.post('/api/owner/assign', {
+        driver_id: parseInt(aForm.driver_id), vehicle_id: parseInt(aForm.vehicle_id),
+        rent_type: v?.rent_type || 'DAILY', rent_amount: v?.daily_rent || 0,
+        deposit_amount: parseFloat(aForm.deposit_amount) || 0,
+      });
+      setSuccess(lang === 'en' ? '✓ Vehicle assigned!' : '✓ वाहन असाइन किया!');
+      setAForm({ driver_id: '', vehicle_id: '', deposit_amount: '0' });
+      loadLists();
+    } catch (e) { setError(e.response?.data?.message || 'Assignment failed'); }
+    finally { setLoading(false); }
+  };
+
+  const inp = { width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px' };
+  const btn = { width: '100%', padding: '12px', backgroundColor: loading ? '#C49A6C' : '#8B5E3C', color: 'white', borderRadius: '8px', fontSize: '13px', fontWeight: '700', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: '4px' };
 
   return (
     <div style={{ padding: '16px' }}>
-
-      {/* Register Vehicle */}
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #E8E0D5' }}>
-        <p style={{ fontSize: '13px', fontWeight: '700', color: '#1A1A1A', marginBottom: '12px' }}>
-          {lang === 'en' ? '🚗 Register Enterprise Rental Vehicle' : '🚗 वाहन पंजीकरण'}
-        </p>
-
-        {vehicleDone ? (
-          <div style={{ backgroundColor: '#DCFCE7', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-            <p style={{ color: '#16A34A', fontWeight: '700' }}>✓ {lang === 'en' ? 'Vehicle registered successfully!' : 'वाहन पंजीकृत!'}</p>
-          </div>
-        ) : (
-          <>
-            <input placeholder={lang === 'en' ? 'Vehicle Make Model Name' : 'वाहन मेक/मॉडल'} value={vehicleForm.make} onChange={(e) => setVehicleForm({ ...vehicleForm, make: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px' }} />
-            <input placeholder={lang === 'en' ? 'RTO Registration Number' : 'RTO नंबर'} value={vehicleForm.plate} onChange={(e) => setVehicleForm({ ...vehicleForm, plate: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px' }} />
-
-            <p style={{ fontSize: '12px', color: '#6B6B6B', marginBottom: '6px' }}>{lang === 'en' ? 'Rental Frequency' : 'किराया चक्र'}</p>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              {['daily', 'weekly', 'monthly'].map(f => (
-                <button key={f} onClick={() => setVehicleForm({ ...vehicleForm, frequency: f })} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: `1px solid ${vehicleForm.frequency === f ? '#8B5E3C' : '#E8E0D5'}`, backgroundColor: vehicleForm.frequency === f ? '#F3EDE5' : 'white', color: vehicleForm.frequency === f ? '#8B5E3C' : '#6B6B6B', fontSize: '11px', fontWeight: '600', cursor: 'pointer', textTransform: 'capitalize' }}>
-                  {lang === 'en' ? f : f === 'daily' ? 'दैनिक' : f === 'weekly' ? 'साप्ताहिक' : 'मासिक'}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <input placeholder={lang === 'en' ? 'Base Rent (₹)' : 'बेस किराया (₹)'} type="number" value={vehicleForm.rent} onChange={(e) => setVehicleForm({ ...vehicleForm, rent: e.target.value })} style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px' }} />
-              <input placeholder={lang === 'en' ? 'Deduction/Day (₹)' : 'कटौती/दिन (₹)'} type="number" value={vehicleForm.deduction} onChange={(e) => setVehicleForm({ ...vehicleForm, deduction: e.target.value })} style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px' }} />
-            </div>
-
-            <p style={{ fontSize: '12px', color: '#6B6B6B', marginBottom: '8px' }}>{lang === 'en' ? 'Vehicle Inspection Images (All Angles Required)' : 'वाहन निरीक्षण फोटो (सभी कोण)'}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-              {['front', 'rear', 'left', 'dashboard'].map(angle => (
-                <label key={angle} style={{ cursor: 'pointer' }}>
-                  <div style={{ backgroundColor: vehicleImages[angle] ? '#DCFCE7' : '#FAF7F2', border: `2px dashed ${vehicleImages[angle] ? '#16A34A' : '#8B5E3C'}`, borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '18px', marginBottom: '4px' }}>📷</p>
-                    <p style={{ fontSize: '11px', color: vehicleImages[angle] ? '#16A34A' : '#8B5E3C', fontWeight: '600', textTransform: 'capitalize' }}>
-                      {vehicleImages[angle] ? '✓ Uploaded' : (lang === 'en' ? angle : angle === 'front' ? 'सामने' : angle === 'rear' ? 'पीछे' : angle === 'left' ? 'बाईं तरफ' : 'डैशबोर्ड')}
-                    </p>
-                  </div>
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageUpload(angle, e.target.files[0])} />
-                </label>
-              ))}
-            </div>
-
-            <p style={{ fontSize: '12px', color: '#6B6B6B', marginBottom: '8px' }}>{lang === 'en' ? 'Compliance Documents Vault' : 'अनुपालन दस्तावेज़'}</p>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-              {[{ key: 'rc', label: lang === 'en' ? 'RTO RC Smart Card' : 'RTO RC कार्ड' }, { key: 'insurance', label: lang === 'en' ? 'Insurance Policy' : 'बीमा पॉलिसी' }].map(doc => (
-                <label key={doc.key} style={{ flex: 1, cursor: 'pointer' }}>
-                  <div style={{ backgroundColor: docs[doc.key] ? '#DCFCE7' : '#FAF7F2', border: `1px dashed ${docs[doc.key] ? '#16A34A' : '#8B5E3C'}`, borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '11px', color: docs[doc.key] ? '#16A34A' : '#8B5E3C', fontWeight: '600' }}>
-                      {docs[doc.key] ? '✓ ' + doc.label : '📎 ' + doc.label}
-                    </p>
-                  </div>
-                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }} onChange={(e) => handleDocUpload(doc.key, e.target.files[0])} />
-                </label>
-              ))}
-            </div>
-
-            <button onClick={() => setVehicleDone(true)} style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '8px', fontSize: '13px', fontWeight: '700', border: 'none', cursor: 'pointer' }}>
-              {lang === 'en' ? 'Instantiate Vehicle & Proceed' : 'वाहन पंजीकृत करें'}
-            </button>
-          </>
-        )}
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', backgroundColor: '#F3EDE5', padding: '4px', borderRadius: '10px' }}>
+        {[['vehicle', lang === 'en' ? '🚗 Vehicle' : '🚗 वाहन'], ['driver', lang === 'en' ? '👤 Driver' : '👤 ड्राइवर'], ['assign', lang === 'en' ? '🔗 Assign' : '🔗 असाइन']].map(([s, label]) => (
+          <button key={s} onClick={() => { setStep(s); setError(''); setSuccess(''); }}
+            style={{ flex: 1, padding: '8px', borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '600', backgroundColor: step === s ? '#8B5E3C' : 'transparent', color: step === s ? 'white' : '#8B5E3C' }}>
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Onboard Driver */}
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '16px', marginBottom: '16px', border: '1px solid #E8E0D5' }}>
-        <p style={{ fontSize: '13px', fontWeight: '700', color: '#1A1A1A', marginBottom: '12px' }}>
-          {lang === 'en' ? '👤 Onboard Field Driver Account' : '👤 ड्राइवर ऑनबोर्डिंग'}
-        </p>
+      {error   && <div style={{ backgroundColor: '#FEE2E2', color: '#DC2626', padding: '10px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '12px' }}>{error}</div>}
+      {success && <div style={{ backgroundColor: '#DCFCE7', color: '#16A34A', padding: '10px 12px', borderRadius: '8px', fontSize: '12px', marginBottom: '12px' }}>{success}</div>}
 
-        {driverDone ? (
-          <div style={{ backgroundColor: '#DCFCE7', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-            <p style={{ color: '#16A34A', fontWeight: '700' }}>✓ {lang === 'en' ? 'Driver onboarded successfully!' : 'ड्राइवर ऑनबोर्ड हो गया!'}</p>
-          </div>
-        ) : (
-          <>
-            <input placeholder={lang === 'en' ? 'Driver Legal Full Name' : 'ड्राइवर का पूरा नाम'} value={driverForm.name} onChange={(e) => setDriverForm({ ...driverForm, name: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px' }} />
-            <input placeholder={lang === 'en' ? 'Mobile Communication Contact' : 'मोबाइल नंबर'} type="tel" value={driverForm.mobile} onChange={(e) => setDriverForm({ ...driverForm, mobile: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px' }} />
-            <input placeholder={lang === 'en' ? 'Commercial License Number' : 'लाइसेंस नंबर'} value={driverForm.license} onChange={(e) => setDriverForm({ ...driverForm, license: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px' }} />
+      {step === 'vehicle' && (
+        <form onSubmit={submitVehicle} style={{ backgroundColor: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #E8E0D5' }}>
+          <p style={{ fontSize: '14px', fontWeight: '700', color: '#1A1A1A', marginBottom: '12px' }}>{lang === 'en' ? 'Register Vehicle' : 'वाहन पंजीकरण'}</p>
+          <input required placeholder={lang === 'en' ? 'Reg. Number (MH12AB1234) *' : 'RTO नंबर *'} value={vForm.reg_number} onChange={e => setVForm(f => ({ ...f, reg_number: e.target.value }))} style={inp} />
+          <input placeholder={lang === 'en' ? 'Model (optional)' : 'मॉडल'} value={vForm.model} onChange={e => setVForm(f => ({ ...f, model: e.target.value }))} style={inp} />
+          <select value={vForm.type} onChange={e => setVForm(f => ({ ...f, type: e.target.value }))} style={{ ...inp, backgroundColor: 'white' }}>
+            <option value="EV_AUTO">EV Auto</option>
+            <option value="PETROL_AUTO">Petrol Auto</option>
+            <option value="TRUCK">Truck</option>
+            <option value="CAB">Cab</option>
+            <option value="OTHER">Other</option>
+          </select>
+          <select value={vForm.rent_type} onChange={e => setVForm(f => ({ ...f, rent_type: e.target.value }))} style={{ ...inp, backgroundColor: 'white' }}>
+            <option value="DAILY">{lang === 'en' ? 'Daily' : 'दैनिक'}</option>
+            <option value="WEEKLY">{lang === 'en' ? 'Weekly' : 'साप्ताहिक'}</option>
+            <option value="MONTHLY">{lang === 'en' ? 'Monthly' : 'मासिक'}</option>
+          </select>
+          <input required type="number" placeholder={lang === 'en' ? 'Daily Rent (₹) *' : 'दैनिक किराया (₹) *'} value={vForm.daily_rent} onChange={e => setVForm(f => ({ ...f, daily_rent: e.target.value }))} style={inp} />
+          <button type="submit" disabled={loading} style={btn}>{loading ? '…' : (lang === 'en' ? 'Register Vehicle' : 'वाहन पंजीकृत करें')}</button>
+        </form>
+      )}
 
-            <p style={{ fontSize: '12px', color: '#6B6B6B', marginBottom: '6px' }}>{lang === 'en' ? 'Baseline KYC Identity Verification' : 'बुनियादी KYC सत्यापन'}</p>
-            <input placeholder={lang === 'en' ? 'Aadhaar Unique Card Number' : 'आधार नंबर'} value={driverForm.aadhaar} onChange={(e) => setDriverForm({ ...driverForm, aadhaar: e.target.value })} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', boxSizing: 'border-box', marginBottom: '8px' }} />
+      {step === 'driver' && (
+        <form onSubmit={submitDriver} style={{ backgroundColor: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #E8E0D5' }}>
+          <p style={{ fontSize: '14px', fontWeight: '700', color: '#1A1A1A', marginBottom: '12px' }}>{lang === 'en' ? 'Onboard Driver' : 'ड्राइवर ऑनबोर्ड करें'}</p>
+          <input required placeholder={lang === 'en' ? 'Full Name *' : 'पूरा नाम *'} value={dForm.name} onChange={e => setDForm(f => ({ ...f, name: e.target.value }))} style={inp} />
+          <input required type="tel" placeholder={lang === 'en' ? 'Mobile (10 digits) *' : 'मोबाइल (10 अंक) *'} value={dForm.phone_number} onChange={e => setDForm(f => ({ ...f, phone_number: e.target.value }))} style={inp} />
+          <input type="tel" placeholder={lang === 'en' ? 'Emergency Contact (optional)' : 'आपातकालीन संपर्क'} value={dForm.emergency_contact} onChange={e => setDForm(f => ({ ...f, emergency_contact: e.target.value }))} style={inp} />
+          <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '12px' }}>{lang === 'en' ? 'Driver logs in via OTP on their phone.' : 'ड्राइवर OTP से लॉगिन करेगा।'}</p>
+          <button type="submit" disabled={loading} style={btn}>{loading ? '…' : (lang === 'en' ? 'Onboard Driver' : 'ड्राइवर ऑनबोर्ड करें')}</button>
+        </form>
+      )}
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-              {[{ label: lang === 'en' ? '📎 Aadhaar Front' : '📎 आधार सामने' }, { label: lang === 'en' ? '📎 License Back' : '📎 लाइसेंस पीछे' }].map((d, i) => (
-                <label key={i} style={{ flex: 1, cursor: 'pointer' }}>
-                  <div style={{ backgroundColor: '#FAF7F2', border: '1px dashed #8B5E3C', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-                    <p style={{ fontSize: '11px', color: '#8B5E3C', fontWeight: '600' }}>{d.label}</p>
-                  </div>
-                  <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} />
-                </label>
-              ))}
-            </div>
+      {step === 'assign' && (
+        <form onSubmit={submitAssign} style={{ backgroundColor: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #E8E0D5' }}>
+          <p style={{ fontSize: '14px', fontWeight: '700', color: '#1A1A1A', marginBottom: '12px' }}>{lang === 'en' ? 'Assign Vehicle → Driver' : 'वाहन → ड्राइवर असाइन करें'}</p>
 
-            <button onClick={() => setDriverDone(true)} style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '8px', fontSize: '13px', fontWeight: '700', border: 'none', cursor: 'pointer' }}>
-              {lang === 'en' ? 'Onboard Driver Node Identity' : 'ड्राइवर ऑनबोर्ड करें'}
-            </button>
-          </>
-        )}
-      </div>
+          {vehicles.length === 0
+            ? <div style={{ backgroundColor: '#FEF3C7', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}><p style={{ fontSize: '12px', color: '#D97706', margin: 0 }}>⚠️ {lang === 'en' ? 'No available vehicles.' : 'कोई वाहन उपलब्ध नहीं।'}</p></div>
+            : <select value={aForm.vehicle_id} onChange={e => setAForm(f => ({ ...f, vehicle_id: e.target.value }))} style={{ ...inp, backgroundColor: 'white' }}>
+                <option value="">{lang === 'en' ? '— Select Vehicle —' : '— वाहन चुनें —'}</option>
+                {vehicles.map(v => <option key={v.id} value={v.id}>{v.reg_number} — ₹{v.daily_rent}/day</option>)}
+              </select>
+          }
 
-      {/* Dispatch & Advance */}
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #E8E0D5' }}>
-        <p style={{ fontSize: '13px', fontWeight: '700', color: '#1A1A1A', marginBottom: '12px' }}>
-          {lang === 'en' ? '🚀 Ecosystem Dispatch & Advance Allocation' : '🚀 डिस्पैच और अग्रिम आवंटन'}
-        </p>
+          {drivers.length === 0
+            ? <div style={{ backgroundColor: '#FEF3C7', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}><p style={{ fontSize: '12px', color: '#D97706', margin: 0 }}>⚠️ {lang === 'en' ? 'No unassigned drivers.' : 'कोई अनअसाइन्ड ड्राइवर नहीं।'}</p></div>
+            : <select value={aForm.driver_id} onChange={e => setAForm(f => ({ ...f, driver_id: e.target.value }))} style={{ ...inp, backgroundColor: 'white' }}>
+                <option value="">{lang === 'en' ? '— Select Driver —' : '— ड्राइवर चुनें —'}</option>
+                {drivers.map(d => <option key={d.id} value={d.id}>{d.name} — {d.phone_number}</option>)}
+              </select>
+          }
 
-        {dispatchDone ? (
-          <div style={{ backgroundColor: '#DCFCE7', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
-            <p style={{ color: '#16A34A', fontWeight: '700' }}>✓ {lang === 'en' ? 'Handover executed & capital disbursed!' : 'हैंडओवर और पूंजी वितरित!'}</p>
-          </div>
-        ) : (
-          <>
-            <div style={{ backgroundColor: '#FEF3C7', borderRadius: '8px', padding: '10px', marginBottom: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#D97706' }}>⚠️ {lang === 'en' ? 'No unassigned vehicles available' : 'कोई अनअसाइन्ड वाहन उपलब्ध नहीं'}</p>
-            </div>
-            <div style={{ backgroundColor: '#FEF3C7', borderRadius: '8px', padding: '10px', marginBottom: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#D97706' }}>⚠️ {lang === 'en' ? 'No active unassigned drivers available' : 'कोई अनअसाइन्ड ड्राइवर उपलब्ध नहीं'}</p>
-            </div>
-
-            <p style={{ fontSize: '12px', color: '#6B6B6B', marginBottom: '6px' }}>
-              {lang === 'en' ? 'Pre-handover Wallet Cash Advance Risk Shield' : 'प्री-हैंडओवर वॉलेट अग्रिम'}
-            </p>
-            <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '10px' }}>
-              {lang === 'en' ? 'Allocate immediate float liquid capital to the driver\'s profile wallet for toll gates, fastag recharge, or battery top-ups.' : 'ड्राइवर के वॉलेट में टोल, फास्टैग या बैटरी टॉप-अप के लिए अग्रिम राशि आवंटित करें।'}
-            </p>
-
-            <input
-              type="number"
-              placeholder="₹ Enter advance amount"
-              value={advanceAmount}
-              onChange={(e) => setAdvanceAmount(e.target.value)}
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px' }}
-            />
-
-            <button onClick={() => setDispatchDone(true)} style={{ width: '100%', padding: '12px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '8px', fontSize: '13px', fontWeight: '700', border: 'none', cursor: 'pointer' }}>
-              {lang === 'en' ? 'Execute Handover & Disburse Capital' : 'हैंडओवर करें और पूंजी वितरित करें'}
-            </button>
-          </>
-        )}
-      </div>
-
+          <input type="number" placeholder={lang === 'en' ? 'Deposit Amount ₹ (default 0)' : 'जमा राशि ₹'} value={aForm.deposit_amount} onChange={e => setAForm(f => ({ ...f, deposit_amount: e.target.value }))} style={inp} />
+          <button type="submit" disabled={loading || !vehicles.length || !drivers.length} style={{ ...btn, opacity: (!vehicles.length || !drivers.length) ? 0.5 : 1 }}>
+            {loading ? '…' : (lang === 'en' ? 'Assign Vehicle' : 'वाहन असाइन करें')}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

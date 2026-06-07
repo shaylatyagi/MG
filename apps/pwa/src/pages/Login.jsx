@@ -18,7 +18,7 @@ export default function Login() {
     try {
       await api.post('/api/auth/send-otp', { phone });
       setStep(2);
-    } catch (err) { setError(err.response?.data?.error?.message || err.message); }
+    } catch (err) { setError(err.response?.data?.message || err.message); }
     finally { setLoading(false); }
   };
 
@@ -27,8 +27,9 @@ export default function Login() {
     try {
       const { data } = await api.post('/api/auth/verify-otp', { phone, otp });
       login(data.token, data.user);
-      navigate(data.user.role === 'manager' ? '/manager' : '/driver/wallet');
-    } catch (err) { setError(err.response?.data?.error?.message || err.message); }
+      const role = (data.user.role || '').toUpperCase();
+      navigate(role === 'OWNER' ? '/manager' : '/driver/wallet');
+    } catch (err) { setError(err.response?.data?.message || err.message); }
     finally { setLoading(false); }
   };
 
@@ -47,7 +48,8 @@ export default function Login() {
 
         {step === 1 ? (
           <form onSubmit={sendOtp} className="space-y-4">
-            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+            <input type="tel" inputMode="numeric" pattern="[0-9]*"
+              value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
               required placeholder="Mobile number" maxLength={10}
               className="w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F4C81]" />
             <button type="submit" disabled={loading}

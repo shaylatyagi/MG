@@ -7,13 +7,13 @@ import { api, fmt } from '@/lib/api';
 
 interface Owner {
   id: number;
-  full_name: string;
-  mobile_number: string;
-  owner_code: string;
+  name: string;
+  phone_number: string;
   status: string;
-  total_drivers: number;
-  total_vehicles: number;
-  assigned_vehicles: number;
+  subscription_status: string;
+  driver_count: number;
+  vehicle_count: number;
+  assigned_vehicle_count: number;
   collection_today: number;
   collection_month: number;
   collection_total: number;
@@ -22,15 +22,15 @@ interface Owner {
 
 interface Driver {
   id: number;
-  full_name: string;
-  mobile_number: string;
-  driver_code: string;
+  name: string;
+  phone_number: string;
   status: string;
   kyc_status: string;
   wallet_balance: number;
   vehicle_number: string | null;
   total_paid: number;
   paid_today: number;
+  paid_month: number;
   last_payment_date: string | null;
 }
 
@@ -100,12 +100,12 @@ export default function CompanyDetailPage() {
                   <tr key={o.id} className={`border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer ${selectedOwner?.id === o.id ? 'bg-indigo-50' : ''}`}
                     onClick={() => loadDrivers(o)}>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-slate-900">{o.full_name}</p>
-                      <p className="text-xs text-slate-400">{o.mobile_number} · {o.owner_code}</p>
+                      <p className="font-medium text-slate-900">{o.name}</p>
+                      <p className="text-xs text-slate-400">{o.phone_number}</p>
                     </td>
                     <td className="px-4 py-3 text-center"><Badge status={o.status || 'ACTIVE'} /></td>
-                    <td className="px-4 py-3 text-right text-slate-700">{o.total_drivers}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{o.assigned_vehicles}/{o.total_vehicles}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{o.driver_count}</td>
+                    <td className="px-4 py-3 text-right text-slate-700">{o.assigned_vehicle_count}/{o.vehicle_count}</td>
                     <td className="px-4 py-3 text-right text-green-700 font-medium">{fmt.inr(o.collection_today)}</td>
                     <td className="px-4 py-3 text-right text-slate-700">{fmt.inr(o.collection_month)}</td>
                     <td className="px-4 py-3 text-right text-xs text-indigo-600">
@@ -123,10 +123,10 @@ export default function CompanyDetailPage() {
       {selectedOwner && (
         <div>
           <h2 className="text-lg font-bold text-slate-900 mb-1">
-            Drivers — {selectedOwner.full_name}
+            Drivers — {selectedOwner.name}
           </h2>
           <p className="text-slate-500 text-sm mb-4">
-            {fmt.inr(selectedOwner.collection_total)} collected all time
+            {fmt.inr(selectedOwner.collection_total)} collected all time · {selectedOwner.driver_count} driver{selectedOwner.driver_count !== 1 ? 's' : ''}
           </p>
 
           {driversLoading ? (
@@ -154,8 +154,8 @@ export default function CompanyDetailPage() {
                   {drivers.map(d => (
                     <tr key={d.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900">{d.full_name}</p>
-                        <p className="text-xs text-slate-400">{d.mobile_number} · {d.driver_code}</p>
+                        <p className="font-medium text-slate-900">{d.name}</p>
+                        <p className="text-xs text-slate-400">{d.phone_number}</p>
                       </td>
                       <td className="px-4 py-3 text-center"><Badge status={d.status || 'ACTIVE'} /></td>
                       <td className="px-4 py-3 text-center">

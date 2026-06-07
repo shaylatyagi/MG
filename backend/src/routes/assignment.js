@@ -199,12 +199,25 @@ router.post('/assign-with-rent', async (req, res) => {
     
     // Validate inputs
     if (!vehicleId || !driverId || !rentType || !rentAmount) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Missing required fields: vehicleId, driverId, rentType, rentAmount' 
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: vehicleId, driverId, rentType, rentAmount'
       });
     }
-    
+
+    // KYC-09 / BR-03: Check driver KYC status before assignment
+    const kycCheck = await pool.query(
+      `SELECT kyc_status FROM public.drivers WHERE id = $1`, [driverId]
+    );
+    if (kycCheck.rows[0] && kycCheck.rows[0].kyc_status === 'REJECTED') {
+      return res.status(400).json({ success: false, error: 'Driver KYC rejected. Ask driver to re-upload documents.' });
+    }
+    // Warn if not verified but allow (configurable — admin can override per BR-03)
+    const kycStatus = kycCheck.rows[0]?.kyc_status || 'PENDING';
+    if (kycStatus !== 'VERIFIED' && process.env.KYC_REQUIRED_FOR_ASSIGNMENT === 'true') {
+      return res.status(400).json({ success: false, error: `Driver KYC not complete (status: ${kycStatus}). Set KYC_REQUIRED_FOR_ASSIGNMENT=false to override.` });
+    }
+
     await client.query('BEGIN');
     
     // Check if vehicle exists and is available

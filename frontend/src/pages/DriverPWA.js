@@ -77,6 +77,7 @@ export default function DriverPWA() {
   const [showChatbot, setShowChatbot] = useState(false);
   const [showSOS, setShowSOS] = useState(false);
   const [showPaying, setShowPaying] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(null); // { amount, timestamp }
   const [earnings, setEarnings] = useState({ earnings: [], today_total: 0, month_total: 0 });
   const [showAddEarning, setShowAddEarning] = useState(false);
   const [earningAmt, setEarningAmt] = useState('');
@@ -217,7 +218,17 @@ export default function DriverPWA() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    if (p.get('status') === 'success' || p.get('refresh') === 'true') { setShowPaying(false); fetchAll(); window.history.replaceState(null, '', window.location.pathname); }
+    if (p.get('status') === 'success') {
+      setShowPaying(false);
+      fetchAll();
+      const amt = p.get('amount') || p.get('order_amount') || null;
+      setPaymentSuccess({ amount: amt, timestamp: new Date() });
+      window.history.replaceState(null, '', window.location.pathname);
+    } else if (p.get('refresh') === 'true') {
+      setShowPaying(false);
+      fetchAll();
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }, [user]);
 
   // Auto-dismiss "Redirecting..." overlay when user returns from payment app without completing
@@ -902,6 +913,28 @@ export default function DriverPWA() {
               <p className="font-black text-slate-800 text-sm">Redirecting...</p>
               <button onClick={() => { payAbortRef.current = true; setShowPaying(false); }} className="mt-3 text-xs text-slate-400 underline">Cancel</button>
             </div>
+          </div>
+        )}
+
+        {/* Payment Success overlay */}
+        {paymentSuccess && (
+          <div className="absolute inset-0 bg-white z-[110] flex flex-col items-center justify-center px-8">
+            <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mb-6">
+              <CheckCircle size={44} className="text-emerald-500"/>
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 mb-1">Payment Done!</h2>
+            {paymentSuccess.amount && (
+              <p className="text-3xl font-black text-emerald-600 mb-2">₹{parseFloat(paymentSuccess.amount).toLocaleString('en-IN')}</p>
+            )}
+            <p className="text-xs text-slate-400 mb-8">
+              {paymentSuccess.timestamp.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+            </p>
+            <button
+              onClick={() => setPaymentSuccess(null)}
+              className="w-full max-w-xs py-4 bg-emerald-600 text-white font-black text-base rounded-2xl active:bg-emerald-700"
+            >
+              Done
+            </button>
           </div>
         )}
 

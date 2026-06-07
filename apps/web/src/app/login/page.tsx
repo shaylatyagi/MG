@@ -46,7 +46,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!data.success || !data.token) throw new Error(data.message || 'Verification failed');
-      saveAdminToken(data.token);
+      saveAdminToken(data.token, secret); // save JWT + admin key cookie (for x-admin-key header)
       router.push('/admin/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Verification failed');

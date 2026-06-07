@@ -124,4 +124,68 @@ router.post('/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out' });
 });
 
+// ── ADMIN-SPECIFIC OTP ROUTES ─────────────────────────────────────────────
+// These add a pre-check of admin_secret before sending/verifying OTP.
+// Used by the Next.js admin login page.
+
+// POST /api/auth/admin-send-otp
+router.post('/admin-send-otp', async (req, res, next) => {
+  try {
+    const { phone_number, admin_secret } = req.body;
+
+    if (!admin_secret || admin_secret !== process.env.ADMIN_SECRET_KEY)
+      throw new AppError('Invalid admin credentials', 403, 'FORBIDDEN');
+    if (!process.env.ADMIN_PHONE || phone_number !== process.env.ADMIN_PHONE)
+      throw new AppError('Phone not authorised for admin access', 403, 'FORBIDDEN');
+
+    const otp  = String(Math.floor(100000 + Math.random() * 900000));
+    const hash = await bcrypt.hash(otp, 10);
+
+    await pool.query(
+      `INSERT INTO otps (phone_number, otp_hash, expires_at, attempts)
+       VALUES ($1, $2, NOW() + INTERVAL '10 minutes', 0)
+       ON CONFLICT (phone_number) DO UPDATE
+         SET otp_hash = $2, expires_at = NOW() + INTERVAL '10 minutes', attempts = 0`,
+      [phone_number, hash]
+    );
+
+    await sendOtpMessage(phone_number, otp);
+    res.json({ success: true, message: 'OTP sent' });
+  } catch (err) { next(err); }
+});
+
+// POST /api/auth/admin-verify-otp
+router.post('/admin-verify-otp', async (req, res, next) => {
+  try {
+    const { phone_number, otp, admin_secret } = req.body;
+
+    if (!admin_secret || admin_secret !== process.env.ADMIN_SECRET_KEY)
+      throw new AppError('Invalid admin credentials', 403, 'FORBIDDEN');
+    if (!process.env.ADMIN_PHONE || phone_number !== process.env.ADMIN_PHONE)
+      throw new AppError('Phone not authorised for admin access', 403, 'FORBIDDEN');
+
+    const isDevBypass = process.env.DEV_BYPASS_OTP === 'true' && otp === '000000';
+
+    if (!isDevBypass) {
+      const { rows } = await pool.query(
+        'SELECT * FROM otps WHERE phone_number = $1 AND expires_at > NOW() LIMIT 1',
+        [phone_number]
+      );
+      const record = rows[0];
+      if (!record) throw new AppError('OTP expired or not found', 400, 'OTP_INVALID');
+      if (record.attempts >= 3) throw new AppError('Too many attempts', 429, 'OTP_LOCKED');
+
+      const valid = await bcrypt.compare(otp, record.otp_hash);
+      if (!valid) {
+        await pool.query('UPDATE otps SET attempts = attempts + 1 WHERE phone_number = $1', [phone_number]);
+        throw new AppError('Invalid OTP', 400, 'OTP_INVALID');
+      }
+      await pool.query('DELETE FROM otps WHERE phone_number = $1', [phone_number]);
+    }
+
+    const token = generateToken({ id: 'admin', role: 'admin', phone: phone_number });
+    res.json({ success: true, token, user: { role: 'admin', phone: phone_number } });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
