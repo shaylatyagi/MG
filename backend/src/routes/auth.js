@@ -1,17 +1,40 @@
-const express = require('express');
-const router = express.Router();
-const pool = require('../config/db');
-const jwt = require('jsonwebtoken');
+const express  = require('express');
+const router   = express.Router();
+const pool     = require('../config/db');
+const jwt      = require('jsonwebtoken');
+const bcrypt   = require('bcrypt');
 const { generateToken, verifyToken } = require('../middleware/auth');
-const twilio = require('twilio');
+const twilio   = require('twilio');
 
-const sendOTP = async (phone, otp) => {
+// OTP rate limiting — { phone: { attempts: N, lockedUntil: ms } }
+const otpAttempts = new Map();
+const MAX_ATTEMPTS  = 3;
+const LOCKOUT_MS    = 15 * 60 * 1000; // 15 minutes
+
+const checkLock = (phone) => {
+  const rec = otpAttempts.get(phone);
+  if (!rec) return null;
+  if (rec.lockedUntil && Date.now() < rec.lockedUntil) {
+    const minsLeft = Math.ceil((rec.lockedUntil - Date.now()) / 60000);
+    return `Too many failed attempts. Try again in ${minsLeft} minute${minsLeft !== 1 ? 's' : ''}.`;
+  }
+  return null;
+};
+const recordFail = (phone) => {
+  const rec = otpAttempts.get(phone) || { attempts: 0, lockedUntil: null };
+  rec.attempts += 1;
+  if (rec.attempts >= MAX_ATTEMPTS) rec.lockedUntil = Date.now() + LOCKOUT_MS;
+  otpAttempts.set(phone, rec);
+};
+const clearAttempts = (phone) => otpAttempts.delete(phone);
+
+const sendSMS = async (phone, otp) => {
   try {
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     await client.messages.create({
       body: `Your MobilityGrid OTP is ${otp}. Valid 10 mins. Do not share.`,
       from: process.env.TWILIO_PHONE_NUMBER,
-      to: `+91${phone}`
+      to:   `+91${phone}`,
     });
     return true;
   } catch (err) {
@@ -20,10 +43,12 @@ const sendOTP = async (phone, otp) => {
   }
 };
 
-// 1. SEND OTP (driver / owner)
+// ── POST /api/auth/send-otp ───────────────────────────────────────────────────
 router.post('/send-otp', async (req, res) => {
-  const { phone_number } = req.body;
+  const phone_number = (req.body.phone || req.body.phone_number || '').trim();
   if (!phone_number) return res.status(400).json({ success: false, message: 'Phone required' });
+  const lockMsg = checkLock(phone_number);
+  if (lockMsg) return res.status(429).json({ success: false, message: lockMsg });
   try {
     const userRes = await pool.query(
       `SELECT id, full_name FROM public.drivers WHERE mobile_number = $1
@@ -45,18 +70,29 @@ router.post('/send-otp', async (req, res) => {
   }
 });
 
-// 2. VERIFY OTP (driver / owner)
+// ── POST /api/auth/verify-otp ─────────────────────────────────────────────────
 router.post('/verify-otp', async (req, res) => {
-  const { phone_number, otp } = req.body;
+  const phone_number = (req.body.phone || req.body.phone_number || '').trim();
+  const otp = (req.body.otp || '').trim();
   if (!phone_number || !otp)
     return res.status(400).json({ success: false, message: 'Phone and OTP required' });
+  const lockMsg = checkLock(phone_number);
+  if (lockMsg) return res.status(429).json({ success: false, message: lockMsg });
   try {
     const otpRes = await pool.query(
       'SELECT * FROM otps WHERE phone_number = $1 AND otp = $2 AND expires_at > NOW() LIMIT 1',
       [phone_number, otp]
     );
-    if (!otpRes.rows[0])
-      return res.status(400).json({ success: false, message: 'OTP invalid or expired' });
+    if (!otpRes.rows[0]) {
+      recordFail(phone_number);
+      const rec = otpAttempts.get(phone_number);
+      const remaining = MAX_ATTEMPTS - (rec?.attempts || 0);
+      const msg = rec?.lockedUntil
+        ? `Account locked for 15 minutes.`
+        : `OTP invalid. ${remaining} attempt${remaining !== 1 ? 's' : ''} left.`;
+      return res.status(400).json({ success: false, message: msg });
+    }
+    clearAttempts(phone_number);
     await pool.query('DELETE FROM otps WHERE phone_number = $1', [phone_number]);
     const driverRes = await pool.query(
       "SELECT *, 'DRIVER' as role FROM public.drivers WHERE mobile_number = $1 LIMIT 1",
@@ -68,12 +104,13 @@ router.post('/verify-otp', async (req, res) => {
     );
     const user = driverRes.rows[0] || ownerRes.rows[0];
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role });
+    const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null });
     res.json({
       success: true, token,
       user: {
         id: user.id, full_name: user.full_name, mobile_number: user.mobile_number,
-        role: user.role, owner_code: user.owner_code || null,
+        role: user.role, owner_id: user.owner_id || null,
+        owner_code: user.owner_code || null,
         driver_code: user.driver_code || null, status: user.status
       }
     });

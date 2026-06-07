@@ -1,15 +1,19 @@
 {
-  "dependencies": {
-    "axios": "^1.16.1",
-    "bcrypt": "^6.0.0",
-    "react-router-dom": "^7.15.0",
-    "recharts": "^3.8.1",
-    "twilio": "^6.0.2",
-    "uuid": "^14.0.0"
+  "name": "mobilitygrid",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/pwa",
+    "apps/api"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "build:web": "npm run build --workspace=apps/web",
+    "type-check": "npm run type-check --workspace=apps/web"
   },
   "devDependencies": {
-    "autoprefixer": "^10.5.0",
-    "postcss": "^8.5.15",
-    "tailwindcss": "^4.3.0"
+    "postcss": "^8.5.15"
   }
 }

@@ -107,6 +107,12 @@ export default function DriverPWA() {
       return cleaned.length >= 10 ? cleaned.slice(-10) : cleaned;
     } catch { return ''; }
   };
+  const ownerIdVal = () => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}');
+      return u?.owner_id || null;
+    } catch { return null; }
+  };
 
   useEffect(() => {
     const tick = () => {
@@ -153,7 +159,7 @@ export default function DriverPWA() {
 
   const fetchChat = async () => {
     const ph = phone(); if (!ph) return;
-    const res = await fetch(`${API}/api/payment/chat/messages?driverPhone=${ph}&ownerId=1`, { headers: { Authorization: `Bearer ${tk()}` } });
+    const res = await fetch(`${API}/api/payment/chat/messages?driverPhone=${ph}&ownerId=${ownerIdVal()}`, { headers: { Authorization: `Bearer ${tk()}` } });
     if (res.ok) { const data = await res.json(); setChatMsgs(data); }
   };
 
@@ -169,7 +175,7 @@ export default function DriverPWA() {
     const msg = chatInput.trim(); setChatInput('');
     await fetch(`${API}/api/payment/chat/send`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-      body: JSON.stringify({ driverPhone: phone(), message: msg, senderType: 'DRIVER', ownerId: 1 })
+      body: JSON.stringify({ driverPhone: phone(), message: msg, senderType: 'DRIVER', ownerId: ownerIdVal() })
     });
     fetchChat();
   };

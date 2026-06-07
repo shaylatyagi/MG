@@ -877,6 +877,74 @@ router.post('/owner/notify-unpaid', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// GET /owner/overdue-drivers?ownerId=X — drivers who haven't paid today
+router.get('/owner/overdue-drivers', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
+    const result = await pool.query(
+      `SELECT d.id, d.full_name, d.mobile_number, d.driver_code,
+              v.vehicle_number, v.daily_rent,
+              COALESCE((
+                SELECT SUM(amount) FROM public.driver_ledger
+                WHERE driver_id = d.id AND entry_type IN ('DAILY_RENT','DAMAGE_CHARGE','PENALTY')
+              ) - (
+                SELECT SUM(amount) FROM public.driver_ledger
+                WHERE driver_id = d.id AND entry_type IN ('PAYMENT','CASH_PAYMENT','ADVANCE_CREDIT','INCENTIVE','REFUND')
+              ), 0) * -1 AS balance
+       FROM public.drivers d
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+         AND d.status = 'ACTIVE'
+         AND d.id NOT IN (
+           SELECT DISTINCT dr.id FROM public.drivers dr
+           JOIN public.ms_orders mo ON mo.payer_mobile = dr.mobile_number
+           WHERE mo.transaction_status = 'SUCCESS'
+             AND DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+         )
+       ORDER BY d.full_name`,
+      [parseInt(ownerId)]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('overdue-drivers error:', err);
+    res.json([]);
+  }
+});
+
+// POST /owner/remind-overdue?ownerId=X — send in-app notification to all overdue drivers
+router.post('/owner/remind-overdue', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
+    const overdue = await pool.query(
+      `SELECT d.id, d.full_name FROM public.drivers d
+       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+         AND d.status = 'ACTIVE'
+         AND d.id NOT IN (
+           SELECT DISTINCT dr.id FROM public.drivers dr
+           JOIN public.ms_orders mo ON mo.payer_mobile = dr.mobile_number
+           WHERE mo.transaction_status = 'SUCCESS'
+             AND DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+         )`,
+      [parseInt(ownerId)]
+    );
+    let count = 0;
+    for (const d of overdue.rows) {
+      await pool.query(
+        `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+         VALUES ($1, 'DRIVER', '⏰ Rent Reminder', 'Aaj ka rent abhi baaki hai. Please pay karo.', NOW())`,
+        [d.id]
+      ).catch(() => {});
+      count++;
+    }
+    res.json({ success: true, count });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/owner/cash-payment', async (req, res) => {
   try {
     const { driverPhone, driverName, amount, ownerId, purpose = 'RENT' } = req.body;
@@ -1269,6 +1337,50 @@ router.get('/owner/stats', async (req, res) => {
     res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0 });
   }
 });
+
+// GET /api/payment/owner/trend?ownerId=X — 30-day daily collection chart
+router.get('/owner/trend', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
+    const result = await pool.query(
+      `SELECT
+         TO_CHAR(DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
+         DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') AS date,
+         COALESCE(SUM(mo.order_amount), 0)::int AS online,
+         COALESCE((
+           SELECT SUM(le.amount) FROM public.driver_ledger le
+           JOIN public.drivers d2 ON d2.id = le.driver_id
+           WHERE d2.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+             AND le.entry_type = 'CASH_PAYMENT'
+             AND DATE(le.created_at AT TIME ZONE 'Asia/Kolkata') = DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+         ), 0)::int AS cash
+       FROM public.ms_orders mo
+       JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+         AND mo.transaction_status = 'SUCCESS'
+         AND mo.order_completion_date >= NOW() - INTERVAL '30 days'
+       GROUP BY DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+       ORDER BY date ASC`,
+      [parseInt(ownerId)]
+    );
+    // Fill missing days with 0
+    const map = {};
+    result.rows.forEach(r => { map[r.date] = { day: r.day, online: r.online, cash: r.cash }; });
+    const days = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      const label = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+      days.push(map[key] || { day: label, online: 0, cash: 0 });
+    }
+    res.json(days);
+  } catch (err) {
+    console.error('trend error:', err);
+    res.json([]);
+  }
+});
+
 router.post('/create-order', async (req, res) => {
   try {
     const { amount, customerName, customerPhone, customerEmail, purpose } = req.body;

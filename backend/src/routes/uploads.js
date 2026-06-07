@@ -82,32 +82,4 @@ router.delete('/delete/:doc_id', verifyToken, async (req, res) => {
   }
 });
 
-// ─── AGREEMENT UPLOAD (owner uploads agreement for a driver) ──────────
-router.post('/agreement', verifyToken, upload.single('document'), async (req, res) => {
-  try {
-    const { driverId } = req.body;
-    const file = req.req || req.file;
-    const f = req.file;
-    if (!f) return res.status(400).json({ success: false, message: 'File required' });
-    const s3Key = `agreements/driver_${driverId}_${Date.now()}_${f.originalname}`;
-    await pool.query(
-      `INSERT INTO public.user_documents
-         (user_id, user_type, doc_type, original_name, s3_key, file_size, mime_type, status)
-       VALUES ($1, 'DRIVER', 'AGREEMENT', $2, $3, $4, $5, 'UPLOADED')
-       ON CONFLICT (user_id, user_type, doc_type)
-       DO UPDATE SET original_name=EXCLUDED.original_name, s3_key=EXCLUDED.s3_key, status='UPLOADED', updated_at=NOW()`,
-      [driverId, f.originalname, s3Key, f.size, f.mimetype]
-    );
-    // Also stamp the driver record
-    await pool.query(
-      `UPDATE public.drivers SET agreement_uploaded=true, updated_at=NOW() WHERE id=$1`,
-      [driverId]
-    ).catch(() => {}); // column may not exist yet — ignore
-    res.json({ success: true, s3Key });
-  } catch (err) {
-    console.error('Agreement upload error:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
 module.exports = router;

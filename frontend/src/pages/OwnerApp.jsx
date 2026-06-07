@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { 
   Camera, Edit2, Building, MapPin, Mail, Phone, User,
   Home, Users, Truck, Wallet, CreditCard, Bell, BellRing,
@@ -371,6 +372,10 @@ const [availableDriversForVehicle, setAvailableDriversForVehicle] = useState([])
     todayCollection: 0,
     pendingDues: 0
   });
+  const [trendData, setTrendData] = useState([]);
+  const [overdueDrivers, setOverdueDrivers] = useState([]);
+  const [showOverdue, setShowOverdue] = useState(false);
+  const [remindingAll, setRemindingAll] = useState(false);
   // Add these with other useState declarations
 const [unassignedDrivers, setUnassignedDrivers] = useState([]);
 const [selectedVehicleDetails, setSelectedVehicleDetails] = useState(null);
@@ -1054,6 +1059,11 @@ useEffect(() => {
   fetch(`${API}/api/payment/owner/managers?ownerId=${oId}`, {
     headers: { Authorization: `Bearer ${token()}` }
   }).then(r => r.json()).then(d => { if (d.managers) setManagers(d.managers); }).catch(() => {});
+
+  // 30-day trend
+  fetch(`${API}/api/payment/owner/trend?ownerId=${oId}`, {
+    headers: { Authorization: `Bearer ${token()}` }
+  }).then(r => r.json()).then(d => { if (Array.isArray(d)) setTrendData(d); }).catch(() => {});
 }, []);
 
   // POLLING FOR REAL-TIME NOTIFICATIONS
@@ -1496,10 +1506,16 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           <span className="text-[9px] text-blue-600 font-black uppercase block">{t.received}</span>
           <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.received.toLocaleString('en-IN')}</b>
         </div>
-        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-          <span className="text-[9px] text-slate-500 font-black uppercase block">{t.outstanding}</span>
+        <button className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-left w-full active:bg-slate-100"
+          onClick={() => {
+            const oId = ownerId();
+            if (!oId) return;
+            fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: { Authorization: `Bearer ${token()}` } })
+              .then(r => r.json()).then(d => { setOverdueDrivers(Array.isArray(d) ? d : []); setShowOverdue(true); }).catch(() => {});
+          }}>
+          <span className="text-[9px] text-slate-500 font-black uppercase block">{t.outstanding} ›</span>
           <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
-        </div>
+        </button>
       </div>
       <div className="flex items-center justify-between text-[9px] text-slate-400">
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/>{t.escrow}</span>
@@ -1513,6 +1529,30 @@ const removeRule = (i) => setIncentiveRules(prev => ({
         <StatCard title={t.collection} value={stats.todayCollection} icon={Wallet} color="bg-slate-700" isMoney/>
         <StatCard title={t.pending} value={stats.pendingDues} icon={AlertCircle} color="bg-slate-500" trend="down" isMoney/>
       </div>
+      {/* 30-day Collection Trend */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-3">30-Day Collection Trend</p>
+        {trendData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={trendData} barSize={6} margin={{ top: 0, right: 0, left: -28, bottom: 0 }}>
+              <XAxis dataKey="day" tick={{ fontSize: 8, fill: '#94a3b8' }} interval={6} />
+              <YAxis tick={{ fontSize: 8, fill: '#94a3b8' }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+              <Tooltip
+                formatter={(val, name) => [`₹${val.toLocaleString('en-IN')}`, name === 'online' ? 'UPI' : 'Cash']}
+                contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
+              />
+              <Legend formatter={v => v === 'online' ? 'UPI' : 'Cash'} iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+              <Bar dataKey="online" stackId="a" fill="#2563eb" radius={[0,0,0,0]} />
+              <Bar dataKey="cash"   stackId="a" fill="#93c5fd" radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-32 flex items-center justify-center">
+            <p className="text-[10px] text-slate-300">No collection data yet</p>
+          </div>
+        )}
+      </div>
+
       {/* Quick Nav */}
       <div className="grid grid-cols-2 gap-2">
         <button onClick={() => setActiveTab('drivers')}
@@ -3566,6 +3606,62 @@ const ProfileTab = () => (
     </div>
   </div>
 )}
+{/* Overdue Drivers Bottom Sheet */}
+{showOverdue && (
+  <div className="fixed inset-0 z-[999] flex flex-col justify-end" onClick={() => setShowOverdue(false)}>
+    <div className="bg-white rounded-t-3xl shadow-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-slate-100">
+        <div>
+          <p className="font-black text-slate-800 text-sm">⏰ Overdue Today</p>
+          <p className="text-[10px] text-slate-400">{overdueDrivers.length} drivers haven't paid yet</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {overdueDrivers.length > 0 && (
+            <button disabled={remindingAll}
+              onClick={async () => {
+                setRemindingAll(true);
+                await fetch(`${API}/api/payment/owner/remind-overdue?ownerId=${ownerId()}`, {
+                  method: 'POST', headers: { Authorization: `Bearer ${token()}` }
+                }).catch(() => {});
+                setRemindingAll(false);
+                alert(`✅ Reminder bhej diya ${overdueDrivers.length} drivers ko`);
+              }}
+              className="text-[10px] font-black bg-blue-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
+              {remindingAll ? 'Sending…' : '🔔 Remind All'}
+            </button>
+          )}
+          <button onClick={() => setShowOverdue(false)} className="text-slate-400"><X size={18}/></button>
+        </div>
+      </div>
+      <div className="overflow-y-auto divide-y divide-slate-50">
+        {overdueDrivers.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-2xl mb-2">✅</p>
+            <p className="text-sm font-black text-slate-700">Sab ne pay kar diya!</p>
+            <p className="text-[10px] text-slate-400 mt-1">No outstanding dues today</p>
+          </div>
+        ) : overdueDrivers.map((d, i) => (
+          <div key={i} className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-500 font-black text-sm border border-red-100">
+                {(d.full_name||'D').charAt(0)}
+              </div>
+              <div>
+                <p className="text-sm font-black text-slate-800">{d.full_name}</p>
+                <p className="text-[9px] text-slate-400">{d.vehicle_number || 'No vehicle'} · {d.mobile_number}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-black text-red-600">₹{parseFloat(d.daily_rent||0).toLocaleString('en-IN')}</p>
+              <p className="text-[9px] text-slate-400">due</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+
 {showSOSAlert && activeSOS && (
   <div className="fixed inset-0 z-[9999] flex flex-col bg-red-600 text-white">
     {/* Flashing header */}

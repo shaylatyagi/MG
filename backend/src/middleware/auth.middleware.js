@@ -1,20 +1,17 @@
 /**
- * JWT Authentication Middleware
- * Apply to ALL owner and driver routes
+ * JWT Authentication Middleware — MobilityGrid
+ * Apply to ALL owner and driver routes.
  */
-
 const jwt = require('jsonwebtoken');
 const { ApiError } = require('./error.middleware');
 
-// Verify JWT token — blocks request if invalid
+// Verify JWT token
 const verifyToken = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader || !authHeader.startsWith('Bearer '))
       throw new ApiError(401, 'No token provided', 'NO_TOKEN');
-    }
-    const token = authHeader.split(' ')[1];
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
     next();
   } catch (err) {
     if (err instanceof ApiError) return next(err);
@@ -22,22 +19,34 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// Verify admin key — for admin panel routes
+// Verify admin — accepts JWT (role=admin) OR legacy x-admin-key header
 const verifyAdmin = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(
+        authHeader.split(' ')[1],
+        process.env.JWT_SECRET || 'voltops_super_secret_key_2025'
+      );
+      if (decoded.role === 'admin') {
+        req.user = decoded;
+        return next();
+      }
+    } catch (_) {}
+  }
   const key = req.headers['x-admin-key'] || req.query.admin_key;
   const expected = process.env.ADMIN_SECRET_KEY || 'mg_admin_2026_secret';
-  if (!key || key !== expected) {
-    return next(new ApiError(403, 'Admin access denied', 'FORBIDDEN'));
+  if (key && key === expected) {
+    req.user = { id: 'admin', role: 'admin' };
+    return next();
   }
-  next();
+  return next(new ApiError(403, 'Admin access denied', 'FORBIDDEN'));
 };
 
-// Check user role — use AFTER verifyToken
-// Usage: router.get('/path', verifyToken, requireRole('OWNER'), handler)
+// Role guard — use AFTER verifyToken
 const requireRole = (...roles) => (req, res, next) => {
-  if (!req.user || !roles.includes(req.user.role)) {
+  if (!req.user || !roles.includes(req.user.role))
     return next(new ApiError(403, 'Insufficient permissions', 'FORBIDDEN'));
-  }
   next();
 };
 

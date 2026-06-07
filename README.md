@@ -10,7 +10,7 @@ A fleet management platform for EV and commercial vehicle rental businesses in I
 
 ## Live
 
-🌐 [mg-sandy.vercel.app](https://mg-sandy.vercel.app)
+[mg-sandy.vercel.app](https://mg-sandy.vercel.app)
 
 ## Stack
 

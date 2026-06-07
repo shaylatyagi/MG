@@ -6,6 +6,16 @@
 # Node artifact files
 node_modules/
 dist/
+.next/
+tsconfig.tsbuildinfo
+
+# Environment variables — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+
+# Large/binary files
+*.pdf
 
 # Compiled Java class files
 *.class
