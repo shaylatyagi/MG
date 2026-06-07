@@ -3131,11 +3131,11 @@ const ProfileTab = () => (
         {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.04)]">
           {[
-            { id: 'home',     Icon: Home,        label: t.navHome },
-{ id: 'drivers',  Icon: Users,       label: t.navDrivers },
-{ id: 'vehicles', Icon: Truck,       label: t.navFleet },
-{ id: 'links',    Icon: CreditCard,  label: 'Pay Links' },
-{ id: 'payments', Icon: Wallet,      label: t.navPayments },
+            { id: 'home',     Icon: Home,       label: t.navHome },
+{ id: 'drivers',  Icon: Users,      label: t.navDrivers },
+{ id: 'vehicles', Icon: Truck,      label: t.navFleet },
+{ id: 'links',    Icon: CreditCard, label: 'Pay Links' },
+{ id: 'payments', Icon: Wallet,     label: t.navPayments },
           ].map(({ id, Icon, label }) => (
             <button
               key={id}
@@ -3842,4 +3842,14 @@ const ProfileTab = () => (
               </div>
             )}
             <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('drivers'); }}
-              className="w-full 
+              className="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-black">✓ Done</button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+      </div>
+    </div>
+  );
+}

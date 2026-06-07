@@ -2615,6 +2615,8 @@ const generateDailyRentEntries = async () => {
     console.error('Daily rent error:', err.message);
   }
 };
+scheduleDailyRent();
+
 // Manual trigger for testing
 router.post('/admin/generate-daily-rent', async (req, res) => {
   await generateDailyRentEntries();
@@ -2765,4 +2767,5 @@ router.get('/owner/plan', async (req, res) => {
     const o = r.rows[0];
     const premium = o?.plan === 'PREMIUM' && (!o.plan_expires_at || new Date(o.plan_expires_at) > new Date());
     res.json({ plan: o?.plan || 'FREE', is_premium: premium, expires_at: o?.plan_expires_at });
-  } catch (err) { res.status(500).json({ error: err.message }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
