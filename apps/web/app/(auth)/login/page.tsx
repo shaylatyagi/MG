@@ -1,93 +1,183 @@
-// apps/web/app/(auth)/login/page.tsx — Unified OTP login per DevSpec §13.1
 'use client';
-import { useState } from 'react';
+// Identical to app/login/page.tsx — kept in sync to resolve Next.js routing conflict.
+// Both app/login and app/(auth)/login resolve to /login; this ensures the correct
+// admin login is shown regardless of which one Next.js decides to serve.
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import api, { saveToken } from '@/lib/api';
+import { saveAdminToken, getAdminToken } from '@/lib/api';
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://mg-qw5s.onrender.com';
+const DEV = process.env.NODE_ENV !== 'production';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [phone,   setPhone]   = useState('');
-  const [otp,     setOtp]     = useState('');
-  const [step,    setStep]    = useState<1 | 2>(1);
+  const [step, setStep] = useState<'credentials' | 'otp'>('credentials');
+  const [phone, setPhone] = useState('');
+  const [secret, setSecret] = useState('');
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
+  const [error, setError] = useState('');
+
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    const token = getAdminToken();
+    if (!token) return;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (payload.role === 'admin' && payload.exp * 1000 > Date.now()) {
+        router.replace('/admin/dashboard');
+      }
+    } catch { /* invalid token — stay on login */ }
+  }, [router]);
 
   const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError('');
+    setLoading(true);
     try {
-      await api.post('/api/auth/send-otp', { phone });
-      setStep(2);
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || err.message);
-    } finally { setLoading(false); }
+      const res = await fetch(`${API}/api/auth/admin-send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone, admin_secret: secret }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed to send OTP');
+      if (DEV) setOtp('000000');
+      setStep('otp');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Request failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const verifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError('');
+    setLoading(true);
     try {
-      const { data } = await api.post('/api/auth/verify-otp', { phone, otp });
-      saveToken(data.token);
-      const role = data.user?.role;
-      router.push(role === 'admin' ? '/admin/dashboard' : '/owner/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || err.message);
-    } finally { setLoading(false); }
+      const res = await fetch(`${API}/api/auth/admin-verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone, otp, admin_secret: secret }),
+      });
+      const data = await res.json();
+      if (!data.success || !data.token) throw new Error(data.message || 'Verification failed');
+      saveAdminToken(data.token, secret);
+      router.push('/admin/dashboard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-indigo-600 rounded-xl mx-auto mb-4 flex items-center justify-center">
-            <span className="text-white text-xl font-bold">M</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">MobilityGrid</h1>
-          <p className="text-gray-500 text-sm mt-1">Sign in to your account</p>
+          <h1 className="text-white text-2xl font-bold tracking-tight">MobilityGrid</h1>
+          <p className="text-slate-400 text-sm mt-1">Platform Admin Access</p>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
-        )}
+        <div className="bg-white rounded-2xl p-8 shadow-xl">
+          {step === 'credentials' ? (
+            <form onSubmit={sendOtp} className="space-y-4">
+              <div>
+                <h2 className="text-slate-900 text-lg font-semibold">Sign in</h2>
+                <p className="text-slate-500 text-sm mt-0.5">Enter your admin credentials</p>
+              </div>
 
-        {step === 1 ? (
-          <form onSubmit={sendOtp} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <input
-                type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-                required placeholder="9876543210" maxLength={10}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-              />
-            </div>
-            <button type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
-              {loading ? 'Sending OTP…' : 'Send OTP'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={verifyOtp} className="space-y-4">
-            <p className="text-sm text-gray-600 text-center">OTP sent to <strong>+91 {phone}</strong></p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP</label>
-              <input
-                type="text" value={otp} onChange={e => setOtp(e.target.value)}
-                required maxLength={6} placeholder="6-digit OTP"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center text-xl tracking-widest"
-              />
-            </div>
-            <button type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
-              {loading ? 'Verifying…' : 'Login'}
-            </button>
-            <button type="button" onClick={() => { setStep(1); setOtp(''); }}
-              className="w-full text-sm text-gray-500 hover:text-gray-700">
-              ← Change number
-            </button>
-          </form>
-        )}
-        <p className="text-center text-xs text-gray-400 mt-6">MobilityGrid by PayYantra · Confidential</p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Admin Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="10-digit mobile number"
+                  required
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Admin Secret Key
+                </label>
+                <input
+                  type="password"
+                  value={secret}
+                  onChange={e => setSecret(e.target.value)}
+                  placeholder="Admin secret key"
+                  required
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || phone.length !== 10 || !secret}
+                className="w-full py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? 'Sending OTP…' : 'Send OTP'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={verifyOtp} className="space-y-4">
+              <div>
+                <h2 className="text-slate-900 text-lg font-semibold">Enter OTP</h2>
+                <p className="text-slate-500 text-sm mt-0.5">
+                  Sent to +91 {phone}
+                  {DEV && <span className="ml-1 text-xs text-green-600">(dev: use 000000)</span>}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">6-digit OTP</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  required
+                  autoFocus
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-center tracking-widest text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || otp.length !== 6}
+                className="w-full py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? 'Verifying…' : 'Verify & Sign In'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setStep('credentials'); setOtp(''); setError(''); }}
+                className="w-full text-sm text-slate-500 hover:text-slate-700"
+              >
+                ← Back
+              </button>
+            </form>
+          )}
+        </div>
+
+        <p className="text-center text-slate-500 text-xs mt-6">
+          MobilityGrid by PayYantra · Confidential
+        </p>
       </div>
     </div>
   );

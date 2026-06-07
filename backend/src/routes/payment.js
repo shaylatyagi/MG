@@ -1340,33 +1340,10 @@ router.get('/owner/stats', async (req, res) => {
 
 // GET /api/payment/owner/trend?ownerId=X — 30-day daily collection chart
 router.get('/owner/trend', async (req, res) => {
-  try {
-    const { ownerId } = req.query;
-    if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
-    const result = await pool.query(
-      `SELECT
-         TO_CHAR(DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
-         DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') AS date,
-         COALESCE(SUM(mo.order_amount), 0)::int AS online,
-         COALESCE((
-           SELECT SUM(le.amount) FROM public.driver_ledger le
-           JOIN public.drivers d2 ON d2.id = le.driver_id
-           WHERE d2.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-             AND le.entry_type = 'CASH_PAYMENT'
-             AND DATE(le.created_at AT TIME ZONE 'Asia/Kolkata') = DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
-         ), 0)::int AS cash
-       FROM public.ms_orders mo
-       JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
-       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-         AND mo.transaction_status = 'SUCCESS'
-         AND mo.order_completion_date >= NOW() - INTERVAL '30 days'
-       GROUP BY DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
-       ORDER BY date ASC`,
-      [parseInt(ownerId)]
-    );
-    // Fill missing days with 0
+  // Always build the 30-day skeleton first so frontend always gets 30 items
+  const buildDays = (rows) => {
     const map = {};
-    result.rows.forEach(r => { map[r.date] = { day: r.day, online: r.online, cash: r.cash }; });
+    rows.forEach(r => { map[String(r.date).split('T')[0]] = { day: r.day, online: Number(r.online), cash: Number(r.cash) }; });
     const days = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
@@ -1374,10 +1351,67 @@ router.get('/owner/trend', async (req, res) => {
       const label = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
       days.push(map[key] || { day: label, online: 0, cash: 0 });
     }
-    res.json(days);
+    return days;
+  };
+
+  const { ownerId } = req.query;
+  if (!ownerId) return res.json(buildDays([]));
+
+  try {
+    // Resolve owner_code — fallback to owner_id join if no owner_code
+    const ownerRes = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id = $1 LIMIT 1',
+      [parseInt(ownerId)]
+    );
+    const ownerCode = ownerRes.rows[0]?.owner_code || null;
+
+    let rows = [];
+    if (ownerCode) {
+      const result = await pool.query(
+        `SELECT
+           TO_CHAR(DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
+           DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') AS date,
+           COALESCE(SUM(mo.order_amount), 0)::int AS online,
+           COALESCE((
+             SELECT SUM(le.amount) FROM public.driver_ledger le
+             JOIN public.drivers d2 ON d2.id = le.driver_id
+             WHERE d2.owner_code = $2
+               AND le.entry_type = 'CASH_PAYMENT'
+               AND DATE(le.created_at AT TIME ZONE 'Asia/Kolkata') = DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+           ), 0)::int AS cash
+         FROM public.ms_orders mo
+         JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+         WHERE d.owner_code = $2
+           AND mo.transaction_status = 'SUCCESS'
+           AND mo.order_completion_date >= NOW() - INTERVAL '30 days'
+         GROUP BY DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+         ORDER BY date ASC`,
+        [parseInt(ownerId), ownerCode]
+      );
+      rows = result.rows;
+    } else {
+      // Fallback: join by driver.owner_id
+      const result = await pool.query(
+        `SELECT
+           TO_CHAR(DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
+           DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') AS date,
+           COALESCE(SUM(mo.order_amount), 0)::int AS online,
+           0::int AS cash
+         FROM public.ms_orders mo
+         JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+         WHERE d.owner_id = $1
+           AND mo.transaction_status = 'SUCCESS'
+           AND mo.order_completion_date >= NOW() - INTERVAL '30 days'
+         GROUP BY DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+         ORDER BY date ASC`,
+        [parseInt(ownerId)]
+      );
+      rows = result.rows;
+    }
+    res.json(buildDays(rows));
   } catch (err) {
     console.error('trend error:', err);
-    res.json([]);
+    res.json(buildDays([])); // always return 30 days, never []
   }
 });
 

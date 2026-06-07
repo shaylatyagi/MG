@@ -168,7 +168,7 @@ router.post('/admin-send-otp', async (req, res) => {
       [phone_number, otp]
     );
     if (process.env.NODE_ENV !== 'production') console.log('[ADMIN OTP]', phone_number, otp);
-    await sendOTP(phone_number, otp);
+    await sendSMS(phone_number, otp);
     res.json({ success: true, message: 'OTP sent to admin phone' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
