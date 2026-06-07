@@ -2615,8 +2615,6 @@ const generateDailyRentEntries = async () => {
     console.error('Daily rent error:', err.message);
   }
 };
-scheduleDailyRent();
-
 // Manual trigger for testing
 router.post('/admin/generate-daily-rent', async (req, res) => {
   await generateDailyRentEntries();
