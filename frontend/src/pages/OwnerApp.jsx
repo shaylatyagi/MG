@@ -3134,7 +3134,7 @@ const ProfileTab = () => (
             { id: 'home',     Icon: Home,        label: t.navHome },
 { id: 'drivers',  Icon: Users,       label: t.navDrivers },
 { id: 'vehicles', Icon: Truck,       label: t.navFleet },
-{ id: 'links',    Icon: CreditCard,  label: lang==='hi'?'पेमेंट लिंक':'Pay Links' },
+{ id: 'links',    Icon: CreditCard,  label: 'Pay Links' },
 { id: 'payments', Icon: Wallet,      label: t.navPayments },
           ].map(({ id, Icon, label }) => (
             <button
@@ -3841,4 +3841,5 @@ const ProfileTab = () => (
                 </div>
               </div>
             )}
-            <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('d
+            <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('drivers'); }}
+              className="w-full 
