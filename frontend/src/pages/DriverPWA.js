@@ -220,6 +220,18 @@ export default function DriverPWA() {
     if (p.get('status') === 'success' || p.get('refresh') === 'true') { setShowPaying(false); fetchAll(); window.history.replaceState(null, '', window.location.pathname); }
   }, [user]);
 
+  // Auto-dismiss "Redirecting..." overlay when user returns from payment app without completing
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        const p = new URLSearchParams(window.location.search);
+        if (p.get('status') !== 'success') setShowPaying(false);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
   const markRead = async () => {
     setUnread(0); setNotifs(p => p.map(n => ({ ...n, is_read: true })));
     try { await fetch(`${API}/api/payment/notifications/mark-read?userId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch {}
