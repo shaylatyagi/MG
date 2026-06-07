@@ -1118,15 +1118,25 @@ router.post('/owner/add-driver', async (req, res) => {
 router.get('/owner/transactions', async (req, res) => {
   try {
     const { ownerId } = req.query;
-    // Build WHERE — filter by owner_code if provided, show SUCCESS + PENDING
-    const ownerFilter = ownerId ? `AND (mo.owner_code = $1 OR d.owner_id::text = $1)` : '';
-    const params = ownerId ? [ownerId] : [];
+    // ownerId is numeric owner id — look up owner_code for matching
+    let ownerCode = null;
+    if (ownerId) {
+      const ocRes = await pool.query(
+        `SELECT owner_code FROM public.owners WHERE id = $1`, [ownerId]
+      ).catch(() => ({ rows: [] }));
+      ownerCode = ocRes.rows[0]?.owner_code || null;
+    }
+
+    const ownerFilter = ownerCode
+      ? `AND (mo.owner_code = $1 OR d.owner_id = $2)`
+      : ownerId ? `AND d.owner_id = $1` : '';
+    const params = ownerCode ? [ownerCode, parseInt(ownerId)] : ownerId ? [parseInt(ownerId)] : [];
 
     const result = await pool.query(
       `SELECT mo.order_id, mo.order_number, mo.order_amount,
               mo.order_initiation_date, mo.order_completion_date,
               mo.transaction_status, mo.payment_mode, mo.payer_mobile,
-              COALESCE(d.full_name, mo.payer_name) as driver_name,
+              COALESCE(d.full_name, mo.payer_name, mo.driver_full_name) as driver_name,
               v.vehicle_number, mo.purpose
        FROM public.ms_orders mo
        LEFT JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
@@ -1345,16 +1355,34 @@ router.post('/create-order', async (req, res) => {
       });
     }
 
-    // ✅ DB mein save karo — purpose aur owner_id bhi
+    // ✅ Driver ka owner_code lookup karo taaki owner dashboard me dike
+    let driverOwnerCode = null;
+    let driverFullName = customerName || 'Driver';
+    try {
+      const dLookup = await pool.query(
+        `SELECT d.full_name, o.owner_code
+         FROM public.drivers d
+         LEFT JOIN public.owners o ON o.id = d.owner_id
+         WHERE d.mobile_number = $1 LIMIT 1`,
+        [customerPhone]
+      );
+      if (dLookup.rows[0]) {
+        driverOwnerCode = dLookup.rows[0].owner_code;
+        driverFullName = dLookup.rows[0].full_name || customerName || 'Driver';
+      }
+    } catch (_) {}
+
+    // ✅ DB mein save karo — owner_code bhi
     await pool.query(
       `INSERT INTO ms_orders 
         (order_id, order_number, order_amount, currency, payer_name, 
          payer_mobile, transaction_status, pg_transaction_id, order_initiation_date,
-         purpose, payment_mode)
-       VALUES ($1, $2, $3, 'INR', $4, $5, 'PENDING', $6, NOW(), $7, 'ONLINE')
+         purpose, payment_mode, owner_code, driver_full_name)
+       VALUES ($1, $2, $3, 'INR', $4, $5, 'PENDING', $6, NOW(), $7, 'ONLINE', $8, $9)
        ON CONFLICT (order_id) DO NOTHING`,
       [orderId, orderNumber, parseFloat(amount), 
-       customerName || 'Driver', customerPhone, pgTxnId || null, purpose || 'RENT']
+       driverFullName, customerPhone, pgTxnId || null, purpose || 'RENT',
+       driverOwnerCode, driverFullName]
     );
 
     // Response mein ye sab fields return karo
