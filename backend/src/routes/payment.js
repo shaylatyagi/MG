@@ -1254,7 +1254,7 @@ router.get('/owner/stats', async (req, res) => {
 });
 router.post('/create-order', async (req, res) => {
   try {
-    const { amount, customerName, customerPhone, customerEmail } = req.body;
+    const { amount, customerName, customerPhone, customerEmail, purpose } = req.body;
     if (!amount || !customerPhone) {
       return res.status(400).json({ success: false, message: 'Amount and phone required' });
     }
@@ -2765,5 +2765,4 @@ router.get('/owner/plan', async (req, res) => {
     const o = r.rows[0];
     const premium = o?.plan === 'PREMIUM' && (!o.plan_expires_at || new Date(o.plan_expires_at) > new Date());
     res.json({ plan: o?.plan || 'FREE', is_premium: premium, expires_at: o?.plan_expires_at });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+  } catch (err) { res.status(500).json({ error: err.message }
