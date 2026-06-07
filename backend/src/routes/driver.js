@@ -171,4 +171,77 @@ router.post('/telemetry/update', verifyToken, async (req, res) => {
   }
 });
 
+// ==================== DRIVER PRIVATE EARNINGS ====================
+// PRIVATE: only the driver themselves can see this — owner has no access
+router.get('/earnings', verifyToken, async (req, res) => {
+  try {
+    const driverId = req.user.id;
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS public.driver_earnings (
+        id SERIAL PRIMARY KEY,
+        driver_id INTEGER NOT NULL,
+        earning_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        amount NUMERIC(10,2) NOT NULL,
+        note TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    const result = await pool.query(
+      `SELECT * FROM public.driver_earnings
+       WHERE driver_id = $1
+       ORDER BY earning_date DESC, created_at DESC
+       LIMIT 60`,
+      [driverId]
+    );
+    const todayRes = await pool.query(
+      `SELECT COALESCE(SUM(amount),0) as today_total
+       FROM public.driver_earnings
+       WHERE driver_id = $1 AND earning_date = CURRENT_DATE`,
+      [driverId]
+    );
+    const monthRes = await pool.query(
+      `SELECT COALESCE(SUM(amount),0) as month_total
+       FROM public.driver_earnings
+       WHERE driver_id = $1 AND earning_date >= DATE_TRUNC('month', CURRENT_DATE)`,
+      [driverId]
+    );
+    res.json({
+      earnings: result.rows,
+      today_total: parseFloat(todayRes.rows[0]?.today_total || 0),
+      month_total: parseFloat(monthRes.rows[0]?.month_total || 0),
+    });
+  } catch (err) {
+    console.error('Earnings fetch error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/earnings', verifyToken, async (req, res) => {
+  try {
+    const driverId = req.user.id;
+    const { amount, note, earning_date } = req.body;
+    if (!amount || isNaN(amount) || Number(amount) <= 0)
+      return res.status(400).json({ error: 'Valid amount required' });
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS public.driver_earnings (
+        id SERIAL PRIMARY KEY,
+        driver_id INTEGER NOT NULL,
+        earning_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        amount NUMERIC(10,2) NOT NULL,
+        note TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    const result = await pool.query(
+      `INSERT INTO public.driver_earnings (driver_id, amount, note, earning_date)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [driverId, Number(amount), note || null, earning_date || new Date().toISOString().slice(0, 10)]
+    );
+    res.json({ success: true, entry: result.rows[0] });
+  } catch (err) {
+    console.error('Earnings save error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

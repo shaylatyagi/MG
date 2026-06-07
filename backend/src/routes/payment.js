@@ -1117,18 +1117,25 @@ router.post('/owner/add-driver', async (req, res) => {
 });
 router.get('/owner/transactions', async (req, res) => {
   try {
+    const { ownerId } = req.query;
+    // Build WHERE — filter by owner_code if provided, show SUCCESS + PENDING
+    const ownerFilter = ownerId ? `AND (mo.owner_code = $1 OR d.owner_id::text = $1)` : '';
+    const params = ownerId ? [ownerId] : [];
+
     const result = await pool.query(
       `SELECT mo.order_id, mo.order_number, mo.order_amount,
               mo.order_initiation_date, mo.order_completion_date,
               mo.transaction_status, mo.payment_mode, mo.payer_mobile,
               COALESCE(d.full_name, mo.payer_name) as driver_name,
-              v.vehicle_number
+              v.vehicle_number, mo.purpose
        FROM public.ms_orders mo
        LEFT JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
        LEFT JOIN public.vehicles v ON v.driver_id = d.id
-       WHERE mo.transaction_status = 'SUCCESS'
+       WHERE mo.transaction_status IN ('SUCCESS', 'PENDING', 'FAILED')
+       ${ownerFilter}
        ORDER BY mo.order_initiation_date DESC
-       LIMIT 50`
+       LIMIT 100`,
+      params
     );
     res.json(result.rows);
   } catch (err) {

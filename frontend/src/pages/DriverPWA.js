@@ -77,6 +77,10 @@ export default function DriverPWA() {
   const [showChatbot, setShowChatbot] = useState(false);
   const [showSOS, setShowSOS] = useState(false);
   const [showPaying, setShowPaying] = useState(false);
+  const [earnings, setEarnings] = useState({ earnings: [], today_total: 0, month_total: 0 });
+  const [showAddEarning, setShowAddEarning] = useState(false);
+  const [earningAmt, setEarningAmt] = useState('');
+  const [earningNote, setEarningNote] = useState('');
   const [showReceipt, setShowReceipt] = useState(false);
   const [selTxn, setSelTxn] = useState(null);
   const [chatInput, setChatInput] = useState('');
@@ -142,6 +146,7 @@ export default function DriverPWA() {
       } catch {}
     };
     fetchNotifications();
+    fetchEarnings();
     const interval = setInterval(fetchNotifications, 15000);
     return () => clearInterval(interval);
   }, [user]);
@@ -214,7 +219,28 @@ export default function DriverPWA() {
     try { await fetch(`${API}/api/payment/notifications/mark-read?userId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch {}
   };
 
+  const fetchEarnings = async () => {
+    try {
+      const r = await fetch(`${API}/api/driver/earnings`, { headers: { Authorization: `Bearer ${tk()}` } });
+      if (r.ok) { const d = await r.json(); setEarnings(d); }
+    } catch {}
+  };
+
+  const addEarning = async () => {
+    if (!earningAmt || isNaN(earningAmt) || Number(earningAmt) <= 0) return;
+    try {
+      const r = await fetch(`${API}/api/driver/earnings`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+        body: JSON.stringify({ amount: Number(earningAmt), note: earningNote })
+      });
+      if (r.ok) { setEarningAmt(''); setEarningNote(''); setShowAddEarning(false); fetchEarnings(); }
+    } catch {}
+  };
+
+  const payAbortRef = React.useRef(false);
+
   const pay = async () => {
+    payAbortRef.current = false;
     setShowPaying(true);
     try {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
@@ -223,13 +249,14 @@ export default function DriverPWA() {
         body: JSON.stringify({ amount: payAmt || dues || 850, customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || 'driver@mg.com', purpose: 'RENT' })
       });
       const d = await r.json();
+      if (payAbortRef.current) return; // user cancelled mid-request
       const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
       if (qrLink) {
         try { const qrUrl = new URL(qrLink); const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent")); if (intentLink?.startsWith('upi://')) { window.location.href = intentLink; return; } } catch {}
       }
       const url = d?.checkoutUrl || d?.data?.checkoutUrl || d?.intentURL || d?.data?.intentURL;
       if (url) { window.location.href = url; } else { alert('Payment error: ' + (d?.message || 'No URL')); setShowPaying(false); }
-    } catch (e) { alert('Network error: ' + e.message); setShowPaying(false); }
+    } catch (e) { if (!payAbortRef.current) alert('Network error: ' + e.message); setShowPaying(false); }
   };
 
   const addFloat = async () => {
@@ -491,6 +518,59 @@ export default function DriverPWA() {
               </button>
             </div>
           )}
+        </div>
+
+        {/* MY EARNINGS — private to driver, owner cannot see this */}
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 bg-emerald-50 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">💰 My Earnings</p>
+              <p className="text-[9px] text-emerald-600 opacity-70">Only you can see this</p>
+            </div>
+            <button onClick={() => setShowAddEarning(!showAddEarning)}
+              className="bg-emerald-600 text-white text-[10px] font-black px-3 py-1.5 rounded-lg">
+              + Add
+            </button>
+          </div>
+
+          {showAddEarning && (
+            <div className="px-4 py-3 bg-emerald-50/50 border-b border-emerald-100 space-y-2">
+              <input type="number" placeholder="Amount earned (₹)" value={earningAmt} onChange={e => setEarningAmt(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-black text-slate-800 bg-white" />
+              <input type="text" placeholder="Note (e.g. 12 trips, good day)" value={earningNote} onChange={e => setEarningNote(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 bg-white" />
+              <div className="flex gap-2">
+                <button onClick={addEarning} className="flex-1 bg-emerald-600 text-white text-xs font-black py-2.5 rounded-xl">Save</button>
+                <button onClick={() => { setShowAddEarning(false); setEarningAmt(''); setEarningNote(''); }}
+                  className="flex-1 bg-slate-100 text-slate-600 text-xs font-black py-2.5 rounded-xl">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          <div className="px-4 py-3 grid grid-cols-2 gap-3 border-b border-slate-100">
+            <div className="bg-emerald-50 rounded-xl p-3 text-center">
+              <p className="text-[9px] text-emerald-600 font-black uppercase mb-1">Today</p>
+              <p className="text-lg font-black text-emerald-700">₹{earnings.today_total?.toLocaleString('en-IN') || '0'}</p>
+            </div>
+            <div className="bg-emerald-50 rounded-xl p-3 text-center">
+              <p className="text-[9px] text-emerald-600 font-black uppercase mb-1">This Month</p>
+              <p className="text-lg font-black text-emerald-700">₹{earnings.month_total?.toLocaleString('en-IN') || '0'}</p>
+            </div>
+          </div>
+
+          <div className="divide-y divide-slate-50 max-h-48 overflow-y-auto">
+            {(earnings.earnings || []).length === 0 ? (
+              <p className="p-4 text-center text-[11px] text-slate-400">No earnings logged yet</p>
+            ) : (earnings.earnings || []).slice(0, 10).map((e, i) => (
+              <div key={i} className="px-4 py-2.5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black text-slate-700">{e.note || 'Earnings'}</p>
+                  <p className="text-[9px] text-slate-400 font-mono">{new Date(e.earning_date).toLocaleDateString('en-IN', {day:'2-digit',month:'short'})}</p>
+                </div>
+                <p className="text-sm font-black text-emerald-600">+₹{parseFloat(e.amount).toLocaleString('en-IN')}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -802,7 +882,7 @@ export default function DriverPWA() {
             <div className="text-center">
               <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"/>
               <p className="font-black text-slate-800 text-sm">Redirecting...</p>
-              <button onClick={() => setShowPaying(false)} className="mt-3 text-xs text-slate-400">Cancel</button>
+              <button onClick={() => { payAbortRef.current = true; setShowPaying(false); }} className="mt-3 text-xs text-slate-400 underline">Cancel</button>
             </div>
           </div>
         )}

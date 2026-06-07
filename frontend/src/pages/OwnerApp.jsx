@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Camera, Edit2, Building, MapPin, Mail, Phone, 
+  Camera, Edit2, Building, MapPin, Mail, Phone, User,
   Home, Users, Truck, Wallet, CreditCard, Bell, BellRing,
   LogOut, MessageCircle, X, Send, CheckCircle, Clock,
   AlertCircle, ChevronLeft, Plus, Eye, EyeOff, Search,
@@ -432,8 +432,10 @@ const [multipleDrivers, setMultipleDrivers] = useState([{ name:'', phone:'' }]);
   name: '', phone: '', email: '', 
   vehicleId: '', securityDeposit: 0,
   dob: '', emergencyName: '', emergencyPhone: '',
-  licenseNumber: '', licenseExpiry: ''
+  licenseNumber: '', licenseExpiry: '',
+  address: ''
 });
+  const [agreementFile, setAgreementFile] = useState(null);
 
   useEffect(() => {
     const tick = () => {
@@ -1397,14 +1399,24 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   emergency_contact_number: newDriver.emergencyPhone || null,
   driving_license_number: newDriver.licenseNumber || null,
   driving_license_expiry: newDriver.licenseExpiry || null,
-  security_deposit: parseFloat(newDriver.securityDeposit) || 0
+  security_deposit: parseFloat(newDriver.securityDeposit) || 0,
+  address: newDriver.address || null
 })
       });
       const data = await response.json();
       if (data.success) {
+        // Upload agreement if file selected
+        if (agreementFile && data.driver?.id) {
+          const fd = new FormData();
+          fd.append('document', agreementFile);
+          fd.append('type', 'AGREEMENT');
+          fd.append('driverId', data.driver.id);
+          fetch(`${API}/api/uploads/agreement`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).catch(()=>{});
+        }
         alert('✅ Driver added successfully!');
         setShowAddDriver(false);
-        setNewDriver({ name: '', phone: '', email: '' });
+        setNewDriver({ name: '', phone: '', email: '', vehicleId: '', securityDeposit: 0, dob: '', emergencyName: '', emergencyPhone: '', licenseNumber: '', licenseExpiry: '', address: '' });
+        setAgreementFile(null);
         fetchAllData();
       } else {
         alert(data.message || 'Failed to add driver');
@@ -2355,6 +2367,7 @@ const VehiclesTab = () => {
 const PaymentsTab = () => {
   const [transactions, setTransactions] = useState([]);
   const [loadingTx, setLoadingTx] = useState(false);
+  const [selectedTx, setSelectedTx] = useState(null);
   
   const fetchTransactions = async () => {
     setLoadingTx(true);
@@ -2380,7 +2393,22 @@ const PaymentsTab = () => {
 
   return (
     <div className="space-y-4 pb-4">
-      
+
+      {/* Pay Links shortcut */}
+      <button
+        onClick={() => setActiveTab('links')}
+        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-4 flex items-center justify-between text-white shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <CreditCard size={20} />
+          <div className="text-left">
+            <p className="text-[11px] font-black tracking-wide">PAYMENT LINKS</p>
+            <p className="text-[9px] opacity-75">Send payment request to driver</p>
+          </div>
+        </div>
+        <span className="text-xs font-black opacity-80">→</span>
+      </button>
+
       {/* Total Banner — clean minimal */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">{t.totalCol}</p>
@@ -2414,7 +2442,7 @@ const PaymentsTab = () => {
             <div className="p-8 text-center text-slate-400 text-xs">{t.noTx}</div>
           ) : (
             displayedTx.map((tx, i) => (
-              <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition">
+              <div key={i} onClick={() => setSelectedTx(tx)} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition cursor-pointer active:bg-slate-100">
                 <div>
                   <p className="text-xs font-black text-slate-800">{tx.driver_name || tx.payer_name || 'Driver'}</p>
                   <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
@@ -2424,7 +2452,11 @@ const PaymentsTab = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-black text-slate-800">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                    tx.transaction_status === 'SUCCESS' ? 'bg-green-50 text-green-600 border-green-100' :
+                    tx.transaction_status === 'PENDING' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                    'bg-red-50 text-red-500 border-red-100'
+                  }`}>
                     {tx.transaction_status || 'SUCCESS'}
                   </span>
                 </div>
@@ -2470,6 +2502,37 @@ const PaymentsTab = () => {
         </div>
       )}
       <DriverLedgerSection ownerIdVal={ownerId()} tokenVal={token()} />
+
+      {/* Transaction Detail Modal */}
+      {selectedTx && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => setSelectedTx(null)}>
+          <div className="bg-white rounded-t-3xl w-full max-w-[412px] p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-800">Transaction Details</h3>
+              <button onClick={() => setSelectedTx(null)} className="text-slate-400 text-lg">✕</button>
+            </div>
+            <div className="space-y-3 text-xs">
+              {[
+                ['Driver', selectedTx.driver_name || selectedTx.payer_name || '—'],
+                ['Phone', selectedTx.payer_mobile || '—'],
+                ['Vehicle', selectedTx.vehicle_number || '—'],
+                ['Amount', `₹${parseFloat(selectedTx.order_amount).toLocaleString('en-IN')}`],
+                ['Purpose', selectedTx.purpose || 'RENT'],
+                ['Mode', selectedTx.payment_mode || '—'],
+                ['Status', selectedTx.transaction_status || '—'],
+                ['Order ID', selectedTx.order_number || selectedTx.order_id || '—'],
+                ['Initiated', selectedTx.order_initiation_date ? new Date(selectedTx.order_initiation_date).toLocaleString('en-IN') : '—'],
+                ['Completed', selectedTx.order_completion_date ? new Date(selectedTx.order_completion_date).toLocaleString('en-IN') : '—'],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between items-start py-2 border-b border-slate-50">
+                  <span className="text-slate-400 font-medium w-24 shrink-0">{label}</span>
+                  <span className="text-slate-800 font-black text-right break-all">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -3132,10 +3195,10 @@ const ProfileTab = () => (
         <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.04)]">
           {[
             { id: 'home',     Icon: Home,       label: t.navHome },
-{ id: 'drivers',  Icon: Users,      label: t.navDrivers },
-{ id: 'vehicles', Icon: Truck,      label: t.navFleet },
-{ id: 'links',    Icon: CreditCard, label: 'Pay Links' },
-{ id: 'payments', Icon: Wallet,     label: t.navPayments },
+            { id: 'drivers',  Icon: Users,      label: t.navDrivers },
+            { id: 'vehicles', Icon: Truck,      label: t.navFleet },
+            { id: 'payments', Icon: Wallet,     label: t.navPayments },
+            { id: 'profile',  Icon: User,       label: t.navProfile },
           ].map(({ id, Icon, label }) => (
             <button
               key={id}
@@ -3391,6 +3454,17 @@ const ProfileTab = () => (
                 className="border rounded-xl p-3 text-sm"
                 value={newDriver.emergencyPhone}
                 onChange={e => setNewDriver({...newDriver, emergencyPhone: e.target.value.replace(/\D/g,'').slice(0,10)})}/>
+            </div>
+            <input placeholder="Home Address (optional)"
+              className="w-full border rounded-xl p-3 text-sm"
+              value={newDriver.address}
+              onChange={e => setNewDriver({...newDriver, address: e.target.value})}/>
+            <div className="border border-dashed border-slate-300 rounded-xl p-3 space-y-1">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Agreement / Contract (PDF/Image)</p>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                onChange={e => setAgreementFile(e.target.files[0] || null)}
+                className="w-full text-xs text-slate-600"/>
+              {agreementFile && <p className="text-[10px] text-emerald-600 font-black">📎 {agreementFile.name}</p>}
             </div>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setShowAddDriver(false)}
