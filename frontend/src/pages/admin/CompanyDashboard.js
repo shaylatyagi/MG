@@ -1,1173 +1,583 @@
-// frontend/src/pages/admin/CompanyDashboard.jsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, ChevronLeft, Building2, Users, Truck, Wallet, TrendingUp, Upload, X, Search, CheckCircle, Shield, Activity, RefreshCw, Clock, CreditCard, Bell, LogOut, FileText } from 'lucide-react';
+import React, { useState, useEffect, useCallback, Component } from 'react';
+
+// ── Error Boundary — prevents white page on any crash ─────────
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(err) { return { error: err }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-900">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Something went wrong</h2>
+            <p className="text-sm text-gray-500 mb-4">{this.state.error?.message || 'Unknown error'}</p>
+            <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.reload(); }}
+              className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">
+              Clear & Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const API = 'https://mg-qw5s.onrender.com';
-const fmt  = (n) => `₹${parseFloat(n||0).toLocaleString('en-IN')}`;
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
-const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+const TOKEN_KEY = 'mg_admin_token';
+
+const fmt = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN')}`;
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const timeSince = (d) => {
   if (!d) return '—';
-  const hrs = Math.floor((Date.now()-new Date(d))/3600000);
-  if (hrs<24) return `${hrs}h ago`;
-  const days = Math.floor(hrs/24);
-  if (days<30) return `${days}d ago`;
-  return fmtDate(d);
+  const hrs = Math.floor((Date.now() - new Date(d)) / 3600000);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return days < 30 ? `${days}d ago` : fmtDate(d);
 };
 
-export default function CompanyDashboard() {
-  const [panel, setPanel]           = useState('companies');
-  const [crumbs, setCrumbs]         = useState([]);
-  const [selCompany, setSelCompany] = useState(null);
-  const [selOwner, setSelOwner]     = useState(null);
-  const [selDriver, setSelDriver]   = useState(null);
+const getToken = () => localStorage.getItem(TOKEN_KEY);
+const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
+const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
-  const [pStats, setPStats]         = useState({});
-  const [companies, setCompanies]   = useState([]);
-  const [owners, setOwners]         = useState([]);
-  const [ownerDetail, setOwnerDetail] = useState(null);
-  const [drivers, setDrivers]       = useState([]);
-  const [driverDetail, setDriverDetail] = useState(null);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState(null);
-  const [q, setQ]                   = useState('');
+const api = async (path, opts = {}) => {
+  const token = getToken();
+  const res = await fetch(`${API}${path}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...opts.headers,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
+  return data;
+};
 
-  const [showDoc, setShowDoc]       = useState(false);
-  const [sideOpen, setSideOpen]     = useState(false);
-
-  const [docTarget, setDocTarget]   = useState(null);
-  const [showAddCo, setShowAddCo]   = useState(false);
-  const [newCo, setNewCo]           = useState({name:'',cin:'',city:''});
-  const [logs, setLogs]             = useState([`[${new Date().toISOString()}] Session started`]);
-  const addLog = t => setLogs(p=>[`[${new Date().toISOString()}] ${t}`,...p]);
-
-  const ADMIN_KEY = 'mg_admin_2026_secret';
-
-  const get = async (url) => {
-    const sep = url.includes('?') ? '&' : '?';
-    const r = await fetch(`${API}${url}${sep}admin_key=${ADMIN_KEY}`);
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${r.status}`);
-    }
-    return r.json();
+// ── Status Badge ─────────────────────────────────────────────
+const Badge = ({ status }) => {
+  const map = {
+    ACTIVE: 'bg-green-100 text-green-700', Active: 'bg-green-100 text-green-700',
+    INACTIVE: 'bg-red-100 text-red-700', Inactive: 'bg-red-100 text-red-700',
+    VERIFIED: 'bg-green-100 text-green-700',
+    PENDING: 'bg-yellow-100 text-yellow-700',
+    SUBMITTED: 'bg-blue-100 text-blue-700',
+    UNDER_REVIEW: 'bg-purple-100 text-purple-700',
+    REJECTED: 'bg-red-100 text-red-700',
   };
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>
+      {status || 'N/A'}
+    </span>
+  );
+};
 
-  const loadPStats   = useCallback(async () => { try { setPStats(await get('/api/admin/platform-stats')); } catch {} }, []);
-  const loadCompanies= useCallback(async () => { setLoading(true); try { const d=await get('/api/admin/companies'); setCompanies(Array.isArray(d)?d:[]); } catch { setCompanies([]); } setLoading(false); }, []);
-
-  useEffect(()=>{ loadPStats(); loadCompanies(); },[]);
-
-  const drillCompany = async (co) => {
-    setSelCompany(co); setSelOwner(null); setSelDriver(null); setOwnerDetail(null); setDriverDetail(null);
-    setCrumbs([{label:co.name,level:'company'}]); setPanel('owners'); setQ(''); setError(null);
-    setLoading(true);
-    try {
-      const data = await get(`/api/admin/companies/${co.id}/owners`);
-      if (Array.isArray(data)) { setOwners(data); }
-      else { setOwners([]); setError(`Server: ${JSON.stringify(data)}`); }
-    } catch(e) {
-      setOwners([]);
-      setError(`API Error: ${e.message} — Make sure new admin.js is deployed on Render and app.use('/api/admin', ...) is in index.js`);
-    }
-    setLoading(false); addLog(`Company: ${co.name}`);
+// ── Stat Card ─────────────────────────────────────────────────
+const StatCard = ({ label, value, sub, color = 'indigo' }) => {
+  const colors = {
+    indigo: 'border-indigo-400 bg-indigo-50',
+    green: 'border-green-400 bg-green-50',
+    blue: 'border-blue-400 bg-blue-50',
+    orange: 'border-orange-400 bg-orange-50',
   };
-
-  const drillOwner = async (o) => {
-    setSelOwner(o); setSelDriver(null); setDriverDetail(null);
-    setCrumbs(p=>[...p.filter(x=>x.level==='company'),{label:o.full_name,level:'owner'}]);
-    setPanel('drivers'); setQ(''); setError(null);
-    setLoading(true);
-    try {
-      const [drv, det] = await Promise.all([
-        get(`/api/admin/owners/${o.id}/drivers`),
-        get(`/api/admin/owners/${o.id}`),
-      ]);
-      setDrivers(Array.isArray(drv)?drv:[]);
-      setOwnerDetail(det);
-    } catch(e) { setDrivers([]); setError(`Owner drill error: ${e.message}`); }
-    setLoading(false); addLog(`Owner: ${o.full_name}`);
-  };
-
-  const drillDriver = async (d) => {
-    setSelDriver(d);
-    setCrumbs(p=>[...p.filter(x=>x.level!=='driver'),{label:d.full_name,level:'driver'}]);
-    setPanel('driver-detail'); setLoading(true); setError(null);
-    try { setDriverDetail(await get(`/api/admin/drivers/${d.id}`)); } catch(e) { setDriverDetail(null); setError(`Driver detail error: ${e.message}`); }
-    setLoading(false); addLog(`Driver: ${d.full_name}`);
-  };
-
-  const goBack = useCallback(() => {
-    if (panel==='driver-detail') { setPanel('drivers'); setSelDriver(null); setCrumbs(p=>p.filter(x=>x.level!=='driver')); }
-    else if (panel==='drivers')  { setPanel('owners');  setSelOwner(null);  setCrumbs(p=>p.filter(x=>x.level!=='owner')); }
-    else if (panel==='owners')   { setPanel('companies'); setSelCompany(null); setCrumbs([]); }
-  }, [panel]);
-
-  // Intercept browser back — don't logout
-  useEffect(() => {
-    window.history.pushState(null, '', window.location.pathname);
-    const onPop = () => {
-      if (['owners','drivers','driver-detail'].includes(panel)) {
-        goBack();
-        window.history.pushState(null, '', window.location.pathname);
-      }
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, [panel, goBack]);
-
-  const filt = arr => arr.filter(x => !q || Object.values(x).some(v=>String(v||'').toLowerCase().includes(q.toLowerCase())));
-
-  // ── UI Primitives ────────────────────────────────────────────────────────
-  const Stat = ({label,value,sub,icon:I,blue,tiny}) => (
-    <div className="bg-white border border-slate-200 rounded-xl p-4">
-      <div className="flex justify-between items-start mb-2">
-        <p className={`font-black text-slate-400 uppercase tracking-widest ${tiny?'text-[8px]':'text-[9px]'}`}>{label}</p>
-        {I && <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${blue?'bg-blue-50':'bg-slate-100'}`}><I size={12} className={blue?'text-blue-600':'text-slate-500'}/></div>}
-      </div>
-      <p className="text-xl font-black text-slate-800 leading-none">{value}</p>
-      {sub && <p className="text-[9px] text-slate-400 mt-1.5">{sub}</p>}
+  return (
+    <div className={`border-l-4 rounded-lg p-4 shadow-sm ${colors[color]}`}>
+      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
     </div>
   );
+};
 
-  const Badge = ({v,green,blue,red,amber}) => {
-    const cls = green?'bg-emerald-50 text-emerald-700 border-emerald-200':blue?'bg-blue-50 text-blue-700 border-blue-200':red?'bg-red-50 text-red-700 border-red-200':amber?'bg-amber-50 text-amber-700 border-amber-200':'bg-slate-50 text-slate-500 border-slate-200';
-    return <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${cls}`}>{v}</span>;
+// ── LOGIN ─────────────────────────────────────────────────────
+function LoginPage({ onLogin }) {
+  const [phone, setPhone] = useState('');
+  const [secret, setSecret] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const sendOtp = async (e) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      await api('/api/auth/admin-send-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone_number: phone, admin_secret: secret }),
+      });
+      setStep(2);
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
-  const Row = ({label,value,mono}) => (
-    <div className="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
-      <span className="text-xs text-slate-400">{label}</span>
-      <span className={`text-xs font-black text-slate-700 ${mono?'font-mono':''}`}>{value||'—'}</span>
-    </div>
-  );
-
-  const UpBtn = (target) => (
-    <button onClick={e=>{e.stopPropagation();setDocTarget(target);setShowDoc(true);}}
-      className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition" title="Upload docs">
-      <Upload size={11}/>
-    </button>
-  );
-
-  const SideItems = [
-    {id:'overview', icon:'▦', label:'Overview'},
-    {id:'companies',icon:'◈', label:'Fleet Hierarchy'},
-    {id:'finance',  icon:'◎', label:'Financials'},
-    {id:'kyc',      icon:'◷', label:'KYC Desk'},
-    {id:'audit',    icon:'◑', label:'Audit Logs'},
-  ];
-  const hierarchyPanels = ['companies','owners','drivers','driver-detail'];
+  const verifyOtp = async (e) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      const data = await api('/api/auth/admin-verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ phone_number: phone, otp, admin_secret: secret }),
+      });
+      setToken(data.token);
+      onLogin();
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex bg-slate-50 font-sans">
-
-      {/* Mobile overlay */}
-      {sideOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-30"
-          style={{display: window.innerWidth >= 1024 ? 'none' : 'block'}}
-          onClick={()=>setSideOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside style={{
-        width: '208px',
-        flexShrink: 0,
-        position: window.innerWidth >= 1024 ? 'static' : 'fixed',
-        top: 0, left: 0, bottom: 0,
-        transform: (window.innerWidth >= 1024 || sideOpen) ? 'translateX(0)' : 'translateX(-100%)',
-        transition: 'transform 0.2s ease',
-        zIndex: 40,
-      }} className="bg-slate-950 flex flex-col">
-        <div className="px-4 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">MG</div>
-            <div><p className="text-white font-black text-sm">MobilityGrid</p><p className="text-[9px] text-slate-500 uppercase tracking-widest">Admin</p></div>
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 bg-indigo-600 rounded-xl mx-auto mb-4 flex items-center justify-center">
+            <span className="text-white text-xl font-bold">M</span>
           </div>
-          <button
-            onClick={()=>setSideOpen(false)}
-            style={{display: window.innerWidth >= 1024 ? 'none' : 'block'}}
-            className="text-slate-500 hover:text-white transition p-1">
-            <X size={16}/>
-          </button>
+          <h1 className="text-2xl font-bold text-gray-900">MobilityGrid</h1>
+          <p className="text-gray-500 text-sm mt-1">Platform Admin Access</p>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5">
-          {SideItems.map(item=>{
-            const active = item.id==='hierarchy' ? hierarchyPanels.includes(panel) : panel===item.id;
-            return <button key={item.id}
-              onClick={()=>{
-                setSideOpen(false);
-                if(item.id==='companies'){
-                  setPanel('companies'); setCrumbs([]); setSelCompany(null); setSelOwner(null); setSelDriver(null);
-                  loadCompanies();
-                } else { setPanel(item.id); }
-              }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition ${active?'bg-blue-600 text-white':'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
-              <span>{item.icon}</span>{item.label}
-            </button>;
-          })}
-        </nav>
-        <div className="p-4 border-t border-slate-800 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/><span className="text-[9px] text-slate-500">Live</span>
-        </div>
-      </aside>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 text-xs min-w-0 flex-1 overflow-hidden mr-2">
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+        )}
+
+        {step === 1 ? (
+          <form onSubmit={sendOtp} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Phone Number</label>
+              <input
+                type="tel" value={phone} onChange={e => setPhone(e.target.value)} required
+                placeholder="9876543210"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Secret Key</label>
+              <input
+                type="password" value={secret} onChange={e => setSecret(e.target.value)} required
+                placeholder="••••••••"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              />
+            </div>
             <button
-              onClick={()=>setSideOpen(!sideOpen)}
-              style={{display: window.innerWidth >= 1024 ? 'none' : 'flex'}}
-              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 items-center justify-center shrink-0">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-              </svg>
+              type="submit" disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50"
+            >
+              {loading ? 'Sending OTP…' : 'Send OTP'}
             </button>
-            <button onClick={()=>{setPanel('companies');setCrumbs([]);setSelCompany(null);setSelOwner(null);setSelDriver(null);}} className="font-black text-slate-400 hover:text-blue-600 transition shrink-0">Platform</button>
-            {crumbs.map((b,i)=>(
-              <React.Fragment key={i}>
-                <ChevronRight size={11} className="text-slate-300 shrink-0"/>
-                <button onClick={()=>{
-                  if(b.level==='company'){setPanel('owners');setSelOwner(null);setSelDriver(null);setCrumbs([b]);}
-                  else if(b.level==='owner'){setPanel('drivers');setSelDriver(null);setCrumbs(p=>p.filter(x=>x.level!=='driver'));}
-                }} className={`font-black transition truncate max-w-[120px] sm:max-w-[200px] ${i===crumbs.length-1?'text-slate-800':'text-slate-400 hover:text-blue-600'}`}>{b.label}</button>
-              </React.Fragment>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={()=>{loadPStats();loadCompanies();}} className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><RefreshCw size={12}/></button>
-            <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600">SA</div>
-            <button onClick={()=>{ localStorage.removeItem('admin_token'); window.location.href='/login'; }}
-              className="p-2 rounded-lg bg-red-50 border border-red-100 text-red-500 hover:bg-red-100 transition" title="Logout">
-              <LogOut size={13}/>
+          </form>
+        ) : (
+          <form onSubmit={verifyOtp} className="space-y-4">
+            <p className="text-sm text-gray-600 text-center">OTP sent to <strong>+91{phone}</strong></p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP</label>
+              <input
+                type="text" value={otp} onChange={e => setOtp(e.target.value)} required
+                placeholder="6-digit OTP (or 000000 for demo)"
+                maxLength={6}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center text-xl tracking-widest"
+              />
+            </div>
+            <button
+              type="submit" disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50"
+            >
+              {loading ? 'Verifying…' : 'Login'}
             </button>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-
-          {/* ── OVERVIEW (stats) ──────────────────────────────────── */}
-          {panel==='overview' && (
-            <div className="space-y-5 max-w-4xl">
-              <div><h2 className="text-base font-black text-slate-800">Platform Overview</h2><p className="text-xs text-slate-400">Live stats</p></div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Stat label="Companies"  value={pStats.total_companies||0}                    icon={Building2}/>
-                <Stat label="Owners"     value={pStats.total_owners||0}                       icon={Shield}/>
-                <Stat label="Drivers"    value={(pStats.total_drivers||0).toLocaleString()}   icon={Users} blue/>
-                <Stat label="Vehicles"   value={(pStats.total_vehicles||0).toLocaleString()}  icon={Truck}/>
-                <Stat label="Today"      value={fmt(pStats.collection_today)}                 icon={Wallet} blue sub="online"/>
-                <Stat label="This Month" value={fmt(pStats.collection_month)}                 icon={TrendingUp} sub="online"/>
-              </div>
-              <button onClick={()=>{ setPanel('companies'); loadCompanies(); }}
-                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-black hover:bg-blue-700 transition flex items-center gap-2">
-                <Building2 size={13}/> Open Fleet Hierarchy →
-              </button>
-            </div>
-          )}
-
-          {/* ── FLEET HIERARCHY — COMPANIES ───────────────────────── */}
-          {panel==='companies' && (
-            <div className="space-y-5 max-w-5xl">
-              <div className="flex items-center justify-between">
-                <div><h2 className="text-base font-black text-slate-800">Platform Overview</h2><p className="text-xs text-slate-400">All data live from DB</p></div>
-                <button onClick={()=>setShowAddCo(true)} className="flex items-center gap-1.5 text-xs font-black text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">+ Add Company</button>
-              </div>
-              <div className="grid grid-cols-5 gap-3">
-                <Stat label="Companies"   value={pStats.total_companies||0} icon={Building2}/>
-                <Stat label="Owners"      value={pStats.total_owners||0}    icon={Shield}/>
-                <Stat label="Drivers"     value={(pStats.total_drivers||0).toLocaleString()}   icon={Users} blue/>
-                <Stat label="Vehicles"    value={(pStats.total_vehicles||0).toLocaleString()}  icon={Truck}/>
-                <Stat label="Today"       value={fmt(pStats.collection_today)} icon={Wallet} blue sub={fmt(pStats.collection_month)+' this month'}/>
-              </div>
-              {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading...</div>:(
-                <div className="space-y-2">
-                  {companies.map((c,i)=>(
-                    <div key={i} onClick={()=>drillCompany(c)} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-200 hover:shadow-sm transition cursor-pointer group">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center"><Building2 size={14} className="text-blue-600"/></div>
-                          <div>
-                            <p className="font-black text-slate-800">{c.name}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[9px] text-slate-400 font-mono">ID #{c.id}</span>
-                              <span className="text-slate-200">·</span>
-                              <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{c.company_code || '—'}</span>
-                              <span className="text-slate-200">·</span>
-                              <span className="text-[9px] text-slate-400">{c.cin || 'No CIN'}</span>
-                              <span className="text-slate-200">·</span>
-                              <span className="text-[9px] text-slate-400">{c.city || '—'}</span>
-                            </div>
-                            <p className="text-[9px] text-slate-400 mt-0.5">Joined: {fmtDate(c.created_at)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-5">
-                          {[['Owners',c.owners||0],['Drivers',c.drivers||0],['Vehicles',c.vehicles||0]].map(([k,v])=>(
-                            <div key={k} className="text-center"><p className="text-[9px] text-slate-400 uppercase">{k}</p><p className="text-sm font-black text-slate-700">{parseInt(v||0)}</p></div>
-                          ))}
-                          <div className="text-center"><p className="text-[9px] text-slate-400 uppercase">Today</p><p className="text-sm font-black text-blue-600">{fmt(c.collection_today)}</p></div>
-                          <div className="text-center"><p className="text-[9px] text-slate-400 uppercase">Month</p><p className="text-sm font-black text-slate-700">{fmt(c.collection_month)}</p></div>
-                          <div className="flex gap-1">
-                            {UpBtn({...c,level:'company',full_name:c.name})}
-                            <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-500 transition"/>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {!loading&&companies.length===0&&<div className="py-10 text-center text-sm text-slate-400">No companies — add one above</div>}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── OWNERS ───────────────────────────────────────────── */}
-          {panel==='owners' && selCompany && (
-            <div className="space-y-4 max-w-6xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <button onClick={goBack} className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><ChevronLeft size={15}/></button>
-                  <div>
-                    <h2 className="text-base font-black text-slate-800">{selCompany.name}</h2>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] text-slate-400 font-mono">ID #{selCompany.id}</span>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-[9px] font-black text-blue-600">{selCompany.company_code}</span>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-[9px] text-slate-400">{selCompany.cin || 'No CIN'}</span>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-[9px] text-slate-400">Joined {fmtDate(selCompany.created_at)}</span>
-                    </div>
-                  </div>
-                </div>
-                {UpBtn({...selCompany,level:'company',full_name:selCompany.name})}
-              </div>
-              <div className="grid grid-cols-5 gap-3">
-                <Stat label="Today"       value={fmt(selCompany.collection_today)}  blue icon={Wallet}/>
-                <Stat label="This Month"  value={fmt(selCompany.collection_month)}  icon={TrendingUp}/>
-                <Stat label="All Time"    value={fmt(selCompany.collection_total)}  icon={TrendingUp}/>
-                <Stat label="Drivers"     value={parseInt(selCompany.drivers||0)}   blue icon={Users}/>
-                <Stat label="Vehicles"    value={parseInt(selCompany.vehicles||0)}  icon={Truck}/>
-              </div>
-              <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search owner name, code, phone..."
-                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white"/>
-              </div>
-              {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading owners...</div>:(
-                <>
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <p className="text-xs font-black text-red-700 mb-1">⚠️ Error loading owners</p>
-                    <p className="text-[10px] text-red-500 font-mono">{error}</p>
-                  </div>
-                )}
-                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
-                    <thead><tr className="border-b border-slate-100 bg-slate-50/80">
-                      {['Owner','Joined','Drivers','Vehicles','Today','Month','Total Wallet',''].map(h=><th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-wider">{h}</th>)}
-                    </tr></thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {filt(owners).map((o,i)=>(
-                        <tr key={i} onClick={()=>drillOwner(o)} className="hover:bg-blue-50/20 cursor-pointer transition group">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-black">{o.full_name?.charAt(0)}</div>
-                              <div>
-                                <p className="font-black text-slate-800">{o.full_name}</p>
-                                <p className="text-[9px] text-slate-400 font-mono">{o.owner_code} · {o.mobile_number}</p>
-                                {o.business_name && <p className="text-[9px] text-slate-500">{o.business_name}</p>}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(o.created_at)}</td>
-                          <td className="px-4 py-3">
-                            <div className="text-center">
-                              <p className="font-black text-slate-800">{o.total_drivers||0}</p>
-                              <p className="text-[9px] text-slate-400">{o.active_drivers||0} w/ vehicle</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-center">
-                              <p className="font-black text-slate-800">{o.total_vehicles||0}</p>
-                              <p className="text-[9px] text-slate-400">{o.assigned_vehicles||0} assigned</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 font-black text-blue-600">{fmt(o.collection_today)}</td>
-                          <td className="px-4 py-3 font-black text-slate-700">{fmt(o.collection_month)}</td>
-                          <td className="px-4 py-3 font-black text-slate-600">{fmt(o.total_wallet_balance)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                              {UpBtn({...o,level:'owner'})}
-                              <ChevronRight size={13} className="text-slate-300 group-hover:text-blue-500"/>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table></div>
-                  {filt(owners).length===0&&!error&&<div className="py-10 text-center text-sm text-slate-400">No owners found — check if SQL ran: <code className="bg-slate-100 px-1 rounded">UPDATE public.owners SET company_id=1 WHERE company_id IS NULL</code></div>}
-                </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ── DRIVERS ──────────────────────────────────────────── */}
-          {panel==='drivers' && selOwner && (
-            <div className="space-y-4 max-w-7xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <button onClick={goBack} className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><ChevronLeft size={15}/></button>
-                  <div>
-                    <h2 className="text-base font-black text-slate-800">{selOwner.full_name}</h2>
-                    <p className="text-[10px] text-slate-400">{selOwner.business_name||selOwner.owner_code} · Joined {fmtDate(selOwner.created_at)}</p>
-                  </div>
-                </div>
-                {UpBtn({...selOwner,level:'owner'})}
-              </div>
-
-              {ownerDetail && (
-                <div className="grid grid-cols-4 gap-3">
-                  <Stat label="Today"          value={fmt(ownerDetail.owner?.collection_today)}  blue icon={Wallet}/>
-                  <Stat label="This Month"     value={fmt(ownerDetail.owner?.collection_month)}  icon={TrendingUp}/>
-                  <Stat label="All Time"       value={fmt(ownerDetail.owner?.collection_total)}  icon={TrendingUp}/>
-                  <Stat label="Total Vehicles" value={`${ownerDetail.owner?.total_vehicles||0} (${ownerDetail.owner?.assigned_vehicles||0} assigned)`} icon={Truck}/>
-                </div>
-              )}
-
-              {/* Owner detail strip */}
-              {ownerDetail && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white border border-slate-200 rounded-xl p-4">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Owner Info</p>
-                    <Row label="Owner ID"   value={`#${ownerDetail.owner?.id}`} mono/>
-                    <Row label="Owner Code" value={ownerDetail.owner?.owner_code} mono/>
-                    <Row label="Phone"      value={ownerDetail.owner?.mobile_number} mono/>
-                    <Row label="Email"      value={ownerDetail.owner?.email}/>
-                    <Row label="Business"   value={ownerDetail.owner?.business_name}/>
-                    <Row label="Address"    value={ownerDetail.owner?.address}/>
-                    <Row label="Joined"     value={fmtDate(ownerDetail.owner?.created_at)}/>
-                    <Row label="Status"     value={ownerDetail.owner?.status}/>
-                    <Row label="Incentives" value={ownerDetail.incentive_rules?.is_enabled ? `${ownerDetail.incentive_rules?.rules?.length||0} rules active` : 'Disabled'}/>
-                  </div>
-                  <div className="bg-white border border-slate-200 rounded-xl p-4">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Recent Payments</p>
-                    {ownerDetail.recent_payments?.length===0 && <p className="text-xs text-slate-400 text-center py-2">No payments</p>}
-                    {ownerDetail.recent_payments?.slice(0,5).map((p,i)=>(
-                      <div key={i} className="flex justify-between items-center py-1.5 border-b border-slate-50 last:border-0">
-                        <div><p className="text-xs font-black text-slate-700">{p.driver_name}</p><p className="text-[9px] text-slate-400">{fmtDate(p.order_completion_date)}</p></div>
-                        <p className="text-sm font-black text-blue-600">{fmt(p.order_amount)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* All Vehicles — complete table */}
-              {ownerDetail?.vehicles?.length > 0 && (
-                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">All Vehicles ({ownerDetail.vehicles.length})</p>
-                    <div className="flex gap-3 text-[9px] text-slate-400">
-                      <span>{ownerDetail.vehicles.filter(v=>v.driver_id).length} assigned</span>
-                      <span>{ownerDetail.vehicles.filter(v=>!v.driver_id).length} free</span>
-                    </div>
-                  </div>
-                  <table className="w-full text-xs">
-                    <thead><tr className="border-b border-slate-100 bg-slate-50/50">
-                      {['Vehicle','Model/Type','Status','Driver','Assigned Since','Days','Rent/day','Earned','Total Assignments','Ins/FC Expiry','Docs'].map(h=><th key={h} className="text-left px-3 py-2.5 text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">{h}</th>)}
-                    </tr></thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {ownerDetail.vehicles.map((v,i)=>(
-                        <tr key={i} className="hover:bg-slate-50/50">
-                          <td className="px-3 py-2.5 font-black text-blue-600 whitespace-nowrap">{v.vehicle_number}</td>
-                          <td className="px-3 py-2.5"><p className="text-slate-700">{v.vehicle_model}</p><p className="text-slate-400 text-[9px]">{v.vehicle_type||'—'}</p></td>
-                          <td className="px-3 py-2.5">
-                            <Badge v={v.driver_id ? 'Assigned' : 'Free'}
-                              blue={!!v.driver_id} green={!v.driver_id}/>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            {v.driver_name
-                              ? <div><p className="font-black text-slate-800">{v.driver_name}</p><p className="text-slate-400 text-[9px] font-mono">{v.driver_mobile} · {v.driver_code}</p></div>
-                              : <span className="text-slate-400">—</span>}
-                          </td>
-                          <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
-                            {v.assigned_since
-                              ? fmtDate(v.assigned_since)
-                              : v.driver_id
-                              ? <span className="text-[9px] text-slate-400 italic">Run backfill SQL</span>
-                              : '—'}
-                          </td>
-                          <td className="px-3 py-2.5 font-black text-slate-700 text-center">
-                            {v.days_assigned != null ? v.days_assigned : v.driver_id ? '—' : '—'}
-                          </td>
-                          <td className="px-3 py-2.5 font-black text-slate-700">₹{v.daily_rent||0}</td>
-                          <td className="px-3 py-2.5 font-black text-blue-600">
-                            {v.earned_from_driver != null ? fmt(v.earned_from_driver) : '—'}
-                          </td>
-                          <td className="px-3 py-2.5 text-center text-slate-600">{v.total_assignments||0}</td>
-                          <td className="px-3 py-2.5">
-                            <p className="text-[9px] text-slate-500">Ins: {fmtDate(v.insurance_expiry)}</p>
-                            <p className="text-[9px] text-slate-500">FC: {fmtDate(v.fitness_expiry)}</p>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <button onClick={()=>{setDocTarget({...v,level:'vehicle',full_name:v.vehicle_number});setShowDoc(true);}}
-                              className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition">
-                              <Upload size={11}/>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search driver name, vehicle, phone..."
-                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 bg-white"/>
-              </div>
-
-              {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading drivers...</div>:(
-                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]">
-                    <thead><tr className="border-b border-slate-100 bg-slate-50/80">
-                      {['Driver','Joined','Vehicle / Since','Rent','Paid Total','Today','Wallet','Active Days',''].map(h=><th key={h} className="text-left px-3 py-3 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}
-                    </tr></thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {filt(drivers).map((d,i)=>(
-                        <tr key={i} onClick={()=>drillDriver(d)} className="hover:bg-blue-50/20 cursor-pointer transition group">
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-600">{d.full_name?.charAt(0)}</div>
-                              <div>
-                                <p className="font-black text-slate-800">{d.full_name}</p>
-                                <p className="text-[9px] text-slate-400 font-mono">{d.driver_code} · {d.mobile_number}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-xs text-slate-500">{fmtDate(d.created_at)}</td>
-                          <td className="px-3 py-3">
-                            {d.vehicle_number
-                              ? <div><span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{d.vehicle_number}</span><p className="text-[9px] text-slate-400 mt-0.5">{timeSince(d.vehicle_since)}</p></div>
-                              : <span className="text-xs text-slate-400">—</span>}
-                          </td>
-                          <td className="px-3 py-3 text-xs font-black text-slate-700">{d.daily_rent?`₹${d.daily_rent}/d`:'—'}</td>
-                          <td className="px-3 py-3 font-black text-slate-700 text-sm">{fmt(d.total_paid)}</td>
-                          <td className="px-3 py-3 font-black text-blue-600">{fmt(d.paid_today)}</td>
-                          <td className="px-3 py-3 font-black text-slate-600">{fmt(d.wallet_balance)}</td>
-                          <td className="px-3 py-3 text-center">
-                            <p className="font-black text-slate-700">{d.total_active_days||0}</p>
-                            <p className="text-[9px] text-slate-400">{Math.floor((d.total_active_minutes||0)/60)}h total</p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                              {UpBtn({...d,level:'driver'})}
-                              <ChevronRight size={13} className="text-slate-300 group-hover:text-blue-500"/>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table></div>
-                  {filt(drivers).length===0&&<div className="py-10 text-center text-sm text-slate-400">No drivers</div>}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── DRIVER DETAIL ────────────────────────────────────── */}
-          {panel==='driver-detail' && selDriver && (
-            <div className="space-y-4 max-w-5xl">
-              <div className="flex items-center gap-3">
-                <button onClick={goBack} className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 transition"><ChevronLeft size={15}/></button>
-                <div className="flex-1">
-                  <h2 className="text-base font-black text-slate-800">{selDriver.full_name}</h2>
-                  <p className="text-[10px] text-slate-400">{selDriver.driver_code} · {selDriver.mobile_number} · Joined {fmtDate(selDriver.created_at)}</p>
-                </div>
-                <Badge v={selDriver.status} green={selDriver.status==='ACTIVE'} amber={selDriver.status!=='ACTIVE'}/>
-                {UpBtn({...selDriver,level:'driver'})}
-              </div>
-
-              {loading?<div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading...</div>:driverDetail&&(
-                <>
-                  {/* Top stats */}
-                  <div className="grid grid-cols-5 gap-3">
-                    <Stat label="Total Paid"    value={fmt(driverDetail.driver?.total_paid)}    blue icon={CreditCard} sub={`${driverDetail.driver?.total_transactions||0} transactions`}/>
-                    <Stat label="Today"         value={fmt(driverDetail.driver?.paid_today)}    blue icon={Wallet}/>
-                    <Stat label="Wallet Balance" value={fmt(driverDetail.driver?.wallet_balance)} icon={Wallet}/>
-                    <Stat label="Security Dep." value={fmt(driverDetail.driver?.security_deposit)} icon={Shield}/>
-                    <Stat label="Last Payment"  value={driverDetail.driver?.last_payment_date?timeSince(driverDetail.driver.last_payment_date):'Never'} icon={Clock}/>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    {/* Profile */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-4">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Profile</p>
-                      <Row label="Driver ID"   value={`#${driverDetail.driver?.id}`} mono/>
-                      <Row label="Name"        value={driverDetail.driver?.full_name}/>
-                      <Row label="Mobile"      value={driverDetail.driver?.mobile_number} mono/>
-                      <Row label="Driver Code" value={driverDetail.driver?.driver_code} mono/>
-                      <Row label="DOB"         value={fmtDate(driverDetail.driver?.date_of_birth)}/>
-                      <Row label="License No." value={driverDetail.driver?.driving_license_number} mono/>
-                      <Row label="DL Expiry"   value={fmtDate(driverDetail.driver?.driving_license_expiry)}/>
-                      <Row label="Rent Type"   value={driverDetail.driver?.rent_type}/>
-                      <Row label="Joined"      value={fmtDate(driverDetail.driver?.created_at)}/>
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Owner</p>
-                        <Row label="Owner ID"   value={`#${driverDetail.driver?.owner_id}`} mono/>
-                        <Row label="Name"       value={driverDetail.driver?.owner_name}/>
-                        <Row label="Phone"      value={driverDetail.driver?.owner_phone} mono/>
-                        <Row label="Code"       value={driverDetail.driver?.owner_code} mono/>
-                        <Row label="Business"   value={driverDetail.driver?.owner_business}/>
-                      </div>
-                    </div>
-
-                    {/* Current vehicle + docs */}
-                    <div className="space-y-3">
-                      <div className="bg-white border border-slate-200 rounded-xl p-4">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Current Vehicle</p>
-                        {driverDetail.driver?.vehicle_number?(
-                          <>
-                            <p className="text-lg font-black text-blue-600 mb-1">{driverDetail.driver.vehicle_number}</p>
-                            <Row label="Model"       value={driverDetail.driver.vehicle_model}/>
-                            <Row label="Daily Rent"  value={`₹${driverDetail.driver.daily_rent}`}/>
-                            <Row label="Assigned"    value={timeSince(driverDetail.driver.vehicle_since)}/>
-                            <Row label="Ins. Expiry" value={fmtDate(driverDetail.driver.insurance_expiry)}/>
-                            <Row label="FC Expiry"   value={fmtDate(driverDetail.driver.fitness_expiry)}/>
-                          </>
-                        ):<p className="text-xs text-slate-400 text-center py-2">No vehicle assigned</p>}
-                      </div>
-
-                      <div className="bg-white border border-slate-200 rounded-xl p-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Documents</p>
-                          <button onClick={()=>{setDocTarget({...selDriver,level:'driver'});setShowDoc(true);}} className="text-[9px] font-black text-blue-600 flex items-center gap-1"><Upload size={9}/>Upload</button>
-                        </div>
-                        {['AADHAAR','PAN_CARD','DRIVING_LICENSE','BANK_CHEQUE','PROFILE_PHOTO'].map(dt=>{
-                          const doc = driverDetail.documents?.find(d=>d.doc_type===dt);
-                          return <div key={dt} className="flex justify-between items-center py-1 border-b border-slate-50 last:border-0">
-                            <span className="text-xs text-slate-500">{dt.replace(/_/g,' ')}</span>
-                            <Badge v={doc?.status==='VERIFIED'?'✓ Verified':doc?'Pending':'Missing'}
-                              blue={doc?.status==='VERIFIED'} amber={doc&&doc?.status!=='VERIFIED'} red={!doc}/>
-                          </div>;
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Notifications */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-4">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1"><Bell size={10}/>Notifications</p>
-                      {driverDetail.notifications?.length===0&&<p className="text-xs text-slate-400 text-center py-4">No notifications</p>}
-                      {driverDetail.notifications?.map((n,i)=>(
-                        <div key={i} className="py-1.5 border-b border-slate-50 last:border-0">
-                          <p className="text-xs font-black text-slate-700">{n.title}</p>
-                          <p className="text-[9px] text-slate-400 mt-0.5">{n.message}</p>
-                          <p className="text-[8px] text-slate-300 mt-0.5">{timeSince(n.created_at)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Vehicle History */}
-                  {driverDetail.vehicle_history?.length>0&&(
-                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vehicle History ({driverDetail.vehicle_history.length})</p>
-                      </div>
-                      <table className="w-full text-xs">
-                        <thead><tr className="border-b border-slate-100">
-                          {['Vehicle','Model','Assigned','Returned','Days','Daily Rent','Total Earned','Reason'].map(h=><th key={h} className="text-left px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}
-                        </tr></thead>
-                        <tbody className="divide-y divide-slate-50">
-                          {driverDetail.vehicle_history.map((h,i)=>(
-                            <tr key={i}>
-                              <td className="px-4 py-2.5 font-black text-blue-600">{h.vehicle_number}</td>
-                              <td className="px-4 py-2.5 text-slate-500">{h.vehicle_model}</td>
-                              <td className="px-4 py-2.5 text-slate-500">{fmtDate(h.assigned_at)}</td>
-                              <td className="px-4 py-2.5">{h.unassigned_at?fmtDate(h.unassigned_at):<Badge v="Current" blue/>}</td>
-                              <td className="px-4 py-2.5 font-black text-slate-700">{h.total_days}d</td>
-                              <td className="px-4 py-2.5 text-slate-600">₹{h.daily_rent}</td>
-                              <td className="px-4 py-2.5 font-black text-blue-600">{fmt(h.total_earned)}</td>
-                              <td className="px-4 py-2.5 text-slate-400">{h.reason||'—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Transactions + Activity side by side */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Transactions */}
-                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Transactions</p>
-                        <p className="text-[9px] text-slate-400">{driverDetail.transactions?.length} shown</p>
-                      </div>
-                      <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
-                        {driverDetail.transactions?.length===0&&<p className="p-4 text-xs text-slate-400 text-center">No transactions</p>}
-                        {driverDetail.transactions?.map((tx,i)=>(
-                          <div key={i} className="px-4 py-2.5 flex justify-between items-center">
-                            <div><p className="text-xs font-black text-slate-700">{fmt(tx.order_amount)}</p><p className="text-[9px] text-slate-400">{fmtDate(tx.order_initiation_date)} {fmtTime(tx.order_initiation_date)}</p></div>
-                            <Badge v={tx.transaction_status==='SUCCESS'?'Paid':'Failed'} blue={tx.transaction_status==='SUCCESS'} red={tx.transaction_status!=='SUCCESS'}/>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Activity log */}
-                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Activity Log (30 days)</p>
-                      </div>
-                      <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
-                        {driverDetail.daily_logs?.length===0&&<p className="p-4 text-xs text-slate-400 text-center">No activity</p>}
-                        {driverDetail.daily_logs?.map((l,i)=>{
-                          const hrs=Math.floor((l.active_minutes||0)/60), mins=(l.active_minutes||0)%60;
-                          return <div key={i} className="px-4 py-2 flex items-center justify-between">
-                            <div>
-                              <p className="text-xs font-black text-slate-700">{fmtDate(l.log_date)}</p>
-                              {l.login_time&&<p className="text-[9px] text-slate-400">{fmtTime(l.login_time)} – {l.logout_time?fmtTime(l.logout_time):'Active'}</p>}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs font-black text-slate-700">{hrs}h {mins}m</p>
-                              {l.incentive_applied&&<p className="text-[9px] font-black text-blue-600">+{fmt(l.incentive_amount)}</p>}
-                            </div>
-                          </div>;
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ── FINANCE ──────────────────────────────────────────── */}
-          {panel==='finance'&&(
-            <FinancePanel API={API} ADMIN_KEY={ADMIN_KEY} fmt={fmt} fmtDate={fmtDate} fmtTime={fmtTime} pStats={pStats} companies={companies} drillCompany={drillCompany}/>
-          )}
-
-          {/* ── KYC ──────────────────────────────────────────────── */}
-          {panel==='kyc'&&<div className="max-w-4xl"><h2 className="text-base font-black text-slate-800 mb-5">KYC Desk</h2><div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">✅ No pending KYC cases</div></div>}
-
-          {/* ── AUDIT ────────────────────────────────────────────── */}
-          {panel==='audit'&&(
-            <div className="max-w-4xl">
-              <h2 className="text-base font-black text-slate-800 mb-5">Audit Logs</h2>
-              <div className="bg-slate-950 rounded-xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/><span className="text-xs font-black text-slate-400">Live</span></div>
-                <div className="p-4 space-y-1.5 max-h-96 overflow-y-auto">{logs.map((l,i)=><p key={i} className="text-xs text-emerald-400 font-mono">{l}</p>)}</div>
-              </div>
-            </div>
-          )}
-        </div>
+            <button type="button" onClick={() => setStep(1)} className="w-full text-sm text-gray-500 hover:text-gray-700">
+              ← Back
+            </button>
+          </form>
+        )}
+        <p className="text-center text-xs text-gray-400 mt-6">MobilityGrid by PayYantra · Confidential</p>
       </div>
-
-      {/* Add Company Modal */}
-      {showAddCo&&(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="px-5 py-4 border-b flex justify-between"><p className="font-black text-slate-800">Register Company</p><button onClick={()=>setShowAddCo(false)}><X size={17} className="text-slate-400"/></button></div>
-            <div className="p-5 space-y-3">
-              <input placeholder="Company Name *" value={newCo.name} onChange={e=>setNewCo(p=>({...p,name:e.target.value}))} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-blue-500"/>
-              <input placeholder="CIN Number"     value={newCo.cin}  onChange={e=>setNewCo(p=>({...p,cin:e.target.value}))}  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-mono focus:outline-none focus:border-blue-500"/>
-              <input placeholder="City"           value={newCo.city} onChange={e=>setNewCo(p=>({...p,city:e.target.value}))} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-blue-500"/>
-              <div className="flex gap-3 pt-1">
-                <button onClick={()=>setShowAddCo(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
-                <button onClick={async()=>{
-                  if(!newCo.name) return alert('Name required');
-                  const r=await fetch(`${API}/api/admin/companies`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(newCo)});
-                  const d=await r.json();
-                  if(d.success){await loadCompanies();addLog(`Company: ${newCo.name}`);setShowAddCo(false);setNewCo({name:'',cin:'',city:''});}
-                  else alert(d.error||'Failed');
-                }} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 transition">Create</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Doc Upload Modal */}
-      {showDoc && docTarget && <DocModal target={docTarget} onClose={()=>setShowDoc(false)} addLog={addLog}/>}
     </div>
   );
 }
 
-// ── Finance Panel — PayYantra style ──────────────────────────────────────────
-function FinancePanel({ API, ADMIN_KEY, fmt, fmtDate, fmtTime, pStats, companies, drillCompany }) {
-  const [txns, setTxns] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('ALL');
-  const [mode, setMode] = useState('ALL');
-  const [datePreset, setDatePreset] = useState('last30');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [perPage, setPerPage] = useState(10);
-  const [page, setPage] = useState(1);
-  const [txError, setTxError] = useState(null);
+// ── DASHBOARD ─────────────────────────────────────────────────
+function Dashboard() {
+  const [stats, setStats] = useState(null);
+  const [kyc, setKyc] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const getDateRange = (preset) => {
-    const today = new Date();
-    const fmt = d => d.toISOString().split('T')[0];
-    if (preset==='today')      return { from: fmt(today), to: fmt(today) };
-    if (preset==='yesterday')  { const y=new Date(today); y.setDate(y.getDate()-1); return { from: fmt(y), to: fmt(y) }; }
-    if (preset==='last7')      { const s=new Date(today); s.setDate(s.getDate()-6); return { from: fmt(s), to: fmt(today) }; }
-    if (preset==='last30')     { const s=new Date(today); s.setDate(s.getDate()-29); return { from: fmt(s), to: fmt(today) }; }
-    if (preset==='this_month') { return { from: fmt(new Date(today.getFullYear(),today.getMonth(),1)), to: fmt(today) }; }
-    if (preset==='last_month') {
-      const s=new Date(today.getFullYear(),today.getMonth()-1,1);
-      const e=new Date(today.getFullYear(),today.getMonth(),0);
-      return { from: fmt(s), to: fmt(e) };
-    }
-    return { from: dateFrom, to: dateTo };
-  };
+  useEffect(() => {
+    Promise.all([
+      api('/api/admin/platform-stats').catch(() => null),
+      api('/api/admin/kyc/summary').catch(() => null),
+    ]).then(([s, k]) => { setStats(s); setKyc(k); setLoading(false); });
+  }, []);
 
-  const fetchTxns = async () => {
-    setLoading(true); setPage(1);
-    const range = getDateRange(datePreset);
-    const params = new URLSearchParams({
-      ...(search && { search }),
-      ...(status !== 'ALL' && { status }),
-      ...(mode !== 'ALL' && { mode }),
-      dateFrom: range.from,
-      dateTo: range.to,
-    });
-    try {
-      const sep = params.toString() ? '&' : '';
-      const r = await fetch(`${API}/api/admin/transactions?${params}${sep}admin_key=${ADMIN_KEY}`);
-      const d = await r.json();
-      if (Array.isArray(d)) { setTxns(d); setTxError(null); }
-      else { setTxns([]); setTxError(d.error || JSON.stringify(d)); }
-    } catch(e) { setTxns([]); setTxError(e.message); }
-    setLoading(false);
-  };
+  if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>;
 
-  useEffect(() => { fetchTxns(); }, [datePreset]);
-
-  const totalAmt   = txns.reduce((s,t) => s + parseFloat(t.order_amount||0), 0);
-  const successAmt = txns.filter(t=>t.transaction_status==='SUCCESS').reduce((s,t) => s + parseFloat(t.order_amount||0), 0);
-  const paginated  = txns.slice((page-1)*perPage, page*perPage);
-  const totalPages = Math.ceil(txns.length / perPage);
-
-  const presets = [
-    {id:'today',label:'Today'},
-    {id:'yesterday',label:'Yesterday'},
-    {id:'last7',label:'Last 7 Days'},
-        {id:'last30',label:'Last 30 Days'},
-    {id:'this_month',label:'This Month'},
-    {id:'last_month',label:'Last Month'},
-    {id:'custom',label:'Custom'},
-  ];
-
-  const statusColor = (s) => ({
-    SUCCESS:'bg-emerald-50 text-emerald-700 border-emerald-200',
-    FAILED:'bg-red-50 text-red-600 border-red-200',
-    INITIATED:'bg-amber-50 text-amber-700 border-amber-200',
-    PENDING:'bg-slate-50 text-slate-500 border-slate-200',
-  }[s] || 'bg-slate-50 text-slate-500 border-slate-200');
+  const s = stats || {};
+  const k = kyc || {};
+  const pending = (k.PENDING || 0) + (k.SUBMITTED || 0) + (k.UNDER_REVIEW || 0);
 
   return (
-    <div className="space-y-4 max-w-7xl">
-      <h2 className="text-base font-black text-slate-800">Transactions</h2>
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-gray-800">Platform Dashboard</h2>
 
-      {/* Date presets */}
-      <div className="flex flex-wrap gap-2">
-        {presets.map(p => (
-          <button key={p.id} onClick={() => setDatePreset(p.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black border transition ${datePreset===p.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}>
-            {p.label}
-          </button>
-        ))}
-        {datePreset==='custom' && (
-          <div className="flex items-center gap-2">
-            <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
-              className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"/>
-            <span className="text-slate-400 text-xs">to</span>
-            <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
-              className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"/>
-            <button onClick={fetchTxns} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-black hover:bg-blue-700 transition">Apply</button>
-          </div>
-        )}
+      {pending > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-sm">
+          ⚠️ <strong>{pending} KYC verification(s)</strong> pending review
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Companies" value={s.total_companies || 0} color="indigo" />
+        <StatCard label="Fleet Owners" value={s.total_owners || 0} color="blue" />
+        <StatCard label="Drivers" value={s.total_drivers || 0} color="green" />
+        <StatCard label="Vehicles" value={s.total_vehicles || 0} color="orange" />
       </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Collection</p>
-          <p className="text-xl font-black text-slate-800">{fmt(totalAmt)}</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Received</p>
-          <p className="text-xl font-black text-blue-600">{fmt(successAmt)}</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Txns</p>
-          <p className="text-xl font-black text-slate-800">{txns.length}</p>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Success Rate</p>
-          <p className="text-xl font-black text-slate-800">
-            {txns.length ? Math.round(txns.filter(t=>t.transaction_status==='SUCCESS').length/txns.length*100) : 0}%
-          </p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard label="GMV Today" value={fmt(s.gmv_today)} color="green" />
+        <StatCard label="GMV This Month" value={fmt(s.gmv_month)} color="blue" />
+        <StatCard label="GMV All Time" value={fmt(s.gmv_total)} color="indigo" />
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-          <input value={search} onChange={e=>setSearch(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&fetchTxns()}
-            placeholder="Search Txn ID / Order ID / Mobile No."
-            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 bg-white"/>
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <h3 className="font-semibold text-gray-700 mb-4">KYC Status Overview</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {['VERIFIED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'REJECTED'].map(status => (
+            <div key={status} className="text-center p-3 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-gray-800">{k[status] || 0}</p>
+              <Badge status={status} />
+            </div>
+          ))}
         </div>
-        <select value={status} onChange={e=>setStatus(e.target.value)}
-          className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-black bg-white focus:outline-none">
-          <option value="ALL">All Status</option>
-          <option value="SUCCESS">Success</option>
-          <option value="FAILED">Failed</option>
-          <option value="INITIATED">Initiated</option>
-          <option value="PENDING">Pending</option>
-        </select>
-        <select value={mode} onChange={e=>setMode(e.target.value)}
-          className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-black bg-white focus:outline-none">
-          <option value="ALL">All Modes</option>
-          <option value="UPI">UPI</option>
-          <option value="CARD">Card</option>
-          <option value="NETBANKING">Net Banking</option>
-          <option value="WALLET">Wallet</option>
-          <option value="CASH">Cash</option>
-        </select>
-        <button onClick={fetchTxns}
-          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 transition flex items-center gap-1.5">
-          <Search size={12}/> Search
+      </div>
+    </div>
+  );
+}
+
+// ── COMPANIES ─────────────────────────────────────────────────
+function Companies() {
+  const [companies, setCompanies] = useState([]);
+  const [q, setQ] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newCo, setNewCo] = useState({ name: '', cin: '', city: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api('/api/admin/companies').then(d => { setCompanies(d.data || d || []); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleStatus = async (id, current) => {
+    const next = current === 'Active' || current === 'ACTIVE' ? 'Inactive' : 'Active';
+    await api(`/api/admin/companies/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: next }) });
+    load();
+  };
+
+  const addCompany = async (e) => {
+    e.preventDefault(); setSaving(true); setError('');
+    try {
+      await api('/api/admin/companies', { method: 'POST', body: JSON.stringify(newCo) });
+      setShowAdd(false); setNewCo({ name: '', cin: '', city: '' }); load();
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const filtered = companies.filter(c => c.name?.toLowerCase().includes(q.toLowerCase()) || c.city?.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-800">Companies</h2>
+        <button onClick={() => setShowAdd(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">
+          + Onboard Company
         </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-            Showing {paginated.length} of {txns.length} transactions
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] text-slate-400">Per page:</span>
-            <select value={perPage} onChange={e=>{setPerPage(Number(e.target.value));setPage(1);}}
-              className="border border-slate-200 rounded-lg px-2 py-1 text-[10px] bg-white focus:outline-none">
-              {[10,25,50,100].map(n=><option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-        </div>
-        {txError && <div className="px-4 py-3 bg-red-50 border-b border-red-100"><p className="text-xs text-red-600 font-black">⚠️ {txError}</p></div>}
-        {loading ? (
-          <div className="py-10 text-center text-sm text-slate-400 animate-pulse">Loading...</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs min-w-[900px]">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  {['PY Txn ID','Order ID','Date & Time','Driver','Mobile','Amount','Mode','Status','Action'].map(h=>(
-                    <th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {paginated.length===0 ? (
-                  <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">No transactions found</td></tr>
-                ) : paginated.map((tx,i) => (
-                  <tr key={i} className="hover:bg-slate-50/50 transition">
-                    <td className="px-4 py-3 font-mono text-[10px] text-slate-600 whitespace-nowrap">{tx.pg_transaction_id||'—'}</td>
-                    <td className="px-4 py-3 font-mono text-[10px] text-slate-500 whitespace-nowrap">{(tx.order_id||'').slice(0,12)}...</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="font-black text-slate-700">{fmtDate(tx.order_initiation_date)}</p>
-                      <p className="text-slate-400">{fmtTime(tx.order_initiation_date)}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-black text-slate-800">{tx.driver_name||tx.payer_name||'—'}</p>
-                      <p className="text-[9px] text-slate-400">{tx.driver_code||''}</p>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{tx.payer_mobile}</td>
-                    <td className="px-4 py-3 font-black text-slate-800 whitespace-nowrap">₹{parseFloat(tx.order_amount||0).toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200">{tx.payment_mode||'N/A'}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${statusColor(tx.transaction_status)}`}>
-                        {tx.transaction_status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button className="text-[9px] font-black text-blue-600 hover:text-blue-700">View</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
-            <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}
-              className="text-xs font-black text-blue-600 disabled:text-slate-300 disabled:cursor-not-allowed">← Prev</button>
-            <span className="text-[10px] text-slate-400">Page {page} of {totalPages}</span>
-            <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}
-              className="text-xs font-black text-blue-600 disabled:text-slate-300 disabled:cursor-not-allowed">Next →</button>
-          </div>
-        )}
-      </div>
+      <input
+        type="text" placeholder="Search companies…" value={q} onChange={e => setQ(e.target.value)}
+        className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      />
 
-      {/* Company breakdown */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Company Breakdown</p>
-        </div>
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-slate-100">{['Company','Today','Month','All Time','Owners','Drivers'].map(h=><th key={h} className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase">{h}</th>)}</tr></thead>
-          <tbody className="divide-y divide-slate-50">
-            {companies.map((c,i)=>(
-              <tr key={i} onClick={()=>drillCompany(c)} className="hover:bg-blue-50/20 cursor-pointer transition">
-                <td className="px-4 py-3 font-black text-slate-800">{c.name}</td>
-                <td className="px-4 py-3 font-black text-blue-600">{fmt(c.collection_today)}</td>
-                <td className="px-4 py-3 font-black text-slate-700">{fmt(c.collection_month)}</td>
-                <td className="px-4 py-3 font-black text-slate-700">{fmt(c.collection_total)}</td>
-                <td className="px-4 py-3 text-slate-600">{parseInt(c.owners||0)}</td>
-                <td className="px-4 py-3 text-slate-600">{parseInt(c.drivers||0)}</td>
+      {loading ? <div className="text-center py-8 text-gray-400">Loading…</div> : (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Company</th>
+                <th className="px-4 py-3 text-left">City</th>
+                <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">Created</th>
+                <th className="px-4 py-3 text-left">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map(c => (
+                <tr key={c.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-800">{c.name}</td>
+                  <td className="px-4 py-3 text-gray-500">{c.city || '—'}</td>
+                  <td className="px-4 py-3"><Badge status={c.status} /></td>
+                  <td className="px-4 py-3 text-gray-400">{fmtDate(c.created_at)}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => toggleStatus(c.id, c.status)}
+                      className={`text-xs px-3 py-1 rounded-full border font-medium transition ${
+                        c.status === 'Active' || c.status === 'ACTIVE'
+                          ? 'border-red-300 text-red-600 hover:bg-red-50'
+                          : 'border-green-300 text-green-600 hover:bg-green-50'
+                      }`}
+                    >
+                      {c.status === 'Active' || c.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No companies found</p>}
+        </div>
+      )}
+
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+            <h3 className="font-bold text-gray-800 mb-4">Onboard New Company</h3>
+            {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+            <form onSubmit={addCompany} className="space-y-3">
+              <input required placeholder="Company Name" value={newCo.name} onChange={e => setNewCo({ ...newCo, name: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <input placeholder="CIN (optional)" value={newCo.cin} onChange={e => setNewCo({ ...newCo, cin: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <input placeholder="City" value={newCo.city} onChange={e => setNewCo({ ...newCo, city: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <div className="flex gap-2 pt-2">
+                <button type="submit" disabled={saving} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                  {saving ? 'Saving…' : 'Create Company'}
+                </button>
+                <button type="button" onClick={() => setShowAdd(false)} className="flex-1 border text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-function DocModal({ target, onClose, addLog }) {
-  const API = 'https://mg-qw5s.onrender.com';
-  const types = {
-    company: ['GST_CERTIFICATE','PAN_CARD','INCORPORATION_CERT','BANK_STATEMENT','AGREEMENT'],
-    owner:   ['AADHAAR','PAN_CARD','BANK_CHEQUE','BUSINESS_REG','GST'],
-    driver:  ['AADHAAR','PAN_CARD','DRIVING_LICENSE','BANK_CHEQUE','PROFILE_PHOTO'],
-    vehicle: ['RC_BOOK','INSURANCE','FITNESS_CERT','PERMIT','PHOTO'],
-  }[target.level] || ['AADHAAR','PAN_CARD','PHOTO'];
 
-  const [docType, setDocType] = useState('');
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploaded, setUploaded] = useState(false);
+// ── KYC REVIEW ────────────────────────────────────────────────
+function KycReview() {
+  const [tab, setTab] = useState('pending');
+  const [drivers, setDrivers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const onFile = (f) => {
-    if (!f) return;
-    setFile(f);
-    if (f.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = e => setPreview(e.target.result);
-      reader.readAsDataURL(f);
-    } else {
-      setPreview('pdf');
-    }
+  const load = useCallback(() => {
+    setLoading(true);
+    const path = tab === 'pending' ? '/api/admin/kyc/pending' : `/api/admin/kyc/all?status=${tab.toUpperCase()}`;
+    api(tab === 'all' ? '/api/admin/kyc/all' : path)
+      .then(d => { setDrivers(d.data || d || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [tab]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const approve = async (id) => {
+    setSaving(true);
+    await api(`/api/admin/kyc/${id}/approve`, { method: 'PATCH' }).catch(() => {});
+    setSaving(false); load();
   };
 
-  const upload = async () => {
-    if (!file || !docType) return alert('Select document type and file');
-    setUploading(true);
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('doc_type', docType);
-    fd.append('user_type', target.level.toUpperCase());
-    fd.append('user_id', String(target.id));
-    try {
-      const r = await fetch(`${API}/api/uploads/upload`, { method:'POST', body:fd });
-      const d = await r.json();
-      if (d.success) {
-        setUploaded(true);
-        addLog(`Doc: ${docType} for ${target.full_name||target.name||target.vehicle_number}`);
-        setTimeout(onClose, 1500);
-      } else alert(d.message || 'Upload failed');
-    } catch { alert('Network error'); }
-    setUploading(false);
+  const reject = async () => {
+    setSaving(true);
+    await api(`/api/admin/kyc/${rejectTarget}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }).catch(() => {});
+    setSaving(false); setRejectTarget(null); setReason(''); load();
   };
+
+  const tabs = [
+    { key: 'pending', label: 'Pending Review' },
+    { key: 'VERIFIED', label: 'Approved' },
+    { key: 'REJECTED', label: 'Rejected' },
+    { key: 'all', label: 'All' },
+  ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
-        <div className="px-5 py-4 border-b flex justify-between items-start">
-          <div>
-            <p className="font-black text-slate-800">Upload Document</p>
-            <p className="text-xs text-slate-400 mt-0.5 capitalize">
-              {target.level}: <span className="font-black text-slate-600">{target.full_name||target.name||target.vehicle_number}</span>
-            </p>
-          </div>
-          <button onClick={onClose}><X size={17} className="text-slate-400"/></button>
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">KYC Review</h2>
+
+      <div className="flex gap-2 border-b">
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition -mb-px ${tab === t.key ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? <div className="text-center py-8 text-gray-400">Loading…</div> : (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Driver</th>
+                <th className="px-4 py-3 text-left">Phone</th>
+                <th className="px-4 py-3 text-left">Owner</th>
+                <th className="px-4 py-3 text-left">KYC Status</th>
+                <th className="px-4 py-3 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {drivers.map(d => (
+                <tr key={d.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-800">{d.full_name || d.driver_name}</td>
+                  <td className="px-4 py-3 text-gray-500">{d.mobile_number || d.driver_phone}</td>
+                  <td className="px-4 py-3 text-gray-500">{d.owner_name || '—'}</td>
+                  <td className="px-4 py-3"><Badge status={d.kyc_status} /></td>
+                  <td className="px-4 py-3">
+                    {(d.kyc_status === 'PENDING' || d.kyc_status === 'SUBMITTED' || d.kyc_status === 'UNDER_REVIEW') && (
+                      <div className="flex gap-2">
+                        <button onClick={() => approve(d.id)} disabled={saving}
+                          className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium hover:bg-green-200 disabled:opacity-50">
+                          Approve
+                        </button>
+                        <button onClick={() => { setRejectTarget(d.id); setReason(''); }}
+                          className="text-xs px-3 py-1 bg-red-100 text-red-700 rounded-full font-medium hover:bg-red-200">
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {drivers.length === 0 && <p className="text-center text-gray-400 py-8">No drivers in this category</p>}
         </div>
+      )}
 
-        {uploaded ? (
-          <div className="p-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-3">
-              <CheckCircle size={24} className="text-blue-600"/>
-            </div>
-            <p className="font-black text-slate-800">Uploaded!</p>
-            <p className="text-xs text-slate-400 mt-1">Document saved successfully</p>
-          </div>
-        ) : (
-          <div className="p-5 space-y-4">
-            <select value={docType} onChange={e=>setDocType(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:outline-none focus:border-blue-500">
-              <option value="">— Select document type —</option>
-              {types.map(t=><option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
-            </select>
-
-            {/* File picker + preview */}
-            <label className={`block w-full border-2 border-dashed rounded-xl cursor-pointer transition overflow-hidden ${preview ? 'border-blue-300' : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50'}`}>
-              {preview === 'pdf' ? (
-                <div className="flex items-center gap-3 p-4">
-                  <div className="w-10 h-10 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
-                    <FileText size={18} className="text-red-500"/>
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-slate-700">{file?.name}</p>
-                    <p className="text-[10px] text-slate-400">{(file?.size/1024).toFixed(0)} KB · PDF</p>
-                  </div>
-                </div>
-              ) : preview ? (
-                <div className="relative">
-                  <img src={preview} alt="preview" className="w-full h-40 object-contain bg-slate-50"/>
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-3 py-1.5">
-                    <p className="text-[10px] text-white font-black truncate">{file?.name}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-24">
-                  <Upload size={18} className="text-slate-400 mb-1"/>
-                  <p className="text-xs text-slate-400">Click to select file</p>
-                  <p className="text-[9px] text-slate-300 mt-0.5">PDF, JPG, PNG</p>
-                </div>
-              )}
-              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>onFile(e.target.files[0])}/>
-            </label>
-
-            {preview && (
-              <button onClick={()=>{setFile(null);setPreview(null);}}
-                className="text-[10px] text-slate-400 hover:text-red-500 transition">✕ Remove file</button>
-            )}
-
-            <div className="flex gap-3">
-              <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
-              <button onClick={upload} disabled={uploading||!file||!docType}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 disabled:opacity-50 transition">
-                {uploading ? 'Uploading...' : 'Upload'}
+      {rejectTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+            <h3 className="font-bold text-gray-800 mb-3">Rejection Reason</h3>
+            <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)}
+              placeholder="Reason for rejection…"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 mb-4" />
+            <div className="flex gap-2">
+              <button onClick={reject} disabled={saving || !reason}
+                className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+                {saving ? 'Rejecting…' : 'Confirm Reject'}
+              </button>
+              <button onClick={() => setRejectTarget(null)} className="flex-1 border text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
+                Cancel
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// ── ALL DRIVERS ───────────────────────────────────────────────
+function AllDrivers() {
+  const [drivers, setDrivers] = useState([]);
+  const [q, setQ] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api('/api/admin/kyc/all')
+      .then(d => { setDrivers(d.data || d || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const filtered = drivers.filter(d => {
+    const matchQ = !q || d.full_name?.toLowerCase().includes(q.toLowerCase()) || d.mobile_number?.includes(q) || d.owner_name?.toLowerCase().includes(q.toLowerCase());
+    const matchStatus = !statusFilter || d.kyc_status === statusFilter;
+    return matchQ && matchStatus;
+  });
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">All Drivers</h2>
+      <div className="flex gap-2">
+        <input type="text" placeholder="Search name, phone, owner…" value={q} onChange={e => setQ(e.target.value)}
+          className="flex-1 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <option value="">All KYC Status</option>
+          {['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED'].map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+
+      {loading ? <div className="text-center py-8 text-gray-400">Loading…</div> : (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Driver</th>
+                <th className="px-4 py-3 text-left">Phone</th>
+                <th className="px-4 py-3 text-left">Owner</th>
+                <th className="px-4 py-3 text-left">KYC</th>
+                <th className="px-4 py-3 text-left">Joined</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map(d => (
+                <tr key={d.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-800">{d.full_name}</td>
+                  <td className="px-4 py-3 text-gray-500">{d.mobile_number}</td>
+                  <td className="px-4 py-3 text-gray-500">{d.owner_name || '—'}</td>
+                  <td className="px-4 py-3"><Badge status={d.kyc_status} /></td>
+                  <td className="px-4 py-3 text-gray-400">{timeSince(d.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No drivers found</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MAIN ADMIN PANEL ──────────────────────────────────────────
+function AdminPanelInner() {
+  const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
+  const [tab, setTab] = useState('dashboard');
+
+  if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
+
+  const navItems = [
+    { key: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { key: 'companies', label: 'Companies', icon: '🏢' },
+    { key: 'kyc', label: 'KYC Review', icon: '🪪' },
+    { key: 'drivers', label: 'All Drivers', icon: '🚗' },
+  ];
+
+  const logout = () => { clearToken(); setIsLoggedIn(false); };
+
+  return (
+    <div className="flex h-screen bg-gray-100 font-sans">
+      {/* Sidebar */}
+      <aside className="w-56 bg-gray-900 flex flex-col">
+        <div className="p-5 border-b border-gray-700">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>
+            <div>
+              <p className="text-white text-sm font-semibold">MobilityGrid</p>
+              <p className="text-gray-400 text-xs">Super Admin</p>
+            </div>
+          </div>
+        </div>
+        <nav className="flex-1 p-3 space-y-1">
+          {navItems.map(item => (
+            <button key={item.key} onClick={() => setTab(item.key)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text

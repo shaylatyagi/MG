@@ -457,4 +457,124 @@ router.post('/owners/:ownerId/assign-company', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── COMPANY STATUS TOGGLE ────────────────────────────────────────────────────
+router.patch('/companies/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['Active', 'Inactive'].includes(status)) {
+      return res.status(400).json({ error: 'status must be Active or Inactive' });
+    }
+    const r = await pool.query(
+      `UPDATE public.companies SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'Company not found' });
+    res.json({ success: true, company: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── KYC MANAGEMENT ───────────────────────────────────────────────────────────
+
+// GET /api/admin/kyc/summary — counts by status
+router.get('/kyc/summary', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT COALESCE(kyc_status, 'NOT_STARTED') as status, COUNT(*)::int as count
+      FROM public.drivers GROUP BY kyc_status ORDER BY count DESC
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/kyc/pending — drivers awaiting review
+router.get('/kyc/pending', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        d.id, d.full_name, d.mobile_number, d.driver_code, d.created_at,
+        d.kyc_status, d.aadhaar_number, d.pan_number,
+        d.driving_license_number, d.driving_license_expiry,
+        d.kyc_rejection_reason,
+        o.full_name  AS owner_name,
+        o.owner_code,
+        c.name       AS company_name
+      FROM public.drivers d
+      LEFT JOIN public.owners   o ON o.owner_code = d.owner_code
+      LEFT JOIN public.companies c ON c.id = o.company_id
+      WHERE d.kyc_status IS NULL
+         OR d.kyc_status IN ('PENDING', 'SUBMITTED', 'UNDER_REVIEW')
+      ORDER BY d.created_at ASC
+      LIMIT 200
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/kyc/:driverId/approve
+router.patch('/kyc/:driverId/approve', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE public.drivers
+       SET kyc_status='VERIFIED', kyc_approved_at=NOW(), kyc_rejection_reason=NULL, updated_at=NOW()
+       WHERE id=$1 RETURNING id, full_name, kyc_status`,
+      [req.params.driverId]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'Driver not found' });
+    // Best-effort: update driver_documents if that table exists
+    await pool.query(
+      `UPDATE public.driver_documents SET status='APPROVED', reviewed_at=NOW()
+       WHERE driver_id=$1 AND status IN ('PENDING','SUBMITTED','UNDER_REVIEW')`,
+      [req.params.driverId]
+    ).catch(() => {});
+    res.json({ success: true, driver: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/kyc/:driverId/reject
+// Body: { reason }
+router.patch('/kyc/:driverId/reject', async (req, res) => {
+  try {
+    const reason = req.body.reason || 'Documents not acceptable';
+    const r = await pool.query(
+      `UPDATE public.drivers
+       SET kyc_status='REJECTED', kyc_rejection_reason=$2, kyc_approved_at=NULL, updated_at=NOW()
+       WHERE id=$1 RETURNING id, full_name, kyc_status`,
+      [req.params.driverId, reason]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'Driver not found' });
+    await pool.query(
+      `UPDATE public.driver_documents SET status='REJECTED', review_notes=$2, reviewed_at=NOW()
+       WHERE driver_id=$1 AND status IN ('PENDING','SUBMITTED','UNDER_REVIEW')`,
+      [req.params.driverId, reason]
+    ).catch(() => {});
+    res.json({ success: true, driver: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/kyc/all — all drivers with any KYC info (for full KYC view)
+router.get('/kyc/all', async (req, res) => {
+  try {
+    const { status } = req.query;
+    const where = status && status !== 'ALL'
+      ? `WHERE d.kyc_status = $1`
+      : `WHERE 1=1`;
+    const params = status && status !== 'ALL' ? [status] : [];
+    const result = await pool.query(`
+      SELECT
+        d.id, d.full_name, d.mobile_number, d.driver_code, d.created_at,
+        d.kyc_status, d.driving_license_number, d.driving_license_expiry,
+        d.kyc_rejection_reason, d.kyc_approved_at,
+        o.full_name  AS owner_name,
+        c.name       AS company_name
+      FROM public.drivers d
+      LEFT JOIN public.owners   o ON o.owner_code = d.owner_code
+      LEFT JOIN public.companies c ON c.id = o.company_id
+      ${where}
+      ORDER BY d.created_at DESC
+      LIMIT 500
+    `, params);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;
