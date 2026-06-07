@@ -8,6 +8,8 @@ import DriverPWA from './pages/DriverPWA';
 import Profile from './pages/Profile';
 import PaymentResult from './pages/PaymentResult';
 import PartnerHub from './pages/PartnerHub';
+import AdminPanel from './pages/admin/CompanyDashboard';
+import PaymentLinkPage from './pages/PaymentLinkPage';
 
 function App() {
   return (
@@ -20,7 +22,10 @@ function App() {
         <Route path="/driver/*" element={<DriverPWA />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/payment-result" element={<PaymentResult />} />
+        <Route path="/admin/*" element={<AdminPanel />} />
         <Route path="/partner" element={<PartnerHub />} />
+        {/* Payment Links — public page, no auth required */}
+        <Route path="/pay/:token" element={<PaymentLinkPage />} />
       </Routes>
     </Router>
   );

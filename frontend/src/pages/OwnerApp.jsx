@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah "Chatbot"
 import DocumentSection from '../components/DocumentSection';
+import PaymentLinks from './owner/PaymentLinks';
 const API ='https://mg-qw5s.onrender.com';
 const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [ledgerData, setLedgerData] = useState([]);
@@ -3121,6 +3122,7 @@ const ProfileTab = () => (
               {activeTab === 'drivers' && <DriversTab />}
               {activeTab === 'vehicles' && <VehiclesTab />}
               {activeTab === 'payments' && <PaymentsTab />}
+              {activeTab === 'links' && <PaymentLinks token={localStorage.getItem('mg_token')} />}
               {activeTab === 'profile' && <ProfileTab />}
             </>
           )}
@@ -3129,11 +3131,11 @@ const ProfileTab = () => (
         {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.04)]">
           {[
-            { id: 'home', Icon: Home, label: t.navHome },
-{ id: 'drivers', Icon: Users, label: t.navDrivers },
-{ id: 'vehicles', Icon: Truck, label: t.navFleet },
-{ id: 'payments', Icon: Wallet, label: t.navPayments },
-{ id: 'profile', Icon: Settings, label: t.navProfile },
+            { id: 'home',     Icon: Home,        label: t.navHome },
+{ id: 'drivers',  Icon: Users,       label: t.navDrivers },
+{ id: 'vehicles', Icon: Truck,       label: t.navFleet },
+{ id: 'links',    Icon: CreditCard,  label: lang==='hi'?'पेमेंट लिंक':'Pay Links' },
+{ id: 'payments', Icon: Wallet,      label: t.navPayments },
           ].map(({ id, Icon, label }) => (
             <button
               key={id}
@@ -3839,15 +3841,4 @@ const ProfileTab = () => (
                 </div>
               </div>
             )}
-            <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('drivers'); }}
-              className="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-black">✓ Done</button>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
-      </div>
-    </div>
-  );
-}
+            <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('d
