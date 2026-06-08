@@ -12,7 +12,7 @@ const fmtTime = (ts) => {
 export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
   const [stats, setStats]     = useState({
     total_vehicles: 0, total_drivers: 0, active_contracts: 0, pending_kyc: 0,
-    collection_today: 0, collection_month: 0, outstanding: 0, collection_efficiency: 0,
+    collection_today: 0, collection_month: 0, collection_total: 0, outstanding: 0, collection_efficiency: 0,
   });
   const [vehicles, setVehicles]   = useState([]);
   const [sosAlerts, setSosAlerts] = useState([]);
@@ -76,6 +76,8 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
         <div style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ fontSize: '12px', opacity: 0.8, margin: 0 }}>
             {lang === 'en' ? 'This Month' : 'इस महीने'}: {loading ? '…' : fmt(stats.collection_month)}
+            {'  •  '}
+            {lang === 'en' ? 'All Time' : 'कुल'}: {loading ? '…' : fmt(stats.collection_total)}
           </p>
           <span style={{ backgroundColor: '#16A34A', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '600' }}>LIVE</span>
         </div>

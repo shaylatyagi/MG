@@ -30,7 +30,8 @@ router.get('/stats', async (req, res) => {
 
     const oid = owner.id;
 
-    const [vehicles, drivers, contracts, pendingKyc, today, month] = await Promise.all([
+    const oCode = owner.owner_code;
+    const [vehicles, drivers, contracts, pendingKyc, today, month, total] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM vehicles WHERE owner_id = $1', [oid]),
       pool.query('SELECT COUNT(*) FROM drivers WHERE owner_id = $1 AND deleted_at IS NULL', [oid]),
       pool.query(
@@ -44,19 +45,23 @@ router.get('/stats', async (req, res) => {
       pool.query(
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
-         WHERE owner_code = (SELECT owner_code FROM owners WHERE id = $1)
-           AND transaction_status = 'SUCCESS'
+         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'
            AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
-        [oid]
+        [oCode]
       ),
       pool.query(
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
-         WHERE owner_code = (SELECT owner_code FROM owners WHERE id = $1)
-           AND transaction_status = 'SUCCESS'
+         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'
            AND DATE_TRUNC('month', order_completion_date AT TIME ZONE 'Asia/Kolkata')
              = DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Kolkata')`,
-        [oid]
+        [oCode]
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(order_amount),0) AS total
+         FROM ms_orders
+         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'`,
+        [oCode]
       ),
     ]);
 
@@ -88,6 +93,7 @@ router.get('/stats', async (req, res) => {
         pending_kyc:      parseInt(pendingKyc.rows[0].count),
         collection_today: parseFloat(today.rows[0].total),
         collection_month: parseFloat(month.rows[0].total),
+        collection_total: parseFloat(total.rows[0].total),
         outstanding,
         collection_efficiency: parseFloat(efficiency),
       },
@@ -403,23 +409,23 @@ router.get('/payments', async (req, res) => {
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
 
     const { driver_id, limit = 20, offset = 0 } = req.query;
-    const params = [owner.id];
+    const ownerCode = owner.owner_code;
+    const params = [ownerCode];
     let extra = '';
     if (driver_id) {
-      params.push(parseInt(driver_id));
-      extra = `AND o.driver_id = $${params.length}`;
+      params.push(driver_id);
+      extra = `AND o.driver_id::text = $${params.length}`;
     }
     params.push(parseInt(limit), parseInt(offset));
 
     const result = await pool.query(
-      `SELECT o.id, o.amount, o.payment_mode, o.transaction_status,
-              o.created_at, d.name AS driver_name, d.phone_number,
-              v.reg_number AS vehicle_reg
+      `SELECT o.id, o.order_amount AS amount, o.payment_mode, o.transaction_status,
+              o.order_completion_date AS created_at,
+              o.payer_name AS driver_name, o.payer_mobile AS phone_number,
+              o.vehicle_number AS vehicle_reg, o.purpose, o.order_number
        FROM ms_orders o
-       JOIN drivers d ON d.id = o.driver_id
-       LEFT JOIN vehicles v ON v.id = d.assigned_vehicle_id
-       WHERE o.owner_id = $1 ${extra}
-       ORDER BY o.created_at DESC
+       WHERE o.owner_code = $1 ${extra}
+       ORDER BY o.order_completion_date DESC NULLS LAST
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
