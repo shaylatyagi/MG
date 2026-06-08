@@ -1471,7 +1471,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   const getHeaderSubtitle = () => {
   const subtitles = {
     'home': t.sub,
-    'drivers': `${filteredDrivers.length} ${lang === 'hi' ? 'सक्रिय ड्राइवर' : 'Active Drivers'}`,
+    'drivers': `${stats.totalDrivers || filteredDrivers.length} ${lang === 'hi' ? 'सक्रिय ड्राइवर' : 'Active Drivers'}`,
     'vehicles': `${vehicles.length} ${lang === 'hi' ? 'वाहन' : 'Vehicles'}`,
     'payments': lang === 'hi' ? 'लेनदेन इतिहास' : 'Transaction History',
     'profile': owner?.full_name || 'Owner Profile'
@@ -2973,8 +2973,7 @@ const ProfileTab = () => (
           <div className="flex items-center gap-2">
             <span className="font-black text-[10px] tracking-widest text-indigo-200">MG</span>
             <span className="text-indigo-400 text-[8px]">|</span>
-            <span className="text-white text-[10px] font-black">{owner?.full_name || t.portal}</span>
-            {owner?.company_name && <span className="text-indigo-300 text-[9px]">· {owner.company_name}</span>}
+            <span className="text-indigo-300 text-[9px] font-semibold">{t.portal}</span>
           </div>
           <span className="text-indigo-300 text-[10px] font-mono">{time}</span>
         </div>
@@ -2983,7 +2982,9 @@ const ProfileTab = () => (
         <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between" style={{boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
           <div>
             <h1 className="text-[17px] font-black text-slate-800 tracking-tight">{getHeaderTitle()}</h1>
-            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{getHeaderSubtitle()}</p>
+            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+              {owner?.full_name ? `${owner.full_name}${owner.company_name ? ' · ' + owner.company_name : ''}` : getHeaderSubtitle()}
+            </p>
           </div>
           <div className="flex items-center gap-1.5">
             {/* Language toggle */}

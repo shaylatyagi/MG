@@ -25,7 +25,7 @@ router.get('/me', async (req, res) => {
   try {
     const r = await pool.query(`
       SELECT o.id, o.full_name, o.mobile_number, o.owner_code, o.status,
-             o.wallet_balance, o.company_id, o.created_at,
+             o.wallet_balance, o.company_id, o.created_at, o.email,
              c.name AS company_name, c.company_code, c.city
       FROM public.owners o
       LEFT JOIN public.companies c ON c.id = o.company_id
