@@ -73,6 +73,7 @@ export default function DriverPWA() {
   const [loading, setLoading] = useState(true);
   const [totalPaid, setTotalPaid] = useState(0);
   const [assignedVehicle, setAssignedVehicle] = useState(null);
+  const [showVehicleDetail, setShowVehicleDetail] = useState(false);
   const [fleetOwner, setFleetOwner] = useState('');
   const [fleetCompany, setFleetCompany] = useState('');
 
@@ -211,7 +212,7 @@ export default function DriverPWA() {
         const d = p.vehicle_number ? parseFloat(p.total_outstanding || p.current_dues || 0) : 0;
         setDues(d); setPayAmt(d > 0 ? d : 0);
         setTelemetry({ vehicleNumber: p.vehicle_number || '', vehicleModel: p.vehicle_model || '', dailyRent: parseFloat(p.vehicle_daily_rent || 0), dailyDepositRecovery: parseFloat(p.daily_deposit_recovery || 0) });
-        if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, dailyRent: p.vehicle_daily_rent });
+        if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, dailyRent: p.vehicle_daily_rent, status: p.vehicle_status || 'ACTIVE', assignedSince: p.assigned_since });
         if (p.owner_name) setFleetOwner(p.owner_name);
         if (p.company_name) setFleetCompany(p.company_name);
       }
@@ -422,7 +423,7 @@ export default function DriverPWA() {
 
       {/* Vehicle info strip */}
       {assignedVehicle && (
-        <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between">
+        <button onClick={() => setShowVehicleDetail(true)} className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between active:bg-slate-50 transition text-left">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
               <Truck size={14} className="text-blue-600"/>
@@ -435,10 +436,10 @@ export default function DriverPWA() {
           <div className="text-right">
             <p className="text-xs font-black text-blue-600">₹{assignedVehicle.dailyRent}/day</p>
             <span className="text-[9px] font-black text-slate-400 flex items-center gap-1 justify-end">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse"/>Active
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse"/>Active · tap for details
             </span>
           </div>
-        </div>
+        </button>
       )}
       {fleetOwner ? (
         <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between">
@@ -824,6 +825,40 @@ export default function DriverPWA() {
           </div>
         </div>
 
+        {/* Vehicle Detail Modal */}
+        {showVehicleDetail && assignedVehicle && (
+          <div className="fixed inset-0 bg-black/50 z-[70] flex items-end justify-center" onClick={() => setShowVehicleDetail(false)}>
+            <div className="bg-white rounded-t-3xl w-full max-w-sm p-5 pb-8" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center"><Truck size={16} className="text-blue-600"/></div>
+                  <div>
+                    <p className="text-base font-black text-slate-800">{assignedVehicle.number}</p>
+                    <p className="text-[10px] text-slate-400">{assignedVehicle.model || '—'}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowVehicleDetail(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><X size={14} className="text-slate-500"/></button>
+              </div>
+              <div className="space-y-2.5 text-sm">
+                {[
+                  ['Vehicle Number', assignedVehicle.number],
+                  ['Model', assignedVehicle.model || '—'],
+                  ['Daily Rent', `₹${parseFloat(assignedVehicle.dailyRent || 0).toLocaleString('en-IN')}/day`],
+                  ['Status', assignedVehicle.status || 'ACTIVE'],
+                  ['Assigned Since', assignedVehicle.assignedSince ? new Date(assignedVehicle.assignedSince).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—'],
+                  ['Fleet Owner', fleetOwner || '—'],
+                  ['Company', fleetCompany || '—'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between items-center py-1.5 border-b border-slate-50">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{label}</span>
+                    <span className={`text-xs font-black ${label==='Status' ? 'text-emerald-600' : 'text-slate-800'}`}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Notifications */}
         {showNotif && (
           <div className="absolute top-[104px] left-3 right-3 bg-white rounded-2xl shadow-xl border border-slate-200 z-[60] overflow-hidden">
@@ -981,56 +1016,4 @@ export default function DriverPWA() {
                   </div>
                 ))}
               </div>
-              <button onClick={() => setShowReceipt(false)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-black text-sm mt-5">Close</button>
-            </div>
-          </div>
-        )}
-
-        {/* Owner Chat */}
-        {showOwnerChat && (
-          <div className="absolute inset-0 z-[100] flex flex-col bg-slate-50">
-            <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
-              <button onClick={() => setShowOwnerChat(false)} className="text-slate-400 hover:text-slate-600 transition">
-                <ChevronLeft size={20}/>
-              </button>
-              <div>
-                <h3 className="font-black text-slate-800 text-sm">Fleet Owner</h3>
-                <p className="text-[9px] text-slate-400">MobilityGrid</p>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {chatMsgs.length === 0 ? (
-                <div className="text-center text-slate-400 text-xs py-12">
-                  <MessageCircle size={28} className="mx-auto mb-2 opacity-20"/>
-                  <p>No messages yet</p>
-                </div>
-              ) : chatMsgs.map((msg, i) => (
-                <div key={i} className={`flex ${msg.sender_type === 'DRIVER' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] px-3 py-2.5 rounded-2xl text-sm ${
-                    msg.sender_type === 'DRIVER'
-                      ? 'bg-blue-600 text-white rounded-br-sm'
-                      : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
-                  }`}>
-                    <p className="text-sm">{msg.message}</p>
-                    <p className={`text-[9px] mt-1 ${msg.sender_type === 'DRIVER' ? 'text-blue-200' : 'text-slate-400'}`}>
-                      {formatChatTime(msg.created_at)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-3 bg-white border-t border-slate-200 flex gap-2">
-              <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
-                placeholder="Message..." className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"/>
-              <button onClick={sendChatMessage} className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-xl transition">
-                <Send size={15}/>
-              </button>
-            </div>
-          </div>
-        )}
-
-      </div>
-    </div>
-  );
-}
+              <button onClick={() => setShowReceipt(false)} className="w-full bg-s

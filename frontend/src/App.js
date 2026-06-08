@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
-import OwnerApp from './pages/OwnerApp';
+import OwnerApp from './pages/OwnerApp.jsx';
 import DriverPWA from './pages/DriverPWA';
 import Profile from './pages/Profile';
 import PaymentResult from './pages/PaymentResult';

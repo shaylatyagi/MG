@@ -1025,7 +1025,15 @@ setOwner({
   address: u.address,
   status: u.status || 'ACTIVE'
 });
-    
+    // Fetch real profile from DB (company name, city, email)
+    try {
+      const meRes = await fetch(`${API}/api/owner/me`, { headers: H });
+      const meData = await meRes.json();
+      if (meData.success && meData.owner) {
+        setOwner(prev => ({ ...prev, ...meData.owner }));
+      }
+    } catch (e) { console.error('owner/me fetch failed:', e); }
+
   } catch (error) {
     console.error('Fetch error:', error);
   } finally {
@@ -2965,7 +2973,8 @@ const ProfileTab = () => (
           <div className="flex items-center gap-2">
             <span className="font-black text-[10px] tracking-widest text-indigo-200">MG</span>
             <span className="text-indigo-400 text-[8px]">|</span>
-            <span className="text-indigo-300 text-[9px] font-semibold">{t.portal}</span>
+            <span className="text-white text-[10px] font-black">{owner?.full_name || t.portal}</span>
+            {owner?.company_name && <span className="text-indigo-300 text-[9px]">· {owner.company_name}</span>}
           </div>
           <span className="text-indigo-300 text-[10px] font-mono">{time}</span>
         </div>
