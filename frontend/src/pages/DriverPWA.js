@@ -1016,4 +1016,56 @@ export default function DriverPWA() {
                   </div>
                 ))}
               </div>
-              <button onClick={() => setShowReceipt(false)} className="w-full bg-s
+              <button onClick={() => setShowReceipt(false)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-black text-sm mt-5">Close</button>
+            </div>
+          </div>
+        )}
+
+        {/* Owner Chat */}
+        {showOwnerChat && (
+          <div className="absolute inset-0 z-[100] flex flex-col bg-slate-50">
+            <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+              <button onClick={() => setShowOwnerChat(false)} className="text-slate-400 hover:text-slate-600 transition">
+                <ChevronLeft size={20}/>
+              </button>
+              <div>
+                <h3 className="font-black text-slate-800 text-sm">Fleet Owner</h3>
+                <p className="text-[9px] text-slate-400">MobilityGrid</p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {chatMsgs.length === 0 ? (
+                <div className="text-center text-slate-400 text-xs py-12">
+                  <MessageCircle size={28} className="mx-auto mb-2 opacity-20"/>
+                  <p>No messages yet</p>
+                </div>
+              ) : chatMsgs.map((msg, i) => (
+                <div key={i} className={`flex ${msg.sender_type === 'DRIVER' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[75%] px-3 py-2.5 rounded-2xl text-sm ${
+                    msg.sender_type === 'DRIVER'
+                      ? 'bg-blue-600 text-white rounded-br-sm'
+                      : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
+                  }`}>
+                    <p className="text-sm">{msg.message}</p>
+                    <p className={`text-[9px] mt-1 ${msg.sender_type === 'DRIVER' ? 'text-blue-200' : 'text-slate-400'}`}>
+                      {formatChatTime(msg.created_at)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="p-3 bg-white border-t border-slate-200 flex gap-2">
+              <input value={chatInput} onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
+                placeholder="Message..." className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"/>
+              <button onClick={sendChatMessage} className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-xl transition">
+                <Send size={15}/>
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
