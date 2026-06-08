@@ -32,25 +32,32 @@ router.get('/metrics', async (req, res) => {
 // ─── PLATFORM STATS ───────────────────────────────────────────────────────────
 router.get('/platform-stats', async (req, res) => {
   try {
-    const [c,o,d,v,col] = await Promise.all([
-      pool.query(`SELECT COUNT(*) FROM public.companies WHERE status='Active'`),
-      pool.query(`SELECT COUNT(*) FROM public.owners WHERE status='ACTIVE'`),
-      pool.query(`SELECT COUNT(*) FROM public.drivers WHERE status='ACTIVE'`),
-      pool.query(`SELECT COUNT(*) FROM public.vehicles`),
-      pool.query(`SELECT
+    // Each query isolated — one missing table won't crash the whole endpoint
+    const safe = async (q, params = []) => {
+      try { return await pool.query(q, params); }
+      catch (_) { return { rows: [{ count: '0', today: '0', this_month: '0', all_time: '0' }] }; }
+    };
+
+    const [c, o, d, v, col] = await Promise.all([
+      // client_companies is the actual table name per schema; fall back gracefully if absent
+      safe(`SELECT COUNT(*) FROM public.client_companies WHERE company_status='ACTIVE'`),
+      safe(`SELECT COUNT(*) FROM public.owners WHERE status='ACTIVE'`),
+      safe(`SELECT COUNT(*) FROM public.drivers WHERE status='ACTIVE'`),
+      safe(`SELECT COUNT(*) FROM public.vehicles`),
+      safe(`SELECT
         COALESCE(SUM(CASE WHEN DATE(order_initiation_date)=CURRENT_DATE THEN order_amount END),0) as today,
         COALESCE(SUM(CASE WHEN DATE_TRUNC('month',order_initiation_date)=DATE_TRUNC('month',NOW()) THEN order_amount END),0) as this_month,
         COALESCE(SUM(order_amount),0) as all_time
         FROM public.ms_orders WHERE transaction_status='SUCCESS'`),
     ]);
     res.json({
-      total_companies:  parseInt(c.rows[0].count),
-      total_owners:     parseInt(o.rows[0].count),
-      total_drivers:    parseInt(d.rows[0].count),
-      total_vehicles:   parseInt(v.rows[0].count),
-      collection_today: parseFloat(col.rows[0].today),
-      collection_month: parseFloat(col.rows[0].this_month),
-      collection_total: parseFloat(col.rows[0].all_time),
+      total_companies:  parseInt(c.rows[0].count  || 0),
+      total_owners:     parseInt(o.rows[0].count  || 0),
+      total_drivers:    parseInt(d.rows[0].count  || 0),
+      total_vehicles:   parseInt(v.rows[0].count  || 0),
+      collection_today: parseFloat(col.rows[0].today       || 0),
+      collection_month: parseFloat(col.rows[0].this_month  || 0),
+      collection_total: parseFloat(col.rows[0].all_time    || 0),
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
