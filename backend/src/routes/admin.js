@@ -628,3 +628,16 @@ router.get('/audit-log', async (req, res) => {
 });
 
 module.exports = router;
+    const result = await pool.query(
+      `SELECT id, action, entity_type, entity_id, actor_id, actor_role, details, created_at
+         FROM public.admin_audit_log
+         ${where}
+         ORDER BY created_at DESC
+         LIMIT $${params.length}`,
+      params
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+module.exports = router;
