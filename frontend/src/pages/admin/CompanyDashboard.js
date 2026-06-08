@@ -572,7 +572,7 @@ function AdminPanelInner() {
     { key: 'drivers', label: 'All Drivers', icon: '🚗' },
   ];
 
-  const logout = () => { clearToken(); setIsLoggedIn(false); };
+  const logout = () => { clearToken(); window.location.href = '/login'; };
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">

@@ -1274,9 +1274,9 @@ router.get('/owner/transactions', verifyToken, requirePermission('view_collectio
     }
 
     const ownerFilter = ownerCode
-      ? `AND (mo.owner_code = $1 OR d.owner_id = $2)`
+      ? `AND (mo.owner_code = $1 OR d.owner_code = $1)`
       : ownerId ? `AND d.owner_id = $1` : '';
-    const params = ownerCode ? [ownerCode, parseInt(ownerId)] : ownerId ? [parseInt(ownerId)] : [];
+    const params = ownerCode ? [ownerCode] : ownerId ? [parseInt(ownerId)] : [];
 
     const result = await pool.query(
       `SELECT mo.order_id, mo.order_number, mo.order_amount,
