@@ -16,6 +16,7 @@ const DOC_CONFIG = {
     { key: 'PAN',         label: 'PAN Card',         icon: '📋', accept: '.pdf,.jpg,.jpeg,.png' },
     { key: 'LICENSE',     label: 'Driving License',  icon: '🚗', accept: '.pdf,.jpg,.jpeg,.png' },
     { key: 'BANK_CHEQUE', label: 'Cancelled Cheque', icon: '🏦', accept: '.pdf,.jpg,.jpeg,.png' },
+    { key: 'AGREEMENT',   label: 'Vehicle Agreement', icon: '📝', accept: '.pdf,.jpg,.jpeg,.png' },
   ]
 };
 

@@ -1,8 +1,15 @@
 const express = require('express');
+const multer  = require('multer');
 const router  = express.Router();
 const pool    = require('../config/db');
 const { logAudit } = require('../utils/audit');
 const notify  = require('../services/notify');
+
+// multer — memory storage for admin uploads (S3 not wired yet)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 // ─── EXISTING ROUTES (unchanged) ─────────────────────────────────────────────
 router.get('/tenants', async (req, res) => {
@@ -635,71 +642,184 @@ router.get('/audit-log', async (req, res) => {
   }
 });
 
-// ─── ALL DRIVERS (platform-wide flat list) ───────────────────────────────────
+// ─── VEHICLE DETAIL ──────────────────────────────────────────────────────────
+router.get('/vehicles/:vehicleId', async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const [vRes, histRes] = await Promise.all([
+      pool.query(`
+        SELECT v.id, v.vehicle_number, v.vehicle_model, v.daily_rent, v.owner_id, v.driver_id,
+               v.status, v.vehicle_type, v.insurance_expiry, v.fitness_expiry, v.chassis_number, v.created_at,
+               d.id AS driver_id, d.full_name AS driver_name,
+               d.mobile_number AS driver_phone, d.driver_code, d.kyc_status AS driver_kyc,
+               o.id AS owner_id, o.full_name AS owner_name, o.mobile_number AS owner_phone, o.owner_code,
+               c.name AS company_name,
+               (SELECT assigned_at FROM public.driver_vehicle_history
+                WHERE vehicle_id=v.id AND unassigned_at IS NULL
+                ORDER BY assigned_at DESC LIMIT 1) AS current_since,
+               COALESCE(SUM(mo.order_amount),0)::float AS total_collected,
+               COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0)::float AS collected_today,
+               COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0)::float AS collected_month
+        FROM public.vehicles v
+        LEFT JOIN public.drivers d ON d.id = v.driver_id
+        LEFT JOIN public.owners o ON o.owner_code = d.owner_code
+        LEFT JOIN public.companies c ON c.id = o.company_id
+        LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status='SUCCESS'
+        WHERE v.id = $1
+        GROUP BY v.id, v.vehicle_number, v.vehicle_model, v.daily_rent, v.owner_id, v.driver_id,
+                 v.status, v.vehicle_type, v.insurance_expiry, v.fitness_expiry, v.chassis_number, v.created_at,
+                 d.id, d.full_name, d.mobile_number, d.driver_code, d.kyc_status,
+                 o.id, o.full_name, o.mobile_number, o.owner_code, c.name
+      `, [vehicleId]),
+      pool.query(`
+        SELECT dvh.id, dvh.assigned_at, dvh.unassigned_at, dvh.daily_rent, dvh.rent_type, dvh.reason,
+               d.full_name AS driver_name, d.mobile_number AS driver_phone,
+               EXTRACT(DAY FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int AS total_days,
+               EXTRACT(DAY FROM COALESCE(dvh.unassigned_at,NOW()) - dvh.assigned_at)::int
+                 * COALESCE(dvh.daily_rent,0) AS total_earned
+        FROM public.driver_vehicle_history dvh
+        JOIN public.drivers d ON d.id = dvh.driver_id
+        WHERE dvh.vehicle_id = $1
+        ORDER BY dvh.assigned_at DESC
+      `, [vehicleId]),
+    ]);
+    if (!vRes.rows[0]) return res.status(404).json({ error: 'Vehicle not found' });
+    res.json({ vehicle: vRes.rows[0], history: histRes.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── USER DOCUMENTS ───────────────────────────────────────────────────────────
+
+// GET all docs for a user (admin view)
+router.get('/user-docs/:userType/:userId', async (req, res) => {
+  try {
+    const { userType, userId } = req.params;
+    const result = await pool.query(
+      `SELECT id, doc_type, original_name, s3_key, file_size, mime_type, status, review_notes, uploaded_at, updated_at
+       FROM public.user_documents WHERE user_id=$1 AND user_type=$2 ORDER BY uploaded_at DESC`,
+      [userId, userType.toUpperCase()]
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST upload doc on behalf of user (admin upload)
+// Must be registered BEFORE /:docId/status to avoid route collision
+router.post('/user-docs/upload', upload.single('file'), async (req, res) => {
+  try {
+    const { user_type, user_id, doc_type } = req.body;
+    const file = req.file;
+    if (!file)     return res.status(400).json({ error: 'No file uploaded' });
+    if (!user_type || !user_id || !doc_type) return res.status(400).json({ error: 'user_type, user_id, doc_type required' });
+
+    const uType  = user_type.toUpperCase();
+    const uId    = parseInt(user_id, 10);
+    const s3Key  = `admin-upload/${uType.toLowerCase()}s/${uId}/${doc_type}_${Date.now()}_${file.originalname}`;
+
+    await pool.query(
+      `INSERT INTO public.user_documents
+         (user_id, user_type, doc_type, original_name, s3_key, file_size, mime_type, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'UPLOADED')
+       ON CONFLICT (user_id, user_type, doc_type)
+       DO UPDATE SET
+         original_name = EXCLUDED.original_name,
+         s3_key        = EXCLUDED.s3_key,
+         file_size     = EXCLUDED.file_size,
+         mime_type     = EXCLUDED.mime_type,
+         status        = 'UPLOADED',
+         updated_at    = NOW()`,
+      [uId, uType, doc_type, file.originalname, s3Key, file.size, file.mimetype]
+    );
+
+    logAudit('ADMIN_DOC_UPLOADED', uType.toLowerCase(), uId, 'admin', { doc_type, original_name: file.originalname });
+    res.json({ success: true, message: 'Document uploaded' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH approve / reject a document
+router.patch('/user-docs/:docId/status', async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const { status, reason } = req.body;
+    const allowed = ['APPROVED', 'REJECTED', 'UNDER_REVIEW'];
+    if (!allowed.includes(status)) return res.status(400).json({ error: 'status must be APPROVED, REJECTED, or UNDER_REVIEW' });
+
+    const result = await pool.query(
+      `UPDATE public.user_documents
+       SET status=$1, review_notes=$2, updated_at=NOW()
+       WHERE id=$3 RETURNING *`,
+      [status, reason || null, docId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+
+    logAudit(`DOC_${status}`, 'document', docId, 'admin', { reason });
+    res.json({ success: true, doc: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- ALL DRIVERS (cross-owner) ---
+
 router.get('/all-drivers', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT
-        d.id, d.full_name, d.mobile_number, d.driver_code, d.status,
-        d.kyc_status, d.created_at, d.driving_license_number,
-        d.wallet_balance, d.security_deposit, d.advance_balance,
-        o.full_name   AS owner_name, o.mobile_number AS owner_phone, o.owner_code,
-        c.name        AS company_name, c.city AS company_city,
-        v.vehicle_number, v.vehicle_model,
-        COALESCE(SUM(mo.order_amount),0)::float                                          AS total_paid,
-        COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0)::float AS paid_today,
-        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0)::float AS paid_month,
-        COUNT(DISTINCT mo.id)::int                                                       AS total_transactions
+      SELECT d.id, d.full_name, d.mobile_number, d.driver_code, d.kyc_status, d.status, d.created_at,
+             o.full_name AS owner_name, o.mobile_number AS owner_phone, o.owner_code,
+             c.name AS company_name,
+             v.vehicle_number, v.vehicle_model, v.vehicle_type,
+             COALESCE(SUM(mo.order_amount),0)::float AS total_collected,
+             COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0)::float AS collected_today
       FROM public.drivers d
-      LEFT JOIN public.owners    o  ON o.owner_code = d.owner_code
-      LEFT JOIN public.companies c  ON c.id = o.company_id
-      LEFT JOIN public.vehicles  v  ON v.driver_id = d.id
-      LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status = 'SUCCESS'
-      GROUP BY d.id, o.full_name, o.mobile_number, o.owner_code, c.name, c.city, v.vehicle_number, v.vehicle_model
+      LEFT JOIN public.owners o ON o.owner_code = d.owner_code
+      LEFT JOIN public.companies c ON c.id = o.company_id
+      LEFT JOIN public.vehicles v ON v.driver_id = d.id AND v.status = 'ACTIVE'
+      LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status='SUCCESS'
+      GROUP BY d.id, d.full_name, d.mobile_number, d.driver_code, d.kyc_status, d.status, d.created_at,
+               o.full_name, o.mobile_number, o.owner_code, c.name,
+               v.vehicle_number, v.vehicle_model, v.vehicle_type
       ORDER BY d.created_at DESC
-      LIMIT 1000
     `);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── ADMIN CHAT — all threads ─────────────────────────────────────────────────
+// --- CHAT VIEWER ---
+
 router.get('/chat/threads', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT DISTINCT ON (cm.driver_id)
-        cm.driver_id,
-        d.full_name   AS driver_name,
-        d.mobile_number AS driver_phone,
-        o.full_name   AS owner_name,
-        o.id          AS owner_id,
-        cm.message    AS last_message,
-        cm.sender_type AS last_sender,
-        cm.created_at AS last_at
+      SELECT DISTINCT ON (cm.driver_id, cm.owner_id)
+             cm.driver_id, cm.owner_id,
+             d.full_name AS driver_name, d.mobile_number AS driver_phone, d.driver_code,
+             o.full_name AS owner_name, o.mobile_number AS owner_phone,
+             c.name AS company_name,
+             cm.message AS last_message, cm.sender_type AS last_sender,
+             cm.created_at AS last_at,
+             (SELECT COUNT(*) FROM public.chat_messages
+              WHERE driver_id=cm.driver_id AND owner_id=cm.owner_id)::int AS total_messages
       FROM public.chat_messages cm
-      JOIN  public.drivers d ON d.id = cm.driver_id
-      LEFT JOIN public.owners  o ON o.id = cm.owner_id
-      ORDER BY cm.driver_id, cm.created_at DESC
+      JOIN public.drivers d ON d.id = cm.driver_id
+      LEFT JOIN public.owners o ON o.id = cm.owner_id
+      LEFT JOIN public.companies c ON c.id = o.company_id
+      ORDER BY cm.driver_id, cm.owner_id, cm.created_at DESC
     `);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── ADMIN CHAT — messages for a thread ──────────────────────────────────────
 router.get('/chat/messages', async (req, res) => {
   try {
-    const { driver_id } = req.query;
+    const { driver_id, owner_id } = req.query;
     if (!driver_id) return res.status(400).json({ error: 'driver_id required' });
-    const result = await pool.query(`
-      SELECT cm.id, cm.sender_type, cm.message, cm.is_read, cm.created_at,
-             d.full_name AS driver_name,
-             o.full_name AS owner_name
-      FROM public.chat_messages cm
-      JOIN  public.drivers d ON d.id = cm.driver_id
-      LEFT JOIN public.owners  o ON o.id = cm.owner_id
-      WHERE cm.driver_id = $1
-      ORDER BY cm.created_at ASC
-    `, [driver_id]);
+    const params = [driver_id];
+    let ownerFilter = '';
+    if (owner_id) { ownerFilter = ' AND owner_id=$2'; params.push(owner_id); }
+    const result = await pool.query(
+      `SELECT id, driver_id, owner_id, sender_type, message, is_read, created_at
+       FROM public.chat_messages
+       WHERE driver_id=$1${ownerFilter}
+       ORDER BY created_at ASC`,
+      params
+    );
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

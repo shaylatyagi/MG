@@ -1536,7 +1536,7 @@ router.get('/owner/trend', async (req, res) => {
          LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
          WHERE (d.owner_code = $1 OR mo.owner_code = $1)
            AND mo.transaction_status = 'SUCCESS'
-           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '90 days'
+           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '365 days'
          GROUP BY DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata')
          ORDER BY date ASC`,
         [ownerCode]
@@ -1554,7 +1554,7 @@ router.get('/owner/trend', async (req, res) => {
          LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
          WHERE d.owner_id = $1
            AND mo.transaction_status = 'SUCCESS'
-           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '90 days'
+           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '365 days'
          GROUP BY DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata')
          ORDER BY date ASC`,
         [parseInt(ownerId)]

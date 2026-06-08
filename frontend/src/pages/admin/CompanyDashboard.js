@@ -1226,7 +1226,7 @@ function KycReview() {
         <DriverDetailModal
           driverId={top.id}
           breadcrumbs={['KYC Review', top.label]}
-          onBack={stack.length > 1 ? pop : null}
+          onBack={pop}
           onClose={closeAll}
         />
       )}
@@ -1316,7 +1316,7 @@ function AllDrivers() {
         <DriverDetailModal
           driverId={top.id}
           breadcrumbs={['All Drivers', top.label]}
-          onBack={stack.length > 1 ? pop : null}
+          onBack={pop}
           onClose={closeAll}
         />
       )}
@@ -1400,7 +1400,7 @@ function AllOwners() {
         <OwnerDetailModal
           ownerId={top.id}
           breadcrumbs={breadcrumbs.slice(0, -1)}
-          onBack={stack.length > 1 ? pop : null}
+          onBack={pop}
           onClose={closeAll}
           onSelectDriver={(id, label) => push({ type: 'driver', id, label })}
           onSelectVehicle={(id, label) => push({ type: 'vehicle', id, label })}
