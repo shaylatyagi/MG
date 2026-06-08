@@ -20,6 +20,7 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
   });
   const [vehicles, setVehicles]   = useState([]);
   const [sosAlerts, setSosAlerts] = useState([]);
+  const [expandedSos, setExpandedSos] = useState(null); // id of alert with map open
   const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
@@ -136,22 +137,73 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
             🆘 {L('SOS Alerts', 'SOS अलर्ट')} ({sosAlerts.length})
           </p>
           {sosAlerts.map(s => (
-            <div key={s.id} style={{ background: '#fff', borderRadius: '10px', padding: '10px 12px', marginBottom: '8px', border: '1px solid #fecaca', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <p style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', margin: '0 0 2px' }}>{s.driver_name}</p>
-                <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 2px', fontFamily: 'monospace' }}>{s.phone_number}</p>
-                {s.lat && s.lng && (
-                  <a href={`https://maps.google.com/?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer"
-                    style={{ fontSize: '11px', color: '#4f46e5', textDecoration: 'none', fontWeight: 600 }}>
-                    📍 {parseFloat(s.lat).toFixed(4)}, {parseFloat(s.lng).toFixed(4)}
-                  </a>
-                )}
-                <p style={{ fontSize: '10px', color: '#94a3b8', margin: '2px 0 0' }}>{fmtTime(s.created_at)}</p>
+            <div key={s.id} style={{ background: '#fff', borderRadius: '10px', marginBottom: '8px', border: '1px solid #fecaca', overflow: 'hidden' }}>
+              {/* Header row */}
+              <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#dc2626' }}>🆘</span>
+                    <p style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{s.driver_name}</p>
+                  </div>
+                  {s.message && (
+                    <p style={{ fontSize: '11px', color: '#374151', margin: '0 0 3px', fontStyle: 'italic' }}>"{s.message}"</p>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <a href={`tel:${s.phone_number}`}
+                      style={{ fontSize: '11px', color: '#0891b2', textDecoration: 'none', fontWeight: 600 }}>
+                      📞 {s.phone_number}
+                    </a>
+                    <a href={`https://wa.me/91${s.phone_number?.replace(/[^0-9]/g,'')}`} target="_blank" rel="noreferrer"
+                      style={{ fontSize: '11px', color: '#16a34a', textDecoration: 'none', fontWeight: 600 }}>
+                      💬 WhatsApp
+                    </a>
+                    <p style={{ fontSize: '10px', color: '#94a3b8', margin: 0 }}>{fmtTime(s.created_at)}</p>
+                  </div>
+                  {/* Location row */}
+                  {s.lat && s.lng ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      <button onClick={() => setExpandedSos(expandedSos === s.id ? null : s.id)}
+                        style={{ fontSize: '11px', fontWeight: 700, color: '#4f46e5', background: '#eef2ff', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
+                        {expandedSos === s.id ? '🗺 Hide Map' : '🗺 View on Map'}
+                      </button>
+                      <a href={`https://maps.google.com/?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer"
+                        style={{ fontSize: '11px', color: '#64748b', textDecoration: 'none' }}>
+                        📍 {parseFloat(s.lat).toFixed(5)}, {parseFloat(s.lng).toFixed(5)} ↗
+                      </a>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '10px', color: '#f59e0b', margin: '4px 0 0', fontWeight: 600 }}>⚠ Location not shared</p>
+                  )}
+                </div>
+                <button onClick={() => resolveSos(s.id)}
+                  style={{ flexShrink: 0, marginLeft: '10px', padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                  Resolve
+                </button>
               </div>
-              <button onClick={() => resolveSos(s.id)}
-                style={{ flexShrink: 0, padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
-                Resolve
-              </button>
+              {/* Expandable map */}
+              {expandedSos === s.id && s.lat && s.lng && (
+                <div style={{ borderTop: '1px solid #fecaca' }}>
+                  <iframe
+                    title={`sos-map-${s.id}`}
+                    width="100%"
+                    height="220"
+                    frameBorder="0"
+                    style={{ display: 'block' }}
+                    src={`https://maps.google.com/maps?q=${s.lat},${s.lng}&z=15&output=embed`}
+                    allowFullScreen
+                  />
+                  <div style={{ padding: '8px 12px', background: '#fef9f9', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <a href={`https://maps.google.com/?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer"
+                      style={{ fontSize: '11px', fontWeight: 700, color: '#4f46e5', textDecoration: 'none', padding: '5px 10px', background: '#eef2ff', borderRadius: '6px' }}>
+                      Open in Google Maps ↗
+                    </a>
+                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`} target="_blank" rel="noreferrer"
+                      style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', textDecoration: 'none', padding: '5px 10px', background: '#f0fdf4', borderRadius: '6px' }}>
+                      Get Directions ↗
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

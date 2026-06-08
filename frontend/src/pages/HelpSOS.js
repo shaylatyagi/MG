@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
+
+const MAPS_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
+
+const NEARBY_TILES = [
+  { icon: '⚡', label: 'EV Charging',    query: 'electric+vehicle+charging+station', color: '#6d28d9', bg: '#f5f3ff' },
+  { icon: '⛽', label: 'Petrol Pump',    query: 'petrol+pump+near+me',                color: '#b45309', bg: '#fef3c7' },
+  { icon: '🏥', label: 'Hospital',       query: 'hospital+near+me',                   color: '#dc2626', bg: '#fef2f2' },
+  { icon: '🔧', label: 'Repair Shop',    query: 'vehicle+repair+shop+near+me',        color: '#0369a1', bg: '#f0f9ff' },
+  { icon: '🚔', label: 'Police Station', query: 'police+station+near+me',             color: '#0f172a', bg: '#f8fafc' },
+  { icon: '🛒', label: 'Grocery Store',  query: 'grocery+store+near+me',              color: '#16a34a', bg: '#f0fdf4' },
+];
 
 const faqs = [
   { q: 'How do I pay my daily rent?', a: 'Go to your Driver Dashboard and click "Quick Pay Rent" or go to My Wallet and click "Pay Balance". You can pay using UPI, debit card, or net banking.' },
@@ -19,6 +30,22 @@ export default function HelpSOS() {
   const [coords, setCoords]     = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [alertId, setAlertId]   = useState(null);
+
+  // Nearby Stations state
+  const [nearbyLoc, setNearbyLoc]       = useState(null);   // { lat, lng }
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyError, setNearbyError]   = useState('');
+  const [mapTile, setMapTile]           = useState(null);    // currently selected tile for embed
+
+  const locateMe = useCallback(() => {
+    setNearbyLoading(true); setNearbyError(''); setMapTile(null);
+    if (!navigator.geolocation) { setNearbyError('GPS not available on this device.'); setNearbyLoading(false); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setNearbyLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setNearbyLoading(false); },
+      ()    => { setNearbyError('Could not get location. Please allow GPS access.'); setNearbyLoading(false); },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  }, []);
 
   const openModal = () => {
     setStage('idle'); setMessage(''); setCoords(null); setErrorMsg(''); setAlertId(null);
@@ -102,7 +129,7 @@ export default function HelpSOS() {
         </div>
 
         {/* Contact */}
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5', marginBottom: '24px' }}>
           <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '16px' }}>Contact Information</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
             {[{ icon: '📧', label: 'Email', value: 'support@mobilitygrid.in' }, { icon: '📞', label: 'Phone', value: '+91 99999 99999' }, { icon: '🕐', label: 'Support Hours', value: 'Mon-Sat, 9AM-8PM' }].map((item, i) => (
@@ -112,6 +139,107 @@ export default function HelpSOS() {
                 <p style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A1A', margin: 0 }}>{item.value}</p>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* ── NEARBY STATIONS ─────────────────────────────────────────── */}
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E8E0D5', overflow: 'hidden' }}>
+          <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 }}>📍 Nearby Stations</p>
+              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '2px 0 0' }}>Find EV charging, petrol pumps, hospitals and more near you</p>
+            </div>
+            <button onClick={locateMe} disabled={nearbyLoading}
+              style={{ padding: '8px 16px', backgroundColor: nearbyLoc ? '#f0fdf4' : '#4F46E5', color: nearbyLoc ? '#16a34a' : 'white', border: nearbyLoc ? '1px solid #bbf7d0' : 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {nearbyLoading ? '📡 Locating…' : nearbyLoc ? '✓ Located' : '📡 Get My Location'}
+            </button>
+          </div>
+
+          <div style={{ padding: '20px 24px' }}>
+            {nearbyError && (
+              <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', color: '#dc2626', fontSize: '13px' }}>
+                ⚠️ {nearbyError}
+              </div>
+            )}
+
+            {!nearbyLoc && !nearbyLoading && (
+              <div style={{ textAlign: 'center', padding: '24px', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '32px', marginBottom: '8px' }}>🗺</p>
+                <p style={{ fontSize: '13px' }}>Tap "Get My Location" to find nearby services</p>
+              </div>
+            )}
+
+            {nearbyLoc && (
+              <>
+                <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '14px' }}>
+                  📍 Your location: {nearbyLoc.lat.toFixed(5)}, {nearbyLoc.lng.toFixed(5)}
+                </p>
+
+                {/* Tile grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
+                  {NEARBY_TILES.map((tile) => {
+                    const mapsUrl = `https://www.google.com/maps/search/${tile.query}/@${nearbyLoc.lat},${nearbyLoc.lng},15z`;
+                    const isActive = mapTile?.query === tile.query;
+                    return (
+                      <div key={tile.query}
+                        style={{ borderRadius: '10px', border: `1.5px solid ${isActive ? tile.color : '#e5e7eb'}`, backgroundColor: isActive ? tile.bg : 'white', cursor: 'pointer', overflow: 'hidden' }}>
+                        {/* Open in Maps button */}
+                        <a href={mapsUrl} target="_blank" rel="noreferrer"
+                          style={{ display: 'block', padding: '14px 8px', textAlign: 'center', textDecoration: 'none' }}>
+                          <p style={{ fontSize: '26px', margin: '0 0 6px' }}>{tile.icon}</p>
+                          <p style={{ fontSize: '11px', fontWeight: '600', color: tile.color, margin: 0 }}>{tile.label}</p>
+                          <p style={{ fontSize: '10px', color: '#9CA3AF', margin: '2px 0 0' }}>Open Maps ↗</p>
+                        </a>
+                        {/* Show embed button — only if API key present */}
+                        {MAPS_KEY && (
+                          <button onClick={() => setMapTile(isActive ? null : tile)}
+                            style={{ width: '100%', padding: '5px', fontSize: '10px', fontWeight: '600', color: tile.color, backgroundColor: tile.bg, border: 'none', borderTop: '1px solid #f0f0f0', cursor: 'pointer' }}>
+                            {isActive ? 'Hide map ▲' : 'Show map ▼'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Embedded map — shown when tile selected and API key is present */}
+                {MAPS_KEY && mapTile && (
+                  <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                    <div style={{ padding: '8px 12px', backgroundColor: mapTile.bg, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{mapTile.icon}</span>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: mapTile.color }}>{mapTile.label} near you</span>
+                    </div>
+                    <iframe
+                      title="nearby-map"
+                      width="100%"
+                      height="300"
+                      frameBorder="0"
+                      style={{ display: 'block' }}
+                      src={`https://www.google.com/maps/embed/v1/search?key=${MAPS_KEY}&q=${mapTile.query}&center=${nearbyLoc.lat},${nearbyLoc.lng}&zoom=14`}
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+
+                {/* Fallback embed (no key) — basic map of current location */}
+                {!MAPS_KEY && (
+                  <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                    <p style={{ padding: '8px 12px', fontSize: '12px', color: '#9CA3AF', margin: 0, backgroundColor: '#f9fafb' }}>
+                      📌 Your current location
+                    </p>
+                    <iframe
+                      title="current-location-map"
+                      width="100%"
+                      height="260"
+                      frameBorder="0"
+                      style={{ display: 'block' }}
+                      src={`https://maps.google.com/maps?q=${nearbyLoc.lat},${nearbyLoc.lng}&z=15&output=embed`}
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

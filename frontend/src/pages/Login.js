@@ -357,7 +357,9 @@ export default function Login() {
           </label>
           <div style={{ position: 'relative' }}>
             <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input type="text" value={selectedDriver?.mobile_number || ''} readOnly style={inputStyle} />
+            <input type="text" value={selectedDriver?.mobile_number || ''} readOnly
+              onKeyDown={e => { if (e.key === 'Enter' && !loading) sendDriverOTP(); }}
+              style={inputStyle} />
           </div>
         </div>
         <button onClick={sendDriverOTP} disabled={loading} style={loading ? btnDisabled : btnPrimary}>
@@ -376,7 +378,9 @@ export default function Login() {
           type="text"
           value={otpValue}
           onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          onKeyDown={e => { if (e.key === 'Enter' && !loading && otpValue.length >= 6) verifyDriverOTP(); }}
           placeholder="• • • • • •"
+          autoFocus
           maxLength={6}
           style={{
             width: '100%', padding: '16px',
@@ -419,6 +423,7 @@ export default function Login() {
               type="tel"
               value={adminPhone}
               onChange={e => setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              onKeyDown={e => { if (e.key === 'Enter' && !loading && adminPhone.length >= 10) sendAdminOTP(); }}
               placeholder="10-digit mobile number"
               autoFocus
               style={inputStyle}
@@ -466,6 +471,7 @@ export default function Login() {
           type="text"
           value={otpValue}
           onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          onKeyDown={e => { if (e.key === 'Enter' && !loading && otpValue.length >= 6) verifyAdminOTP(); }}
           placeholder="• • • • • •"
           maxLength={6}
           autoFocus
@@ -503,7 +509,9 @@ export default function Login() {
         type="text"
         value={otpValue}
         onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        onKeyDown={e => { if (e.key === 'Enter' && !loading && otpValue.length >= 6) verifyOwnerOTP(); }}
         placeholder="• • • • • •"
+        autoFocus
         maxLength={6}
         style={{
           width: '100%', padding: '16px',
