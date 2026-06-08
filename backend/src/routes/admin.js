@@ -40,8 +40,7 @@ router.get('/platform-stats', async (req, res) => {
     };
 
     const [c, o, d, v, col] = await Promise.all([
-      // client_companies is the actual table name per schema; fall back gracefully if absent
-      safe(`SELECT COUNT(*) FROM public.client_companies WHERE company_status='ACTIVE'`),
+      safe(`SELECT COUNT(*) FROM public.companies WHERE status='ACTIVE'`),
       safe(`SELECT COUNT(*) FROM public.owners WHERE status='ACTIVE'`),
       safe(`SELECT COUNT(*) FROM public.drivers WHERE status='ACTIVE'`),
       safe(`SELECT COUNT(*) FROM public.vehicles`),
