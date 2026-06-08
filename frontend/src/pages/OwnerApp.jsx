@@ -962,7 +962,7 @@ if (!oId) { navigate('/login'); return; }
     
     const [vehiclesRes, driversRes, statsRes, notifRes, ledgerRes] = await Promise.all([
   fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
-  fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}`, { headers: H }),
+  fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}&limit=200`, { headers: H }),
   fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
   fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H }),
   fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H })
