@@ -1452,23 +1452,46 @@ router.get('/owner/stats', async (req, res) => {
       [parseInt(ownerId)]
     );
     
-    const earnings = await pool.query(
-  `SELECT COALESCE(SUM(order_amount), 0) as total 
-   FROM public.ms_orders mo
-   JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
-   WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-   AND mo.transaction_status = 'SUCCESS'`,
-  [parseInt(ownerId)]
-);
-    
+    const ownerCodeRes = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id = $1',
+      [parseInt(ownerId)]
+    );
+    const oCode = ownerCodeRes.rows[0]?.owner_code;
+
+    const [earnings, earningsToday, earningsMonth] = await Promise.all([
+      pool.query(
+        `SELECT COALESCE(SUM(order_amount), 0) as total
+         FROM public.ms_orders
+         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'`,
+        [oCode]
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(order_amount), 0) as total
+         FROM public.ms_orders
+         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'
+           AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
+        [oCode]
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(order_amount), 0) as total
+         FROM public.ms_orders
+         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'
+           AND DATE_TRUNC('month', order_completion_date AT TIME ZONE 'Asia/Kolkata')
+             = DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Kolkata')`,
+        [oCode]
+      ),
+    ]);
+
     res.json({
-      total_vehicles: parseInt(vehicles.rows[0].count || 0),
-      total_drivers: parseInt(drivers.rows[0].count || 0),
-      total_earnings: parseFloat(earnings.rows[0].total || 0)
+      total_vehicles:   parseInt(vehicles.rows[0].count || 0),
+      total_drivers:    parseInt(drivers.rows[0].count || 0),
+      total_earnings:   parseFloat(earnings.rows[0].total || 0),
+      earnings_today:   parseFloat(earningsToday.rows[0].total || 0),
+      earnings_month:   parseFloat(earningsMonth.rows[0].total || 0),
     });
   } catch (err) {
     console.error('Stats error:', err);
-    res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0 });
+    res.json({ total_vehicles: 0, total_drivers: 0, total_earnings: 0, earnings_today: 0, earnings_month: 0 });
   }
 });
 
