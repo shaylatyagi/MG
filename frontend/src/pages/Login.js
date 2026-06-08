@@ -60,6 +60,7 @@ export default function Login() {
   const [otpValue, setOtpValue] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const [adminPhone, setAdminPhone] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
 
   useEffect(() => { fetchDrivers(); }, []);
 
@@ -87,7 +88,7 @@ export default function Login() {
   };
 
   const sendOwnerOTP = async () => {
-    const phone = selectedRole.phone;
+    const phone = ownerPhone;
     setLoading(true); setError(''); setSuccess('');
     try {
       const res = await fetch(`${API}/api/auth/send-otp`, {
@@ -107,7 +108,7 @@ export default function Login() {
   };
 
   const verifyOwnerOTP = async () => {
-    const phone = selectedRole.phone;
+    const phone = ownerPhone;
     setLoading(true); setError('');
     try {
       const res = await fetch(`${API}/api/auth/verify-otp`, {
@@ -452,10 +453,19 @@ export default function Login() {
           </label>
           <div style={{ position: 'relative' }}>
             <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input type="text" value={selectedRole.phone} readOnly style={inputStyle} />
+            <input
+              type="tel"
+              value={ownerPhone}
+              onChange={e => setOwnerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              onKeyDown={e => { if (e.key === 'Enter' && !loading && ownerPhone.length >= 10) sendOwnerOTP(); }}
+              placeholder="10-digit mobile number"
+              autoFocus
+              style={inputStyle}
+            />
           </div>
         </div>
-        <button onClick={sendOwnerOTP} disabled={loading} style={loading ? btnDisabled : btnPrimary}>
+        <button onClick={sendOwnerOTP} disabled={loading || ownerPhone.length < 10}
+          style={loading || ownerPhone.length < 10 ? btnDisabled : btnPrimary}>
           {loading ? 'Sending…' : 'Send OTP'} <Send size={14} />
         </button>
       </Shell>
@@ -503,7 +513,7 @@ export default function Login() {
 
   // ── Owner/Manager Verify OTP ─────────────────────────────────────────
   return (
-    <Shell showBack onBack={() => setStep('send-otp')} title="Enter OTP" subtitle={`Sent to ${selectedRole?.phone}`}>
+    <Shell showBack onBack={() => setStep('send-otp')} title="Enter OTP" subtitle={`Sent to ${ownerPhone}`}>
       <Alert />
       <input
         type="text"

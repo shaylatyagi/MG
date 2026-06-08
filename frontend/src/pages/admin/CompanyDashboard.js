@@ -1372,15 +1372,38 @@ function AllDrivers() {
 
 // ── ALL OWNERS ────────────────────────────────────────────────────────────────
 function AllOwners() {
-  const [owners, setOwners]     = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [q, setQ]               = useState('');
-  const [stack, setStack]       = useState([]);
+  const [owners, setOwners]         = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [q, setQ]                   = useState('');
+  const [stack, setStack]           = useState([]);
+  const [editPhone, setEditPhone]   = useState(null);   // { id, name }
+  const [editPhoneVal, setEditPhoneVal]   = useState('');
+  const [editPhoneSaving, setEditPhoneSaving] = useState(false);
   const push = (entry) => setStack(prev => [...prev, entry]);
   const pop  = ()      => setStack(prev => prev.slice(0, -1));
   const closeAll = ()  => setStack([]);
   const top = stack[stack.length - 1];
   const breadcrumbs = ['Owners', ...stack.map(s => s.label)];
+
+  const startEditPhone = (e, o) => {
+    e.stopPropagation();
+    setEditPhone({ id: o.id, name: o.full_name });
+    setEditPhoneVal(o.mobile_number || '');
+  };
+  const savePhone = async () => {
+    if (!/^\d{10}$/.test(editPhoneVal.trim())) { alert('10-digit number daalo'); return; }
+    const cur = owners.find(o => o.id === editPhone.id)?.mobile_number;
+    if (editPhoneVal.trim() === cur) { setEditPhone(null); return; }
+    setEditPhoneSaving(true);
+    try {
+      await api(`/api/admin/owners/${editPhone.id}/phone`, {
+        method: 'PATCH', body: JSON.stringify({ phone: editPhoneVal.trim() })
+      });
+      setOwners(prev => prev.map(o => o.id === editPhone.id ? { ...o, mobile_number: editPhoneVal.trim() } : o));
+      setEditPhone(null);
+    } catch (err) { alert(err.message); }
+    finally { setEditPhoneSaving(false); }
+  };
 
   useEffect(() => {
     api('/api/admin/companies')
@@ -1428,7 +1451,10 @@ function AllOwners() {
                 <tr key={o.id} className="hover:bg-indigo-50 cursor-pointer"
                   onClick={() => push({ type: 'owner', id: o.id, label: o.full_name })}>
                   <td className="px-4 py-3 font-medium text-indigo-700 hover:underline">{o.full_name}</td>
-                  <td className="px-4 py-3 text-gray-500">{o.mobile_number}</td>
+                  <td className="px-4 py-3 text-gray-500" onClick={e => e.stopPropagation()}>
+                    <span>{o.mobile_number}</span>
+                    <button onClick={e => startEditPhone(e, o)} className="ml-2 text-gray-300 hover:text-indigo-500 text-xs" title="Edit phone">✏️</button>
+                  </td>
                   <td className="px-4 py-3 text-gray-400 font-mono text-xs">{o.owner_code}</td>
                   <td className="px-4 py-3 text-right text-gray-700">{o.total_drivers || 0}</td>
                   <td className="px-4 py-3 text-right text-gray-700">{o.total_vehicles || 0}</td>
@@ -1439,6 +1465,28 @@ function AllOwners() {
             </tbody>
           </table>
           {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No owners</p>}
+        </div>
+      )}
+
+      {editPhone && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setEditPhone(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-gray-800 mb-1">Change Phone Number</h3>
+            <p className="text-sm text-gray-500 mb-4">{editPhone.name}</p>
+            <input type="tel" autoFocus maxLength={10}
+              value={editPhoneVal}
+              onChange={e => setEditPhoneVal(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={e => { if (e.key === 'Enter') savePhone(); if (e.key === 'Escape') setEditPhone(null); }}
+              className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-4"
+              placeholder="10-digit mobile number" />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setEditPhone(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+              <button onClick={savePhone} disabled={editPhoneSaving}
+                className="px-4 py-2 rounded-lg text-sm bg-indigo-600 text-white disabled:opacity-50">
+                {editPhoneSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
