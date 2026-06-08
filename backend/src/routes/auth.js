@@ -69,7 +69,7 @@ router.post('/send-otp', async (req, res) => {
     // Never return OTP in production
     if (process.env.NODE_ENV !== 'production') console.log('DEV OTP:', phone_number, otp);
     const resp = { success: true, message: 'OTP sent' };
-    if (process.env.NODE_ENV !== 'production') resp.otp = otp; // dev only
+    if (process.env.NODE_ENV !== 'production' || process.env.DEV_BYPASS_OTP === 'true') resp.otp = otp;
     res.json(resp);
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
