@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, Component } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Component } from 'react';
 
-// ── Error Boundary — prevents white page on any crash ─────────
+// ── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
   static getDerivedStateFromError(err) { return { error: err }; }
@@ -30,11 +30,15 @@ class ErrorBoundary extends Component {
   }
 }
 
-const API = 'https://mg-qw5s.onrender.com';
-const TOKEN_KEY = 'mg_admin_token';
+// ── Constants ─────────────────────────────────────────────────────────────────
+const API           = 'https://mg-qw5s.onrender.com';
+const TOKEN_KEY     = 'mg_admin_token';
+const ADMIN_PHONE   = process.env.REACT_APP_ADMIN_PHONE  || '';
+const ADMIN_SECRET  = process.env.REACT_APP_ADMIN_SECRET || '';
 
-const fmt = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN')}`;
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+// ── Utilities ─────────────────────────────────────────────────────────────────
+const fmt      = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN')}`;
+const fmtDate  = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const timeSince = (d) => {
   if (!d) return '—';
   const hrs = Math.floor((Date.now() - new Date(d)) / 3600000);
@@ -43,8 +47,8 @@ const timeSince = (d) => {
   return days < 30 ? `${days}d ago` : fmtDate(d);
 };
 
-const getToken = () => localStorage.getItem(TOKEN_KEY);
-const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
+const getToken   = () => localStorage.getItem(TOKEN_KEY);
+const setToken   = (t) => localStorage.setItem(TOKEN_KEY, t);
 const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
 const api = async (path, opts = {}) => {
@@ -58,11 +62,12 @@ const api = async (path, opts = {}) => {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
+  if (!res.ok) throw new Error(data.message || data.error || `Error ${res.status}`);
   return data;
 };
 
-// ── Status Badge ─────────────────────────────────────────────
+// ── Shared Components (defined at module level — never inside render) ─────────
+
 const Badge = ({ status }) => {
   const map = {
     ACTIVE: 'bg-green-100 text-green-700', Active: 'bg-green-100 text-green-700',
@@ -72,6 +77,8 @@ const Badge = ({ status }) => {
     SUBMITTED: 'bg-blue-100 text-blue-700',
     UNDER_REVIEW: 'bg-purple-100 text-purple-700',
     REJECTED: 'bg-red-100 text-red-700',
+    SUCCESS: 'bg-green-100 text-green-700',
+    FAILED: 'bg-red-100 text-red-700',
   };
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>
@@ -80,16 +87,16 @@ const Badge = ({ status }) => {
   );
 };
 
-// ── Stat Card ─────────────────────────────────────────────────
 const StatCard = ({ label, value, sub, color = 'indigo' }) => {
   const colors = {
     indigo: 'border-indigo-400 bg-indigo-50',
-    green: 'border-green-400 bg-green-50',
-    blue: 'border-blue-400 bg-blue-50',
+    green:  'border-green-400 bg-green-50',
+    blue:   'border-blue-400 bg-blue-50',
     orange: 'border-orange-400 bg-orange-50',
+    red:    'border-red-400 bg-red-50',
   };
   return (
-    <div className={`border-l-4 rounded-lg p-4 shadow-sm ${colors[color]}`}>
+    <div className={`border-l-4 rounded-lg p-4 shadow-sm ${colors[color] || colors.indigo}`}>
       <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
       <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
       {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
@@ -97,27 +104,66 @@ const StatCard = ({ label, value, sub, color = 'indigo' }) => {
   );
 };
 
-// ── LOGIN ─────────────────────────────────────────────────────
-function LoginPage({ onLogin }) {
-  const [phone, setPhone] = useState('');
-  const [secret, setSecret] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+const Modal = ({ title, onClose, children, wide }) => (
+  <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-8 px-4">
+    <div className={`bg-white rounded-2xl shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-2xl'} relative`}>
+      <div className="flex items-center justify-between px-6 py-4 border-b">
+        <h3 className="font-bold text-gray-800 text-lg">{title}</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold leading-none">&times;</button>
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  </div>
+);
 
-  const sendOtp = async (e) => {
-    e.preventDefault();
+const Spinner = () => (
+  <div className="flex items-center justify-center h-48 text-gray-400">
+    <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full mr-2" />
+    Loading…
+  </div>
+);
+
+// ── LOGIN PAGE ─────────────────────────────────────────────────────────────────
+// Auto-sends OTP on mount using REACT_APP_ADMIN_PHONE + REACT_APP_ADMIN_SECRET
+// If env vars are set: user only sees OTP input (no phone, no secret)
+// If not set: shows minimal manual form
+function LoginPage({ onLogin }) {
+  const [otp, setOtp]         = useState('');
+  const [step, setStep]       = useState(1);   // 1=sending/phone, 2=otp
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+  const [phone, setPhone]     = useState(ADMIN_PHONE);
+  const [secret, setSecret]   = useState(ADMIN_SECRET);
+  const otpRef                = useRef(null);
+  const autoSentRef           = useRef(false);
+
+  const sendOtp = useCallback(async (phoneNum, secretKey) => {
     setError(''); setLoading(true);
     try {
-      await api('/api/auth/admin-send-otp', {
+      const data = await api('/api/auth/admin-send-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone_number: phone, admin_secret: secret }),
+        body: JSON.stringify({ phone_number: phoneNum, admin_secret: secretKey }),
       });
       setStep(2);
+      // Auto-fill OTP in dev/demo mode (backend returns otp field)
+      if (data.otp) {
+        setOtp(data.otp);
+        // small delay to let step=2 render, then focus
+        setTimeout(() => otpRef.current?.focus(), 100);
+      } else {
+        setTimeout(() => otpRef.current?.focus(), 100);
+      }
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
-  };
+  }, []);
+
+  // Auto-send if env vars available
+  useEffect(() => {
+    if (ADMIN_PHONE && ADMIN_SECRET && !autoSentRef.current) {
+      autoSentRef.current = true;
+      sendOtp(ADMIN_PHONE, ADMIN_SECRET);
+    }
+  }, [sendOtp]);
 
   const verifyOtp = async (e) => {
     e.preventDefault();
@@ -128,7 +174,6 @@ function LoginPage({ onLogin }) {
         body: JSON.stringify({ phone_number: phone, otp, admin_secret: secret }),
       });
       setToken(data.token);
-      // Hard reload — ensures localStorage token is read fresh, avoids ErrorBoundary loop
       window.location.href = '/admin/dashboard';
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
@@ -149,12 +194,16 @@ function LoginPage({ onLogin }) {
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
         )}
 
-        {step === 1 ? (
-          <form onSubmit={sendOtp} className="space-y-4">
+        {step === 1 && loading && ADMIN_PHONE && (
+          <div className="text-center py-6 text-gray-500 text-sm">Sending OTP to admin phone…</div>
+        )}
+
+        {step === 1 && !loading && !ADMIN_PHONE && (
+          <form onSubmit={(e) => { e.preventDefault(); sendOtp(phone, secret); }} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Admin Phone Number</label>
               <input
-                type="tel" value={phone}
+                type="tel" value={phone} autoFocus
                 onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 required placeholder="10-digit mobile number"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
@@ -168,46 +217,49 @@ function LoginPage({ onLogin }) {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
               />
             </div>
-            <button
-              type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
               {loading ? 'Sending OTP…' : 'Send OTP'}
             </button>
           </form>
-        ) : (
+        )}
+
+        {step === 2 && (
           <form onSubmit={verifyOtp} className="space-y-4">
-            <p className="text-sm text-gray-600 text-center">OTP sent to <strong>+91{phone}</strong></p>
+            <p className="text-sm text-gray-600 text-center">
+              OTP sent to <strong>+91{phone}</strong>
+            </p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP</label>
               <input
+                ref={otpRef}
                 type="text" value={otp} onChange={e => setOtp(e.target.value)} required
-                placeholder="6-digit OTP (or 000000 for demo)"
+                placeholder="6-digit OTP"
                 maxLength={6}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center text-xl tracking-widest"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center text-2xl tracking-widest"
               />
             </div>
-            <button
-              type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
               {loading ? 'Verifying…' : 'Login'}
             </button>
-            <button type="button" onClick={() => setStep(1)} className="w-full text-sm text-gray-500 hover:text-gray-700">
-              ← Back
+            <button type="button" onClick={() => { setStep(1); setOtp(''); autoSentRef.current = false; }}
+              className="w-full text-sm text-gray-500 hover:text-gray-700">
+              ← Resend OTP
             </button>
           </form>
         )}
+
         <p className="text-center text-xs text-gray-400 mt-6">MobilityGrid by PayYantra · Confidential</p>
       </div>
     </div>
   );
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard() {
-  const [stats, setStats] = useState(null);
-  const [kyc, setKyc] = useState(null);
+  const [stats, setStats]     = useState(null);
+  const [kyc, setKyc]         = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -217,10 +269,9 @@ function Dashboard() {
     ]).then(([s, k]) => { setStats(s); setKyc(k); setLoading(false); });
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>;
+  if (loading) return <Spinner />;
 
   const s = stats || {};
-  // kyc/summary returns [{status, count}] array — convert to {STATUS: count} object
   const k = Array.isArray(kyc)
     ? kyc.reduce((acc, row) => { acc[row.status] = row.count; return acc; }, {})
     : (kyc || {});
@@ -237,22 +288,21 @@ function Dashboard() {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Companies" value={s.total_companies || 0} color="indigo" />
-        <StatCard label="Fleet Owners" value={s.total_owners || 0} color="blue" />
-        <StatCard label="Drivers" value={s.total_drivers || 0} color="green" />
-        <StatCard label="Vehicles" value={s.total_vehicles || 0} color="orange" />
+        <StatCard label="Companies"    value={s.total_companies || 0} color="indigo" />
+        <StatCard label="Fleet Owners" value={s.total_owners   || 0} color="blue"   />
+        <StatCard label="Drivers"      value={s.total_drivers  || 0} color="green"  />
+        <StatCard label="Vehicles"     value={s.total_vehicles || 0} color="orange" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* platform-stats returns collection_today/month/all_time */}
-        <StatCard label="Collection Today" value={fmt(s.collection_today || s.gmv_today)} color="green" />
-        <StatCard label="Collection This Month" value={fmt(s.collection_month || s.gmv_month)} color="blue" />
-        <StatCard label="Collection All Time" value={fmt(s.collection_total || s.gmv_total)} color="indigo" />
+        <StatCard label="Collection Today"      value={fmt(s.collection_today || s.gmv_today)}    color="green"  />
+        <StatCard label="Collection This Month" value={fmt(s.collection_month || s.gmv_month)}    color="blue"   />
+        <StatCard label="Collection All Time"   value={fmt(s.collection_total || s.gmv_total)}    color="indigo" />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border p-6">
         <h3 className="font-semibold text-gray-700 mb-4">KYC Status Overview</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {['VERIFIED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'REJECTED'].map(status => (
             <div key={status} className="text-center p-3 bg-gray-50 rounded-lg">
               <p className="text-2xl font-bold text-gray-800">{k[status] || 0}</p>
@@ -265,19 +315,383 @@ function Dashboard() {
   );
 }
 
-// ── COMPANIES ─────────────────────────────────────────────────
-function Companies() {
-  const [companies, setCompanies] = useState([]);
-  const [q, setQ] = useState('');
+// ── DRIVER DETAIL MODAL ───────────────────────────────────────────────────────
+function DriverDetailModal({ driverId, onClose }) {
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newCo, setNewCo] = useState({ name: '', cin: '', city: '' });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [tab, setTab]         = useState('overview');
+
+  useEffect(() => {
+    api(`/api/admin/drivers/${driverId}`)
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [driverId]);
+
+  if (loading) return <Modal title="Driver Details" onClose={onClose}><Spinner /></Modal>;
+  if (!data)   return <Modal title="Driver Details" onClose={onClose}><p className="text-gray-500">Failed to load</p></Modal>;
+
+  const { driver: d, transactions = [], vehicle_history = [], daily_logs = [] } = data;
+
+  return (
+    <Modal title={`${d.full_name || 'Driver'} · ${d.driver_code || ''}`} onClose={onClose} wide>
+      {/* Tabs */}
+      <div className="flex gap-1 border-b mb-4 -mt-2">
+        {[['overview','Overview'],['transactions','Payments'],['vehicles','Vehicle History'],['logs','Daily Logs']].map(([k,label]) => (
+          <button key={k} onClick={() => setTab(k)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab === k ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Total Paid"     value={fmt(d.total_paid)}         color="green"  />
+            <StatCard label="Paid Today"     value={fmt(d.paid_today)}          color="blue"   />
+            <StatCard label="Paid This Month" value={fmt(d.paid_month)}         color="indigo" />
+            <StatCard label="Transactions"   value={d.total_transactions || 0}  color="orange" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <p className="font-semibold text-gray-700 mb-2">Personal</p>
+              <Row label="Phone"      value={d.mobile_number} />
+              <Row label="Status"     value={<Badge status={d.status} />} />
+              <Row label="KYC"        value={<Badge status={d.kyc_status} />} />
+              <Row label="DOB"        value={fmtDate(d.date_of_birth)} />
+              <Row label="DL Number"  value={d.driving_license_number || '—'} />
+              <Row label="DL Expiry"  value={fmtDate(d.driving_license_expiry)} />
+              <Row label="Joined"     value={fmtDate(d.created_at)} />
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <p className="font-semibold text-gray-700 mb-2">Fleet & Finance</p>
+              <Row label="Owner"      value={d.owner_name || '—'} />
+              <Row label="Owner Phone" value={d.owner_phone || '—'} />
+              <Row label="Vehicle"    value={d.vehicle_number ? `${d.vehicle_number} · ${d.vehicle_model || ''}` : '—'} />
+              <Row label="Assigned"   value={d.vehicle_since ? timeSince(d.vehicle_since) : '—'} />
+              <Row label="Daily Rent" value={d.daily_rent ? fmt(d.daily_rent) : '—'} />
+              <Row label="Wallet"     value={fmt(d.wallet_balance)} />
+              <Row label="Security"   value={fmt(d.security_deposit)} />
+              <Row label="Last Payment" value={timeSince(d.last_payment_date)} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'transactions' && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-3 py-2 text-left">Date</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2 text-left">Status</th>
+                <th className="px-3 py-2 text-left">Order ID</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {transactions.length === 0
+                ? <tr><td colSpan={4} className="py-8 text-center text-gray-400">No transactions</td></tr>
+                : transactions.map(t => (
+                  <tr key={t.order_id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 text-gray-500">{fmtDate(t.order_initiation_date)}</td>
+                    <td className="px-3 py-2 text-right font-medium text-gray-800">{fmt(t.order_amount)}</td>
+                    <td className="px-3 py-2"><Badge status={t.transaction_status} /></td>
+                    <td className="px-3 py-2 text-gray-400 text-xs">{t.order_id}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'vehicles' && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-3 py-2 text-left">Vehicle</th>
+                <th className="px-3 py-2 text-left">Assigned</th>
+                <th className="px-3 py-2 text-left">Released</th>
+                <th className="px-3 py-2 text-right">Days</th>
+                <th className="px-3 py-2 text-right">Earned</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {vehicle_history.length === 0
+                ? <tr><td colSpan={5} className="py-8 text-center text-gray-400">No vehicle history</td></tr>
+                : vehicle_history.map(h => (
+                  <tr key={h.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-gray-800">{h.vehicle_number} {h.vehicle_model ? `· ${h.vehicle_model}` : ''}</td>
+                    <td className="px-3 py-2 text-gray-500">{fmtDate(h.assigned_at)}</td>
+                    <td className="px-3 py-2 text-gray-500">{h.unassigned_at ? fmtDate(h.unassigned_at) : <span className="text-green-600 font-medium">Active</span>}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{h.total_days ?? '—'}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{h.total_earned != null ? fmt(h.total_earned) : '—'}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'logs' && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-3 py-2 text-left">Date</th>
+                <th className="px-3 py-2 text-right">Active Minutes</th>
+                <th className="px-3 py-2 text-right">Trips</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {daily_logs.length === 0
+                ? <tr><td colSpan={3} className="py-8 text-center text-gray-400">No daily logs</td></tr>
+                : daily_logs.map(l => (
+                  <tr key={l.id || l.log_date} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 text-gray-500">{fmtDate(l.log_date)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{l.active_minutes ?? '—'}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{l.trip_count ?? '—'}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ── OWNER DETAIL MODAL ────────────────────────────────────────────────────────
+function OwnerDetailModal({ ownerId, onClose, onSelectDriver }) {
+  const [data, setData]         = useState(null);
+  const [drivers, setDrivers]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [tab, setTab]           = useState('overview');
+
+  useEffect(() => {
+    Promise.all([
+      api(`/api/admin/owners/${ownerId}`).catch(() => null),
+      api(`/api/admin/owners/${ownerId}/drivers`).catch(() => []),
+    ]).then(([d, dr]) => {
+      setData(d);
+      setDrivers(Array.isArray(dr) ? dr : []);
+      setLoading(false);
+    });
+  }, [ownerId]);
+
+  if (loading) return <Modal title="Owner Details" onClose={onClose}><Spinner /></Modal>;
+  if (!data)   return <Modal title="Owner Details" onClose={onClose}><p className="text-gray-500">Failed to load</p></Modal>;
+
+  const o = data.owner || {};
+  const vehicles = data.vehicles || [];
+  const payments = data.recent_payments || [];
+
+  return (
+    <Modal title={`${o.full_name || 'Owner'} · ${o.owner_code || ''}`} onClose={onClose} wide>
+      <div className="flex gap-1 border-b mb-4 -mt-2">
+        {[['overview','Overview'],['drivers','Drivers'],['vehicles','Vehicles'],['payments','Recent Payments']].map(([k,label]) => (
+          <button key={k} onClick={() => setTab(k)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab === k ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            {label}{k === 'drivers' ? ` (${drivers.length})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Total Drivers"  value={o.total_drivers  || 0} color="blue"   />
+            <StatCard label="Vehicles"       value={o.total_vehicles || 0} color="orange" />
+            <StatCard label="Collection Total" value={fmt(o.collection_total)} color="green" />
+            <StatCard label="This Month"     value={fmt(o.collection_month)}  color="indigo" />
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-2">
+            <Row label="Phone"         value={o.mobile_number} />
+            <Row label="Business"      value={o.business_name || '—'} />
+            <Row label="Email"         value={o.email || '—'} />
+            <Row label="City"          value={o.city || '—'} />
+            <Row label="Subscription"  value={o.subscription_end_date ? fmtDate(o.subscription_end_date) : '—'} />
+            <Row label="Joined"        value={fmtDate(o.created_at)} />
+          </div>
+        </div>
+      )}
+
+      {tab === 'drivers' && (
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+            <tr>
+              <th className="px-3 py-2 text-left">Driver</th>
+              <th className="px-3 py-2 text-left">Phone</th>
+              <th className="px-3 py-2 text-left">Vehicle</th>
+              <th className="px-3 py-2 text-right">Total Paid</th>
+              <th className="px-3 py-2 text-left">KYC</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {drivers.length === 0
+              ? <tr><td colSpan={6} className="py-8 text-center text-gray-400">No drivers</td></tr>
+              : drivers.map(d => (
+                <tr key={d.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 font-medium text-gray-800">{d.full_name}</td>
+                  <td className="px-3 py-2 text-gray-500">{d.mobile_number}</td>
+                  <td className="px-3 py-2 text-gray-500">{d.vehicle_number || '—'}</td>
+                  <td className="px-3 py-2 text-right text-gray-700">{fmt(d.total_paid)}</td>
+                  <td className="px-3 py-2"><Badge status={d.kyc_status} /></td>
+                  <td className="px-3 py-2">
+                    <button onClick={() => onSelectDriver(d.id)}
+                      className="text-xs text-indigo-600 hover:underline font-medium">View</button>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
+
+      {tab === 'vehicles' && (
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+            <tr>
+              <th className="px-3 py-2 text-left">Vehicle</th>
+              <th className="px-3 py-2 text-left">Model</th>
+              <th className="px-3 py-2 text-left">Status</th>
+              <th className="px-3 py-2 text-left">Driver</th>
+              <th className="px-3 py-2 text-right">Daily Rent</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {vehicles.length === 0
+              ? <tr><td colSpan={5} className="py-8 text-center text-gray-400">No vehicles</td></tr>
+              : vehicles.map(v => (
+                <tr key={v.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 font-medium text-gray-800">{v.vehicle_number}</td>
+                  <td className="px-3 py-2 text-gray-500">{v.vehicle_model || '—'}</td>
+                  <td className="px-3 py-2"><Badge status={v.status || v.operational_status} /></td>
+                  <td className="px-3 py-2 text-gray-500">{v.driver_mobile || '—'}</td>
+                  <td className="px-3 py-2 text-right text-gray-700">{v.daily_rent ? fmt(v.daily_rent) : '—'}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
+
+      {tab === 'payments' && (
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+            <tr>
+              <th className="px-3 py-2 text-left">Date</th>
+              <th className="px-3 py-2 text-left">Driver</th>
+              <th className="px-3 py-2 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {payments.length === 0
+              ? <tr><td colSpan={3} className="py-8 text-center text-gray-400">No payments</td></tr>
+              : payments.map((p, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-gray-500">{fmtDate(p.order_completion_date)}</td>
+                  <td className="px-3 py-2 text-gray-700">{p.driver_name}</td>
+                  <td className="px-3 py-2 text-right font-medium text-gray-800">{fmt(p.order_amount)}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
+    </Modal>
+  );
+}
+
+// ── COMPANY DETAIL MODAL ──────────────────────────────────────────────────────
+function CompanyDetailModal({ company, onClose, onSelectOwner }) {
+  const [owners, setOwners]   = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api(`/api/admin/companies/${company.id}/owners`)
+      .then(d => { setOwners(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [company.id]);
+
+  const totalCollection = owners.reduce((s, o) => s + parseFloat(o.collection_total || 0), 0);
+
+  return (
+    <Modal title={`${company.name} — ${company.city || 'N/A'}`} onClose={onClose} wide>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Owners"    value={owners.length}                                            color="blue"   />
+        <StatCard label="Drivers"   value={owners.reduce((s, o) => s + (o.total_drivers || 0), 0)}  color="green"  />
+        <StatCard label="Vehicles"  value={owners.reduce((s, o) => s + (o.total_vehicles || 0), 0)} color="orange" />
+        <StatCard label="Collection" value={fmt(totalCollection)}                                    color="indigo" />
+      </div>
+
+      {loading ? <Spinner /> : (
+        <div>
+          <h4 className="font-semibold text-gray-700 mb-3">Fleet Owners ({owners.length})</h4>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-3 py-2 text-left">Owner</th>
+                <th className="px-3 py-2 text-left">Phone</th>
+                <th className="px-3 py-2 text-right">Drivers</th>
+                <th className="px-3 py-2 text-right">Vehicles</th>
+                <th className="px-3 py-2 text-right">Total Collection</th>
+                <th className="px-3 py-2 text-right">This Month</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {owners.length === 0
+                ? <tr><td colSpan={7} className="py-8 text-center text-gray-400">No owners found</td></tr>
+                : owners.map(o => (
+                  <tr key={o.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-gray-800">{o.full_name}</td>
+                    <td className="px-3 py-2 text-gray-500">{o.mobile_number}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{o.total_drivers || 0}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{o.total_vehicles || 0}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmt(o.collection_total)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{fmt(o.collection_month)}</td>
+                    <td className="px-3 py-2">
+                      <button onClick={() => onSelectOwner(o.id)}
+                        className="text-xs text-indigo-600 hover:underline font-medium">View</button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ── helper row ────────────────────────────────────────────────────────────────
+function Row({ label, value }) {
+  return (
+    <div className="flex justify-between items-start">
+      <span className="text-gray-500 shrink-0 mr-4">{label}</span>
+      <span className="text-gray-800 font-medium text-right">{value ?? '—'}</span>
+    </div>
+  );
+}
+
+// ── COMPANIES ─────────────────────────────────────────────────────────────────
+function Companies() {
+  const [companies, setCompanies]   = useState([]);
+  const [q, setQ]                   = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [showAdd, setShowAdd]       = useState(false);
+  const [newCo, setNewCo]           = useState({ name: '', cin: '', city: '' });
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState('');
+  const [detailCo, setDetailCo]     = useState(null);
+  const [detailOwner, setDetailOwner] = useState(null);
+  const [detailDriver, setDetailDriver] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    api('/api/admin/companies').then(d => { setCompanies(d.data || d || []); setLoading(false); }).catch(() => setLoading(false));
+    api('/api/admin/companies')
+      .then(d => { setCompanies(d.data || d || []); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -297,50 +711,54 @@ function Companies() {
     finally { setSaving(false); }
   };
 
-  const filtered = companies.filter(c => c.name?.toLowerCase().includes(q.toLowerCase()) || c.city?.toLowerCase().includes(q.toLowerCase()));
+  const filtered = companies.filter(c =>
+    c.name?.toLowerCase().includes(q.toLowerCase()) || c.city?.toLowerCase().includes(q.toLowerCase())
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-800">Companies</h2>
-        <button onClick={() => setShowAdd(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">
+        <button onClick={() => setShowAdd(true)}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">
           + Onboard Company
         </button>
       </div>
 
-      <input
-        type="text" placeholder="Search companies…" value={q} onChange={e => setQ(e.target.value)}
-        className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-      />
+      <input type="text" placeholder="Search companies…" value={q} onChange={e => setQ(e.target.value)}
+        className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
-      {loading ? <div className="text-center py-8 text-gray-400">Loading…</div> : (
+      {loading ? <Spinner /> : (
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Company</th>
                 <th className="px-4 py-3 text-left">City</th>
+                <th className="px-4 py-3 text-right">Owners</th>
+                <th className="px-4 py-3 text-right">Drivers</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Created</th>
-                <th className="px-4 py-3 text-left">Action</th>
+                <th className="px-4 py-3 text-left">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-800">{c.name}</td>
+                <tr key={c.id} className="hover:bg-indigo-50 cursor-pointer" onClick={() => setDetailCo(c)}>
+                  <td className="px-4 py-3 font-medium text-indigo-700 hover:underline">{c.name}</td>
                   <td className="px-4 py-3 text-gray-500">{c.city || '—'}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{c.owner_count || c.owners_count || '—'}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{c.driver_count || c.drivers_count || '—'}</td>
                   <td className="px-4 py-3"><Badge status={c.status} /></td>
                   <td className="px-4 py-3 text-gray-400">{fmtDate(c.created_at)}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => toggleStatus(c.id, c.status)}
                       className={`text-xs px-3 py-1 rounded-full border font-medium transition ${
                         c.status === 'Active' || c.status === 'ACTIVE'
                           ? 'border-red-300 text-red-600 hover:bg-red-50'
                           : 'border-green-300 text-green-600 hover:bg-green-50'
-                      }`}
-                    >
+                      }`}>
                       {c.status === 'Active' || c.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                     </button>
                   </td>
@@ -352,6 +770,7 @@ function Companies() {
         </div>
       )}
 
+      {/* Add Company Modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
@@ -365,10 +784,12 @@ function Companies() {
               <input placeholder="City" value={newCo.city} onChange={e => setNewCo({ ...newCo, city: e.target.value })}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               <div className="flex gap-2 pt-2">
-                <button type="submit" disabled={saving} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                <button type="submit" disabled={saving}
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
                   {saving ? 'Saving…' : 'Create Company'}
                 </button>
-                <button type="button" onClick={() => setShowAdd(false)} className="flex-1 border text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
+                <button type="button" onClick={() => setShowAdd(false)}
+                  className="flex-1 border text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
                   Cancel
                 </button>
               </div>
@@ -376,23 +797,48 @@ function Companies() {
           </div>
         </div>
       )}
+
+      {/* Drill-down modals */}
+      {detailCo && !detailOwner && !detailDriver && (
+        <CompanyDetailModal
+          company={detailCo}
+          onClose={() => setDetailCo(null)}
+          onSelectOwner={id => setDetailOwner(id)}
+        />
+      )}
+      {detailOwner && !detailDriver && (
+        <OwnerDetailModal
+          ownerId={detailOwner}
+          onClose={() => setDetailOwner(null)}
+          onSelectDriver={id => setDetailDriver(id)}
+        />
+      )}
+      {detailDriver && (
+        <DriverDetailModal
+          driverId={detailDriver}
+          onClose={() => setDetailDriver(null)}
+        />
+      )}
     </div>
   );
 }
 
-// ── KYC REVIEW ────────────────────────────────────────────────
+// ── KYC REVIEW ────────────────────────────────────────────────────────────────
 function KycReview() {
-  const [tab, setTab] = useState('pending');
-  const [drivers, setDrivers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [tab, setTab]             = useState('pending');
+  const [drivers, setDrivers]     = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [rejectTarget, setRejectTarget] = useState(null);
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [reason, setReason]       = useState('');
+  const [saving, setSaving]       = useState(false);
+  const [detailDriver, setDetailDriver] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    const path = tab === 'pending' ? '/api/admin/kyc/pending' : `/api/admin/kyc/all?status=${tab.toUpperCase()}`;
-    api(tab === 'all' ? '/api/admin/kyc/all' : path)
+    const path = tab === 'pending' ? '/api/admin/kyc/pending'
+                : tab === 'all'    ? '/api/admin/kyc/all'
+                : `/api/admin/kyc/all?status=${tab}`;
+    api(path)
       .then(d => { setDrivers(d.data || d || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, [tab]);
@@ -407,15 +853,17 @@ function KycReview() {
 
   const reject = async () => {
     setSaving(true);
-    await api(`/api/admin/kyc/${rejectTarget}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }).catch(() => {});
+    await api(`/api/admin/kyc/${rejectTarget}/reject`, {
+      method: 'PATCH', body: JSON.stringify({ reason }),
+    }).catch(() => {});
     setSaving(false); setRejectTarget(null); setReason(''); load();
   };
 
   const tabs = [
-    { key: 'pending', label: 'Pending Review' },
-    { key: 'VERIFIED', label: 'Approved' },
-    { key: 'REJECTED', label: 'Rejected' },
-    { key: 'all', label: 'All' },
+    { key: 'pending',     label: 'Pending Review' },
+    { key: 'VERIFIED',    label: 'Approved' },
+    { key: 'REJECTED',    label: 'Rejected' },
+    { key: 'all',         label: 'All' },
   ];
 
   return (
@@ -431,7 +879,7 @@ function KycReview() {
         ))}
       </div>
 
-      {loading ? <div className="text-center py-8 text-gray-400">Loading…</div> : (
+      {loading ? <Spinner /> : (
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
@@ -439,6 +887,7 @@ function KycReview() {
                 <th className="px-4 py-3 text-left">Driver</th>
                 <th className="px-4 py-3 text-left">Phone</th>
                 <th className="px-4 py-3 text-left">Owner</th>
+                <th className="px-4 py-3 text-left">Company</th>
                 <th className="px-4 py-3 text-left">KYC Status</th>
                 <th className="px-4 py-3 text-left">Actions</th>
               </tr>
@@ -446,9 +895,15 @@ function KycReview() {
             <tbody className="divide-y divide-gray-100">
               {drivers.map(d => (
                 <tr key={d.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-800">{d.full_name || d.driver_name}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => setDetailDriver(d.id)}
+                      className="font-medium text-indigo-700 hover:underline text-left">
+                      {d.full_name || d.driver_name}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-gray-500">{d.mobile_number || d.driver_phone}</td>
                   <td className="px-4 py-3 text-gray-500">{d.owner_name || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{d.company_name || '—'}</td>
                   <td className="px-4 py-3"><Badge status={d.kyc_status} /></td>
                   <td className="px-4 py-3">
                     {(d.kyc_status === 'PENDING' || d.kyc_status === 'SUBMITTED' || d.kyc_status === 'UNDER_REVIEW') && (
@@ -484,67 +939,92 @@ function KycReview() {
                 className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">
                 {saving ? 'Rejecting…' : 'Confirm Reject'}
               </button>
-              <button onClick={() => setRejectTarget(null)} className="flex-1 border text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
+              <button onClick={() => setRejectTarget(null)}
+                className="flex-1 border text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
                 Cancel
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {detailDriver && (
+        <DriverDetailModal driverId={detailDriver} onClose={() => setDetailDriver(null)} />
+      )}
     </div>
   );
 }
 
-// ── ALL DRIVERS ───────────────────────────────────────────────
+// ── ALL DRIVERS ───────────────────────────────────────────────────────────────
 function AllDrivers() {
-  const [drivers, setDrivers] = useState([]);
-  const [q, setQ] = useState('');
+  const [drivers, setDrivers]   = useState([]);
+  const [q, setQ]               = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
+  const [detailDriver, setDetailDriver] = useState(null);
 
   useEffect(() => {
-    api('/api/admin/kyc/all')
+    api('/api/admin/all-drivers')
       .then(d => { setDrivers(d.data || d || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
   const filtered = drivers.filter(d => {
-    const matchQ = !q || d.full_name?.toLowerCase().includes(q.toLowerCase()) || d.mobile_number?.includes(q) || d.owner_name?.toLowerCase().includes(q.toLowerCase());
+    const matchQ = !q ||
+      d.full_name?.toLowerCase().includes(q.toLowerCase()) ||
+      d.mobile_number?.includes(q) ||
+      d.owner_name?.toLowerCase().includes(q.toLowerCase()) ||
+      d.company_name?.toLowerCase().includes(q.toLowerCase()) ||
+      d.vehicle_number?.toLowerCase().includes(q.toLowerCase());
     const matchStatus = !statusFilter || d.kyc_status === statusFilter;
     return matchQ && matchStatus;
   });
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800">All Drivers</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-800">All Drivers
+          <span className="ml-2 text-sm font-normal text-gray-400">({drivers.length})</span>
+        </h2>
+      </div>
       <div className="flex gap-2">
-        <input type="text" placeholder="Search name, phone, owner…" value={q} onChange={e => setQ(e.target.value)}
+        <input type="text" placeholder="Search name, phone, owner, vehicle…" value={q} onChange={e => setQ(e.target.value)}
           className="flex-1 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
           className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-          <option value="">All KYC Status</option>
-          {['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED'].map(s => <option key={s} value={s}>{s}</option>)}
+          <option value="">All KYC</option>
+          {['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED'].map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
         </select>
       </div>
 
-      {loading ? <div className="text-center py-8 text-gray-400">Loading…</div> : (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      {loading ? <Spinner /> : (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Driver</th>
                 <th className="px-4 py-3 text-left">Phone</th>
                 <th className="px-4 py-3 text-left">Owner</th>
+                <th className="px-4 py-3 text-left">Company</th>
+                <th className="px-4 py-3 text-left">Vehicle</th>
+                <th className="px-4 py-3 text-right">Paid Today</th>
+                <th className="px-4 py-3 text-right">Total Paid</th>
                 <th className="px-4 py-3 text-left">KYC</th>
                 <th className="px-4 py-3 text-left">Joined</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(d => (
-                <tr key={d.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-800">{d.full_name}</td>
+                <tr key={d.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailDriver(d.id)}>
+                  <td className="px-4 py-3 font-medium text-indigo-700 hover:underline">{d.full_name}</td>
                   <td className="px-4 py-3 text-gray-500">{d.mobile_number}</td>
                   <td className="px-4 py-3 text-gray-500">{d.owner_name || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{d.company_name || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{d.vehicle_number || '—'}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{fmt(d.paid_today)}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{fmt(d.total_paid)}</td>
                   <td className="px-4 py-3"><Badge status={d.kyc_status} /></td>
                   <td className="px-4 py-3 text-gray-400">{timeSince(d.created_at)}</td>
                 </tr>
@@ -554,30 +1034,362 @@ function AllDrivers() {
           {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No drivers found</p>}
         </div>
       )}
+
+      {detailDriver && (
+        <DriverDetailModal driverId={detailDriver} onClose={() => setDetailDriver(null)} />
+      )}
     </div>
   );
 }
 
-// ── MAIN ADMIN PANEL ──────────────────────────────────────────
+// ── TRANSACTIONS ──────────────────────────────────────────────────────────────
+function Transactions() {
+  const [rows, setRows]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch]   = useState('');
+  const [status, setStatus]   = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]   = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (search)   params.set('search',   search);
+    if (status !== 'ALL') params.set('status', status);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo)   params.set('dateTo',   dateTo);
+    api(`/api/admin/transactions?${params}`)
+      .then(d => { setRows(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [search, status, dateFrom, dateTo]);
+
+  useEffect(() => { load(); }, []); // eslint-disable-line
+
+  const totalSuccess = rows.filter(r => r.transaction_status === 'SUCCESS').reduce((s, r) => s + parseFloat(r.order_amount || 0), 0);
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">Transactions</h2>
+
+      <div className="flex flex-wrap gap-2">
+        <input type="text" placeholder="Search order ID, phone…" value={search} onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-48 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        <select value={status} onChange={e => setStatus(e.target.value)}
+          className="px-3 py-2 border rounded-lg text-sm focus:outline-none">
+          <option value="ALL">All Status</option>
+          <option value="SUCCESS">Success</option>
+          <option value="FAILED">Failed</option>
+          <option value="PENDING">Pending</option>
+        </select>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+          className="px-3 py-2 border rounded-lg text-sm focus:outline-none" />
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+          className="px-3 py-2 border rounded-lg text-sm focus:outline-none" />
+        <button onClick={load}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+          Apply
+        </button>
+      </div>
+
+      {!loading && (
+        <div className="flex gap-4 text-sm text-gray-600">
+          <span><strong>{rows.length}</strong> records</span>
+          <span className="text-green-700"><strong>{fmt(totalSuccess)}</strong> total successful</span>
+        </div>
+      )}
+
+      {loading ? <Spinner /> : (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Date</th>
+                <th className="px-4 py-3 text-left">Driver</th>
+                <th className="px-4 py-3 text-left">Owner</th>
+                <th className="px-4 py-3 text-right">Amount</th>
+                <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">Order ID</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((r, i) => (
+                <tr key={r.id || i} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-500">{fmtDate(r.order_initiation_date)}</td>
+                  <td className="px-4 py-3 text-gray-700">{r.driver_name || r.payer_mobile || '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{r.owner_name || '—'}</td>
+                  <td className="px-4 py-3 text-right font-medium text-gray-800">{fmt(r.order_amount)}</td>
+                  <td className="px-4 py-3"><Badge status={r.transaction_status} /></td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">{r.order_id || r.pg_transaction_id || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length === 0 && <p className="text-center text-gray-400 py-8">No transactions found</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AUDIT LOG ─────────────────────────────────────────────────────────────────
+function AuditLog() {
+  const [logs, setLogs]       = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api('/api/admin/audit-log')
+      .then(d => { setLogs(d.logs || d || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const actionColors = {
+    KYC_APPROVED:           'text-green-600',
+    KYC_REJECTED:           'text-red-600',
+    COMPANY_STATUS_CHANGED: 'text-blue-600',
+    COMPANY_CREATED:        'text-indigo-600',
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">Audit Log</h2>
+
+      {loading ? <Spinner /> : (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Time</th>
+                <th className="px-4 py-3 text-left">Action</th>
+                <th className="px-4 py-3 text-left">Entity</th>
+                <th className="px-4 py-3 text-left">By</th>
+                <th className="px-4 py-3 text-left">Details</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {logs.map(l => {
+                let details = '';
+                try { details = typeof l.details === 'string' ? JSON.stringify(JSON.parse(l.details), null, 0) : JSON.stringify(l.details); }
+                catch { details = String(l.details || ''); }
+                return (
+                  <tr key={l.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{timeSince(l.created_at)}</td>
+                    <td className={`px-4 py-3 font-medium ${actionColors[l.action] || 'text-gray-700'}`}>{l.action}</td>
+                    <td className="px-4 py-3 text-gray-500">{l.entity_type} #{l.entity_id}</td>
+                    <td className="px-4 py-3 text-gray-500">{l.performed_by}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{details}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {logs.length === 0 && <p className="text-center text-gray-400 py-8">No audit events yet</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── CHAT VIEWER ───────────────────────────────────────────────────────────────
+function ChatViewer() {
+  const [threads, setThreads]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [q, setQ]               = useState('');
+
+  useEffect(() => {
+    api('/api/admin/chat/threads')
+      .then(d => { setThreads(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const openThread = (thread) => {
+    setSelected(thread);
+    setMsgLoading(true);
+    api(`/api/admin/chat/messages?driver_id=${thread.driver_id}`)
+      .then(d => { setMessages(Array.isArray(d) ? d : []); setMsgLoading(false); })
+      .catch(() => setMsgLoading(false));
+  };
+
+  const filtered = threads.filter(t =>
+    !q ||
+    t.driver_name?.toLowerCase().includes(q.toLowerCase()) ||
+    t.owner_name?.toLowerCase().includes(q.toLowerCase()) ||
+    t.driver_phone?.includes(q)
+  );
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">Chat Viewer</h2>
+      <p className="text-sm text-gray-500">Read-only view of all owner ↔ driver conversations.</p>
+
+      <div className="flex gap-4 h-[600px]">
+        {/* Thread list */}
+        <div className="w-72 flex flex-col bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div className="p-3 border-b">
+            <input type="text" placeholder="Search…" value={q} onChange={e => setQ(e.target.value)}
+              className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {loading ? <Spinner /> : filtered.map(t => (
+              <button key={t.driver_id} onClick={() => openThread(t)}
+                className={`w-full text-left px-4 py-3 border-b hover:bg-indigo-50 transition ${selected?.driver_id === t.driver_id ? 'bg-indigo-50 border-l-2 border-l-indigo-500' : ''}`}>
+                <p className="font-medium text-gray-800 text-sm truncate">{t.driver_name}</p>
+                <p className="text-xs text-gray-500 truncate">Owner: {t.owner_name || '—'}</p>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">{t.last_message}</p>
+                <p className="text-xs text-gray-300 mt-0.5">{timeSince(t.last_at)}</p>
+              </button>
+            ))}
+            {!loading && filtered.length === 0 && (
+              <p className="text-center text-gray-400 py-8 text-sm">No conversations</p>
+            )}
+          </div>
+        </div>
+
+        {/* Message view */}
+        <div className="flex-1 bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
+          {!selected ? (
+            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+              Select a conversation to view messages
+            </div>
+          ) : (
+            <>
+              <div className="px-4 py-3 border-b bg-gray-50">
+                <p className="font-semibold text-gray-800">{selected.driver_name} ↔ {selected.owner_name}</p>
+                <p className="text-xs text-gray-500">{selected.driver_phone}</p>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {msgLoading ? <Spinner /> : messages.map(m => (
+                  <div key={m.id} className={`flex ${m.sender_type === 'OWNER' ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-xs rounded-xl px-4 py-2 text-sm shadow-sm ${m.sender_type === 'OWNER' ? 'bg-gray-100 text-gray-800' : 'bg-indigo-600 text-white'}`}>
+                      <p>{m.message}</p>
+                      <p className={`text-xs mt-1 ${m.sender_type === 'OWNER' ? 'text-gray-400' : 'text-indigo-200'}`}>
+                        {m.sender_type === 'OWNER' ? m.owner_name : m.driver_name} · {timeSince(m.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {!msgLoading && messages.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-8">No messages in this thread</p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── OWNERS (standalone tab) ───────────────────────────────────────────────────
+function AllOwners() {
+  const [owners, setOwners]     = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [q, setQ]               = useState('');
+  const [detailOwner, setDetailOwner] = useState(null);
+  const [detailDriver, setDetailDriver] = useState(null);
+
+  useEffect(() => {
+    // Fetch all companies first, then owners for each — or use companies/:id/owners
+    // Use platform-stats to check if there's an all-owners endpoint
+    // Actually let's use a combined approach: fetch companies then owners
+    api('/api/admin/companies')
+      .then(async (cos) => {
+        const list = cos.data || cos || [];
+        const allOwners = await Promise.all(
+          list.map(c => api(`/api/admin/companies/${c.id}/owners`).catch(() => []))
+        );
+        const flat = allOwners.flat().filter((o, i, arr) => arr.findIndex(x => x.id === o.id) === i);
+        setOwners(flat);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const filtered = owners.filter(o =>
+    !q ||
+    o.full_name?.toLowerCase().includes(q.toLowerCase()) ||
+    o.mobile_number?.includes(q) ||
+    o.owner_code?.toLowerCase().includes(q.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">Fleet Owners
+        <span className="ml-2 text-sm font-normal text-gray-400">({owners.length})</span>
+      </h2>
+      <input type="text" placeholder="Search name, phone, owner code…" value={q} onChange={e => setQ(e.target.value)}
+        className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+
+      {loading ? <Spinner /> : (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Owner</th>
+                <th className="px-4 py-3 text-left">Phone</th>
+                <th className="px-4 py-3 text-left">Code</th>
+                <th className="px-4 py-3 text-right">Drivers</th>
+                <th className="px-4 py-3 text-right">Vehicles</th>
+                <th className="px-4 py-3 text-right">Total Collection</th>
+                <th className="px-4 py-3 text-right">This Month</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map(o => (
+                <tr key={o.id} className="hover:bg-indigo-50 cursor-pointer" onClick={() => setDetailOwner(o.id)}>
+                  <td className="px-4 py-3 font-medium text-indigo-700 hover:underline">{o.full_name}</td>
+                  <td className="px-4 py-3 text-gray-500">{o.mobile_number}</td>
+                  <td className="px-4 py-3 text-gray-400 font-mono text-xs">{o.owner_code}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{o.total_drivers || 0}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{o.total_vehicles || 0}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{fmt(o.collection_total)}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{fmt(o.collection_month)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No owners found</p>}
+        </div>
+      )}
+
+      {detailOwner && !detailDriver && (
+        <OwnerDetailModal ownerId={detailOwner} onClose={() => setDetailOwner(null)} onSelectDriver={id => setDetailDriver(id)} />
+      )}
+      {detailDriver && (
+        <DriverDetailModal driverId={detailDriver} onClose={() => setDetailDriver(null)} />
+      )}
+    </div>
+  );
+}
+
+// ── MAIN ADMIN PANEL ──────────────────────────────────────────────────────────
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
-  const [tab, setTab] = useState('dashboard');
+  const [tab, setTab]               = useState('dashboard');
 
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
   const navItems = [
-    { key: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { key: 'companies', label: 'Companies', icon: '🏢' },
-    { key: 'kyc', label: 'KYC Review', icon: '🪪' },
-    { key: 'drivers', label: 'All Drivers', icon: '🚗' },
+    { key: 'dashboard',    label: 'Dashboard',     icon: '📊' },
+    { key: 'companies',    label: 'Companies',      icon: '🏢' },
+    { key: 'owners',       label: 'Owners',         icon: '👤' },
+    { key: 'drivers',      label: 'All Drivers',    icon: '🚗' },
+    { key: 'kyc',          label: 'KYC Review',     icon: '🪪' },
+    { key: 'transactions', label: 'Transactions',   icon: '💳' },
+    { key: 'chat',         label: 'Chat',           icon: '💬' },
+    { key: 'audit',        label: 'Audit Log',      icon: '📋' },
   ];
 
   const logout = () => { clearToken(); window.location.href = '/login'; };
 
+  const tabLabel = navItems.find(n => n.key === tab)?.label || tab;
+
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
       {/* Sidebar */}
-      <aside className="w-56 bg-gray-900 flex flex-col">
+      <aside className="w-56 bg-gray-900 flex flex-col shrink-0">
         <div className="p-5 border-b border-gray-700">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>
@@ -587,7 +1399,7 @@ function AdminPanelInner() {
             </div>
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {navItems.map(item => (
             <button key={item.key} onClick={() => setTab(item.key)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
@@ -598,7 +1410,8 @@ function AdminPanelInner() {
           ))}
         </nav>
         <div className="p-3 border-t border-gray-700">
-          <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition">
+          <button onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition">
             <span>🚪</span> Logout
           </button>
         </div>
@@ -606,15 +1419,19 @@ function AdminPanelInner() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-700 capitalize">{tab === 'kyc' ? 'KYC Review' : tab}</h1>
-          <span className="text-xs text-gray-400">Admin Panel · MobilityGrid</span>
+        <header className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+          <h1 className="text-lg font-semibold text-gray-700">{tabLabel}</h1>
+          <span className="text-xs text-gray-400">Super Admin · MobilityGrid</span>
         </header>
         <div className="p-6">
-          {tab === 'dashboard' && <Dashboard />}
-          {tab === 'companies' && <Companies />}
-          {tab === 'kyc' && <KycReview />}
-          {tab === 'drivers' && <AllDrivers />}
+          {tab === 'dashboard'    && <Dashboard />}
+          {tab === 'companies'    && <Companies />}
+          {tab === 'owners'       && <AllOwners />}
+          {tab === 'drivers'      && <AllDrivers />}
+          {tab === 'kyc'          && <KycReview />}
+          {tab === 'transactions' && <Transactions />}
+          {tab === 'chat'         && <ChatViewer />}
+          {tab === 'audit'        && <AuditLog />}
         </div>
       </main>
     </div>

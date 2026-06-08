@@ -635,6 +635,73 @@ router.get('/audit-log', async (req, res) => {
   }
 });
 
-module.exports = router;
+// ─── ALL DRIVERS (platform-wide flat list) ───────────────────────────────────
+router.get('/all-drivers', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        d.id, d.full_name, d.mobile_number, d.driver_code, d.status,
+        d.kyc_status, d.created_at, d.driving_license_number,
+        d.wallet_balance, d.security_deposit, d.advance_balance,
+        o.full_name   AS owner_name, o.mobile_number AS owner_phone, o.owner_code,
+        c.name        AS company_name, c.city AS company_city,
+        v.vehicle_number, v.vehicle_model,
+        COALESCE(SUM(mo.order_amount),0)::float                                          AS total_paid,
+        COALESCE(SUM(CASE WHEN DATE(mo.order_initiation_date)=CURRENT_DATE THEN mo.order_amount END),0)::float AS paid_today,
+        COALESCE(SUM(CASE WHEN DATE_TRUNC('month',mo.order_initiation_date)=DATE_TRUNC('month',NOW()) THEN mo.order_amount END),0)::float AS paid_month,
+        COUNT(DISTINCT mo.id)::int                                                       AS total_transactions
+      FROM public.drivers d
+      LEFT JOIN public.owners    o  ON o.owner_code = d.owner_code
+      LEFT JOIN public.companies c  ON c.id = o.company_id
+      LEFT JOIN public.vehicles  v  ON v.driver_id = d.id
+      LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status = 'SUCCESS'
+      GROUP BY d.id, o.full_name, o.mobile_number, o.owner_code, c.name, c.city, v.vehicle_number, v.vehicle_model
+      ORDER BY d.created_at DESC
+      LIMIT 1000
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── ADMIN CHAT — all threads ─────────────────────────────────────────────────
+router.get('/chat/threads', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT ON (cm.driver_id)
+        cm.driver_id,
+        d.full_name   AS driver_name,
+        d.mobile_number AS driver_phone,
+        o.full_name   AS owner_name,
+        o.id          AS owner_id,
+        cm.message    AS last_message,
+        cm.sender_type AS last_sender,
+        cm.created_at AS last_at
+      FROM public.chat_messages cm
+      JOIN  public.drivers d ON d.id = cm.driver_id
+      LEFT JOIN public.owners  o ON o.id = cm.owner_id
+      ORDER BY cm.driver_id, cm.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── ADMIN CHAT — messages for a thread ──────────────────────────────────────
+router.get('/chat/messages', async (req, res) => {
+  try {
+    const { driver_id } = req.query;
+    if (!driver_id) return res.status(400).json({ error: 'driver_id required' });
+    const result = await pool.query(`
+      SELECT cm.id, cm.sender_type, cm.message, cm.is_read, cm.created_at,
+             d.full_name AS driver_name,
+             o.full_name AS owner_name
+      FROM public.chat_messages cm
+      JOIN  public.drivers d ON d.id = cm.driver_id
+      LEFT JOIN public.owners  o ON o.id = cm.owner_id
+      WHERE cm.driver_id = $1
+      ORDER BY cm.created_at ASC
+    `, [driver_id]);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 module.exports = router;
