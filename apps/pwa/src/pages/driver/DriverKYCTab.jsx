@@ -177,36 +177,44 @@ export default function DriverKYCTab() {
               </div>
             )}
 
-            {/* Upload buttons */}
+            {/* Upload buttons — KYC-08: re-upload on rejection */}
             {!isLocked && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => triggerUpload(doc.key, true)}
-                  disabled={isUploading}
-                  className="flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors"
-                  style={{
-                    borderColor: '#8B5E3C',
-                    color: '#8B5E3C',
-                    backgroundColor: isUploading ? '#F5F5F5' : 'white',
-                    opacity: isUploading ? 0.7 : 1,
-                    cursor: isUploading ? 'not-allowed' : 'pointer',
-                  }}>
-                  {isUploading ? '⏳ Uploading…' : '📷 Take Photo'}
-                </button>
-                <button
-                  onClick={() => triggerUpload(doc.key, false)}
-                  disabled={isUploading}
-                  className="flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors"
-                  style={{
-                    borderColor: '#8B5E3C',
-                    color: '#8B5E3C',
-                    backgroundColor: isUploading ? '#F5F5F5' : 'white',
-                    opacity: isUploading ? 0.7 : 1,
-                    cursor: isUploading ? 'not-allowed' : 'pointer',
-                  }}>
-                  {isUploading ? '⏳' : '📁 Upload File'}
-                </button>
-              </div>
+              <>
+                {existing?.status === 'rejected' && (
+                  <div className="mb-2 bg-orange-50 border border-orange-200 rounded-xl p-2 text-center">
+                    <p className="text-xs font-bold text-orange-600 mb-1">⚠️ Re-upload required</p>
+                    <p className="text-[10px] text-orange-500">Fix the issue above and upload a new photo</p>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => triggerUpload(doc.key, true)}
+                    disabled={isUploading}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors"
+                    style={{
+                      borderColor: existing?.status === 'rejected' ? '#F97316' : '#8B5E3C',
+                      color:       existing?.status === 'rejected' ? '#F97316' : '#8B5E3C',
+                      backgroundColor: isUploading ? '#F5F5F5' : 'white',
+                      opacity: isUploading ? 0.7 : 1,
+                      cursor: isUploading ? 'not-allowed' : 'pointer',
+                    }}>
+                    {isUploading ? '⏳ Uploading…' : existing?.status === 'rejected' ? '📷 Re-take Photo' : '📷 Take Photo'}
+                  </button>
+                  <button
+                    onClick={() => triggerUpload(doc.key, false)}
+                    disabled={isUploading}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors"
+                    style={{
+                      borderColor: existing?.status === 'rejected' ? '#F97316' : '#8B5E3C',
+                      color:       existing?.status === 'rejected' ? '#F97316' : '#8B5E3C',
+                      backgroundColor: isUploading ? '#F5F5F5' : 'white',
+                      opacity: isUploading ? 0.7 : 1,
+                      cursor: isUploading ? 'not-allowed' : 'pointer',
+                    }}>
+                    {isUploading ? '⏳' : existing?.status === 'rejected' ? '📁 Re-upload File' : '📁 Upload File'}
+                  </button>
+                </div>
+              </>
             )}
 
             {isLocked && (

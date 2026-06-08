@@ -2,6 +2,29 @@ require('dotenv').config();
 
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
+const notify = require('../services/notify');
+
+// ── Webhook HMAC verifier ─────────────────────────────────────────────────────
+// Set PAYANTRA_WEBHOOK_SECRET in Render env once PayYantra confirms the value.
+// Until then, the check is skipped (logs a warning).
+const verifyWebhookSignature = (req) => {
+  const secret = process.env.PAYANTRA_WEBHOOK_SECRET;
+  if (!secret) {
+    console.warn('⚠️  PAYANTRA_WEBHOOK_SECRET not set — skipping signature check');
+    return true;
+  }
+  const received = req.headers['x-payantra-signature'] ||
+                   req.headers['x-webhook-signature']  ||
+                   req.headers['x-signature'];
+  if (!received) {
+    console.warn('⚠️  Webhook received with no signature header');
+    return false;
+  }
+  const payload  = JSON.stringify(req.body);
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected));
+};
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/db');
 const { verifyToken, requirePermission } = require('../middleware/auth');
@@ -1901,10 +1924,14 @@ router.get('/chat/unread', async (req, res) => {
 // WEBHOOK
 router.post('/webhook', async (req, res) => {
 
+  // PAY-03 security: HMAC-SHA256 signature verification
+  if (!verifyWebhookSignature(req)) {
+    console.error('❌ Webhook signature mismatch — rejected');
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
   const body = req.body;
-
-  console.log('Webhook received:', body);
-
+  console.log('Webhook received:', body?.data?.referenceId || body?.referenceId || 'unknown');
 
   try {
 
@@ -1980,6 +2007,11 @@ if (driverUser.rows.length === 0) {
 );
     
     console.log(`📢 Notification sent to DRIVER ${driverPhone}`);
+
+    // PAY-04: WhatsApp confirmation to driver
+    notify.send(driverPhone,
+      `✅ MobilityGrid: Payment of ₹${amount} received successfully. Your wallet has been updated.`
+    ).catch(() => {});
     
     // ============================================
     // 3. GET OWNER AND SEND NOTIFICATION

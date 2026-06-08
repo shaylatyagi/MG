@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../api';
 
 const KYC_COLOR = {
@@ -9,18 +9,28 @@ const KYC_COLOR = {
 };
 
 export default function OwnerDriversTab({ lang }) {
-  const [drivers, setDrivers]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [selected, setSelected] = useState(null);
-  const [showAdd, setShowAdd]   = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState('');
-  const [form, setForm]         = useState({ name: '', phone_number: '', emergency_contact: '' });
+  const [drivers, setDrivers]       = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [selected, setSelected]     = useState(null);
+  const [showAdd, setShowAdd]       = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState('');
+  const [form, setForm]             = useState({ name: '', phone_number: '', emergency_contact: '' });
+  const [importing, setImporting]   = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [search, setSearch]         = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [profile, setProfile]       = useState({});   // { [driverId]: profileData }
+  const [profileLoading, setProfileLoading] = useState({});
+  const fileInputRef                = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/api/owner/drivers');
+      const params = {};
+      if (search.trim()) params.q = search.trim();
+      if (statusFilter)  params.status = statusFilter;
+      const res = await api.get('/api/owner/drivers', { params });
       const data = res.data?.data ?? res.data;
       setDrivers(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -28,7 +38,7 @@ export default function OwnerDriversTab({ lang }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -52,6 +62,50 @@ export default function OwnerDriversTab({ lang }) {
     }
   };
 
+  const downloadTemplate = () => {
+    const csv = 'name,phone_number,emergency_contact\nSuresh Kumar,9876543210,9876543211\nRaj Verma,9876543212,';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href = url; a.download = 'driver_import_template.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportCSV = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setImporting(true);
+    setImportResult(null);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await api.post('/api/owner/drivers/bulk-import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const d = res.data?.data || res.data;
+      setImportResult(d);
+      if (d.created > 0) load();
+    } catch (e) {
+      setImportResult({ error: e.response?.data?.message || 'Import failed' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const loadProfile = async (driverId) => {
+    if (profile[driverId]) return; // already loaded
+    setProfileLoading(prev => ({ ...prev, [driverId]: true }));
+    try {
+      const res = await api.get(`/api/owner/drivers/${driverId}/profile`);
+      const data = res.data?.data ?? res.data;
+      setProfile(prev => ({ ...prev, [driverId]: data }));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setProfileLoading(prev => ({ ...prev, [driverId]: false }));
+    }
+  };
+
   const fmt = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN')}`;
 
   if (loading) return (
@@ -64,18 +118,67 @@ export default function OwnerDriversTab({ lang }) {
 
   return (
     <div style={{ padding: '16px' }}>
+      {/* Hidden CSV file input */}
+      <input type="file" accept=".csv,text/csv" style={{ display: 'none' }}
+        ref={fileInputRef} onChange={handleImportCSV} />
+
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
         <p style={{ fontSize: '15px', fontWeight: '700', color: '#1A1A1A', margin: 0 }}>
           {lang === 'en' ? 'Driver Management' : 'ड्राइवर प्रबंधन'} ({drivers.length})
         </p>
-        <button
-          onClick={() => { setShowAdd(true); setError(''); }}
-          style={{ padding: '8px 16px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '8px', fontSize: '13px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
-        >
-          + {lang === 'en' ? 'Add Driver' : 'ड्राइवर जोड़ें'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={downloadTemplate}
+            style={{ padding: '8px 12px', backgroundColor: 'white', color: '#8B5E3C', borderRadius: '8px', fontSize: '12px', fontWeight: '600', border: '1px solid #8B5E3C', cursor: 'pointer' }}>
+            ⬇ Template
+          </button>
+          <button onClick={() => fileInputRef.current?.click()} disabled={importing}
+            style={{ padding: '8px 12px', backgroundColor: importing ? '#C49A6C' : '#5B4FCF', color: 'white', borderRadius: '8px', fontSize: '12px', fontWeight: '600', border: 'none', cursor: importing ? 'not-allowed' : 'pointer' }}>
+            {importing ? '⏳ Importing…' : '📂 Import CSV'}
+          </button>
+          <button onClick={() => { setShowAdd(true); setError(''); }}
+            style={{ padding: '8px 16px', backgroundColor: '#8B5E3C', color: 'white', borderRadius: '8px', fontSize: '13px', fontWeight: '600', border: 'none', cursor: 'pointer' }}>
+            + {lang === 'en' ? 'Add Driver' : 'ड्राइवर जोड़ें'}
+          </button>
+        </div>
       </div>
+
+      {/* DRV-06: Search + Filter */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="🔍 Search name or phone…"
+          style={{ flex: 1, padding: '9px 12px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', outline: 'none' }}
+        />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          style={{ padding: '9px 10px', borderRadius: '8px', border: '1px solid #E8E0D5', fontSize: '13px', color: '#6B6B6B', background: 'white' }}>
+          <option value=''>All Status</option>
+          <option value='ACTIVE'>Active</option>
+          <option value='INACTIVE'>Inactive</option>
+        </select>
+      </div>
+
+      {/* Import Result */}
+      {importResult && (
+        <div style={{ backgroundColor: importResult.error ? '#FEE2E2' : '#F0FDF4', border: `1px solid ${importResult.error ? '#FCA5A5' : '#86EFAC'}`, borderRadius: '10px', padding: '12px 16px', marginBottom: '14px', fontSize: '13px' }}>
+          {importResult.error
+            ? <p style={{ color: '#DC2626', margin: 0 }}>❌ {importResult.error}</p>
+            : <>
+                <p style={{ fontWeight: '700', color: '#16A34A', margin: '0 0 4px' }}>✅ Import Complete</p>
+                <p style={{ margin: '0 0 2px', color: '#374151' }}>Total rows: {importResult.total} &nbsp;|&nbsp; Created: <strong>{importResult.created}</strong> &nbsp;|&nbsp; Skipped: {importResult.skipped}</p>
+                {importResult.errors?.length > 0 && (
+                  <details style={{ marginTop: '6px' }}>
+                    <summary style={{ cursor: 'pointer', color: '#D97706', fontSize: '12px' }}>{importResult.errors.length} row{importResult.errors.length !== 1 ? 's' : ''} had issues</summary>
+                    <ul style={{ margin: '4px 0 0', paddingLeft: '16px', color: '#6B7280', fontSize: '12px' }}>
+                      {importResult.errors.map((e, i) => <li key={i}>Row {e.row}: {e.reason}</li>)}
+                    </ul>
+                  </details>
+                )}
+              </>
+          }
+          <button onClick={() => setImportResult(null)} style={{ marginTop: '8px', background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: '12px' }}>Dismiss</button>
+        </div>
+      )}
 
       {/* Add Driver Form */}
       {showAdd && (
@@ -122,7 +225,7 @@ export default function OwnerDriversTab({ lang }) {
         const kycStyle = KYC_COLOR[d.kyc_status] || KYC_COLOR.PENDING;
         const isPaid   = parseFloat(d.paid_today || 0) >= parseFloat(d.daily_rent || 1);
         return (
-          <div key={d.id} onClick={() => setSelected(selected === d.id ? null : d.id)}
+          <div key={d.id} onClick={() => { const next = selected === d.id ? null : d.id; setSelected(next); if (next) loadProfile(next); }}
             style={{ backgroundColor: 'white', borderRadius: '12px', padding: '16px', marginBottom: '10px', border: '1px solid #E8E0D5', cursor: 'pointer' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -156,6 +259,7 @@ export default function OwnerDriversTab({ lang }) {
 
             {selected === d.id && (
               <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #E8E0D5' }}>
+                {/* Basic stats */}
                 {[
                   [lang === 'en' ? 'This month' : 'इस महीने', fmt(d.paid_month)],
                   [lang === 'en' ? 'Wallet balance' : 'वॉलेट बैलेंस', fmt(d.wallet_balance)],
@@ -165,6 +269,51 @@ export default function OwnerDriversTab({ lang }) {
                     <p style={{ fontSize: '12px', fontWeight: '700', color: '#8B5E3C', margin: 0 }}>{val}</p>
                   </div>
                 ))}
+
+                {/* DRV-05: Profile — last payments + assignment history */}
+                {profileLoading[d.id] ? (
+                  <p style={{ fontSize: '11px', color: '#9CA3AF', textAlign: 'center', margin: '8px 0' }}>Loading profile…</p>
+                ) : profile[d.id] && (
+                  <>
+                    {/* Last payments */}
+                    {profile[d.id].payments?.length > 0 && (
+                      <div style={{ marginTop: '10px' }}>
+                        <p style={{ fontSize: '11px', fontWeight: '700', color: '#6B6B6B', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          Last Payments
+                        </p>
+                        {profile[d.id].payments.slice(0, 5).map(p => (
+                          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <p style={{ fontSize: '11px', color: '#6B6B6B', margin: 0 }}>
+                              {new Date(p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                              {' · '}{p.payment_mode || 'UPI'}
+                            </p>
+                            <p style={{ fontSize: '11px', fontWeight: '700', color: '#16A34A', margin: 0 }}>{fmt(p.amount)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Assignment history */}
+                    {profile[d.id].assignments?.length > 0 && (
+                      <div style={{ marginTop: '10px' }}>
+                        <p style={{ fontSize: '11px', fontWeight: '700', color: '#6B6B6B', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          Vehicle History
+                        </p>
+                        {profile[d.id].assignments.slice(0, 3).map(a => (
+                          <div key={a.id} style={{ backgroundColor: '#F9F6F2', borderRadius: '6px', padding: '6px 8px', marginBottom: '4px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A1A1A', margin: 0 }}>{a.reg_number || '—'}</p>
+                              <p style={{ fontSize: '11px', color: '#8B5E3C', fontWeight: '600', margin: 0 }}>{fmt(a.rent_amount)}/day</p>
+                            </div>
+                            <p style={{ fontSize: '10px', color: '#9CA3AF', margin: '2px 0 0' }}>
+                              {new Date(a.assigned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
+                              {a.unassigned_at ? ` → ${new Date(a.unassigned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}` : ' → Active'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>

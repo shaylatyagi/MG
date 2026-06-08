@@ -5,6 +5,7 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/db');
 const { verifyToken } = require('../middleware/auth');
+const notify  = require('../services/notify');
 
 // All owner routes require a valid JWT
 router.use(verifyToken);
@@ -153,11 +154,27 @@ router.post('/vehicles', async (req, res) => {
 });
 
 // ─── DRIVERS ──────────────────────────────────────────────────────────────────
-// GET /api/owner/drivers
+// GET /api/owner/drivers?q=&status=&page=1&limit=50
 router.get('/drivers', async (req, res) => {
   try {
     const owner = await getOwner(req.user.id);
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const { q, status, page = 1, limit = 50 } = req.query;
+    const params = [owner.id];
+    const conditions = ['d.owner_id = $1', 'd.deleted_at IS NULL'];
+
+    if (q) {
+      params.push(`%${q.trim()}%`);
+      conditions.push(`(d.name ILIKE $${params.length} OR d.phone_number ILIKE $${params.length})`);
+    }
+    if (status) {
+      params.push(status.toUpperCase());
+      conditions.push(`d.status = $${params.length}`);
+    }
+
+    const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+    params.push(parseInt(limit), offset);
 
     const result = await pool.query(
       `SELECT d.id, d.name, d.phone_number, d.status, d.kyc_status,
@@ -180,9 +197,10 @@ router.get('/drivers', async (req, res) => {
               ) AS paid_month
        FROM drivers d
        LEFT JOIN vehicles v ON v.id = d.assigned_vehicle_id
-       WHERE d.owner_id = $1 AND d.deleted_at IS NULL
-       ORDER BY d.created_at DESC`,
-      [owner.id]
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY d.created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
     );
     res.json({ success: true, data: result.rows });
   } catch (err) {
@@ -217,6 +235,13 @@ router.post('/drivers', async (req, res) => {
       [owner.id, owner.company_id, name.trim(), phone_number,
        emergency_contact || null]
     );
+
+    // DRV-01: WhatsApp welcome (fire-and-forget)
+    notify.send(phone_number,
+      `👋 Welcome to MobilityGrid! Hi ${name.trim()}, you've been added to your fleet. ` +
+      `Download the driver app and complete your KYC to get started.`
+    ).catch(() => {});
+
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error('owner/drivers POST:', err);
@@ -252,6 +277,15 @@ router.post('/assign', async (req, res) => {
       return res.status(409).json({ success: false, message: 'Driver already has an assigned vehicle' });
     if (vehicle.status !== 'AVAILABLE')
       return res.status(409).json({ success: false, message: 'Vehicle is not available' });
+
+    // KYC-09: block assignment if KYC not approved (unless owner has override enabled)
+    const ownerSettings = await pool.query(
+      'SELECT kyc_required_for_assignment FROM owners WHERE id = $1', [owner.id]
+    );
+    const kycRequired = ownerSettings.rows[0]?.kyc_required_for_assignment !== false;
+    const driverKyc = await pool.query('SELECT kyc_status FROM drivers WHERE id = $1', [driver.id]);
+    if (kycRequired && driverKyc.rows[0]?.kyc_status !== 'APPROVED')
+      return res.status(422).json({ success: false, message: 'Driver KYC not approved. Complete KYC before assignment or disable KYC requirement in settings.' });
 
     const effectiveRent = parseFloat(rent_amount) || vehicle.daily_rent;
 
@@ -336,6 +370,19 @@ router.post('/unassign', async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    // INC-05: WhatsApp incentive notification (fire-and-forget)
+    try {
+      const driverInfo = await pool.query(
+        'SELECT name, phone_number FROM drivers WHERE id = $1', [driver.id]
+      );
+      if (driverInfo.rows[0]?.phone_number) {
+        notify.send(driverInfo.rows[0].phone_number,
+          `🏆 MobilityGrid: Hi ${driverInfo.rows[0].name}, you have been unassigned from your vehicle. If an incentive was earned, it has been applied to your wallet. Check the app for details.`
+        );
+      }
+    } catch (_) {}
+
     res.json({ success: true, message: 'Vehicle unassigned successfully' });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -377,6 +424,306 @@ router.get('/payments', async (req, res) => {
     res.json({ success: true, data: result.rows });
   } catch (err) {
     console.error('owner/payments GET:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── BULK CSV DRIVER IMPORT ───────────────────────────────────────────────────
+// POST /api/owner/drivers/bulk-import
+// Body: multipart/form-data, field "file" = CSV file
+// CSV format: name,phone_number,emergency_contact (header row required)
+const multer = require('multer');
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+
+router.post('/drivers/bulk-import', csvUpload.single('file'), async (req, res) => {
+  if (!req.file)
+    return res.status(400).json({ success: false, message: 'CSV file required (field: file)' });
+
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const text    = req.file.buffer.toString('utf8');
+    const lines   = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2)
+      return res.status(400).json({ success: false, message: 'CSV must have header + at least 1 data row' });
+
+    const headers  = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+    const nameIdx  = headers.indexOf('name');
+    const phoneIdx = headers.indexOf('phone_number');
+    const ecIdx    = headers.indexOf('emergency_contact');
+
+    if (nameIdx === -1 || phoneIdx === -1)
+      return res.status(400).json({ success: false, message: 'CSV must have "name" and "phone_number" columns' });
+
+    const results = { total: lines.length - 1, created: 0, skipped: 0, errors: [] };
+
+    for (let i = 0; i < lines.length - 1; i++) {
+      const cols  = lines[i + 1].split(',').map(c => c.trim().replace(/"/g, ''));
+      const name  = cols[nameIdx]  || '';
+      const phone = cols[phoneIdx] || '';
+      const ec    = ecIdx !== -1   ? (cols[ecIdx] || null) : null;
+
+      if (!name)                       { results.errors.push({ row: i + 2, reason: 'Name required' }); continue; }
+      if (!/^\d{10}$/.test(phone))     { results.errors.push({ row: i + 2, reason: `Invalid phone: ${phone}` }); continue; }
+
+      const dup = await pool.query('SELECT id FROM drivers WHERE phone_number = $1', [phone]);
+      if (dup.rows.length) { results.skipped++; results.errors.push({ row: i + 2, reason: `${phone} already exists` }); continue; }
+
+      try {
+        await pool.query(
+          `INSERT INTO drivers (owner_id, company_id, name, phone_number, emergency_contact,
+                                wallet_balance, status, kyc_status, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5, 0,'ACTIVE','PENDING',NOW(),NOW())`,
+          [owner.id, owner.company_id, name, phone, ec]
+        );
+        results.created++;
+      } catch (e) {
+        results.errors.push({ row: i + 2, reason: e.message });
+      }
+    }
+
+    res.json({ success: true, data: results });
+  } catch (err) {
+    console.error('bulk-import:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── EDIT CASH COLLECTION WITHIN 24H ─────────────────────────────────────────
+// PUT /api/owner/cash/:id
+// Body: { amount, notes }
+router.put('/cash/:id', async (req, res) => {
+  const { id } = req.params;
+  const { amount, notes } = req.body;
+  if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0)
+    return res.status(400).json({ success: false, message: 'Valid amount required' });
+
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    // Verify ownership + 24h window
+    const existing = await pool.query(
+      `SELECT id, amount, driver_id, created_at FROM cash_collections
+       WHERE id = $1 AND owner_id = $2`,
+      [id, owner.id]
+    );
+    if (!existing.rows.length)
+      return res.status(404).json({ success: false, message: 'Cash entry not found' });
+
+    const entry   = existing.rows[0];
+    const ageMs   = Date.now() - new Date(entry.created_at).getTime();
+    const MAX_MS  = 24 * 60 * 60 * 1000;
+    if (ageMs > MAX_MS)
+      return res.status(403).json({ success: false, message: 'Cannot edit — 24-hour window has passed' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Update cash_collections
+      await client.query(
+        `UPDATE cash_collections SET amount = $1, notes = $2, updated_at = NOW() WHERE id = $3`,
+        [parseFloat(amount), notes || entry.notes, id]
+      );
+
+      // Correct ledger: find the original CASH entry and adjust
+      const diff = parseFloat(amount) - parseFloat(entry.amount);
+      if (diff !== 0) {
+        await client.query(
+          `INSERT INTO driver_ledger (driver_id, entry_type, amount, description, created_at)
+           VALUES ($1, 'CASH', $2, $3, NOW())`,
+          [entry.driver_id, diff, `Cash correction (edit by owner) — ref #${id}`]
+        );
+        await client.query(
+          `UPDATE driver_wallet SET balance = balance + $1, updated_at = NOW() WHERE driver_id = $2`,
+          [diff, entry.driver_id]
+        );
+      }
+
+      await client.query('COMMIT');
+      res.json({ success: true, message: 'Cash entry updated' });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('cash PUT:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── VEH-03: MARK VEHICLE UNDER MAINTENANCE ──────────────────────────────────
+// PUT /api/owner/vehicles/:id/maintenance
+// Body: { reason, under_maintenance: true|false }
+router.put('/vehicles/:id/maintenance', async (req, res) => {
+  const { reason = '', under_maintenance = true } = req.body;
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const veh = await pool.query(
+      'SELECT id, status, driver_id FROM vehicles WHERE id = $1 AND owner_id = $2',
+      [req.params.id, owner.id]
+    );
+    if (!veh.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+
+    if (under_maintenance) {
+      if (veh.rows[0].driver_id)
+        return res.status(409).json({ success: false, message: 'Unassign the driver before marking maintenance' });
+      await pool.query(
+        `UPDATE vehicles SET status = 'MAINTENANCE', maintenance_reason = $1, updated_at = NOW() WHERE id = $2`,
+        [reason, req.params.id]
+      );
+    } else {
+      await pool.query(
+        `UPDATE vehicles SET status = 'AVAILABLE', maintenance_reason = NULL, updated_at = NOW() WHERE id = $1`,
+        [req.params.id]
+      );
+    }
+    res.json({ success: true, message: under_maintenance ? 'Vehicle marked under maintenance' : 'Vehicle available again' });
+  } catch (err) {
+    console.error('vehicles/maintenance:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── DRV-05: DRIVER PROFILE WITH ASSIGNMENT HISTORY ──────────────────────────
+// GET /api/owner/drivers/:id/profile
+router.get('/drivers/:id/profile', async (req, res) => {
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const [driverRow, paymentsRow, historyRow] = await Promise.all([
+      pool.query(
+        `SELECT d.*, v.reg_number AS vehicle_reg, v.type AS vehicle_type,
+                v.daily_rent AS vehicle_daily_rent
+         FROM drivers d
+         LEFT JOIN vehicles v ON v.id = d.assigned_vehicle_id
+         WHERE d.id = $1 AND d.owner_id = $2 AND d.deleted_at IS NULL`,
+        [req.params.id, owner.id]
+      ),
+      pool.query(
+        `SELECT id, amount, payment_mode, transaction_status, created_at
+         FROM ms_orders
+         WHERE driver_id = $1 AND transaction_status = 'SUCCESS'
+         ORDER BY created_at DESC LIMIT 30`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT dvh.id, dvh.assigned_at, dvh.unassigned_at,
+                dvh.rent_type, dvh.rent_amount, dvh.deposit_amount,
+                v.reg_number, v.type AS vehicle_type,
+                EXTRACT(EPOCH FROM (COALESCE(dvh.unassigned_at, NOW()) - dvh.assigned_at))/3600 AS hours_active
+         FROM driver_vehicle_history dvh
+         LEFT JOIN vehicles v ON v.id = dvh.vehicle_id
+         WHERE dvh.driver_id = $1
+         ORDER BY dvh.assigned_at DESC`,
+        [req.params.id]
+      ),
+    ]);
+
+    if (!driverRow.rows.length)
+      return res.status(404).json({ success: false, message: 'Driver not found' });
+
+    res.json({
+      success: true,
+      data: {
+        driver:      driverRow.rows[0],
+        payments:    paymentsRow.rows,
+        assignments: historyRow.rows,
+      },
+    });
+  } catch (err) {
+    console.error('drivers/profile:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── MGR-06: REVOKE MANAGER ACCESS ───────────────────────────────────────────
+// DELETE /api/owner/managers/:id
+router.delete('/managers/:id', async (req, res) => {
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const result = await pool.query(
+      `UPDATE managers SET status = 'REVOKED', updated_at = NOW()
+       WHERE id = $1 AND owner_id = $2 RETURNING id`,
+      [req.params.id, owner.id]
+    );
+    if (!result.rows.length)
+      return res.status(404).json({ success: false, message: 'Manager not found' });
+
+    res.json({ success: true, message: 'Manager access revoked' });
+  } catch (err) {
+    console.error('managers/revoke:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── KYC-09 OVERRIDE: TOGGLE KYC REQUIREMENT ─────────────────────────────────
+// PUT /api/owner/settings/kyc-required
+// Body: { required: true|false }
+router.put('/settings/kyc-required', async (req, res) => {
+  const { required } = req.body;
+  if (typeof required !== 'boolean')
+    return res.status(400).json({ success: false, message: 'required (boolean) is needed' });
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+    await pool.query(
+      'UPDATE owners SET kyc_required_for_assignment = $1, updated_at = NOW() WHERE id = $2',
+      [required, owner.id]
+    );
+    res.json({ success: true, message: `KYC requirement ${required ? 'enabled' : 'disabled'}` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── DSH-04: SOS ALERTS FOR OWNER ────────────────────────────────────────────
+// GET /api/owner/sos — unresolved SOS alerts
+// POST /api/owner/sos/:id/resolve — mark resolved
+router.get('/sos', async (req, res) => {
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const result = await pool.query(
+      `SELECT s.id, s.driver_id, s.lat, s.lng, s.created_at,
+              d.name AS driver_name, d.phone_number
+       FROM sos_alerts s
+       JOIN drivers d ON d.id = s.driver_id
+       WHERE s.owner_id = $1 AND s.resolved_at IS NULL
+       ORDER BY s.created_at DESC`,
+      [owner.id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/sos/:id/resolve', async (req, res) => {
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const result = await pool.query(
+      `UPDATE sos_alerts SET resolved_at = NOW()
+       WHERE id = $1 AND owner_id = $2 RETURNING id`,
+      [req.params.id, owner.id]
+    );
+    if (!result.rows.length)
+      return res.status(404).json({ success: false, message: 'SOS alert not found' });
+
+    res.json({ success: true, message: 'SOS resolved' });
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });

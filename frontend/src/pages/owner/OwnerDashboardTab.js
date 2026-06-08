@@ -2,27 +2,37 @@ import { useState, useEffect } from 'react';
 import api from '../../api';
 
 const fmt = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN')}`;
+const fmtTime = (ts) => {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) +
+    ', ' + d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+};
 
 export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
   const [stats, setStats]     = useState({
     total_vehicles: 0, total_drivers: 0, active_contracts: 0, pending_kyc: 0,
     collection_today: 0, collection_month: 0, outstanding: 0, collection_efficiency: 0,
   });
-  const [vehicles, setVehicles] = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [vehicles, setVehicles]   = useState([]);
+  const [sosAlerts, setSosAlerts] = useState([]);
+  const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true);
       try {
-        const [sRes, vRes] = await Promise.all([
+        const [sRes, vRes, sosRes] = await Promise.all([
           api.get('/api/owner/stats'),
           api.get('/api/owner/vehicles'),
+          api.get('/api/owner/sos').catch(() => ({ data: { data: [] } })),
         ]);
         const sData = sRes.data?.data ?? sRes.data;
         const vData = vRes.data?.data ?? vRes.data;
+        const sosData = sosRes.data?.data ?? [];
         if (sData) setStats(sData);
         setVehicles(Array.isArray(vData) ? vData : []);
+        setSosAlerts(Array.isArray(sosData) ? sosData : []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -31,6 +41,13 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
     };
     fetchAll();
   }, []);
+
+  const resolveSos = async (id) => {
+    try {
+      await api.post(`/api/owner/sos/${id}/resolve`);
+      setSosAlerts(prev => prev.filter(s => s.id !== id));
+    } catch (e) { console.error(e); }
+  };
 
   return (
     <div style={{ padding: '16px' }}>
@@ -80,6 +97,34 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
           </div>
         ))}
       </div>
+
+      {/* DSH-04: SOS Alerts */}
+      {sosAlerts.length > 0 && (
+        <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
+          <p style={{ fontSize: '13px', fontWeight: '800', color: '#DC2626', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            🆘 SOS Alerts ({sosAlerts.length})
+          </p>
+          {sosAlerts.map(s => (
+            <div key={s.id} style={{ backgroundColor: 'white', borderRadius: '10px', padding: '10px 12px', marginBottom: '8px', border: '1px solid #FCA5A5', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: '700', color: '#1A1A1A', margin: '0 0 2px' }}>{s.driver_name}</p>
+                <p style={{ fontSize: '11px', color: '#6B6B6B', margin: '0 0 2px' }}>{s.phone_number}</p>
+                {s.lat && s.lng && (
+                  <a href={`https://maps.google.com/?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer"
+                    style={{ fontSize: '11px', color: '#2563EB', textDecoration: 'none' }}>
+                    📍 {parseFloat(s.lat).toFixed(4)}, {parseFloat(s.lng).toFixed(4)}
+                  </a>
+                )}
+                <p style={{ fontSize: '10px', color: '#9CA3AF', margin: '2px 0 0' }}>{fmtTime(s.created_at)}</p>
+              </div>
+              <button onClick={() => resolveSos(s.id)}
+                style={{ flexShrink: 0, padding: '6px 12px', backgroundColor: '#DC2626', color: 'white', border: 'none', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                Resolve
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Vehicle list */}
       <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #E8E0D5' }}>

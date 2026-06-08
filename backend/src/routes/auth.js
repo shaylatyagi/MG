@@ -60,13 +60,17 @@ router.post('/send-otp', async (req, res) => {
     if (!userRes.rows[0])
       return res.status(404).json({ success: false, message: 'Phone registered nahi hai' });
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
     await pool.query('DELETE FROM otps WHERE phone_number = $1', [phone_number]);
     await pool.query(
       "INSERT INTO otps (phone_number, otp, expires_at) VALUES ($1, $2, NOW() + INTERVAL '10 minutes')",
-      [phone_number, otp]
+      [phone_number, otpHash]
     );
-    if (process.env.NODE_ENV !== 'production') console.log('OTP:', phone_number, otp);
-    res.json({ success: true, message: 'OTP generated', otp });
+    // Never return OTP in production
+    if (process.env.NODE_ENV !== 'production') console.log('DEV OTP:', phone_number, otp);
+    const resp = { success: true, message: 'OTP sent' };
+    if (process.env.NODE_ENV !== 'production') resp.otp = otp; // dev only
+    res.json(resp);
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -81,11 +85,13 @@ router.post('/verify-otp', async (req, res) => {
   const lockMsg = checkLock(phone_number);
   if (lockMsg) return res.status(429).json({ success: false, message: lockMsg });
   try {
+    // Fetch by phone + expiry only (not by value — bcrypt comparison needed)
     const otpRes = await pool.query(
-      'SELECT * FROM otps WHERE phone_number = $1 AND otp = $2 AND expires_at > NOW() LIMIT 1',
-      [phone_number, otp]
+      'SELECT * FROM otps WHERE phone_number = $1 AND expires_at > NOW() LIMIT 1',
+      [phone_number]
     );
-    if (!otpRes.rows[0]) {
+    const validHash = otpRes.rows[0] && await bcrypt.compare(otp, otpRes.rows[0].otp);
+    if (!otpRes.rows[0] || !validHash) {
       recordFail(phone_number);
       const rec = otpAttempts.get(phone_number);
       const remaining = MAX_ATTEMPTS - (rec?.attempts || 0);
@@ -110,13 +116,21 @@ router.post('/verify-otp', async (req, res) => {
     // Check manager table if not driver or owner
     if (!driverRes.rows[0] && !ownerRes.rows[0]) {
       const mgrRes = await pool.query(
-        `SELECT m.*, o.owner_code FROM public.managers m
+        `SELECT m.*, o.owner_code, o.subscription_end_date
+         FROM public.managers m
          LEFT JOIN public.owners o ON o.id = m.owner_id
          WHERE m.mobile_number = $1 AND m.status = 'ACTIVE' LIMIT 1`,
         [phone_number]
       );
       if (mgrRes.rows[0]) {
         const mgr = mgrRes.rows[0];
+        // MGR-05: Block login if owner subscription has expired
+        if (mgr.subscription_end_date && new Date(mgr.subscription_end_date) < new Date()) {
+          return res.status(403).json({
+            success: false,
+            message: 'Manager access suspended — fleet owner subscription has expired.'
+          });
+        }
         const perms = typeof mgr.permissions === 'string' ? JSON.parse(mgr.permissions) : (mgr.permissions || {});
         const token = generateToken({ id: mgr.id, phone_number: mgr.mobile_number, role: 'MANAGER', owner_id: mgr.owner_id, permissions: perms });
         return res.json({
@@ -177,7 +191,7 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/admin-send-otp  — Body: { phone_number, admin_secret }
 router.post('/admin-send-otp', async (req, res) => {
   const { phone_number, admin_secret } = req.body;
-  const expected = process.env.ADMIN_SECRET_KEY || 'mg_admin_2026_secret';
+  const expected = process.env.ADMIN_SECRET_KEY;
   const adminPhone = process.env.ADMIN_PHONE;
   if (!admin_secret || admin_secret !== expected)
     return res.status(403).json({ success: false, message: 'Invalid admin secret' });
@@ -185,10 +199,11 @@ router.post('/admin-send-otp', async (req, res) => {
     return res.status(403).json({ success: false, message: 'Unauthorized phone number' });
   try {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
     await pool.query('DELETE FROM otps WHERE phone_number = $1', [phone_number]);
     await pool.query(
       "INSERT INTO otps (phone_number, otp, expires_at) VALUES ($1, $2, NOW() + INTERVAL '10 minutes')",
-      [phone_number, otp]
+      [phone_number, otpHash]
     );
     if (process.env.NODE_ENV !== 'production') console.log('[ADMIN OTP]', phone_number, otp);
     await sendSMS(phone_number, otp);
@@ -201,7 +216,7 @@ router.post('/admin-send-otp', async (req, res) => {
 // POST /api/auth/admin-verify-otp  — Body: { phone_number, otp, admin_secret }
 router.post('/admin-verify-otp', async (req, res) => {
   const { phone_number, otp, admin_secret } = req.body;
-  const expected = process.env.ADMIN_SECRET_KEY || 'mg_admin_2026_secret';
+  const expected = process.env.ADMIN_SECRET_KEY;
   if (!admin_secret || admin_secret !== expected)
     return res.status(403).json({ success: false, message: 'Invalid admin secret' });
   if (!phone_number || !otp)
@@ -211,15 +226,15 @@ router.post('/admin-verify-otp', async (req, res) => {
     const isDevBypass = process.env.DEV_BYPASS_OTP === 'true' && otp === '000000';
     if (!isDevBypass) {
       const otpRes = await pool.query(
-        'SELECT * FROM otps WHERE phone_number = $1 AND otp = $2 AND expires_at > NOW() LIMIT 1',
-        [phone_number, otp]
+        'SELECT * FROM otps WHERE phone_number = $1 AND expires_at > NOW() LIMIT 1',
+        [phone_number]
       );
-      if (!otpRes.rows[0])
+      const validHash = otpRes.rows[0] && await bcrypt.compare(otp, otpRes.rows[0].otp);
+      if (!otpRes.rows[0] || !validHash)
         return res.status(400).json({ success: false, message: 'OTP invalid or expired' });
       await pool.query('DELETE FROM otps WHERE phone_number = $1', [phone_number]);
     }
-    const secret = process.env.JWT_SECRET || 'voltops_super_secret_key_2025';
-    const token = jwt.sign({ id: 'admin', role: 'admin', phone: phone_number }, secret, { expiresIn: '30d' });
+    const token = jwt.sign({ id: 'admin', role: 'admin', phone: phone_number }, process.env.JWT_SECRET, { expiresIn: '30d' });
     res.json({ success: true, token, user: { role: 'admin', phone: phone_number } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

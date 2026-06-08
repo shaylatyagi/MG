@@ -1,6 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+
+// ── Startup env guard — fail fast, never silently use weak defaults ────────────
+const REQUIRED_ENV = ['JWT_SECRET', 'DATABASE_URL', 'ADMIN_SECRET_KEY'];
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length) {
+  console.error(`❌ Missing required env vars: ${missing.join(', ')}`);
+  console.error('Set them in Render → Environment before deploying.');
+  process.exit(1);
+}
 //To connect DB
 require('./src/config/db');
 require('./src/services/scheduler.service'); 
@@ -49,31 +58,18 @@ app.use('/api/assignment', verifyToken, require('./src/routes/assignment'));
 // Payment Links — public webhook + GET; POST/list auth handled inside route
 app.use('/api/payment-links', require('./src/routes/paymentLinks'));
 
-// Auth routes pe JWT nahi lagega — wahan login hota hai
-app.use('/api/auth', require('./src/routes/auth'));
-
-// Admin pe admin key already hai — theek hai
+// Admin — single registration with verifyAdmin guard
 app.use('/api/admin', verifyAdmin, require('./src/routes/admin'));
-app.use('/api/admin', (req, res, next) => {
-  const key = req.headers['x-admin-key'] || req.query.admin_key;
-  const expected = process.env.ADMIN_SECRET_KEY || 'mg_admin_2026_secret';
-  if (!key || key !== expected) 
-    return res.status(403).json({ error: 'Forbidden' });
-  next();
-}, require('./src/routes/admin'));
 
-// In index.js
 app.use('/api/owner', ownerRoutes);
-const rateLimit = require('express-rate-limit');
+app.use('/api/chat',  require('./src/routes/chat'));
 
+const rateLimit = require('express-rate-limit');
 app.use('/api/auth/send-otp', rateLimit({
-  windowMs: 10 * 60 * 1000,  // 10 minutes
+  windowMs: 10 * 60 * 1000,
   max: 5,
   message: { error: 'Too many OTP requests, try after 10 minutes' }
 }));
-const adminRoutes = require('./src/routes/admin');
-app.use('/api/admin', adminRoutes);
-const assignmentRoutes = require('./src/routes/assignment');
 
 // Check Health
 app.get('/', (req, res) => {

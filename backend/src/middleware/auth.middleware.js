@@ -26,7 +26,7 @@ const verifyAdmin = (req, res, next) => {
     try {
       const decoded = jwt.verify(
         authHeader.split(' ')[1],
-        process.env.JWT_SECRET || 'voltops_super_secret_key_2025'
+        process.env.JWT_SECRET
       );
       if (decoded.role === 'admin') {
         req.user = decoded;
@@ -35,7 +35,7 @@ const verifyAdmin = (req, res, next) => {
     } catch (_) {}
   }
   const key = req.headers['x-admin-key'] || req.query.admin_key;
-  const expected = process.env.ADMIN_SECRET_KEY || 'mg_admin_2026_secret';
+  const expected = process.env.ADMIN_SECRET_KEY;
   if (key && key === expected) {
     req.user = { id: 'admin', role: 'admin' };
     return next();

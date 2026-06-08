@@ -6,7 +6,7 @@ const verifyToken = (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'voltops_super_secret_key_2025');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.user = decoded; 
         next(); // Yahan next() call karna zaroori hai
     } catch (err) {
@@ -16,7 +16,7 @@ const verifyToken = (req, res, next) => {
 
 const generateToken = (payload) => {
     // Sign full payload — includes id, role, owner_id, phone_number, permissions
-    return jwt.sign(payload, process.env.JWT_SECRET || 'voltops_super_secret_key_2025', { expiresIn: '30d' });
+    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
 // requirePermission(perm) — use after verifyToken on owner/manager shared routes
