@@ -1,5 +1,200 @@
-// apps/api/src/routes/driver.js — TODO: migrate from backend/src/routes/driver.js
-const router = require('express').Router();
-// Stub — replace with full implementation per DevSpec
-router.get('/', (_req, res) => res.json({ success: true, message: 'driver routes — coming soon' }));
+// apps/api/src/routes/driver.js — per DevSpec §driver routes
+const router             = require('express').Router();
+const pool               = require('../config/db');
+const { requireRole }    = require('../middleware/roleCheck');
+const { AppError }       = require('../utils/errors');
+
+// ── Helper: resolve driverId from JWT or query param ─────────────────────────
+// driver → use own id; owner/admin → require ?driverId=
+const resolveDriverId = (req) => {
+  const { role, id } = req.user;
+  if (role === 'driver') return id;
+  const driverId = req.query.driverId || req.body.driverId;
+  if (!driverId)
+    throw new AppError('driverId query param required for this role', 400, 'VALIDATION_ERROR');
+  return driverId;
+};
+
+// GET /api/driver/profile
+router.get(
+  '/profile',
+  requireRole('driver', 'owner', 'admin'),
+  async (req, res, next) => {
+    try {
+      const driverId = resolveDriverId(req);
+      const { rows } = await pool.query(
+        `SELECT d.id, d.name, d.phone_number, d.driver_code, d.status,
+                d.owner_id, d.company_id, d.created_at,
+                v.registration_number, v.model, v.status AS vehicle_status
+           FROM public.drivers d
+           LEFT JOIN public.vehicles v ON v.driver_id = d.id
+          WHERE d.id = $1
+          LIMIT 1`,
+        [driverId]
+      );
+      if (!rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+      res.json({ success: true, data: rows[0] });
+    } catch (err) { next(err); }
+  }
+);
+
+// GET /api/driver/wallet — balance + last 5 ledger entries
+router.get(
+  '/wallet',
+  requireRole('driver', 'owner', 'admin'),
+  async (req, res, next) => {
+    try {
+      const driverId = resolveDriverId(req);
+
+      const [walletRes, ledgerRes] = await Promise.all([
+        pool.query(
+          'SELECT wallet_balance FROM public.drivers WHERE id = $1 LIMIT 1',
+          [driverId]
+        ),
+        pool.query(
+          `SELECT id, entry_type, amount, description, created_at
+             FROM public.driver_ledger
+            WHERE driver_id = $1
+            ORDER BY created_at DESC
+            LIMIT 5`,
+          [driverId]
+        ),
+      ]);
+
+      if (!walletRes.rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+
+      res.json({
+        success: true,
+        data: {
+          balance:       walletRes.rows[0].wallet_balance,
+          recentEntries: ledgerRes.rows,
+        },
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+// GET /api/driver/ledger?page=1&pageSize=20
+router.get(
+  '/ledger',
+  requireRole('driver', 'owner', 'admin'),
+  async (req, res, next) => {
+    try {
+      const driverId  = resolveDriverId(req);
+      const page      = Math.max(1, parseInt(req.query.page     || '1',  10));
+      const pageSize  = Math.min(100, Math.max(1, parseInt(req.query.pageSize || '20', 10)));
+      const offset    = (page - 1) * pageSize;
+
+      const [countRes, rowsRes] = await Promise.all([
+        pool.query(
+          'SELECT COUNT(*)::int AS total FROM public.driver_ledger WHERE driver_id = $1',
+          [driverId]
+        ),
+        pool.query(
+          `SELECT id, entry_type, amount, description, reference_id, created_at
+             FROM public.driver_ledger
+            WHERE driver_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3`,
+          [driverId, pageSize, offset]
+        ),
+      ]);
+
+      const total      = countRes.rows[0].total;
+      const totalPages = Math.ceil(total / pageSize);
+
+      res.json({
+        success: true,
+        data: rowsRes.rows,
+        pagination: { page, pageSize, total, totalPages },
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+// POST /api/driver/sos
+router.post(
+  '/sos',
+  requireRole('driver'),
+  async (req, res, next) => {
+    try {
+      const driverId = req.user.id;
+      const { lat, lng } = req.body;
+      if (lat == null || lng == null)
+        throw new AppError('lat and lng are required', 400, 'VALIDATION_ERROR');
+
+      // Look up owner for this driver
+      const driverRes = await pool.query(
+        'SELECT owner_id, name FROM public.drivers WHERE id = $1 LIMIT 1',
+        [driverId]
+      );
+      if (!driverRes.rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+      const { owner_id, name } = driverRes.rows[0];
+
+      // Insert SOS alert
+      const sosRes = await pool.query(
+        `INSERT INTO public.sos_alerts (driver_id, owner_id, lat, lng)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, created_at`,
+        [driverId, owner_id, lat, lng]
+      );
+
+      // Insert notification for owner
+      if (owner_id) {
+        await pool.query(
+          `INSERT INTO public.notifications
+             (recipient_id, recipient_role, type, title, body)
+           VALUES ($1, 'owner', 'SOS', $2, $3)`,
+          [
+            owner_id,
+            'SOS Alert',
+            `Driver ${name || driverId} has triggered an SOS at (${lat}, ${lng})`,
+          ]
+        );
+      }
+
+      res.status(201).json({ success: true, data: sosRes.rows[0] });
+    } catch (err) { next(err); }
+  }
+);
+
+// GET /api/driver/notifications
+router.get(
+  '/notifications',
+  requireRole('driver', 'owner', 'admin'),
+  async (req, res, next) => {
+    try {
+      const recipientId   = req.user.id;
+      const recipientRole = req.user.role;
+      const page     = Math.max(1, parseInt(req.query.page     || '1',  10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize || '20', 10)));
+      const offset   = (page - 1) * pageSize;
+
+      const [countRes, rowsRes] = await Promise.all([
+        pool.query(
+          'SELECT COUNT(*)::int AS total FROM public.notifications WHERE recipient_id = $1 AND recipient_role = $2',
+          [recipientId, recipientRole]
+        ),
+        pool.query(
+          `SELECT id, type, title, body, read_at, created_at
+             FROM public.notifications
+            WHERE recipient_id = $1 AND recipient_role = $2
+            ORDER BY created_at DESC
+            LIMIT $3 OFFSET $4`,
+          [recipientId, recipientRole, pageSize, offset]
+        ),
+      ]);
+
+      const total      = countRes.rows[0].total;
+      const totalPages = Math.ceil(total / pageSize);
+
+      res.json({
+        success: true,
+        data: rowsRes.rows,
+        pagination: { page, pageSize, total, totalPages },
+      });
+    } catch (err) { next(err); }
+  }
+);
+
 module.exports = router;
