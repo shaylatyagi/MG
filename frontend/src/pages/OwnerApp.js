@@ -1,6 +1,7 @@
 // frontend/src/pages/OwnerDashboard.js
 // Complete with ALL buttons - Notification Bell, Logout, Chat, Search
 
+import ThemeToggle from '../components/ThemeToggle';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -1377,6 +1378,8 @@ const ProfileTab = () => (
               )}
             </button>
             
+            {/* THEME TOGGLE */}
+            <ThemeToggle />
             {/* LOGOUT BUTTON */}
             <button onClick={logout} className="p-2 rounded-xl bg-red-50 hover:bg-red-100 transition">
               <LogOut size={18} className="text-red-600" />

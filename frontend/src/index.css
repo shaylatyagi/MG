@@ -372,4 +372,12 @@ html.dark .hover\:bg-slate-100:hover { background-color: #334155 !important; }
 html.dark .hover\:bg-slate-200:hover { background-color: #334155 !important; }
 
 /* ── Admin sidebar (keep its existing dark bg) ───────────────────── */
-html.dark .admin-sidebar { background-color: #020617 !impor
+html.dark .admin-sidebar { background-color: #020617 !important; }
+
+/* ── Bottom nav ──────────────────────────────────────────────────── */
+html.dark nav.bg-white { background-color: #1e293b !important; }
+
+/* ── Theme toggle button itself ──────────────────────────────────── */
+.mg-theme-toggle {
+  transition: all 0.2s ease;
+}
