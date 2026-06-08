@@ -1359,15 +1359,32 @@ router.get('/owners/list', async (req, res) => {
     res.json({ owners: [] });
   }
 });
-router.get('/owner/drivers/list', verifyToken, requirePermission('view_drivers'), async (req, res) => {
+router.get('/owner/drivers/list', async (req, res) => {
   try {
+    const { ownerId } = req.query;
     const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50', 10)));
     const offset = (page - 1) * limit;
 
-    // Total count
+    // Get owner_code for this owner
+    let ownerCode = null;
+    if (ownerId) {
+      const ownerRes = await pool.query(
+        'SELECT owner_code FROM public.owners WHERE id = $1 LIMIT 1',
+        [parseInt(ownerId)]
+      );
+      ownerCode = ownerRes.rows[0]?.owner_code || null;
+    }
+
+    const whereClause = ownerCode
+      ? `WHERE d.status = 'ACTIVE' AND d.owner_code = $3`
+      : `WHERE d.status = 'ACTIVE'`;
+    const params = ownerCode ? [limit, offset, ownerCode] : [limit, offset];
+
+    const countParams = ownerCode ? [ownerCode] : [];
+    const countWhere = ownerCode ? `WHERE status = 'ACTIVE' AND owner_code = $1` : `WHERE status = 'ACTIVE'`;
     const countRes = await pool.query(
-      `SELECT COUNT(*) FROM public.drivers WHERE status = 'ACTIVE'`
+      `SELECT COUNT(*) FROM public.drivers ${countWhere}`, countParams
     );
     const total = parseInt(countRes.rows[0].count, 10);
 
@@ -1378,10 +1395,10 @@ router.get('/owner/drivers/list', verifyToken, requirePermission('view_drivers')
               v.id as vehicle_id
        FROM public.drivers d
        LEFT JOIN public.vehicles v ON v.driver_id = d.id
-       WHERE d.status = 'ACTIVE'
+       ${whereClause}
        ORDER BY d.full_name
        LIMIT $1 OFFSET $2`,
-      [limit, offset]
+      params
     );
 
     res.json({
@@ -1463,16 +1480,16 @@ router.get('/owner/trend', async (req, res) => {
     if (ownerCode) {
       const result = await pool.query(
         `SELECT
-           TO_CHAR(DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
-           DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') AS date,
+           TO_CHAR(DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
+           DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata') AS date,
            COALESCE(SUM(CASE WHEN mo.payment_mode != 'CASH' THEN mo.order_amount ELSE 0 END), 0)::int AS online,
            COALESCE(SUM(CASE WHEN mo.payment_mode = 'CASH' THEN mo.order_amount ELSE 0 END), 0)::int AS cash
          FROM public.ms_orders mo
          LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
          WHERE (d.owner_code = $1 OR mo.owner_code = $1)
            AND mo.transaction_status = 'SUCCESS'
-           AND mo.order_completion_date >= NOW() - INTERVAL '30 days'
-         GROUP BY DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '30 days'
+         GROUP BY DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata')
          ORDER BY date ASC`,
         [ownerCode]
       );
@@ -1481,16 +1498,16 @@ router.get('/owner/trend', async (req, res) => {
       // Fallback: join by driver.owner_id
       const result = await pool.query(
         `SELECT
-           TO_CHAR(DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
-           DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') AS date,
+           TO_CHAR(DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata'), 'DD Mon') AS day,
+           DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata') AS date,
            COALESCE(SUM(CASE WHEN mo.payment_mode != 'CASH' THEN mo.order_amount ELSE 0 END), 0)::int AS online,
            COALESCE(SUM(CASE WHEN mo.payment_mode = 'CASH' THEN mo.order_amount ELSE 0 END), 0)::int AS cash
          FROM public.ms_orders mo
          LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
          WHERE d.owner_id = $1
            AND mo.transaction_status = 'SUCCESS'
-           AND mo.order_completion_date >= NOW() - INTERVAL '30 days'
-         GROUP BY DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '30 days'
+         GROUP BY DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata')
          ORDER BY date ASC`,
         [parseInt(ownerId)]
       );

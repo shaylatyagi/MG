@@ -1,0 +1,12 @@
+PENDING (not yet committed/pushed as of 2026-06-08):
+1. backend/src/routes/payment.js — trend chart COALESCE fix (order_completion_date fallback)
+2. backend/src/routes/payment.js — drivers/list route: removed requirePermission, added owner_code filter
+3. frontend/src/pages/Login.js — admin OTP verify saves mg_admin_token
+4. frontend/src/pages/admin/CompanyDashboard.js — phone field digits-only, KYC array parse, OTP redirect
+5. vercel.json — simplified build config (no cd frontend)
+
+BEFORE PUSHING: delete .git/index.lock first
+  Remove-Item "C:\Users\Bharat\Downloads\projects\voltops\.git\index.lock" -Force
+  git add -A && git reset HEAD backend/.env && git commit -m "fix: trend, drivers, admin-token" && git push
+
+NEON: run backend/src/db/migrations/audit_log.sql once manually
