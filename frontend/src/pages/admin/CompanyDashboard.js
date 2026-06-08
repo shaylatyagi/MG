@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Component } from 'react';
+import ThemeToggle from '../../components/ThemeToggle';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -1807,7 +1808,10 @@ function AdminPanelInner() {
       <main className="flex-1 overflow-auto">
         <header className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10">
           <h1 className="text-lg font-semibold text-gray-700">{tabLabel}</h1>
-          <span className="text-xs text-gray-400">Super Admin · MobilityGrid</span>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <span className="text-xs text-gray-400">Super Admin · MobilityGrid</span>
+          </div>
         </header>
         <div className="p-6">
           {tab === 'dashboard'    && <Dashboard />}

@@ -14,7 +14,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
     <title>MobilityGrid</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Enable Tailwind dark mode via class strategy
+      tailwind = window.tailwind || {};
+      window.tailwindConfig = { darkMode: 'class' };
+      // Apply saved theme before page renders (no flash)
+      (function() {
+        try {
+          if (localStorage.getItem('mg_theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+      // Apply dark mode config after Tailwind loads
+      if (window.tailwind && window.tailwind.config) {
+        tailwind.config = { darkMode: 'class' };
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
