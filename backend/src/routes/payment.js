@@ -3086,28 +3086,4 @@ router.get('/manager/profile', async (req, res) => {
 });
 
 // Upgrade to premium (admin manually upgrades, or payment webhook)
-router.post('/owner/upgrade-premium', async (req, res) => {
-  try {
-    const { ownerId, months = 1 } = req.body;
-    const expires = new Date();
-    expires.setMonth(expires.getMonth() + months);
-    await pool.query(
-      `UPDATE public.owners SET plan='PREMIUM', plan_expires_at=$1 WHERE id=$2`,
-      [expires, ownerId]
-    );
-    res.json({ success: true, expires_at: expires });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Get owner plan status
-router.get('/owner/plan', async (req, res) => {
-  try {
-    const { ownerId } = req.query;
-    const r = await pool.query(
-      `SELECT plan, plan_expires_at FROM public.owners WHERE id=$1`, [ownerId]
-    );
-    const o = r.rows[0];
-    const premium = o?.plan === 'PREMIUM' && (!o.plan_expires_at || new Date(o.plan_expires_at) > new Date());
-    res.json({ plan: o?.plan || 'FREE', is_premium: premium, expires_at: o?.plan_expires_at });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+r
