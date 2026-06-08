@@ -1,131 +1,808 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import './LandingPage.css';
 
 function LandingPage() {
-  const navigate = useNavigate();
+  const [navScrolled, setNavScrolled] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    company: '',
+    role: '',
+    fleet: '',
+    city: '',
+    type: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [activeTab, setActiveTab] = useState('admin');
+
+  useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (submitted) {
+      const successCard = document.getElementById('successCard');
+      successCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [submitted]);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const phone = formData.phone.trim();
+    if (!/^[0-9]{10}$/.test(phone)) {
+      alert('Please enter a valid 10-digit WhatsApp number.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const payload = {
+      name: formData.name.trim(),
+      phone,
+      company: formData.company.trim(),
+      role: formData.role,
+      fleet: formData.fleet,
+      city: formData.city.trim(),
+      type: formData.type,
+      ts: new Date().toISOString(),
+    };
+
+    try {
+      await fetch('https://mg-qw5s.onrender.com/api/auth/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (_) {
+      // ignore network errors for now
+    }
+
+    setIsSubmitting(false);
+    setSubmitted(true);
+  };
+
   return (
-    <div style={{ backgroundColor: '#FAF7F2', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
-      {/* Navbar */}
-      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 60px', backgroundColor: 'white', borderBottom: '1px solid #E8E0D5', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ fontSize: '18px', fontWeight: '800', color: '#8B5E3C', letterSpacing: '1px' }}>MOBILITY GRID</div>
-        <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-          {/* Admin hata diya, ab Partner link hai */}
-          <span 
-            onClick={() => navigate('/partner')} 
-            style={{ fontSize: '14px', color: '#6B6B6B', cursor: 'pointer'}}
-          >
-            Partners
-          </span>
-          <span style={{ fontSize: '14px', color: '#6B6B6B', cursor: 'pointer' }} onClick={() => document.getElementById('vision').scrollIntoView({ behavior: 'smooth' })}>Vision</span>
-          <span style={{ fontSize: '14px', color: '#6B6B6B', cursor: 'pointer' }} onClick={() => document.getElementById('solutions').scrollIntoView({ behavior: 'smooth' })}>Solutions</span>
-          <span style={{ fontSize: '14px', color: '#6B6B6B', cursor: 'pointer' }} onClick={() => document.getElementById('the-grid').scrollIntoView({ behavior: 'smooth' })}>The Grid</span>
-          <button onClick={() => navigate('/login')} style={{ backgroundColor: '#8B5E3C', color: 'white', padding: '10px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '600' }}>Launch Platform</button>
+    <>
+      <nav id="nav" className={navScrolled ? 'scrolled' : ''}>
+        <div className="nav-inner">
+          <Link to="/" className="nav-logo">
+            <svg className="nav-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="36" height="36" rx="9" fill="#4f46e5" />
+              <circle cx="10" cy="10" r="1.8" fill="white" opacity="0.45" />
+              <circle cx="18" cy="10" r="1.8" fill="white" opacity="0.45" />
+              <circle cx="26" cy="10" r="1.8" fill="white" opacity="0.45" />
+              <circle cx="10" cy="18" r="1.8" fill="white" opacity="0.45" />
+              <circle cx="26" cy="18" r="1.8" fill="white" opacity="0.45" />
+              <circle cx="10" cy="26" r="1.8" fill="white" opacity="0.45" />
+              <circle cx="18" cy="26" r="1.8" fill="white" opacity="0.45" />
+              <circle cx="26" cy="26" r="1.8" fill="white" opacity="0.45" />
+              <circle cx="18" cy="18" r="4" fill="white" />
+              <text x="18" y="21.5" fontFamily="Georgia,serif" fontWeight="900" fontSize="7" fill="#4f46e5" textAnchor="middle">M</text>
+              <line x1="18" y1="14" x2="10" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
+              <line x1="18" y1="14" x2="18" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
+              <line x1="18" y1="14" x2="26" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
+              <line x1="22" y1="18" x2="26" y2="18" stroke="white" strokeWidth="0.9" opacity="0.3" />
+              <line x1="18" y1="22" x2="26" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
+              <line x1="18" y1="22" x2="18" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
+              <line x1="18" y1="22" x2="10" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
+              <line x1="14" y1="18" x2="10" y2="18" stroke="white" strokeWidth="0.9" opacity="0.3" />
+            </svg>
+            <span className="nav-wordmark">Mobility<span>Grid</span></span>
+          </Link>
+          <div className="nav-links">
+            <a href="#vision" className="nav-link">Vision</a>
+            <a href="#gaps" className="nav-link">The Problem</a>
+            <a href="#product" className="nav-link">Product</a>
+            <a href="#how" className="nav-link">How it Works</a>
+          </div>
+          <div className="nav-actions">
+            <a href="#signup" className="btn btn-primary btn-sm">Get Early Access</a>
+          </div>
         </div>
       </nav>
-      
-      {/* Rest of your landing page remains SAME */}
-      {/* Hero Section */}
-      <div id="vision" style={{ textAlign: 'center', padding: '0 60px', minHeight: 'calc(100vh - 65px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundImage: 'radial-gradient(circle, #E8E0D5 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
-        <div style={{ display: 'inline-block', backgroundColor: '#F3EDE5', color: '#8B5E3C', fontSize: '12px', fontWeight: '600', padding: '6px 16px', borderRadius: '20px', marginBottom: '24px', letterSpacing: '0.5px' }}>
-          THE FUTURE OF FLEET OPS
-        </div>
-        <h1 style={{ fontSize: '52px', fontWeight: '800', color: '#1A1A1A', lineHeight: '1.2', maxWidth: '700px', margin: '0 auto 16px' }}>
-          Building the Trust Layer for{' '}
-          <span style={{ color: '#8B5E3C' }}>Commercial EV Mobility</span>
-        </h1>
-        <p style={{ fontSize: '16px', color: '#6B6B6B', maxWidth: '500px', margin: '20px auto 40px', lineHeight: '1.6' }}>
-          Mobility Grid is a digital operating system transforming fragmented rentals into a governance-ready, credit-worthy ecosystem.
-        </p>
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-          <button onClick={() => navigate('/login')} style={{ backgroundColor: '#8B5E3C', color: 'white', padding: '14px 28px', borderRadius: '8px', fontSize: '15px', fontWeight: '600' }}>Launch Dashboard</button>
-          <button onClick={() => alert('Whitepaper coming soon')} style={{ backgroundColor: 'white', color: '#1A1A1A', padding: '14px 28px', borderRadius: '8px', fontSize: '15px', fontWeight: '600', border: '1px solid #E8E0D5' }}>Read Whitepaper</button>
-        </div>
-      </div>
-      
-      {/* Dual Sided Ecosystem */}
-      <div id="solutions" style={{ padding: '80px 60px', backgroundColor: 'white' }}>
-        <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>A Dual-Sided Ecosystem</p>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '40px' }}>
-          <p style={{ fontSize: '20px', fontWeight: '600', color: '#1A1A1A', maxWidth: '400px' }}>
-            We optimize the Grid for the best owners of EV mobility, the asset owner and the driver partner.
+
+      <section className="hero">
+        <div className="hero-content container">
+          <div className="hero-badge">
+            <div className="hero-badge-dot" />
+            <span className="hero-badge-text">Now in private beta · Onboarding fleets across India</span>
+          </div>
+          <h1>
+            The Operating<br />
+            System for India's<br />
+            <em>Fleet Economy</em>
+          </h1>
+          <p className="hero-sub">
+            Digital rent collection, driver KYC, fleet management, and earnings tracking — built from the ground up for how India's gig workforce actually lives and works.
           </p>
-          <div style={{ display: 'flex', gap: '32px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '28px', fontWeight: '700', color: '#8B5E3C' }}>94%</p>
-              <p style={{ fontSize: '12px', color: '#9CA3AF' }}>Collection Rate</p>
+          <div className="hero-ctas">
+            <a href="#signup" className="btn btn-primary btn-lg">Get Early Access</a>
+            <Link to="/login" className="btn btn-outline-light btn-lg">See the Product</Link>
+          </div>
+        </div>
+        <div className="hero-preview container-wide">
+          <div className="preview-glow" />
+          <div className="browser-mock">
+            <div className="browser-bar">
+              <div className="browser-dots">
+                <div className="browser-dot" style={{ background: '#ef4444' }} />
+                <div className="browser-dot" style={{ background: '#f59e0b' }} />
+                <div className="browser-dot" style={{ background: '#22c55e' }} />
+              </div>
+              <div className="browser-url">app.mobilitygrid.in/admin/dashboard</div>
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '28px', fontWeight: '700', color: '#8B5E3C' }}>₹4.2k</p>
-              <p style={{ fontSize: '12px', color: '#9CA3AF' }}>Avg Monthly Earning</p>
+            <div className="admin-mock">
+              <div className="admin-sidebar-mock">
+                <div className="mock-logo-row">
+                  <div className="mock-logo-name">MobilityGrid</div>
+                  <div className="mock-logo-sub">Super Admin</div>
+                </div>
+                <div className="mock-nav-item active"><div className="mock-nav-icon" /> Dashboard</div>
+                <div className="mock-nav-item"><div className="mock-nav-icon" /> Companies</div>
+                <div className="mock-nav-item"><div className="mock-nav-icon" /> KYC Review</div>
+                <div className="mock-nav-item"><div className="mock-nav-icon" /> All Drivers</div>
+              </div>
+              <div className="admin-main-mock">
+                <div className="mock-page-title">Platform Overview</div>
+                <div className="mock-page-sub">Sunday, 7 June 2026</div>
+                <div className="mock-stats-row">
+                  <div className="mock-stat"><div className="mock-stat-val">24</div><div className="mock-stat-lbl">Companies</div></div>
+                  <div className="mock-stat"><div className="mock-stat-val blue">312</div><div className="mock-stat-lbl">Fleet Owners</div></div>
+                  <div className="mock-stat"><div className="mock-stat-val">1,840</div><div className="mock-stat-lbl">Drivers</div></div>
+                  <div className="mock-stat"><div className="mock-stat-val green">₹8.4L</div><div className="mock-stat-lbl">This Month</div></div>
+                </div>
+                <div className="mock-table">
+                  <div className="mock-table-hdr">
+                    <span className="mock-th">Company</span>
+                    <span className="mock-th">Drivers</span>
+                    <span className="mock-th">Collection</span>
+                    <span className="mock-th">Status</span>
+                  </div>
+                  <div className="mock-table-row">
+                    <span className="mock-td">Rajesh EV Fleet</span>
+                    <span className="mock-td">48</span>
+                    <span className="mock-td">₹96,000</span>
+                    <span className="mock-td"><span className="mock-badge green">Active</span></span>
+                  </div>
+                  <div className="mock-table-row">
+                    <span className="mock-td">Metro Autos Pvt</span>
+                    <span className="mock-td">22</span>
+                    <span className="mock-td">₹41,800</span>
+                    <span className="mock-td"><span className="mock-badge amber">KYC Pending</span></span>
+                  </div>
+                  <div className="mock-table-row">
+                    <span className="mock-td">CityRide Solutions</span>
+                    <span className="mock-td">76</span>
+                    <span className="mock-td">₹1.52L</span>
+                    <span className="mock-td"><span className="mock-badge indigo">Reviewing</span></span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '24px' }}>
-          <div style={{ flex: 1, backgroundColor: '#2C1810', borderRadius: '16px', padding: '32px' }}>
-            <p style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '16px' }}>For Vehicle Owners</p>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '20px', lineHeight: '1.6' }}>
-              Monetize your fleet with zero operational overhead. Get daily collections, compliance tracking, and driver intelligence automatically.
-            </p>
-            {['Compliance Vault (RC/Insurance)', 'Earnings Intelligence Dashboard', 'Automated Daily Collections'].map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <span style={{ color: '#C49A6C', fontSize: '14px' }}>✓</span>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)' }}>{item}</p>
-              </div>
-            ))}
-          </div>
-          <div style={{ flex: 1, backgroundColor: '#2C1810', borderRadius: '16px', padding: '32px' }}>
-            <p style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '16px' }}>For Driver Partners</p>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '20px', lineHeight: '1.6' }}>
-              Access premium EV assets with zero upfront debt. Build a digital credit profile to unlock future ownership.
-            </p>
-            {['Flexible Daily Rental Plans', 'Driver Trust Score Financing', '24/7 Digital SOS Support'].map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <span style={{ color: '#C49A6C', fontSize: '14px' }}>✓</span>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)' }}>{item}</p>
-              </div>
-            ))}
-          </div>
+      </section>
+
+      <div className="trust-bar">
+        <div className="trust-inner">
+          <span className="trust-label">Built for India's fleet economy</span>
+          <div className="trust-divider" />
+          <div className="trust-stat"><div className="trust-stat-val">Any Scale</div><div className="trust-stat-lbl">Small fleet to enterprise</div></div>
+          <div className="trust-divider" />
+          <div className="trust-stat"><div className="trust-stat-val">UPI</div><div className="trust-stat-lbl">Verified digital collections</div></div>
+          <div className="trust-divider" />
+          <div className="trust-stat"><div className="trust-stat-val">Real-time</div><div className="trust-stat-lbl">Live fleet visibility</div></div>
+          <div className="trust-divider" />
+          <div className="trust-stat"><div className="trust-stat-val">EN / HI</div><div className="trust-stat-lbl">Multi-language support</div></div>
+          <div className="trust-divider" />
+          <div className="trust-stat"><div className="trust-stat-val">24 hrs</div><div className="trust-stat-lbl">Fleet onboarding time</div></div>
         </div>
       </div>
-      
-      {/* Grid Intelligence */}
-      <div id="the-grid" style={{ padding: '80px 60px', backgroundColor: '#FAF7F2' }}>
-        <div style={{ backgroundColor: '#7D5235', borderRadius: '24px', padding: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ maxWidth: '500px' }}>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>The Grid Intelligence: Our Operational Moat</p>
-            <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'white', marginBottom: '16px', lineHeight: '1.3' }}>
-              While others rent vehicles, we rent managed uptime.
-            </h2>
-            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', marginBottom: '24px' }}>
-              Our Grid engine processes thousands of telemetry data points to ensure the Grid remains stable and profitable.
-            </p>
-            <div style={{ display: 'flex', gap: '32px' }}>
-              <div>
-                <p style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '4px' }}>Predictive</p>
-                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>Risk scoring before problems surface</p>
+
+      <section className="vm-section" id="vision">
+        <div className="container">
+          <div className="vm-grid">
+            <div>
+              <div className="vm-grid" style={{ gridTemplateColumns: '1fr', gap: '20px' }}>
+                <div className="vm-card">
+                  <div className="vm-card-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2" strokeLinecap="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 2v3m0 14v3M2 12h3m14 0h3m-3.5-6.5-2.12 2.12M6.62 17.38l-2.12 2.12M17.38 17.38l2.12 2.12M4.5 6.5l2.12 2.12" />
+                    </svg>
+                  </div>
+                  <h3>Our Vision</h3>
+                  <p>A world where every fleet operator and gig worker in India has the infrastructure, visibility, and tools to build a financially secure livelihood — on their own terms.</p>
+                </div>
+                <div className="vm-card" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)' }}>
+                  <div className="vm-card-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2" strokeLinecap="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                  </div>
+                  <h3>Our Mission</h3>
+                  <p>To close the three structural gaps — Time, Payment, and Asset — that hold India's gig workforce back, by building an operating ecosystem designed entirely around how they actually earn and live.</p>
+                </div>
               </div>
-              <div>
-                <p style={{ fontSize: '14px', fontWeight: '600', color: 'white', marginBottom: '4px' }}>Responsive</p>
-                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>Automated escalation and priorities</p>
+            </div>
+            <div className="vm-text">
+              <p className="section-label">Why We Exist</p>
+              <h2 className="display" style={{ marginBottom: '24px' }}>Most people see the <em>convenience.</em></h2>
+              <p>Every day, millions of drivers, riders, and logistics workers power the Indian city — delivering food, ferrying passengers, moving goods. They are the circulatory system of the modern urban economy.</p>
+              <p>Yet the infrastructure built around them was never truly designed for <strong>how they live and work</strong>. Fleet operators — often small business owners managing 5 to 500 vehicles — carry enormous operational weight on fragmented, manual systems: WhatsApp messages, paper ledgers, and disconnected spreadsheets.</p>
+              <p>We spent months listening to the ground truth. What we found is not a technology problem. It is a <strong>design problem</strong>. The products built for this workforce were designed around the platform's convenience, not the person doing the work.</p>
+              <p>MobilityGrid is our answer to that.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="gaps-section" id="gaps">
+        <div className="container">
+          <div className="gaps-header">
+            <p className="section-label">The Problem</p>
+            <h2 className="display">Three gaps that define the challenge</h2>
+            <p>Through months of direct research, we identified three structural mismatches that compound into a system that consistently fails both the operator and the driver.</p>
+          </div>
+
+          <div className="gaps-grid">
+            <div className="gap-card">
+              <span className="gap-num">01</span>
+              <div className="gap-icon-wrap">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 6v6l4 2" />
+                </svg>
+              </div>
+              <div className="gap-label">Time Gap</div>
+              <div className="gap-title">Daily earners in a monthly financial system</div>
+              <div className="gap-body">A driver earns every day. But traditional finance, collections, and settlements are built around monthly cycles. That mismatch creates friction, missed collections, and uncertainty for everyone.</div>
+            </div>
+            <div className="gap-card">
+              <span className="gap-num">02</span>
+              <div className="gap-icon-wrap">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round">
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <path d="M2 10h20" />
+                </svg>
+              </div>
+              <div className="gap-label">Payment Gap</div>
+              <div className="gap-title">Fluid income, rigid collection systems</div>
+              <div className="gap-body">Drivers live in daily cash flow. Fleet owners still use paper records, manual reminders, or one-size-fits-all billing systems that break trust and trigger defaults.</div>
+            </div>
+            <div className="gap-card">
+              <span className="gap-num">03</span>
+              <div className="gap-icon-wrap">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+              </div>
+              <div className="gap-label">Asset Gap</div>
+              <div className="gap-title">A vehicle is their livelihood, not their own</div>
+              <div className="gap-body">A driver's vehicle is their primary asset. But assignment, documentation, and payment responsibility remain fragmented across WhatsApp, paper, and disconnected systems.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="product-section" id="product">
+        <div className="container">
+          <div className="product-header">
+            <p className="section-label">The Platform</p>
+            <h2 className="display">One ecosystem. <em>Three stakeholders.</em></h2>
+            <p>MobilityGrid is not a single app — it is a coordinated operating system with purpose-built interfaces for every actor in the fleet economy.</p>
+          </div>
+
+          <div className="product-tabs">
+            <button type="button" className={`ptab ${activeTab === 'admin' ? 'active' : ''}`} onClick={() => setActiveTab('admin')}>
+              <span className="ptab-dot" /> Super Admin Console
+            </button>
+            <button type="button" className={`ptab ${activeTab === 'owner' ? 'active' : ''}`} onClick={() => setActiveTab('owner')}>
+              <span className="ptab-dot" /> Fleet Owner Dashboard
+            </button>
+            <button type="button" className={`ptab ${activeTab === 'driver' ? 'active' : ''}`} onClick={() => setActiveTab('driver')}>
+              <span className="ptab-dot" /> Driver Terminal
+            </button>
+          </div>
+
+          <div className="product-panels">
+            <div className={`product-panel ${activeTab === 'admin' ? 'active' : ''}`}>
+              <div className="panel-content">
+                <span className="tag tag-indigo">Super Admin</span>
+                <h3>Full platform oversight from one console</h3>
+                <p>The Super Admin Console gives the MobilityGrid team complete visibility over every company, fleet owner, driver, and payment on the platform — with tools to onboard, approve, and monitor at scale.</p>
+                <ul className="panel-features">
+                  <li className="panel-feature"><span className="pf-check">✓</span>Company onboarding and fleet operator management</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Driver KYC review queue — approve Aadhaar, PAN, DL, Bank</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Real-time platform GMV and collections dashboard</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Cross-fleet driver and vehicle registry</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Role-based access — admin, manager, read-only</li>
+                </ul>
+              </div>
+              <div className="panel-visual">
+                <div className="browser-mock" style={{ boxShadow: '0 24px 64px rgba(15, 23, 42, 0.16)' }}>
+                  <div className="browser-bar">
+                    <div className="browser-dots">
+                      <div className="browser-dot" style={{ background: '#ef4444' }} />
+                      <div className="browser-dot" style={{ background: '#f59e0b' }} />
+                      <div className="browser-dot" style={{ background: '#22c55e' }} />
+                    </div>
+                    <div className="browser-url">app.mobilitygrid.in/admin/kyc</div>
+                  </div>
+                  <div className="admin-mock" style={{ minHeight: '280px' }}>
+                    <div className="admin-sidebar-mock">
+                      <div className="mock-logo-row">
+                        <div className="mock-logo-name">MobilityGrid</div>
+                        <div className="mock-logo-sub">Super Admin</div>
+                      </div>
+                      <div className="mock-nav-item">Dashboard</div>
+                      <div className="mock-nav-item">Companies</div>
+                      <div className="mock-nav-item active">KYC Review</div>
+                      <div className="mock-nav-item">All Drivers</div>
+                    </div>
+                    <div className="admin-main-mock" style={{ padding: '16px' }}>
+                      <div className="mock-page-title">KYC Review Queue</div>
+                      <div className="mock-page-sub">14 pending · 3 under review</div>
+                      <div className="mock-table" style={{ marginTop: '12px' }}>
+                        <div className="mock-table-hdr">
+                          <span className="mock-th">Driver</span>
+                          <span className="mock-th">Document</span>
+                          <span className="mock-th">Status</span>
+                          <span className="mock-th">Action</span>
+                        </div>
+                        <div className="mock-table-row">
+                          <span className="mock-td">Santosh Kumar</span>
+                          <span className="mock-td">Aadhaar</span>
+                          <span className="mock-td"><span className="mock-badge amber">Pending</span></span>
+                          <span className="mock-td" style={{ color: '#4f46e5' }}>Review →</span>
+                        </div>
+                        <div className="mock-table-row">
+                          <span className="mock-td">Pradeep Yadav</span>
+                          <span className="mock-td">DL + PAN</span>
+                          <span className="mock-td"><span className="mock-badge indigo">Review</span></span>
+                          <span className="mock-td" style={{ color: '#4f46e5' }}>Review →</span>
+                        </div>
+                        <div className="mock-table-row">
+                          <span className="mock-td">Ramesh Singh</span>
+                          <span className="mock-td">Bank A/C</span>
+                          <span className="mock-td"><span className="mock-badge green">Verified</span></span>
+                          <span className="mock-td" style={{ color: '#94a3b8' }}>Done</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`product-panel ${activeTab === 'owner' ? 'active' : ''}`}>
+              <div className="panel-content">
+                <span className="tag tag-gold">Fleet Owner</span>
+                <h3>Complete fleet visibility, zero spreadsheets</h3>
+                <p>The Fleet Owner Dashboard replaces WhatsApp groups, paper ledgers, and Excel files with a single source of truth — so every operator knows exactly who has paid, who hasn't, and what their fleet is worth today.</p>
+                <ul className="panel-features">
+                  <li className="panel-feature"><span className="pf-check">✓</span>Live dashboard — vehicles, drivers, outstanding dues</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>UPI payment links — send directly to driver via WhatsApp</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Transaction history with driver-wise breakdown</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Driver onboarding with agreement upload and address verification</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Vehicle assignment and daily rent tracking</li>
+                </ul>
+              </div>
+              <div className="panel-visual">
+                <div className="owner-mock">
+                  <div className="om-header">
+                    <div>
+                      <div className="om-title">Fleet Dashboard</div>
+                      <div className="om-sub">June 2026 · 23 active drivers</div>
+                    </div>
+                    <div className="om-badge">● Live</div>
+                  </div>
+                  <div className="om-body">
+                    <div className="om-stats">
+                      <div className="om-stat"><div className="om-stat-val indigo">₹46,200</div><div className="om-stat-lbl">Collected · June</div></div>
+                      <div className="om-stat"><div className="om-stat-val" style={{ color: '#dc2626' }}>₹8,400</div><div className="om-stat-lbl">Outstanding</div></div>
+                      <div className="om-stat"><div className="om-stat-val green">19 / 23</div><div className="om-stat-lbl">Paid this month</div></div>
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '10px' }}>Recent Drivers</div>
+                    <div className="om-driver-row">
+                      <div className="om-avatar">RK</div>
+                      <div><div className="om-driver-name">Ravi Kumar</div><div className="om-driver-sub">KA 01 EV 2201</div></div>
+                      <div className="om-driver-amt">₹2,000<span className="om-driver-status paid">Paid</span></div>
+                    </div>
+                    <div className="om-driver-row">
+                      <div className="om-avatar" style={{ background: '#7c3aed' }}>SP</div>
+                      <div><div className="om-driver-name">Suresh Patil</div><div className="om-driver-sub">KA 05 EV 1148</div></div>
+                      <div className="om-driver-amt">₹2,000<span className="om-driver-status pending">Due</span></div>
+                    </div>
+                    <div className="om-driver-row">
+                      <div className="om-avatar" style={{ background: '#0f766e' }}>MR</div>
+                      <div><div className="om-driver-name">Mohan Reddy</div><div className="om-driver-sub">KA 02 EV 0890</div></div>
+                      <div className="om-driver-amt">₹1,800<span className="om-driver-status paid">Paid</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`product-panel ${activeTab === 'driver' ? 'active' : ''}`}>
+              <div className="panel-content">
+                <span className="tag tag-slate">Driver</span>
+                <h3>Your earnings, your vehicle, your future</h3>
+                <p>The Driver Terminal is a mobile-first terminal designed for low-end Android devices and 2G/3G networks. It gives every driver full transparency into their financial relationship with their fleet — in English and Hindi.</p>
+                <ul className="panel-features">
+                  <li className="panel-feature"><span className="pf-check">✓</span>Wallet balance, daily dues, and outstanding amount</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Pay rent instantly via UPI — any amount, any time</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Private earnings tracker — only visible to the driver</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>KYC document upload — Aadhaar, PAN, Driving Licence</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Full transaction history with downloadable receipts</li>
+                </ul>
+              </div>
+              <div className="panel-visual" style={{ display: 'flex', justifyContent: 'center' }}>
+                <div className="phone-mock">
+                  <div className="phone-notch">
+                    <div className="phone-notch-bar" />
+                  </div>
+                  <div className="phone-screen">
+                    <div className="phone-header">
+                      <div className="ph-name">Driver Terminal</div>
+                      <div className="ph-role">Santosh Kumar · KA 01 EV 2201</div>
+                    </div>
+                    <div className="phone-body">
+                      <div className="wallet-card">
+                        <div className="wc-label">Wallet Balance</div>
+                        <div className="wc-amount">₹1,240</div>
+                        <div className="wc-due">Due this cycle: ₹2,000</div>
+                        <div className="wc-actions">
+                          <div className="wc-btn">Pay Now</div>
+                          <div className="wc-btn">Withdraw</div>
+                          <div className="wc-btn">History</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', color: '#94a3b8', marginBottom: '8px' }}>My Earnings · June</div>
+                      <div className="phone-list-item">
+                        <div className="pli-icon">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2"><path d="M12 2v20m5-17H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+                        </div>
+                        <div className="pli-main">
+                          <div className="pli-title">Today's Earnings</div>
+                          <div className="pli-sub">3 trips · 7 hrs active</div>
+                        </div>
+                        <div className="pli-amount green">+₹820</div>
+                      </div>
+                      <div className="phone-list-item">
+                        <div className="pli-icon">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
+                        </div>
+                        <div className="pli-main">
+                          <div className="pli-title">Rent paid · Jun 5</div>
+                          <div className="pli-sub">UPI · MobilityGrid</div>
+                        </div>
+                        <div className="pli-amount" style={{ color: '#dc2626' }}>−₹2,000</div>
+                      </div>
+                      <div className="phone-list-item">
+                        <div className="pli-icon">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                        </div>
+                        <div className="pli-main">
+                          <div className="pli-title">Month total</div>
+                          <div className="pli-sub">June 1 – 7</div>
+                        </div>
+                        <div className="pli-amount green">₹5,240</div>
+                      </div>
+                    </div>
+                    <div className="phone-bottom-nav">
+                      <div className="pbn-item active"><div className="pbn-icon" />Home</div>
+                      <div className="pbn-item"><div className="pbn-icon" />Wallet</div>
+                      <div className="pbn-item"><div className="pbn-icon" />Pay</div>
+                      <div className="pbn-item"><div className="pbn-icon" />KYC</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div style={{ width: '200px', height: '200px' }}>
-            <svg viewBox="0 0 200 200" width="200" height="200">
-              <polygon points="100,20 180,70 180,130 100,180 20,130 20,70" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
-              <polygon points="100,40 160,80 160,120 100,160 40,120 40,80" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1"/>
-              <polygon points="100,60 140,85 140,115 100,140 60,115 60,85" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1"/>
-              <polygon points="100,30 170,72 165,128 100,168 35,128 30,72" fill="rgba(196,154,108,0.3)" stroke="#C49A6C" strokeWidth="1.5"/>
-            </svg>
+        </div>
+      </section>
+
+      <section className="features-section">
+        <div className="container">
+          <div className="features-header">
+            <p className="section-label section-label-light">Platform Capabilities</p>
+            <h2 className="display display-light">Everything the fleet economy needs,<br /><em>nothing it doesn't</em></h2>
+            <p>Every feature was built from direct research with fleet operators and drivers across India — not from assumptions.</p>
+          </div>
+          <div className="features-grid">
+            <div className="feature-cell">
+              <div className="feature-icon">💳</div>
+              <div className="feature-title">UPI Rent Collection</div>
+              <div className="feature-body">Verified digital payments via MobilityGrid. Drivers pay through any UPI app. Owners see collections in real time with a full audit trail.</div>
+            </div>
+            <div className="feature-cell">
+              <div className="feature-icon">🪪</div>
+              <div className="feature-title">Driver KYC & Verification</div>
+              <div className="feature-body">Aadhaar, PAN, Driving Licence, and bank verification managed through an admin queue.</div>
+            </div>
+            <div className="feature-cell">
+              <div className="feature-icon">📊</div>
+              <div className="feature-title">Live Fleet Dashboard</div>
+              <div className="feature-body">Real-time visibility across your vehicles, drivers, and collections in a single system.</div>
+            </div>
+            <div className="feature-cell">
+              <div className="feature-icon">🔒</div>
+              <div className="feature-title">Private Earnings Tracker</div>
+              <div className="feature-body">Drivers track earnings privately — helping build trust while keeping operations transparent.</div>
+            </div>
+            <div className="feature-cell">
+              <div className="feature-icon">📁</div>
+              <div className="feature-title">Compliance Vault</div>
+              <div className="feature-body">Store documents, RC copies, and KYC files in one searchable place.</div>
+            </div>
+            <div className="feature-cell">
+              <div className="feature-icon">🌐</div>
+              <div className="feature-title">Hindi + English Interface</div>
+              <div className="feature-body">The driver terminal supports both Hindi and English for real-world usability.</div>
+            </div>
           </div>
         </div>
-      </div>
-      
-      {/* Footer */}
-      <div style={{ backgroundColor: 'white', borderTop: '1px solid #E8E0D5', padding: '24px 60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <p style={{ fontSize: '14px', fontWeight: '700', color: '#8B5E3C' }}>MOBILITY GRID</p>
-        <p style={{ fontSize: '12px', color: '#9CA3AF' }}>© 2025 Mobility Grid. All rights reserved.</p>
-      </div>
-    </div>
+      </section>
+
+      <section className="how-section" id="how">
+        <div className="container">
+          <div className="how-header">
+            <p className="section-label">How It Works</p>
+            <h2 className="display">Up and running in <em>four steps</em></h2>
+            <p>From fleet onboarding to digital collections — the process is designed to be simple, fast, and reliable.</p>
+          </div>
+          <div className="how-steps">
+            <div className="how-step">
+              <div className="how-step-num">1</div>
+              <h4>Admin onboards your company</h4>
+              <p>MobilityGrid verifies and activates your fleet, usually in under 24 hours.</p>
+            </div>
+            <div className="how-step">
+              <div className="how-step-num">2</div>
+              <h4>Add vehicles and drivers</h4>
+              <p>Set up vehicles, assign drivers, and define daily rents from the owner dashboard.</p>
+            </div>
+            <div className="how-step">
+              <div className="how-step-num">3</div>
+              <h4>Drivers complete KYC</h4>
+              <p>Drivers upload documents through the mobile terminal. Admin verifies to unlock assignments.</p>
+            </div>
+            <div className="how-step">
+              <div className="how-step-num">4</div>
+              <h4>Collections run digitally</h4>
+              <p>Drivers pay rent via UPI. Every payment is recorded, visible, and reconciled automatically.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="for-section">
+        <div className="container">
+          <div className="for-header">
+            <p className="section-label">Built For</p>
+            <h2 className="display">Purpose-built for <em>every stakeholder</em></h2>
+          </div>
+          <div className="for-grid">
+            <div className="for-card">
+              <div className="for-avatar" style={{ background: '#ede9fe' }}>🚗</div>
+              <h4>Fleet Owners</h4>
+              <p className="sub">Any fleet, any size</p>
+              <p>Replace WhatsApp reminders and paper ledgers with a real-time dashboard. Know exactly who has paid and what your fleet is worth.</p>
+              <ul className="for-list">
+                <li className="for-item"><span className="for-bullet" />Zero manual reconciliation</li>
+                <li className="for-item"><span className="for-bullet" />Verified UPI collections</li>
+                <li className="for-item"><span className="for-bullet" />Fleet registry at scale</li>
+              </ul>
+            </div>
+            <div className="for-card">
+              <div className="for-avatar" style={{ background: '#fef3c7' }}>🧑‍💼</div>
+              <h4>Fleet Managers</h4>
+              <p className="sub">Day-to-day operations</p>
+              <p>Manage assignments, record collections, and track driver compliance without access to owner-only financial controls.</p>
+              <ul className="for-list">
+                <li className="for-item"><span className="for-bullet" />Role-based controls</li>
+                <li className="for-item"><span className="for-bullet" />Driver and vehicle assignment</li>
+                <li className="for-item"><span className="for-bullet" />Cash collection recording</li>
+              </ul>
+            </div>
+            <div className="for-card">
+              <div className="for-avatar" style={{ background: '#dcfce7' }}>🛺</div>
+              <h4>Drivers</h4>
+              <p className="sub">Gig workers, daily earners</p>
+              <p>See dues, track earnings, pay rent with a tap, and keep documents in order using a phone that works even on 2G.</p>
+              <ul className="for-list">
+                <li className="for-item"><span className="for-bullet" />Private earnings tracker</li>
+                <li className="for-item"><span className="for-bullet" />UPI payment in one tap</li>
+                <li className="for-item"><span className="for-bullet" />Hindi + English UI</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="signup-section" id="signup">
+        <div className="container signup-inner">
+          <div className="signup-grid">
+            <div className="signup-left">
+              <p className="section-label section-label-light" style={{ marginBottom: '16px' }}>Expression of Interest</p>
+              <h2 className="display display-light">Be part of<br /><em>what comes next.</em></h2>
+              <p className="body-lg">We are in active development and speaking with fleet operators, managers, and drivers across India. If you operate a fleet or work within the ecosystem, we want to hear from you first.</p>
+              <div className="signup-promises">
+                <div className="sp-item"><span className="sp-dot" />Our team reaches out within 24 hours</div>
+                <div className="sp-item"><span className="sp-dot" />This is a conversation, not a sales call</div>
+                <div className="sp-item"><span className="sp-dot" />Early participants shape the product roadmap</div>
+                <div className="sp-item"><span className="sp-dot" />Your details are never shared with third parties</div>
+              </div>
+            </div>
+
+            <div>
+              <div id="successCard" className={`success-card${submitted ? ' show' : ''}`}>
+                <span className="success-icon">✦</span>
+                <div className="success-title">You're on the list.</div>
+                <div className="success-body">
+                  Thank you for your interest in MobilityGrid.<br />
+                  Our team will reach out on WhatsApp within 24 hours.<br /><br />
+                  You are now part of building the infrastructure that India's fleet economy deserves.
+                </div>
+              </div>
+
+              <div id="formCard" className="form-card" style={{ display: submitted ? 'none' : 'block' }}>
+                <div className="form-title">Express Your Interest</div>
+                <div className="form-sub">Takes 60 seconds. No commitment required.</div>
+
+                <form className="signup-form" onSubmit={handleSubmit}>
+                  <div className="field-row">
+                    <div className="field">
+                      <label>Full Name</label>
+                      <input name="name" value={formData.name} onChange={handleChange} placeholder="Your name" required />
+                    </div>
+                    <div className="field">
+                      <label>WhatsApp Number</label>
+                      <input name="phone" value={formData.phone} onChange={handleChange} placeholder="10-digit number" maxLength="10" required />
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label>Organisation / Fleet Name</label>
+                    <input name="company" value={formData.company} onChange={handleChange} placeholder="Your company or fleet" required />
+                  </div>
+
+                  <div className="field-row">
+                    <div className="field">
+                      <label>Your Role</label>
+                      <select name="role" value={formData.role} onChange={handleChange} required>
+                        <option value="" disabled>Select role</option>
+                        <option>Fleet Owner / Operator</option>
+                        <option>Fleet Manager</option>
+                        <option>Driver / Rider</option>
+                        <option>Investor / Partner</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>Fleet Size</label>
+                      <select name="fleet" value={formData.fleet} onChange={handleChange}>
+                        <option value="" disabled>Select range</option>
+                        <option>1 – 10 vehicles</option>
+                        <option>11 – 30 vehicles</option>
+                        <option>31 – 100 vehicles</option>
+                        <option>100+ vehicles</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="field-row">
+                    <div className="field">
+                      <label>City</label>
+                      <input name="city" value={formData.city} onChange={handleChange} placeholder="Where you operate" />
+                    </div>
+                    <div className="field">
+                      <label>Vehicle Type</label>
+                      <select name="type" value={formData.type} onChange={handleChange}>
+                        <option value="" disabled>Select type</option>
+                        <option>EV / Electric</option>
+                        <option>Auto-Rickshaw</option>
+                        <option>Cab / Car</option>
+                        <option>Truck / Commercial</option>
+                        <option>Two-Wheeler</option>
+                        <option>Mixed Fleet</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="form-submit btn btn-primary btn-lg" disabled={isSubmitting}>
+                    {isSubmitting ? 'Submitting...' : 'Submit Expression of Interest →'}
+                  </button>
+                  <div className="form-note">By submitting you agree to be contacted by the MobilityGrid team. We do not share your information.</div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <div className="footer-accent" />
+        <div className="container footer-inner">
+          <div className="footer-top">
+            <div className="footer-brand">
+              <div className="footer-logo">
+                <svg className="footer-logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="36" height="36" rx="9" fill="#4f46e5" />
+                  <circle cx="10" cy="10" r="1.8" fill="white" opacity="0.45" />
+                  <circle cx="18" cy="10" r="1.8" fill="white" opacity="0.45" />
+                  <circle cx="26" cy="10" r="1.8" fill="white" opacity="0.45" />
+                  <circle cx="10" cy="18" r="1.8" fill="white" opacity="0.45" />
+                  <circle cx="26" cy="18" r="1.8" fill="white" opacity="0.45" />
+                  <circle cx="10" cy="26" r="1.8" fill="white" opacity="0.45" />
+                  <circle cx="18" cy="26" r="1.8" fill="white" opacity="0.45" />
+                  <circle cx="26" cy="26" r="1.8" fill="white" opacity="0.45" />
+                  <circle cx="18" cy="18" r="4" fill="white" />
+                  <text x="18" y="21.5" fontFamily="Georgia,serif" fontWeight="900" fontSize="7" fill="#4f46e5" textAnchor="middle">M</text>
+                  <line x1="18" y1="14" x2="10" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
+                  <line x1="18" y1="14" x2="18" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
+                  <line x1="18" y1="14" x2="26" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
+                  <line x1="22" y1="18" x2="26" y2="18" stroke="white" strokeWidth="0.9" opacity="0.3" />
+                  <line x1="18" y1="22" x2="26" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
+                  <line x1="18" y1="22" x2="18" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
+                  <line x1="18" y1="22" x2="10" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
+                  <line x1="14" y1="18" x2="10" y2="18" stroke="white" strokeWidth="0.9" opacity="0.3" />
+                </svg>
+                <span className="footer-wordmark">Mobility<span>Grid</span></span>
+              </div>
+              <p className="footer-tagline">The operating system for India's fleet economy — built for every operator, manager, and driver.</p>
+              <div className="footer-badge">
+                <div className="footer-badge-dot" />
+                <span className="footer-badge-text">India's Fleet Operating System</span>
+              </div>
+            </div>
+            <div className="footer-col">
+              <div className="footer-col-title">Product</div>
+              <ul className="footer-links">
+                <li><a href="#product" className="footer-link">Super Admin Console</a></li>
+                <li><a href="#product" className="footer-link">Fleet Owner Dashboard</a></li>
+                <li><a href="#product" className="footer-link">Driver Terminal</a></li>
+                <li><a href="#product" className="footer-link">KYC &amp; Compliance</a></li>
+              </ul>
+            </div>
+            <div className="footer-col">
+              <div className="footer-col-title">Company</div>
+              <ul className="footer-links">
+                <li><a href="#vision" className="footer-link">Vision &amp; Mission</a></li>
+                <li><a href="#gaps" className="footer-link">The Problem</a></li>
+                <li><a href="#how" className="footer-link">How It Works</a></li>
+                <li><a href="#signup" className="footer-link">Get Early Access</a></li>
+              </ul>
+            </div>
+            <div className="footer-col">
+              <div className="footer-col-title">Contact</div>
+              <ul className="footer-links">
+                <li><a href="mailto:hello@mobilitygrid.in" className="footer-link">hello@mobilitygrid.in</a></li>
+                <li><span className="footer-link">Bengaluru, India</span></li>
+                <li><a href="#signup" className="footer-link">Request a Demo</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <div className="footer-copy">© 2026 MobilityGrid. All rights reserved.</div>
+            <div className="footer-by">Built with purpose in India <span className="footer-india">🇮🇳</span></div>
+          </div>
+        </div>
+      </footer>
+    </>
   );
 }
 
