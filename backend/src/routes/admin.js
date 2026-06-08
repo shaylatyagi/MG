@@ -473,6 +473,20 @@ router.post('/owners/:ownerId/assign-company', async (req, res) => {
 });
 
 // ─── COMPANY STATUS TOGGLE ────────────────────────────────────────────────────
+router.patch('/companies/:id/name', async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+    const result = await pool.query(
+      `UPDATE public.companies SET name=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+      [name.trim(), req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Company not found' });
+    logAudit('COMPANY_RENAMED', 'company', req.params.id, 'admin', { new_name: name.trim() });
+    res.json({ success: true, company: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.patch('/companies/:id/status', async (req, res) => {
   try {
     const { status } = req.body;

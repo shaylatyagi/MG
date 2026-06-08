@@ -943,6 +943,9 @@ function Companies() {
   const [newCo, setNewCo]       = useState({ name: '', cin: '', city: '' });
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState('');
+  const [renaming, setRenaming] = useState(null); // { id, name }
+  const [renameVal, setRenameVal] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
 
   // Drill-down stack: each entry = { type, id, label }
   const [stack, setStack] = useState([]);
@@ -957,6 +960,23 @@ function Companies() {
       .catch(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const startRename = (e, c) => {
+    e.stopPropagation();
+    setRenaming({ id: c.id, name: c.name });
+    setRenameVal(c.name);
+  };
+
+  const saveRename = async () => {
+    if (!renameVal.trim() || renameVal.trim() === renaming.name) { setRenaming(null); return; }
+    setRenameSaving(true);
+    try {
+      await api(`/api/admin/companies/${renaming.id}/name`, { method: 'PATCH', body: JSON.stringify({ name: renameVal.trim() }) });
+      setRenaming(null);
+      load();
+    } catch (err) { alert(err.message); }
+    finally { setRenameSaving(false); }
+  };
 
   const toggleStatus = async (id, current) => {
     const next = current === 'Active' || current === 'ACTIVE' ? 'Inactive' : 'Active';
@@ -1014,7 +1034,7 @@ function Companies() {
                   <td className="px-4 py-3 text-gray-500">{c.city || '—'}</td>
                   <td className="px-4 py-3"><Badge status={c.status} /></td>
                   <td className="px-4 py-3 text-gray-400">{fmtDate(c.created_at)}</td>
-                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                  <td className="px-4 py-3 flex gap-2" onClick={e => e.stopPropagation()}>
                     <button onClick={() => toggleStatus(c.id, c.status)}
                       className={`text-xs px-3 py-1 rounded-full border font-medium transition ${
                         c.status === 'Active' || c.status === 'ACTIVE'
@@ -1023,12 +1043,38 @@ function Companies() {
                       }`}>
                       {c.status === 'Active' || c.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                     </button>
+                    <button onClick={e => startRename(e, c)}
+                      className="text-xs px-3 py-1 rounded-full border border-indigo-300 text-indigo-600 hover:bg-indigo-50 font-medium transition">
+                      ✏️ Rename
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No companies found</p>}
+        </div>
+      )}
+
+      {/* Rename Company */}
+      {renaming && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="font-bold text-gray-800 mb-4">Rename Company</h3>
+            <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setRenaming(null); }}
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-4" />
+            <div className="flex gap-2">
+              <button onClick={saveRename} disabled={renameSaving}
+                className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+                {renameSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setRenaming(null)}
+                className="flex-1 border text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
