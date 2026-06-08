@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const pool = require('../config/db');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth.middleware');
 
 // Memory storage — demo ke liye (S3 nahi hai abhi)
 const upload = multer({

@@ -27,7 +27,8 @@ const verifyWebhookSignature = (req) => {
 };
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/db');
-const { verifyToken, requirePermission } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth.middleware');
+const { requirePermission } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
 // ─── ASSIGNMENT HISTORY HELPER ───────────────────────────────────────
 const logAssignment = async (driverId, vehicleId, ownerId, dailyRent, rentType) => {

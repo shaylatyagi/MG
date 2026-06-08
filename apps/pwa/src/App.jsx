@@ -5,6 +5,24 @@ import Login      from './pages/Login';
 import DriverApp  from './pages/driver/DriverApp';
 import ManagerApp from './pages/manager/ManagerApp';
 
+// Global session-expiry interceptor: if backend returns SESSION_EXPIRED, force logout
+const _origFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const res = await _origFetch(...args);
+  if (res.status === 401) {
+    const clone = res.clone();
+    try {
+      const data = await clone.json();
+      if (data.code === 'SESSION_EXPIRED') {
+        localStorage.removeItem('mg_token');
+        localStorage.removeItem('mg_user');
+        window.location.href = '/login';
+      }
+    } catch {}
+  }
+  return res;
+};
+
 function Guard({ roles, children }) {
   const { user } = useAuth();
   if (!user)              return <Navigate to="/login" replace />;

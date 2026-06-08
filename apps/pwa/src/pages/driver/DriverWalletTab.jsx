@@ -56,7 +56,7 @@ export default function DriverWalletTab() {
       <p className="text-red-500 text-sm mb-3">{error}</p>
       <button onClick={load}
         className="px-4 py-2 text-white rounded-xl text-sm font-semibold"
-        style={{ backgroundColor: '#8B5E3C' }}>
+        style={{ backgroundColor: '#4f46e5' }}>
         Retry
       </button>
     </div>
@@ -89,7 +89,7 @@ export default function DriverWalletTab() {
 
       {/* Balance card */}
       <div className="rounded-2xl p-5 text-white shadow-lg"
-           style={{ background: 'linear-gradient(135deg, #7D5235 0%, #5C3A1E 100%)' }}>
+           style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #5C3A1E 100%)' }}>
         <p className="text-xs font-semibold tracking-wide mb-1" style={{ opacity: 0.75 }}>WALLET BALANCE</p>
         <p className="text-4xl font-black mb-4">{fmt(wallet_balance)}</p>
 
@@ -148,7 +148,7 @@ export default function DriverWalletTab() {
               </p>
             </div>
             <div className="ml-auto text-right">
-              <p className="text-sm font-bold" style={{ color: '#8B5E3C' }}>{fmt(vehicle.rent_amount)}</p>
+              <p className="text-sm font-bold" style={{ color: '#4f46e5' }}>{fmt(vehicle.rent_amount)}</p>
               <p className="text-[10px] text-gray-400">/{vehicle.rent_type?.toLowerCase()}</p>
             </div>
           </div>

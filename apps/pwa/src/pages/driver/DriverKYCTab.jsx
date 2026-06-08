@@ -92,7 +92,7 @@ export default function DriverKYCTab() {
            style={{
              background: allApproved
                ? 'linear-gradient(135deg, #16A34A, #15803D)'
-               : 'linear-gradient(135deg, #7D5235, #5C3A1E)',
+               : 'linear-gradient(135deg, #4f46e5, #5C3A1E)',
              color: 'white',
            }}>
         <p className="text-xs font-semibold tracking-wide mb-1" style={{ opacity: 0.8 }}>KYC STATUS</p>
@@ -192,8 +192,8 @@ export default function DriverKYCTab() {
                     disabled={isUploading}
                     className="flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors"
                     style={{
-                      borderColor: existing?.status === 'rejected' ? '#F97316' : '#8B5E3C',
-                      color:       existing?.status === 'rejected' ? '#F97316' : '#8B5E3C',
+                      borderColor: existing?.status === 'rejected' ? '#F97316' : '#4f46e5',
+                      color:       existing?.status === 'rejected' ? '#F97316' : '#4f46e5',
                       backgroundColor: isUploading ? '#F5F5F5' : 'white',
                       opacity: isUploading ? 0.7 : 1,
                       cursor: isUploading ? 'not-allowed' : 'pointer',
@@ -205,8 +205,8 @@ export default function DriverKYCTab() {
                     disabled={isUploading}
                     className="flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors"
                     style={{
-                      borderColor: existing?.status === 'rejected' ? '#F97316' : '#8B5E3C',
-                      color:       existing?.status === 'rejected' ? '#F97316' : '#8B5E3C',
+                      borderColor: existing?.status === 'rejected' ? '#F97316' : '#4f46e5',
+                      color:       existing?.status === 'rejected' ? '#F97316' : '#4f46e5',
                       backgroundColor: isUploading ? '#F5F5F5' : 'white',
                       opacity: isUploading ? 0.7 : 1,
                       cursor: isUploading ? 'not-allowed' : 'pointer',

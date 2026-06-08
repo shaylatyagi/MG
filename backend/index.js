@@ -12,8 +12,14 @@ if (missing.length) {
 }
 //To connect DB
 require('./src/config/db');
-require('./src/services/scheduler.service'); 
+require('./src/services/scheduler.service');
 const pool = require('./src/config/db');
+
+// ── Auto-migration: single-device session tokens ─────────────────────────────
+pool.query(`
+  ALTER TABLE public.owners  ADD COLUMN IF NOT EXISTS session_token VARCHAR(64);
+  ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS session_token VARCHAR(64);
+`).catch(err => console.warn('Session token migration warning:', err.message));
 const app = express();
 // CORS fixed
 app.use(cors({

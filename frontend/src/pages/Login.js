@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Truck, Building2, Shield, Phone, Send, ArrowRight } from 'lucide-react';
+import { Truck, Building2, Shield, Phone, Send, ArrowRight, ChevronLeft } from 'lucide-react';
 
 const API = 'https://mg-qw5s.onrender.com';
 
@@ -13,8 +13,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [otpValue, setOtpValue] = useState('');  // editable otp input
+  const [otpValue, setOtpValue] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
+  const [adminPhone, setAdminPhone] = useState('');
+  const [adminSecret, setAdminSecret] = useState('');
 
   useEffect(() => { fetchDrivers(); }, []);
 
@@ -29,12 +31,11 @@ export default function Login() {
   };
 
   const roles = [
-    { type: 'driver',  name: 'Driver',         icon: <Truck className="w-8 h-8" />,    bgColor: 'from-emerald-500 to-teal-600',   redirect: '/driver/dashboard' },
-    { type: 'owner',   name: 'Vehicle Owner',   icon: <Building2 className="w-8 h-8" />, bgColor: 'from-blue-500 to-indigo-600',   phone: '9876542345', redirect: '/owner/dashboard' },
-    { type: 'admin',   name: 'Platform Admin',  icon: <Shield className="w-8 h-8" />,   bgColor: 'from-purple-500 to-pink-600',   phone: '9999999999', redirect: '/admin' }
+    { type: 'driver',  name: 'Driver',        icon: <Truck className="w-6 h-6" />,    redirect: '/driver/dashboard' },
+    { type: 'owner',   name: 'Fleet Owner',   icon: <Building2 className="w-6 h-6" />, phone: '9876542345', redirect: '/owner/dashboard' },
+    { type: 'admin',   name: 'Platform Admin', icon: <Shield className="w-6 h-6" />,   phone: '9999999999', redirect: '/admin' }
   ];
 
-  // ── Timer ─────────────────────────────────────────────────────────
   const startResendTimer = () => {
     setResendTimer(30);
     const t = setInterval(() => {
@@ -42,7 +43,6 @@ export default function Login() {
     }, 1000);
   };
 
-  // ── Send OTP (owner/admin) ─────────────────────────────────────────
   const sendOwnerOTP = async () => {
     const phone = selectedRole.phone;
     setLoading(true); setError(''); setSuccess('');
@@ -54,8 +54,8 @@ export default function Login() {
       });
       const data = await res.json();
       if (data.success) {
-        setOtpValue(data.otp || '');           // autofill
-        setSuccess(`OTP: ${data.otp}`);        // screen pe dikhao
+        setOtpValue(data.otp || '');
+        setSuccess(`OTP: ${data.otp}`);
         setStep('verify-otp');
         startResendTimer();
       } else { setError(data.message || 'Failed'); }
@@ -63,7 +63,6 @@ export default function Login() {
     setLoading(false);
   };
 
-  // ── Verify OTP (owner/admin) ───────────────────────────────────────
   const verifyOwnerOTP = async () => {
     const phone = selectedRole.phone;
     setLoading(true); setError('');
@@ -80,7 +79,6 @@ export default function Login() {
         const role = data.user?.role;
         if (role === 'MANAGER') navigate('/manager/dashboard');
         else if (selectedRole.type === 'admin') {
-          // CompanyDashboard reads mg_admin_token, not token
           localStorage.setItem('mg_admin_token', data.token);
           window.location.href = '/admin/dashboard';
         } else navigate(selectedRole.redirect);
@@ -89,7 +87,6 @@ export default function Login() {
     setLoading(false);
   };
 
-  // ── Send OTP (driver) ──────────────────────────────────────────────
   const sendDriverOTP = async () => {
     const phone = selectedDriver.mobile_number;
     setLoading(true); setError(''); setSuccess('');
@@ -101,8 +98,8 @@ export default function Login() {
       });
       const data = await res.json();
       if (data.success) {
-        setOtpValue(data.otp || '');           // autofill
-        setSuccess(`OTP: ${data.otp}`);        // screen pe dikhao
+        setOtpValue(data.otp || '');
+        setSuccess(`OTP: ${data.otp}`);
         setStep('driver-verify-otp');
         startResendTimer();
       } else { setError(data.message || 'Failed'); }
@@ -110,7 +107,6 @@ export default function Login() {
     setLoading(false);
   };
 
-  // ── Verify OTP (driver) ────────────────────────────────────────────
   const verifyDriverOTP = async () => {
     const phone = selectedDriver.mobile_number;
     setLoading(true); setError('');
@@ -142,205 +138,434 @@ export default function Login() {
     setStep('driver-otp');
   };
 
+  const sendAdminOTP = async () => {
+    setLoading(true); setError(''); setSuccess('');
+    try {
+      const res = await fetch(`${API}/api/auth/admin-send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: adminPhone, admin_secret: adminSecret })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpValue(data.otp || '');
+        setSuccess(data.otp ? `OTP: ${data.otp}` : 'OTP sent');
+        setStep('verify-otp');
+        startResendTimer();
+      } else { setError(data.message || 'Failed to send OTP'); }
+    } catch { setError('Network error.'); }
+    setLoading(false);
+  };
+
+  const verifyAdminOTP = async () => {
+    setLoading(true); setError('');
+    try {
+      const res = await fetch(`${API}/api/auth/admin-verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: adminPhone, otp: otpValue, admin_secret: adminSecret })
+      });
+      const data = await res.json();
+      if (data.success && data.token) {
+        localStorage.setItem('mg_admin_token', data.token);
+        window.location.href = '/admin/dashboard';
+      } else { setError(data.message || 'Verification failed'); }
+    } catch { setError('Network error.'); }
+    setLoading(false);
+  };
+
   const handleBack = () => {
     setStep('select-role'); setSelectedRole(null);
     setSelectedDriver(null); setError(''); setSuccess(''); setOtpValue('');
+    setAdminPhone(''); setAdminSecret('');
   };
 
-  // ── Error/Success helper ───────────────────────────────────────────
-  const AlertBox = () => (
-    <>
-      {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 font-semibold">{error}</div>}
-      {success && <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-700 font-bold">{success}</div>}
-    </>
-  );
+  // ── Shared layout shell ──────────────────────────────────────────────
+  const Shell = ({ children, showBack, onBack, title, subtitle }) => (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px 16px',
+      fontFamily: "'Inter', -apple-system, sans-serif"
+    }}>
+      {/* Subtle grid pattern */}
+      <div style={{
+        position: 'fixed', inset: 0, opacity: 0.03,
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+        backgroundSize: '40px 40px', pointerEvents: 'none'
+      }} />
 
-  // ====================== ROLE SELECTION ======================
-  if (step === 'select-role') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-4xl mx-auto">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <span className="text-3xl font-bold text-white">MG</span>
-            </div>
-            <h1 className="text-3xl font-bold text-slate-800">MobilityGrid</h1>
-            <p className="text-slate-500 mt-2">Select your role to continue</p>
+      <div style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            width: '52px', height: '52px',
+            background: '#4f46e5',
+            borderRadius: '14px',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: '14px',
+            boxShadow: '0 8px 24px rgba(79,70,229,0.4)'
+          }}>
+            <span style={{ color: '#fff', fontWeight: 800, fontSize: '22px', letterSpacing: '-1px' }}>M</span>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {roles.map((role) => (
-              <button key={role.type} onClick={() => handleRoleSelect(role)}
-                className="group bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all text-center border-2 border-transparent hover:border-blue-200">
-                <div className={`w-20 h-20 rounded-xl bg-gradient-to-br ${role.bgColor} flex items-center justify-center text-white mx-auto mb-4 group-hover:scale-110 transition-transform`}>
-                  {role.icon}
-                </div>
-                <h3 className="text-xl font-bold text-slate-800">{role.name}</h3>
-                <p className="text-slate-400 text-sm mt-2">Click to continue →</p>
-              </button>
-            ))}
+          <div>
+            <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px', margin: 0 }}>
+              MobilityGrid
+            </h1>
+            <p style={{ color: 'rgba(148,163,184,0.8)', fontSize: '12px', marginTop: '4px', letterSpacing: '0.08em' }}>
+              FLEET OPERATING SYSTEM
+            </p>
           </div>
         </div>
-      </div>
-    );
-  }
 
-  // ====================== DRIVER LIST ======================
-  if (step === 'select-driver') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden">
-          <div className={`bg-gradient-to-r ${selectedRole.bgColor} p-6 text-center`}>
-            <h2 className="text-xl font-bold text-white">Select Driver</h2>
-            <p className="text-white/80 text-sm mt-1">Choose your profile to login</p>
-          </div>
-          <div className="p-4 max-h-96 overflow-y-auto">
-            {drivers.length === 0 ? (
-              <div className="text-center py-8 text-gray-500"><p>Loading drivers...</p></div>
-            ) : (
-              <div className="space-y-2">
-                {drivers.map((driver) => (
-                  <button key={driver.id} onClick={() => handleDriverSelect(driver)}
-                    className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="font-bold text-gray-800 text-lg">{driver.full_name}</div>
-                        <div className="text-sm text-gray-500 font-mono">{driver.mobile_number}</div>
-                        <div className="text-xs text-gray-400">Code: {driver.driver_code}</div>
-                      </div>
-                      <ArrowRight className="w-5 h-5 text-gray-400" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="p-4 border-t">
-            <button onClick={handleBack} className="w-full text-center text-slate-500 text-sm py-2">← Back</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ====================== DRIVER SEND OTP ======================
-  if (step === 'driver-otp') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-[400px] bg-white rounded-3xl shadow-xl overflow-hidden">
-          <div className={`bg-gradient-to-r ${selectedRole.bgColor} p-6 text-center`}>
-            <h2 className="text-xl font-bold text-white">Login as Driver</h2>
-            <p className="text-white/80 text-sm mt-1">{selectedDriver?.full_name}</p>
-          </div>
-          <div className="p-6 space-y-4">
-            <AlertBox />
-            <div>
-              <label className="text-xs font-semibold text-slate-600">Mobile Number</label>
-              <div className="relative mt-1">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="text" value={selectedDriver?.mobile_number || ''} readOnly
-                  className="w-full pl-9 pr-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 font-mono" />
-              </div>
-            </div>
-            <button onClick={sendDriverOTP} disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
-              {loading ? 'Sending...' : 'Send OTP'} <Send className="w-4 h-4" />
+        {/* Card */}
+        <div style={{
+          background: '#fff',
+          borderRadius: '20px',
+          padding: '28px 24px',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.3)'
+        }}>
+          {showBack && (
+            <button onClick={onBack} style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              color: '#94a3b8', fontSize: '13px', background: 'none', border: 'none',
+              cursor: 'pointer', padding: '0 0 16px', fontWeight: 600
+            }}>
+              <ChevronLeft size={15} /> Back
             </button>
-            <button onClick={() => setStep('select-driver')} className="w-full text-center text-slate-500 text-sm">← Back to Drivers</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ====================== DRIVER VERIFY OTP ======================
-  if (step === 'driver-verify-otp') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-[400px] bg-white rounded-3xl shadow-xl overflow-hidden">
-          <div className={`bg-gradient-to-r ${selectedRole.bgColor} p-6 text-center`}>
-            <h2 className="text-xl font-bold text-white">Verify OTP</h2>
-            <p className="text-white/80 text-sm mt-1">OTP sent to {selectedDriver?.mobile_number}</p>
-          </div>
-          <div className="p-6 space-y-4">
-            <AlertBox />
-            <input type="text" value={otpValue}
-              onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="w-full px-4 py-3 border border-slate-200 rounded-xl text-center text-2xl tracking-[0.5em] font-mono"
-              placeholder="——————" maxLength={6} />
-            <button onClick={verifyDriverOTP} disabled={loading || otpValue.length < 6}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
-              {loading ? 'Verifying...' : 'Verify OTP'} <ArrowRight className="w-4 h-4" />
-            </button>
-            <div className="flex justify-between text-sm">
-              <button onClick={() => setStep('driver-otp')} className="text-slate-500">← Back</button>
-              <button onClick={sendDriverOTP} disabled={resendTimer > 0}
-                className="text-blue-600 disabled:text-slate-400">
-                {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-              </button>
+          )}
+          {title && (
+            <div style={{ marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{title}</h2>
+              {subtitle && <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>{subtitle}</p>}
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ====================== OWNER/ADMIN SEND OTP ======================
-  if (step === 'send-otp') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-[400px] bg-white rounded-3xl shadow-xl overflow-hidden">
-          <div className={`bg-gradient-to-r ${selectedRole.bgColor} p-6 text-center`}>
-            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">{selectedRole.icon}</div>
-            <h2 className="text-xl font-bold text-white">Login as {selectedRole.name}</h2>
-          </div>
-          <div className="p-6 space-y-4">
-            <AlertBox />
-            <div>
-              <label className="text-xs font-semibold text-slate-600">Mobile Number</label>
-              <div className="relative mt-1">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="text" value={selectedRole.phone} readOnly
-                  className="w-full pl-9 pr-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 font-mono" />
-              </div>
-            </div>
-            <button onClick={sendOwnerOTP} disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
-              {loading ? 'Sending...' : 'Send OTP'} <Send className="w-4 h-4" />
-            </button>
-            <button onClick={handleBack} className="w-full text-center text-slate-500 text-sm">← Back</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ====================== OWNER/ADMIN VERIFY OTP ======================
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-[400px] bg-white rounded-3xl shadow-xl overflow-hidden">
-        <div className={`bg-gradient-to-r ${selectedRole.bgColor} p-6 text-center`}>
-          <h2 className="text-xl font-bold text-white">Verify OTP</h2>
-          <p className="text-white/80 text-sm mt-1">OTP sent to {selectedRole.phone}</p>
-        </div>
-        <div className="p-6 space-y-4">
-          <AlertBox />
-          <input type="text" value={otpValue}
-            onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-center text-2xl tracking-[0.5em] font-mono"
-            placeholder="——————" maxLength={6} />
-          <button onClick={verifyOwnerOTP} disabled={loading || otpValue.length < 6}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
-            {loading ? 'Verifying...' : 'Verify OTP'} <ArrowRight className="w-4 h-4" />
-          </button>
-          <div className="flex justify-between text-sm">
-            <button onClick={() => setStep('send-otp')} className="text-slate-500">← Back</button>
-            <button onClick={sendOwnerOTP} disabled={resendTimer > 0}
-              className="text-blue-600 disabled:text-slate-400">
-              {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-            </button>
-          </div>
+          )}
+          {children}
         </div>
       </div>
     </div>
+  );
+
+  // ── Alert ─────────────────────────────────────────────────────────
+  const Alert = () => (
+    <div style={{ marginBottom: error || success ? '14px' : 0 }}>
+      {error && (
+        <div style={{
+          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px',
+          padding: '10px 14px', fontSize: '13px', color: '#dc2626', fontWeight: 600
+        }}>{error}</div>
+      )}
+      {success && (
+        <div style={{
+          background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px',
+          padding: '10px 14px', fontSize: '13px', color: '#16a34a', fontWeight: 600
+        }}>{success}</div>
+      )}
+    </div>
+  );
+
+  // ── Input ─────────────────────────────────────────────────────────
+  const inputStyle = {
+    width: '100%', padding: '12px 14px 12px 42px',
+    border: '1.5px solid #e2e8f0', borderRadius: '10px',
+    fontSize: '14px', color: '#0f172a', background: '#f8fafc',
+    boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit'
+  };
+
+  const btnPrimary = {
+    width: '100%', padding: '13px',
+    background: '#4f46e5', color: '#fff',
+    border: 'none', borderRadius: '10px',
+    fontSize: '14px', fontWeight: 700,
+    cursor: 'pointer', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', gap: '8px', fontFamily: 'inherit',
+    transition: 'background 0.15s',
+    boxSizing: 'border-box'
+  };
+
+  const btnDisabled = { ...btnPrimary, background: '#c7d2fe', cursor: 'not-allowed' };
+
+  // ── Role Selection ──────────────────────────────────────────────────
+  if (step === 'select-role') {
+    return (
+      <Shell>
+        <div style={{ marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>Sign in</h2>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Select your role to continue</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {roles.map((role) => (
+            <button key={role.type} onClick={() => handleRoleSelect(role)} style={{
+              display: 'flex', alignItems: 'center', gap: '14px',
+              padding: '14px 16px',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '12px',
+              background: '#fff',
+              cursor: 'pointer', textAlign: 'left', width: '100%',
+              transition: 'all 0.15s',
+              fontFamily: 'inherit'
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#4f46e5'; e.currentTarget.style.background = '#f5f3ff'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
+            >
+              <div style={{
+                width: '40px', height: '40px', borderRadius: '10px',
+                background: '#f5f3ff', color: '#4f46e5',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                {role.icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{role.name}</p>
+                <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0', fontWeight: 400 }}>
+                  {role.type === 'driver' ? 'Access your wallet & payments' :
+                   role.type === 'owner'  ? 'Manage your fleet & drivers' :
+                                            'Platform administration'}
+                </p>
+              </div>
+              <ArrowRight size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />
+            </button>
+          ))}
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Driver List ──────────────────────────────────────────────────────
+  if (step === 'select-driver') {
+    return (
+      <Shell showBack onBack={handleBack} title="Select Driver" subtitle="Choose your profile to continue">
+        <div style={{ maxHeight: '340px', overflowY: 'auto', margin: '0 -4px', padding: '0 4px' }}>
+          {drivers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '14px' }}>
+              Loading drivers...
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {drivers.map((driver) => (
+                <button key={driver.id} onClick={() => handleDriverSelect(driver)} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  border: '1.5px solid #e2e8f0', borderRadius: '10px',
+                  background: '#fff', cursor: 'pointer', textAlign: 'left', width: '100%',
+                  fontFamily: 'inherit'
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#4f46e5'; e.currentTarget.style.background = '#f5f3ff'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
+                >
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{driver.full_name}</p>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0', fontFamily: 'monospace' }}>{driver.mobile_number}</p>
+                  </div>
+                  <ArrowRight size={15} style={{ color: '#94a3b8' }} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Driver Send OTP ──────────────────────────────────────────────────
+  if (step === 'driver-otp') {
+    return (
+      <Shell showBack onBack={() => setStep('select-driver')} title="Login as Driver" subtitle={selectedDriver?.full_name}>
+        <Alert />
+        <div style={{ marginBottom: '14px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+            Mobile Number
+          </label>
+          <div style={{ position: 'relative' }}>
+            <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input type="text" value={selectedDriver?.mobile_number || ''} readOnly style={inputStyle} />
+          </div>
+        </div>
+        <button onClick={sendDriverOTP} disabled={loading} style={loading ? btnDisabled : btnPrimary}>
+          {loading ? 'Sending…' : 'Send OTP'} <Send size={14} />
+        </button>
+      </Shell>
+    );
+  }
+
+  // ── Driver Verify OTP ───────────────────────────────────────────────
+  if (step === 'driver-verify-otp') {
+    return (
+      <Shell showBack onBack={() => setStep('driver-otp')} title="Enter OTP" subtitle={`Sent to ${selectedDriver?.mobile_number}`}>
+        <Alert />
+        <input
+          type="text"
+          value={otpValue}
+          onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="• • • • • •"
+          maxLength={6}
+          style={{
+            width: '100%', padding: '16px',
+            border: '1.5px solid #e2e8f0', borderRadius: '12px',
+            fontSize: '28px', textAlign: 'center', letterSpacing: '0.4em',
+            fontFamily: 'monospace', color: '#0f172a',
+            background: '#f8fafc', outline: 'none',
+            marginBottom: '14px', boxSizing: 'border-box'
+          }}
+        />
+        <button onClick={verifyDriverOTP} disabled={loading || otpValue.length < 6}
+          style={loading || otpValue.length < 6 ? btnDisabled : btnPrimary}>
+          {loading ? 'Verifying…' : 'Verify & Login'} <ArrowRight size={14} />
+        </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
+          <button onClick={sendDriverOTP} disabled={resendTimer > 0} style={{
+            fontSize: '13px', color: resendTimer > 0 ? '#94a3b8' : '#4f46e5',
+            background: 'none', border: 'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
+            fontWeight: 600, fontFamily: 'inherit'
+          }}>
+            {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Admin Send OTP ───────────────────────────────────────────────────
+  if (step === 'send-otp' && selectedRole?.type === 'admin') {
+    return (
+      <Shell showBack onBack={handleBack} title="Platform Admin Login">
+        <Alert />
+        <div style={{ marginBottom: '14px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+            Admin Phone Number
+          </label>
+          <div style={{ position: 'relative' }}>
+            <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input
+              type="tel"
+              value={adminPhone}
+              onChange={e => setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              placeholder="10-digit mobile number"
+              style={inputStyle}
+            />
+          </div>
+        </div>
+        <div style={{ marginBottom: '18px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+            Admin Secret Key
+          </label>
+          <div style={{ position: 'relative' }}>
+            <Shield size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input
+              type="password"
+              value={adminSecret}
+              onChange={e => setAdminSecret(e.target.value)}
+              placeholder="Admin secret key"
+              style={inputStyle}
+            />
+          </div>
+        </div>
+        <button
+          onClick={sendAdminOTP}
+          disabled={loading || adminPhone.length < 10 || !adminSecret}
+          style={loading || adminPhone.length < 10 || !adminSecret ? btnDisabled : btnPrimary}
+        >
+          {loading ? 'Sending…' : 'Send OTP'} <Send size={14} />
+        </button>
+      </Shell>
+    );
+  }
+
+  // ── Owner Send OTP ────────────────────────────────────────────────────
+  if (step === 'send-otp') {
+    return (
+      <Shell showBack onBack={handleBack} title={`Login as ${selectedRole.name}`}>
+        <Alert />
+        <div style={{ marginBottom: '14px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+            Mobile Number
+          </label>
+          <div style={{ position: 'relative' }}>
+            <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input type="text" value={selectedRole.phone} readOnly style={inputStyle} />
+          </div>
+        </div>
+        <button onClick={sendOwnerOTP} disabled={loading} style={loading ? btnDisabled : btnPrimary}>
+          {loading ? 'Sending…' : 'Send OTP'} <Send size={14} />
+        </button>
+      </Shell>
+    );
+  }
+
+  // ── Admin Verify OTP ─────────────────────────────────────────────────
+  if (step === 'verify-otp' && selectedRole?.type === 'admin') {
+    return (
+      <Shell showBack onBack={() => setStep('send-otp')} title="Enter OTP" subtitle={`Sent to ${adminPhone}`}>
+        <Alert />
+        <input
+          type="text"
+          value={otpValue}
+          onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="• • • • • •"
+          maxLength={6}
+          autoFocus
+          style={{
+            width: '100%', padding: '16px',
+            border: '1.5px solid #e2e8f0', borderRadius: '12px',
+            fontSize: '28px', textAlign: 'center', letterSpacing: '0.4em',
+            fontFamily: 'monospace', color: '#0f172a',
+            background: '#f8fafc', outline: 'none',
+            marginBottom: '14px', boxSizing: 'border-box'
+          }}
+        />
+        <button onClick={verifyAdminOTP} disabled={loading || otpValue.length < 6}
+          style={loading || otpValue.length < 6 ? btnDisabled : btnPrimary}>
+          {loading ? 'Verifying…' : 'Verify & Login'} <ArrowRight size={14} />
+        </button>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
+          <button onClick={sendAdminOTP} disabled={resendTimer > 0} style={{
+            fontSize: '13px', color: resendTimer > 0 ? '#94a3b8' : '#4f46e5',
+            background: 'none', border: 'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
+            fontWeight: 600, fontFamily: 'inherit'
+          }}>
+            {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Owner/Manager Verify OTP ─────────────────────────────────────────
+  return (
+    <Shell showBack onBack={() => setStep('send-otp')} title="Enter OTP" subtitle={`Sent to ${selectedRole?.phone}`}>
+      <Alert />
+      <input
+        type="text"
+        value={otpValue}
+        onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        placeholder="• • • • • •"
+        maxLength={6}
+        style={{
+          width: '100%', padding: '16px',
+          border: '1.5px solid #e2e8f0', borderRadius: '12px',
+          fontSize: '28px', textAlign: 'center', letterSpacing: '0.4em',
+          fontFamily: 'monospace', color: '#0f172a',
+          background: '#f8fafc', outline: 'none',
+          marginBottom: '14px', boxSizing: 'border-box'
+        }}
+      />
+      <button onClick={verifyOwnerOTP} disabled={loading || otpValue.length < 6}
+        style={loading || otpValue.length < 6 ? btnDisabled : btnPrimary}>
+        {loading ? 'Verifying…' : 'Verify & Login'} <ArrowRight size={14} />
+      </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
+        <button onClick={sendOwnerOTP} disabled={resendTimer > 0} style={{
+          fontSize: '13px', color: resendTimer > 0 ? '#94a3b8' : '#4f46e5',
+          background: 'none', border: 'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
+          fontWeight: 600, fontFamily: 'inherit'
+        }}>
+          {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+        </button>
+      </div>
+    </Shell>
   );
 }

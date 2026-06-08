@@ -56,12 +56,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)' }}>
       <div className="w-full max-w-sm">
-        {/* Header */}
+        {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-white text-2xl font-bold tracking-tight">MobilityGrid</h1>
-          <p className="text-slate-400 text-sm mt-1">Platform Admin Access</p>
+          <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style={{ background: '#4f46e5', boxShadow: '0 6px 20px rgba(79,70,229,0.4)' }}>
+            <span className="text-white font-black text-xl">M</span>
+          </div>
+          <h1 className="text-white text-xl font-black tracking-tight">MobilityGrid</h1>
+          <p className="text-slate-400 text-xs mt-1 tracking-widest uppercase">Platform Admin</p>
         </div>
 
         {/* Card */}

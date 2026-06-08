@@ -100,9 +100,9 @@ export default function DriverPayTab() {
                   onClick={() => setAmount(String(v))}
                   className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
                   style={{
-                    backgroundColor: parseFloat(amount) === v ? '#8B5E3C' : 'white',
-                    color:           parseFloat(amount) === v ? 'white'    : '#8B5E3C',
-                    borderColor:     '#8B5E3C',
+                    backgroundColor: parseFloat(amount) === v ? '#4f46e5' : 'white',
+                    color:           parseFloat(amount) === v ? 'white'    : '#4f46e5',
+                    borderColor:     '#4f46e5',
                   }}>
                   {fmt(v)}
                 </button>
@@ -118,7 +118,7 @@ export default function DriverPayTab() {
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full pl-8 pr-4 py-3 border border-gray-200 rounded-xl text-xl font-black text-gray-900 focus:outline-none focus:border-amber-700"
+            className="w-full pl-8 pr-4 py-3 border border-gray-200 rounded-xl text-xl font-black text-gray-900 focus:outline-none focus:border-indigo-600"
           />
         </div>
 

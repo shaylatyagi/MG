@@ -4,7 +4,7 @@
 const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/db');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth.middleware');
 const notify  = require('../services/notify');
 
 // All owner routes require a valid JWT

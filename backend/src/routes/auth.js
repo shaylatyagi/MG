@@ -3,6 +3,7 @@ const router   = express.Router();
 const pool     = require('../config/db');
 const jwt      = require('jsonwebtoken');
 const bcrypt   = require('bcrypt');
+const crypto   = require('crypto');
 const { generateToken, verifyToken } = require('../middleware/auth');
 const twilio   = require('twilio');
 
@@ -141,7 +142,11 @@ router.post('/verify-otp', async (req, res) => {
     }
     const user = driverRes.rows[0] || ownerRes.rows[0];
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null });
+    // Single-device login: generate new session token, invalidate old sessions
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const table = user.role === 'DRIVER' ? 'drivers' : 'owners';
+    await pool.query(`UPDATE public.${table} SET session_token=$1 WHERE id=$2`, [sessionToken, user.id]);
+    const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null, session_token: sessionToken });
     res.json({
       success: true, token,
       user: {

@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth.middleware');
 
 const FRONTEND = process.env.FRONTEND_URL || 'https://mg-xi.vercel.app';
 const BASE_PY   = process.env.PAYYANTRA_BASE_URL || 'https://payin-api-uat.payyantra.com';

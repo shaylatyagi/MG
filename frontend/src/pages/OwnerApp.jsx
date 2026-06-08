@@ -111,7 +111,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
               onClick={() => setExpandedDriver(expandedDriver === d.id ? null : d.id)}
             >
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 font-black text-sm">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-700 font-black text-sm">
                   {d.full_name?.charAt(0)}
                 </div>
                 <div>
@@ -206,7 +206,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setSelectedEntryDriver(d); setShowEntryModal(true); }}
-                    className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-black"
+                    className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black"
                   >
                     + Add Entry
                   </button>
@@ -252,7 +252,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
               <button onClick={() => setShowEntryModal(false)}
                 className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
               <button onClick={addEntry}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Record</button>
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black">Record</button>
             </div>
           </div>
         </div>
@@ -535,7 +535,7 @@ const DriverDetailsModal = () => {
     >
       <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Driver Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white text-center rounded-t-3xl">
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 text-white text-center rounded-t-3xl">
           <div className="w-24 h-24 rounded-full bg-white/20 mx-auto flex items-center justify-center text-4xl font-black mb-3">
             {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
           </div>
@@ -551,7 +551,7 @@ const DriverDetailsModal = () => {
       setSelectedDriverDetails(null);
       openChatWithDriver(driver);
     }}
-    className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2 mb-4"
+    className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2 mb-4"
   >
     <MessageCircle size={16}/> Chat with Driver
   </button>
@@ -705,7 +705,7 @@ const DriverDetailsModal = () => {
 {incentiveRules.is_enabled && incentiveRules.rules.length > 0 && (
   <div className="mb-5">
     <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">🎯 Incentive Rule</h3>
-    <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+    <div className="bg-indigo-50 rounded-xl p-3 border border-indigo-200">
       <p className="text-[10px] text-slate-500 mb-2">Is driver ke liye applicable rule select karo:</p>
       <select
         defaultValue={driver.incentive_rule_index ?? ''}
@@ -965,9 +965,14 @@ if (!oId) { navigate('/login'); return; }
   fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}`, { headers: H }),
   fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
   fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H }),
-  fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H })  // ← ADD
+  fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H })
 ]);
-    
+    // Session expired on another device → redirect to login
+    if ([vehiclesRes, driversRes, statsRes, notifRes, ledgerRes].some(r => r.status === 401)) {
+      localStorage.clear();
+      navigate('/login');
+      return;
+    }
     if (vehiclesRes.ok) {
   const vehiclesData = await vehiclesRes.json();
   console.log('Vehicles raw:', vehiclesData);
@@ -1466,7 +1471,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   return subtitles[activeTab] || '';
 };
   const StatCard = ({ title, value, icon: Icon, color, trend, isMoney = false }) => (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 hover:border-blue-100 transition">
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 hover:border-indigo-100 transition">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
@@ -1502,8 +1507,8 @@ const removeRule = (i) => setIncentiveRules(prev => ({
         </select>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
-          <span className="text-[9px] text-blue-600 font-black uppercase block">{t.received}</span>
+        <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+          <span className="text-[9px] text-indigo-600 font-black uppercase block">{t.received}</span>
           <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.received.toLocaleString('en-IN')}</b>
         </div>
         <button className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-left w-full active:bg-slate-100"
@@ -1518,14 +1523,14 @@ const removeRule = (i) => setIncentiveRules(prev => ({
         </button>
       </div>
       <div className="flex items-center justify-between text-[9px] text-slate-400">
-        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"/>{t.escrow}</span>
+        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/>{t.escrow}</span>
         <span>{t.calcToday}</span>
       </div>
     </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <StatCard title={t.fleet} value={stats.totalVehicles} icon={Truck} color="bg-blue-600" />
-        <StatCard title={t.drivers} value={stats.totalDrivers} icon={Users} color="bg-blue-500" />
+        <StatCard title={t.fleet} value={stats.totalVehicles} icon={Truck} color="bg-indigo-600" />
+        <StatCard title={t.drivers} value={stats.totalDrivers} icon={Users} color="bg-indigo-500" />
         <StatCard title={t.collection} value={stats.todayCollection} icon={Wallet} color="bg-slate-700" isMoney/>
         <StatCard title={t.pending} value={stats.pendingDues} icon={AlertCircle} color="bg-slate-500" trend="down" isMoney/>
       </div>
@@ -1556,9 +1561,9 @@ const removeRule = (i) => setIncentiveRules(prev => ({
       {/* Quick Nav */}
       <div className="grid grid-cols-2 gap-2">
         <button onClick={() => setActiveTab('drivers')}
-          className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2 hover:border-blue-200 hover:bg-blue-50/30 transition">
-          <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
-            <UserPlus size={14} className="text-blue-600"/>
+          className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2 hover:border-indigo-200 hover:bg-indigo-50/30 transition">
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+            <UserPlus size={14} className="text-indigo-600"/>
           </div>
           <div className="text-left">
             <p className="text-xs font-black text-slate-800">Drivers</p>
@@ -1566,9 +1571,9 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           </div>
         </button>
         <button onClick={() => setActiveTab('vehicles')}
-          className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2 hover:border-blue-200 hover:bg-blue-50/30 transition">
-          <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
-            <Truck size={14} className="text-blue-600"/>
+          className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2 hover:border-indigo-200 hover:bg-indigo-50/30 transition">
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+            <Truck size={14} className="text-indigo-600"/>
           </div>
           <div className="text-left">
             <p className="text-xs font-black text-slate-800">Fleet</p>
@@ -1580,7 +1585,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t.recentDrivers}</h3>
-          <button onClick={() => setActiveTab('drivers')} className="text-[10px] text-blue-600 font-black">{t.viewAll}</button>
+          <button onClick={() => setActiveTab('drivers')} className="text-[10px] text-indigo-600 font-black">{t.viewAll}</button>
         </div>
         <div className="divide-y">
           {drivers.slice(0, 5).map((driver, i) => {
@@ -1588,7 +1593,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
             return (
               <div key={i} className="px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-black text-sm border border-blue-100">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-sm border border-indigo-100">
                     {driver.full_name?.charAt(0) || 'D'}
                   </div>
                   <div>
@@ -1597,7 +1602,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
                   </div>
                 </div>
                 <button onClick={() => openChatWithDriver(driver)}
-                  className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:border-blue-200 hover:text-blue-600 transition">
+                  className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600 transition">
                   <MessageCircle size={13} />
                 </button>
               </div>
@@ -1705,7 +1710,7 @@ const DriversTab = () => {
           placeholder={t.search}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
+          className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500"
         />
         {searchQuery && (
           <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1716,7 +1721,7 @@ const DriversTab = () => {
       
       <div className="flex gap-2">
   <button onClick={() => setShowAddDriver(true)}
-    className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
+    className="flex-1 bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
     <UserPlus size={16}/> {t.addNewDriver}
   </button>
   <button onClick={() => { setShowBulkModal(true); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
@@ -1748,7 +1753,7 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-lg">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-black text-lg">
                         {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
                       </div>
                       <div>
@@ -1774,7 +1779,7 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
                             setDriverRentAmount('');
                             setShowDriverAssignModal(true);
                           }}
-                          className="p-2 rounded-lg bg-blue-50 text-blue-600"
+                          className="p-2 rounded-lg bg-indigo-50 text-indigo-600"
                           title="Assign Vehicle"
                         >
                           <Truck size={14} />
@@ -1796,7 +1801,7 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
 )}
                       <button 
                         onClick={() => openChatWithDriver(driver)}
-                        className="p-2 rounded-lg bg-blue-50 text-blue-600"
+                        className="p-2 rounded-lg bg-indigo-50 text-indigo-600"
                       >
                         <MessageCircle size={16} />
                       </button>
@@ -1841,7 +1846,7 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
               }}
               className={`flex-1 py-2 rounded-lg text-xs font-black transition ${
                 driverRentType === type 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-indigo-600 text-white' 
                   : 'bg-slate-100 text-slate-600'
               }`}
             >
@@ -1913,7 +1918,7 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
             handleAssignFromDriversTab();
           }} 
           disabled={!selectedVehicleForAssign || !driverRentAmount || assigning}
-          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
+          className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
         >
           {assigning ? 'Assigning...' : '✓ Assign Vehicle'}
         </button>
@@ -2003,7 +2008,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
       <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
         
         {/* Image Header */}
-        <div className="relative h-48 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-t-3xl">
+        <div className="relative h-48 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-t-3xl">
           <img src={getVehicleImage(vehicle.vehicle_type||'TRUCK')} alt={vehicle.vehicle_model}
             className="w-full h-full object-contain p-4" />
           <button onClick={()=>{setShowVehicleDetailModal(false);setSelectedVehicleDetails(null);}}
@@ -2058,9 +2063,9 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
                   <p className="text-[9px] text-emerald-600 font-bold uppercase">Total Revenue</p>
                   <p className="text-base font-black text-emerald-700">₹{vStats.total_revenue.toLocaleString('en-IN')}</p>
                 </div>
-                <div className="bg-blue-50 rounded-xl p-3 text-center">
-                  <p className="text-[9px] text-blue-600 font-bold uppercase">Payments</p>
-                  <p className="text-base font-black text-blue-700">{vStats.payment_count}</p>
+                <div className="bg-indigo-50 rounded-xl p-3 text-center">
+                  <p className="text-[9px] text-indigo-600 font-bold uppercase">Payments</p>
+                  <p className="text-base font-black text-indigo-700">{vStats.payment_count}</p>
                 </div>
                 <div className="bg-amber-50 rounded-xl p-3 text-center">
                   <p className="text-[9px] text-amber-600 font-bold uppercase">Days Assigned</p>
@@ -2107,7 +2112,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
   <div className="flex justify-between items-center mb-3">
     <h3 className="font-black text-slate-800">🚨 Damage Records</h3>
     <button onClick={()=>setShowDamageForm(!showDamageForm)}
-      className="text-xs font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-xl">
+      className="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-xl">
       + Add
     </button>
   </div>
@@ -2189,7 +2194,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
         setSelectedVehicleDetails(null);
         if (driver) openChatWithDriver(driver);
       }}
-      className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2"
+      className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-black flex items-center justify-center gap-2"
     >
       <MessageCircle size={16}/> Chat with Driver
     </button>
@@ -2252,7 +2257,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
                           if(type==='DAILY')setCustomRentAmount(vehicle.daily_rent);
                           else if(type==='WEEKLY')setCustomRentAmount(vehicle.daily_rent*7);
                           else setCustomRentAmount(vehicle.daily_rent*30);}}
-                        className={`flex-1 py-2 rounded-lg text-xs font-black ${selectedRentType===type?'bg-blue-600 text-white':'bg-slate-100 text-slate-600'}`}>
+                        className={`flex-1 py-2 rounded-lg text-xs font-black ${selectedRentType===type?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600'}`}>
                         {type==='DAILY'?'📅 Daily':type==='WEEKLY'?'📆 Weekly':'📅 Monthly'}
                       </button>
                     ))}
@@ -2272,7 +2277,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
                     if(!customRentAmount||customRentAmount<=0)return alert('Enter valid rent');
                     assignDriverToVehicleWithRent(vehicle.id,selectedDriverForAssign.id,selectedRentType,parseFloat(customRentAmount));}}
                   disabled={!selectedDriverForAssign||assigning}
-                  className="w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
                   {assigning?'Assigning...':'✓ Assign & Notify Driver'}
                 </button>
               </>
@@ -2314,7 +2319,7 @@ const VehiclesTab = () => {
       <input type="text" placeholder="Search by vehicle no, model or driver..."
         value={vehicleSearch}
         onChange={e => setVehicleSearch(e.target.value)}
-        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"/>
+        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500"/>
       {vehicleSearch && (
         <button onClick={() => setVehicleSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
           <X size={14} className="text-slate-400"/>
@@ -2323,7 +2328,7 @@ const VehiclesTab = () => {
     </div>
     <div className="flex gap-2">
   <button onClick={openAddVehicleModal}
-    className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
+    className="flex-1 bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
     <Plus size={16} /> Add Vehicle
   </button>
   <button onClick={() => { setShowBulkModal(true); setBulkTab('vehicles'); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); }}
@@ -2437,7 +2442,7 @@ const PaymentsTab = () => {
       {/* Pay Links shortcut */}
       <button
         onClick={() => setActiveTab('links')}
-        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-4 flex items-center justify-between text-white shadow-sm"
+        className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 flex items-center justify-between text-white shadow-sm"
       >
         <div className="flex items-center gap-3">
           <CreditCard size={20} />
@@ -2459,7 +2464,7 @@ const PaymentsTab = () => {
           </div>
           <div className="text-right">
             <p className="text-[9px] text-slate-400 mb-0.5">Cash Collected</p>
-            <p className="text-2xl font-black text-blue-600">₹{cashTotal.toLocaleString('en-IN')}</p>
+            <p className="text-2xl font-black text-indigo-600">₹{cashTotal.toLocaleString('en-IN')}</p>
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center">
@@ -2507,7 +2512,7 @@ const PaymentsTab = () => {
         {liveTx.length > 5 && (
           <div className="px-4 py-3 border-t border-slate-100">
             <button onClick={() => setShowAllTx(!showAllTx)}
-              className="w-full text-[11px] font-black text-blue-600 py-2 rounded-xl hover:bg-blue-50 transition">
+              className="w-full text-[11px] font-black text-indigo-600 py-2 rounded-xl hover:bg-indigo-50 transition">
               {showAllTx ? `Show Less ↑` : `Load More (${liveTx.length - 5} more) ↓`}
             </button>
           </div>
@@ -2581,13 +2586,13 @@ const PaymentsTab = () => {
 // PROFILE TAB - Complete
 const ProfileTab = () => (
   <div className="space-y-4 pb-4">
-    <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white text-center">
+    <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white text-center">
       <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3 cursor-pointer hover:bg-white/30 transition">
         <Camera size={24} className="text-white" />
       </div>
       <h2 className="text-lg font-black">{owner?.full_name || owner?.name || 'Rajesh Kumar'}</h2>
-      <p className="text-xs text-blue-200">Owner Code: {owner?.owner_code || 'OWN701951'}</p>
-      <p className="text-[10px] text-blue-200 mt-1">Member since {new Date().toLocaleDateString()}</p>
+      <p className="text-xs text-indigo-200">Owner Code: {owner?.owner_code || 'OWN701951'}</p>
+      <p className="text-[10px] text-indigo-200 mt-1">Member since {new Date().toLocaleDateString()}</p>
     </div>
     
     <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
@@ -2598,7 +2603,7 @@ const ProfileTab = () => (
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500 flex items-center gap-2"><Mail size={12} /> {t.email}</span>
         <span className="text-xs font-black">{owner?.email || 'rajesh@mobilitygrid.com'}</span>
-        <button className="text-[9px] text-blue-600">Edit</button>
+        <button className="text-[9px] text-indigo-600">Edit</button>
       </div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500 flex items-center gap-2"><Truck size={12} /> Total Fleet</span>
@@ -2611,16 +2616,16 @@ const ProfileTab = () => (
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500 flex items-center gap-2"><Building size={12} /> {t.businessName}</span>
         <span className="text-xs font-black">{owner?.business_name || 'MobilityGrid Fleet Services'}</span>
-        <button className="text-[9px] text-blue-600">Edit</button>
+        <button className="text-[9px] text-indigo-600">Edit</button>
       </div>
       <div className="flex justify-between items-center py-2">
         <span className="text-xs text-slate-500 flex items-center gap-2"><MapPin size={12} /> {t.address}</span>
         <span className="text-xs font-black text-right">{owner?.address || 'Mumbai, Maharashtra'}</span>
-        <button className="text-[9px] text-blue-600">Edit</button>
+        <button className="text-[9px] text-indigo-600">Edit</button>
       </div>
     </div>
     
-    <button className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
+    <button className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
       <Edit2 size={14} /> {t.editProfile}
     </button>
 
@@ -2630,13 +2635,13 @@ const ProfileTab = () => (
         <div className="flex items-center gap-2">
           <span className="text-sm font-black text-slate-800">👥 Manager Role</span>
           {ownerPlan.is_premium
-            ? <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">PREMIUM ✓</span>
+            ? <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">PREMIUM ✓</span>
             : <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">🔒 LOCKED</span>
           }
         </div>
         {ownerPlan.is_premium && (
           <button onClick={() => setShowAddManager(true)}
-            className="text-xs font-black text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition">
+            className="text-xs font-black text-indigo-600 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100 transition">
             + Add Manager
           </button>
         )}
@@ -2654,8 +2659,8 @@ const ProfileTab = () => (
           <div className="space-y-2 mb-4">
             {['Add unlimited managers','Custom permissions per manager','Assign vehicles, record cash, view reports','Full access control'].map((f,i)=>(
               <div key={i} className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
-                  <span className="text-[8px] text-blue-600 font-black">✓</span>
+                <div className="w-4 h-4 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center shrink-0">
+                  <span className="text-[8px] text-indigo-600 font-black">✓</span>
                 </div>
                 <span className="text-xs text-slate-600">{f}</span>
               </div>
@@ -2663,11 +2668,11 @@ const ProfileTab = () => (
           </div>
           <div className="bg-slate-50 rounded-xl p-4 text-center border border-slate-200 mb-3">
             <p className="text-[10px] text-slate-400 mb-1">Starting at</p>
-            <p className="text-2xl font-black text-blue-600">₹499<span className="text-sm font-normal text-slate-400">/month</span></p>
+            <p className="text-2xl font-black text-indigo-600">₹499<span className="text-sm font-normal text-slate-400">/month</span></p>
           </div>
           {/* Sneak peek button */}
           <button onClick={() => setManagerDemoMode(true)}
-            className="w-full border-2 border-blue-200 text-blue-600 font-black py-2.5 rounded-xl text-sm mb-2 hover:bg-blue-50 transition flex items-center justify-center gap-2">
+            className="w-full border-2 border-indigo-200 text-indigo-600 font-black py-2.5 rounded-xl text-sm mb-2 hover:bg-indigo-50 transition flex items-center justify-center gap-2">
             👀 See how it works — Free Preview
           </button>
           <button onClick={async () => {
@@ -2679,7 +2684,7 @@ const ProfileTab = () => (
               const url = r?.checkoutUrl || r?.data?.checkoutUrl;
               if (url) window.location.href = url; else alert('Contact support to upgrade.');
             }}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-xl text-sm transition">
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl text-sm transition">
             🚀 Unlock — ₹499/month
           </button>
           <p className="text-[9px] text-slate-400 text-center mt-2">Secure payment via PayYantra</p>
@@ -2705,7 +2710,7 @@ const ProfileTab = () => (
             ].map((dm, i) => (
               <div key={i} className="px-4 py-3 flex items-start justify-between gap-2 opacity-70">
                 <div className="flex items-start gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center font-black text-indigo-600 shrink-0">
                     {dm.name.charAt(0)}
                   </div>
                   <div>
@@ -2716,7 +2721,7 @@ const ProfileTab = () => (
                     <p className="text-[9px] text-slate-400 font-mono">{dm.phone} · {dm.code}</p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {dm.perms.map(k => (
-                        <span key={k} className="text-[8px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded border border-blue-100">{k.replace(/_/g,' ')}</span>
+                        <span key={k} className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100">{k.replace(/_/g,' ')}</span>
                       ))}
                     </div>
                   </div>
@@ -2745,7 +2750,7 @@ const ProfileTab = () => (
                   <div key={key} className="flex items-center justify-between py-2 border-b border-slate-50">
                     <span className="text-xs text-slate-600">{label}</span>
                     <button onClick={() => setNewManager(p => ({...p, permissions:{...p.permissions,[key]:!p.permissions[key]}}))}
-                      className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${newManager.permissions[key]?'bg-blue-600':'bg-slate-200'}`}>
+                      className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${newManager.permissions[key]?'bg-indigo-600':'bg-slate-200'}`}>
                       <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 shadow transition-all ${newManager.permissions[key]?'right-0.5':'left-0.5'}`}/>
                     </button>
                   </div>
@@ -2753,9 +2758,9 @@ const ProfileTab = () => (
               </div>
 
               {/* Upgrade CTA after they've explored */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-4 text-white text-center">
+              <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white text-center">
                 <p className="text-sm font-black mb-1">🎉 Looks good, right?</p>
-                <p className="text-[10px] text-blue-200 mb-3">Unlock to actually add managers and save their permissions</p>
+                <p className="text-[10px] text-indigo-200 mb-3">Unlock to actually add managers and save their permissions</p>
                 <button onClick={async () => {
                     setManagerDemoMode(false);
                     const u = JSON.parse(localStorage.getItem('user') || '{}');
@@ -2766,7 +2771,7 @@ const ProfileTab = () => (
                     const url = r?.checkoutUrl || r?.data?.checkoutUrl;
                     if (url) window.location.href = url; else alert('Contact support to upgrade.');
                   }}
-                  className="w-full bg-white text-blue-600 font-black py-2.5 rounded-xl text-sm hover:bg-blue-50 transition">
+                  className="w-full bg-white text-indigo-600 font-black py-2.5 rounded-xl text-sm hover:bg-indigo-50 transition">
                   🚀 Unlock Now — ₹499/month
                 </button>
               </div>
@@ -2779,12 +2784,12 @@ const ProfileTab = () => (
           {managers.length === 0 ? (
             <div className="p-6 text-center">
               <p className="text-xs text-slate-400">No managers yet</p>
-              <button onClick={() => setShowAddManager(true)} className="text-blue-600 font-black text-xs mt-1">+ Add first manager</button>
+              <button onClick={() => setShowAddManager(true)} className="text-indigo-600 font-black text-xs mt-1">+ Add first manager</button>
             </div>
           ) : managers.map((m, i) => (
             <div key={i} className="px-4 py-3 flex items-start justify-between gap-2">
               <div className="flex items-start gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center font-black text-blue-600 shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center font-black text-indigo-600 shrink-0">
                   {m.full_name?.charAt(0)}
                 </div>
                 <div>
@@ -2792,7 +2797,7 @@ const ProfileTab = () => (
                   <p className="text-[9px] text-slate-400 font-mono">{m.mobile_number} · {m.manager_code}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {Object.entries(m.permissions||{}).filter(([,v])=>v).map(([k])=>(
-                      <span key={k} className="text-[8px] font-black text-blue-600 bg-blue-50 px-1 py-0.5 rounded border border-blue-100">{k.replace(/_/g,' ')}</span>
+                      <span key={k} className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100">{k.replace(/_/g,' ')}</span>
                     ))}
                   </div>
                 </div>
@@ -2824,10 +2829,10 @@ const ProfileTab = () => (
           <div className="p-5 space-y-4">
             <input placeholder="Full Name *" value={newManager.name}
               onChange={e => setNewManager(p => ({...p, name: e.target.value.replace(/[^a-zA-Z\s]/g,'')}))}
-              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-blue-500"/>
+              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500"/>
             <input placeholder="Phone Number *" value={newManager.phone} maxLength={10}
               onChange={e => setNewManager(p => ({...p, phone: e.target.value.replace(/\D/g,'').slice(0,10)}))}
-              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-mono focus:outline-none focus:border-blue-500"/>
+              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500"/>
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Set Permissions</p>
               <div className="space-y-0">
@@ -2845,7 +2850,7 @@ const ProfileTab = () => (
                   <div key={key} className="flex items-center justify-between py-2 border-b border-slate-50">
                     <span className="text-xs text-slate-600">{label}</span>
                     <button onClick={() => setNewManager(p => ({...p, permissions:{...p.permissions,[key]:!p.permissions[key]}}))}
-                      className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${newManager.permissions[key]?'bg-blue-600':'bg-slate-200'}`}>
+                      className={`w-10 h-5 rounded-full relative transition-all shrink-0 ${newManager.permissions[key]?'bg-indigo-600':'bg-slate-200'}`}>
                       <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 shadow transition-all ${newManager.permissions[key]?'right-0.5':'left-0.5'}`}/>
                     </button>
                   </div>
@@ -2866,7 +2871,7 @@ const ProfileTab = () => (
                   setNewManager({name:'',phone:'',permissions:{assign_vehicles:true,record_cash:true,view_financials:true,chat_drivers:true,add_drivers:false,remove_drivers:false,add_vehicles:false,bulk_import:false,upload_documents:false}});
                   alert(`✅ ${newManager.name} added as manager!`);
                 } else alert(r.error || 'Failed');
-              }} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 transition">
+              }} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black hover:bg-indigo-700 transition">
                 Add Manager
               </button>
             </div>
@@ -2923,19 +2928,19 @@ const ProfileTab = () => (
                     className="w-full border rounded-lg p-2 text-xs text-center disabled:bg-slate-100"/>
                 </div>
               </div>
-              <div className="bg-blue-50 rounded-lg px-2 py-1">
-                <p className="text-[9px] text-blue-700 font-black">
+              <div className="bg-indigo-50 rounded-lg px-2 py-1">
+                <p className="text-[9px] text-indigo-700 font-black">
                   {rule.min_hours}h+ active → {rule.type === 'FULL_WAIVER' ? 'Rent free!' : rule.type === 'PERCENTAGE' ? `${rule.value||0}% rent discount` : `₹${rule.value||0} off`}
                 </p>
               </div>
             </div>
           ))}
           <button onClick={addRule}
-            className="w-full py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-xl text-xs font-black hover:border-blue-500 transition">
+            className="w-full py-2 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl text-xs font-black hover:border-indigo-500 transition">
             + Add Rule
           </button>
           <button onClick={saveRules} disabled={savingRules}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
+            className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
             {savingRules ? 'Saving...' : '💾 Save Rules'}
           </button>
         </div>
@@ -2953,47 +2958,46 @@ const ProfileTab = () => (
 );
 
   return (
-    <div className="min-h-screen bg-slate-200 flex items-start justify-center">
+    <div className="min-h-screen bg-slate-100 flex items-start justify-center">
       <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, minHeight:'100dvh'}}>
-        <div className="bg-slate-900 text-white text-[11px] px-4 py-2 flex justify-between items-center">
-  <div className="flex flex-col">
-    <span className="text-emerald-400 font-black text-[10px] tracking-widest">{t.portal}</span>
-    <span className="text-slate-500 text-[8px] font-mono">v1.0.0 · May 29, 2026</span>
-  </div>
-  <span>{time}</span>
-</div>
-
-        {/* Header with ALL BUTTONS - Notification Bell, Logout, Search (in drivers tab only) */}
-        <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shadow-sm">
-          <div>
-            <h1 className="text-lg font-black text-slate-800">{getHeaderTitle()}</h1>
-            <p className="text-[10px] text-slate-400 font-black">{getHeaderSubtitle()}</p>
-          </div>
+        {/* Status bar */}
+        <div className="bg-indigo-700 text-white text-[11px] px-4 py-1.5 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            {/* NOTIFICATION BELL */}
-            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-  <button onClick={() => setLang('en')} className={`px-2 py-1 text-[10px] font-black rounded-lg transition ${lang==='en'?'bg-white text-blue-600 shadow-sm':'text-slate-400'}`}>EN</button>
-  <button onClick={() => setLang('hi')} className={`px-2 py-1 text-[10px] font-black rounded-lg transition ${lang==='hi'?'bg-white text-blue-600 shadow-sm':'text-slate-400'}`}>हिं</button>
-</div>
-            <button 
-  onClick={() => setShowChatbot(true)} 
-  className="p-2 rounded-xl bg-purple-100 hover:bg-purple-200 transition"
-  title="AI Assistant"
->
-  <span className="text-lg">💬</span>
-</button>
-            <button onClick={() => setShowNotif(!showNotif)} className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition">
-              {unreadCount > 0 ? <BellRing size={18} className="text-blue-600" /> : <Bell size={18} className="text-slate-600" />}
+            <span className="font-black text-[10px] tracking-widest text-indigo-200">MG</span>
+            <span className="text-indigo-400 text-[8px]">|</span>
+            <span className="text-indigo-300 text-[9px] font-semibold">{t.portal}</span>
+          </div>
+          <span className="text-indigo-300 text-[10px] font-mono">{time}</span>
+        </div>
+
+        {/* Header */}
+        <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between" style={{boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+          <div>
+            <h1 className="text-[17px] font-black text-slate-800 tracking-tight">{getHeaderTitle()}</h1>
+            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{getHeaderSubtitle()}</p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {/* Language toggle */}
+            <div className="flex bg-slate-100 p-0.5 rounded-lg">
+              <button onClick={() => setLang('en')} className={`px-2 py-1 text-[10px] font-black rounded-md transition ${lang==='en'?'bg-white text-indigo-600 shadow-sm':'text-slate-400'}`}>EN</button>
+              <button onClick={() => setLang('hi')} className={`px-2 py-1 text-[10px] font-black rounded-md transition ${lang==='hi'?'bg-white text-indigo-600 shadow-sm':'text-slate-400'}`}>हिं</button>
+            </div>
+            {/* AI Assistant */}
+            <button onClick={() => setShowChatbot(true)} className="w-8 h-8 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition flex items-center justify-center" title="AI Assistant">
+              <MessageCircle size={15} className="text-indigo-600" />
+            </button>
+            {/* Notification bell */}
+            <button onClick={() => setShowNotif(!showNotif)} className="relative w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center">
+              {unreadCount > 0 ? <BellRing size={15} className="text-indigo-600" /> : <Bell size={15} className="text-slate-500" />}
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
-            
-            {/* LOGOUT BUTTON */}
-            <button onClick={logout} className="p-2 rounded-xl bg-red-50 hover:bg-red-100 transition">
-              <LogOut size={18} className="text-red-600" />
+            {/* Logout */}
+            <button onClick={logout} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 transition flex items-center justify-center">
+              <LogOut size={15} className="text-red-500" />
             </button>
           </div>
         </div>
@@ -3008,7 +3012,7 @@ const ProfileTab = () => (
         <button
           onClick={() => setAssignMode('driver')}
           className={`flex-1 py-2 rounded-lg text-sm font-black transition ${
-            assignMode === 'driver' ? 'bg-blue-600 text-white' : 'text-slate-600'
+            assignMode === 'driver' ? 'bg-indigo-600 text-white' : 'text-slate-600'
           }`}
         >
           Driver → Vehicle
@@ -3016,7 +3020,7 @@ const ProfileTab = () => (
         <button
           onClick={() => setAssignMode('vehicle')}
           className={`flex-1 py-2 rounded-lg text-sm font-black transition ${
-            assignMode === 'vehicle' ? 'bg-blue-600 text-white' : 'text-slate-600'
+            assignMode === 'vehicle' ? 'bg-indigo-600 text-white' : 'text-slate-600'
           }`}
         >
           Vehicle → Driver
@@ -3125,8 +3129,8 @@ const ProfileTab = () => (
       )}
       
       {selectedDriverForAssign && selectedVehicleForAssign && (
-        <div className="p-3 bg-blue-50 rounded-xl mb-4">
-          <p className="text-xs text-center text-blue-800">
+        <div className="p-3 bg-indigo-50 rounded-xl mb-4">
+          <p className="text-xs text-center text-indigo-800">
             Assigning <strong>{selectedDriverForAssign.full_name}</strong> to <strong>{selectedVehicleForAssign.vehicle_number}</strong>
           </p>
         </div>
@@ -3147,7 +3151,7 @@ const ProfileTab = () => (
         <button 
           onClick={handleAssignVehicle} 
           disabled={!selectedDriverForAssign || !selectedVehicleForAssign || assigning}
-          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
+          className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
         >
           {assigning ? 'Assigning...' : 'Confirm Assignment'}
         </button>
@@ -3168,7 +3172,7 @@ const ProfileTab = () => (
               ) : (
                 notifications.map((n, i) => (
   <div key={i}
-    className={`px-4 py-3 border-b cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-blue-50' : ''}`}
+    className={`px-4 py-3 border-b cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-indigo-50' : ''}`}
     onClick={() => {
       setNotifications(prev => prev.map((x, idx) => idx === i ? {...x, is_read: true} : x));
       setUnreadCount(prev => Math.max(0, prev - 1));
@@ -3202,7 +3206,7 @@ const ProfileTab = () => (
     <p className="text-[10px] text-slate-500">{n.message}</p>
     <p className="text-[9px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
     {!n.is_read && (
-      <p className="text-[9px] font-black mt-0.5 text-blue-500">
+      <p className="text-[9px] font-black mt-0.5 text-indigo-500">
         {/* ✅ Chat vs transaction alag text */}
         {(n.title||'').includes('💬') ? 'Tap to open chat →' : 
          (n.title||'').includes('🚨') ? 'Tap to view SOS →' :
@@ -3233,7 +3237,7 @@ const ProfileTab = () => (
         </div>
 
         {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50 shadow-[0_-4px_15px_rgba(0,0,0,0.04)]">
+        <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-100 flex justify-around items-center z-50" style={{height:58, boxShadow:'0 -4px 20px rgba(0,0,0,0.06)'}}>
           {[
             { id: 'home',     Icon: Home,       label: t.navHome },
             { id: 'drivers',  Icon: Users,      label: t.navDrivers },
@@ -3248,10 +3252,13 @@ const ProfileTab = () => (
                 setSearchQuery('');
                 setVehicleSearch('');
               }}
-              className={`flex flex-col items-center gap-1 transition-all ${activeTab === id ? 'text-blue-600 -translate-y-0.5' : 'text-slate-400'}`}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 2, position: 'relative' }}
             >
-              <Icon size={activeTab === id ? 22 : 20} />
-              <span className="text-[9px] font-black tracking-wide">{label}</span>
+              {activeTab === id && (
+                <span style={{ position:'absolute', top:0, left:'50%', transform:'translateX(-50%)', width:24, height:2, background:'#4f46e5', borderRadius:'0 0 4px 4px' }} />
+              )}
+              <Icon size={19} style={{ color: activeTab === id ? '#4f46e5' : '#94a3b8' }} />
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', color: activeTab === id ? '#4f46e5' : '#94a3b8' }}>{label}</span>
             </button>
           ))}
         </div>
@@ -3268,19 +3275,19 @@ const ProfileTab = () => (
         {showChat && selectedDriver && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl w-full max-w-sm h-[500px] flex flex-col">
-              <div className="p-4 bg-blue-600 text-white rounded-t-3xl flex justify-between items-center">
+              <div className="p-4 bg-indigo-600 text-white rounded-t-3xl flex justify-between items-center">
                 <div>
                   <h3 className="font-black">{selectedDriver.full_name || selectedDriver.name}</h3>
-                  <p className="text-[10px] text-blue-200">{selectedDriver.phone_number || selectedDriver.phone}</p>
+                  <p className="text-[10px] text-indigo-200">{selectedDriver.phone_number || selectedDriver.phone}</p>
                 </div>
                 <button onClick={() => setShowChat(false)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center"><X size={16} /></button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {chatHistory.map((msg, i) => (
                   <div key={i} className={`flex ${msg.from === 'owner' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] p-3 rounded-2xl text-sm ${msg.from === 'owner' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
+                    <div className={`max-w-[75%] p-3 rounded-2xl text-sm ${msg.from === 'owner' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
                       {msg.text}
-                      <div className={`text-[9px] mt-1 ${msg.from === 'owner' ? 'text-blue-200' : 'text-slate-400'}`}>{msg.time}</div>
+                      <div className={`text-[9px] mt-1 ${msg.from === 'owner' ? 'text-indigo-200' : 'text-slate-400'}`}>{msg.time}</div>
                     </div>
                   </div>
                 ))}
@@ -3288,7 +3295,7 @@ const ProfileTab = () => (
               <div className="p-3 border-t flex gap-2">
                 <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessageToDriver()}
                   placeholder="Type message..." className="flex-1 border rounded-xl px-3 py-2 text-sm" />
-                <button onClick={sendMessageToDriver} className="bg-blue-600 text-white p-2 rounded-xl"><Send size={16} /></button>
+                <button onClick={sendMessageToDriver} className="bg-indigo-600 text-white p-2 rounded-xl"><Send size={16} /></button>
               </div>
             </div>
           </div>
@@ -3414,7 +3421,7 @@ const ProfileTab = () => (
       {/* Buttons */}
       <div className="flex gap-3">
         <button onClick={() => setShowAddVehicle(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
-        <button onClick={addVehicle} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Add Vehicle</button>
+        <button onClick={addVehicle} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black">Add Vehicle</button>
       </div>
     </div>
   </div>
@@ -3437,13 +3444,13 @@ const ProfileTab = () => (
       <div className="flex gap-2 p-4 pb-0">
         <button onClick={() => setAddDriverMode('single')}
           className={`flex-1 py-2 rounded-xl text-sm font-black transition ${
-            addDriverMode==='single' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+            addDriverMode==='single' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
           👤 Single
         </button>
         <button onClick={() => setAddDriverMode('multiple')}
           className={`flex-1 py-2 rounded-xl text-sm font-black transition ${
-            addDriverMode==='multiple' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+            addDriverMode==='multiple' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
           }`}>
           👥 Multiple
         </button>
@@ -3511,7 +3518,7 @@ const ProfileTab = () => (
               <button onClick={() => setShowAddDriver(false)}
                 className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
               <button onClick={addDriver}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black">Add</button>
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black">Add</button>
             </div>
           </div>
         )}
@@ -3582,7 +3589,7 @@ const ProfileTab = () => (
             {/* Add Row */}
             <button
               onClick={() => setMultipleDrivers(prev => [...prev, {name:'', phone:'', license:'', deposit:''}])}
-              className="w-full py-2 border-2 border-dashed border-blue-300 text-blue-600 rounded-xl text-sm font-black mb-4 hover:border-blue-500 transition">
+              className="w-full py-2 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl text-sm font-black mb-4 hover:border-indigo-500 transition">
               + Add Another Driver
             </button>
 
@@ -3597,7 +3604,7 @@ const ProfileTab = () => (
               <button
                 onClick={addMultipleDrivers}
                 disabled={bulkLoading}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
                 {bulkLoading ? 'Adding...' : `Add ${multipleDrivers.filter(d=>d.name&&d.phone&&!d._saved).length} Drivers`}
               </button>
             </div>
@@ -3627,7 +3634,7 @@ const ProfileTab = () => (
                 setRemindingAll(false);
                 alert(`✅ Reminder bhej diya ${overdueDrivers.length} drivers ko`);
               }}
-              className="text-[10px] font-black bg-blue-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
+              className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
               {remindingAll ? 'Sending…' : '🔔 Remind All'}
             </button>
           )}
@@ -3815,16 +3822,16 @@ const ProfileTab = () => (
           <>
             {/* Step row */}
             <div className="flex gap-3 mb-4">
-              <div className="flex-1 bg-blue-50 rounded-xl p-3">
-                <p className="text-xs font-black text-blue-700 mb-2">① Download Template</p>
+              <div className="flex-1 bg-indigo-50 rounded-xl p-3">
+                <p className="text-xs font-black text-indigo-700 mb-2">① Download Template</p>
                 <button onClick={bulkTab==='drivers' ? downloadTemplate : downloadVehicleTemplate}
-                  className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-black">
+                  className="w-full py-2 bg-indigo-600 text-white rounded-xl text-xs font-black">
                   📥 Download {bulkTab==='drivers'?'Driver':'Vehicle'} CSV
                 </button>
               </div>
               <div className="flex-1 bg-slate-50 rounded-xl p-3">
                 <p className="text-xs font-black text-slate-600 mb-2">② Upload Filled CSV</p>
-                <label className="w-full py-2 border-2 border-dashed border-slate-300 rounded-xl text-xs font-black text-slate-500 cursor-pointer hover:border-blue-400 flex items-center justify-center gap-1 transition">
+                <label className="w-full py-2 border-2 border-dashed border-slate-300 rounded-xl text-xs font-black text-slate-500 cursor-pointer hover:border-indigo-400 flex items-center justify-center gap-1 transition">
                   📂 {bulkFile || 'Choose File'}
                   <input type="file" accept=".csv" className="hidden"
                     onChange={bulkTab==='drivers' ? handleBulkFile : handleVehicleBulkFile}/>
@@ -3907,7 +3914,7 @@ const ProfileTab = () => (
                     className="px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-black border border-amber-200">🗑 Remove Errors</button>
                   <button onClick={importBulkDrivers}
                     disabled={bulkLoading || bulkDrivers.filter(d=>d._errors.length===0).length===0}
-                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black disabled:opacity-50">
+                    className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black disabled:opacity-50">
                     {bulkLoading ? '⏳ Importing...' : `Import ${bulkDrivers.filter(d=>d._errors.length===0).length} Drivers →`}
                   </button>
                 </div>
@@ -3987,7 +3994,7 @@ const ProfileTab = () => (
                     className="px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-black border border-amber-200">🗑 Remove Errors</button>
                   <button onClick={importBulkVehicles}
                     disabled={bulkLoading || bulkVehicles.filter(v=>v._errors.length===0).length===0}
-                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black disabled:opacity-50">
+                    className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black disabled:opacity-50">
                     {bulkLoading ? '⏳ Importing...' : `Import ${bulkVehicles.filter(v=>v._errors.length===0).length} Vehicles →`}
                   </button>
                 </div>
