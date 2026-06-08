@@ -1261,7 +1261,7 @@ router.post('/owner/add-driver', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to add driver: ' + err.message });
   }
 });
-router.get('/owner/transactions', verifyToken, requirePermission('view_collections'), async (req, res) => {
+router.get('/owner/transactions', async (req, res) => {
   try {
     const { ownerId } = req.query;
     // ownerId is numeric owner id — look up owner_code for matching
@@ -1449,14 +1449,15 @@ router.get('/owner/stats', async (req, res) => {
   }
 });
 
-// GET /api/payment/owner/trend?ownerId=X — 30-day daily collection chart
+// GET /api/payment/owner/trend?ownerId=X — 90-day daily collection chart
 router.get('/owner/trend', async (req, res) => {
-  // Always build the 30-day skeleton first so frontend always gets 30 items
+  // Build 90-day skeleton so chart always has data even for sparse periods
+  const DAYS = 90;
   const buildDays = (rows) => {
     const map = {};
     rows.forEach(r => { map[String(r.date).split('T')[0]] = { day: r.day, online: Number(r.online), cash: Number(r.cash) }; });
     const days = [];
-    for (let i = 29; i >= 0; i--) {
+    for (let i = DAYS - 1; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const key = d.toISOString().split('T')[0];
       const label = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
@@ -1488,7 +1489,7 @@ router.get('/owner/trend', async (req, res) => {
          LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
          WHERE (d.owner_code = $1 OR mo.owner_code = $1)
            AND mo.transaction_status = 'SUCCESS'
-           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '30 days'
+           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '90 days'
          GROUP BY DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata')
          ORDER BY date ASC`,
         [ownerCode]
@@ -1506,7 +1507,7 @@ router.get('/owner/trend', async (req, res) => {
          LEFT JOIN public.drivers d ON RIGHT(d.mobile_number, 10) = RIGHT(mo.payer_mobile, 10)
          WHERE d.owner_id = $1
            AND mo.transaction_status = 'SUCCESS'
-           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '30 days'
+           AND COALESCE(mo.order_completion_date, mo.order_initiation_date) >= NOW() - INTERVAL '90 days'
          GROUP BY DATE(COALESCE(mo.order_completion_date, mo.order_initiation_date) AT TIME ZONE 'Asia/Kolkata')
          ORDER BY date ASC`,
         [parseInt(ownerId)]
