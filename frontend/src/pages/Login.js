@@ -3,6 +3,50 @@ import { useNavigate } from 'react-router-dom';
 import { Truck, Building2, Shield, Phone, Send, ArrowRight, ChevronLeft } from 'lucide-react';
 
 const API = 'https://mg-qw5s.onrender.com';
+const ADMIN_SECRET = process.env.REACT_APP_ADMIN_SECRET || '';
+
+// Shell defined OUTSIDE Login so it's not recreated on every keystroke (fixes input focus loss)
+const Shell = ({ children, showBack, onBack, title, subtitle }) => (
+  <div style={{
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '24px 16px', fontFamily: "'Inter', -apple-system, sans-serif"
+  }}>
+    <div style={{ position: 'fixed', inset: 0, opacity: 0.03,
+      backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+      backgroundSize: '40px 40px', pointerEvents: 'none' }} />
+    <div style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ width: '52px', height: '52px', background: '#4f46e5', borderRadius: '14px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: '14px', boxShadow: '0 8px 24px rgba(79,70,229,0.4)' }}>
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: '22px', letterSpacing: '-1px' }}>M</span>
+        </div>
+        <div>
+          <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px', margin: 0 }}>MobilityGrid</h1>
+          <p style={{ color: 'rgba(148,163,184,0.8)', fontSize: '12px', marginTop: '4px', letterSpacing: '0.08em' }}>FLEET OPERATING SYSTEM</p>
+        </div>
+      </div>
+      <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', boxShadow: '0 24px 64px rgba(0,0,0,0.3)' }}>
+        {showBack && (
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '4px',
+            color: '#94a3b8', fontSize: '13px', background: 'none', border: 'none',
+            cursor: 'pointer', padding: '0 0 16px', fontWeight: 600 }}>
+            <span style={{ fontSize: '15px' }}>‹</span> Back
+          </button>
+        )}
+        {title && (
+          <div style={{ marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{title}</h2>
+            {subtitle && <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>{subtitle}</p>}
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  </div>
+);
 
 export default function Login() {
   const navigate = useNavigate();
@@ -16,7 +60,6 @@ export default function Login() {
   const [otpValue, setOtpValue] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const [adminPhone, setAdminPhone] = useState('');
-  const [adminSecret, setAdminSecret] = useState('');
 
   useEffect(() => { fetchDrivers(); }, []);
 
@@ -144,7 +187,7 @@ export default function Login() {
       const res = await fetch(`${API}/api/auth/admin-send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: adminPhone, admin_secret: adminSecret })
+        body: JSON.stringify({ phone_number: adminPhone, admin_secret: ADMIN_SECRET })
       });
       const data = await res.json();
       if (data.success) {
@@ -163,7 +206,7 @@ export default function Login() {
       const res = await fetch(`${API}/api/auth/admin-verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: adminPhone, otp: otpValue, admin_secret: adminSecret })
+        body: JSON.stringify({ phone_number: adminPhone, otp: otpValue, admin_secret: ADMIN_SECRET })
       });
       const data = await res.json();
       if (data.success && data.token) {
@@ -177,78 +220,10 @@ export default function Login() {
   const handleBack = () => {
     setStep('select-role'); setSelectedRole(null);
     setSelectedDriver(null); setError(''); setSuccess(''); setOtpValue('');
-    setAdminPhone(''); setAdminSecret('');
+    setAdminPhone('');
   };
 
   // ── Shared layout shell ──────────────────────────────────────────────
-  const Shell = ({ children, showBack, onBack, title, subtitle }) => (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px 16px',
-      fontFamily: "'Inter', -apple-system, sans-serif"
-    }}>
-      {/* Subtle grid pattern */}
-      <div style={{
-        position: 'fixed', inset: 0, opacity: 0.03,
-        backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
-        backgroundSize: '40px 40px', pointerEvents: 'none'
-      }} />
-
-      <div style={{ width: '100%', maxWidth: '400px', position: 'relative' }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '52px', height: '52px',
-            background: '#4f46e5',
-            borderRadius: '14px',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: '14px',
-            boxShadow: '0 8px 24px rgba(79,70,229,0.4)'
-          }}>
-            <span style={{ color: '#fff', fontWeight: 800, fontSize: '22px', letterSpacing: '-1px' }}>M</span>
-          </div>
-          <div>
-            <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px', margin: 0 }}>
-              MobilityGrid
-            </h1>
-            <p style={{ color: 'rgba(148,163,184,0.8)', fontSize: '12px', marginTop: '4px', letterSpacing: '0.08em' }}>
-              FLEET OPERATING SYSTEM
-            </p>
-          </div>
-        </div>
-
-        {/* Card */}
-        <div style={{
-          background: '#fff',
-          borderRadius: '20px',
-          padding: '28px 24px',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.3)'
-        }}>
-          {showBack && (
-            <button onClick={onBack} style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              color: '#94a3b8', fontSize: '13px', background: 'none', border: 'none',
-              cursor: 'pointer', padding: '0 0 16px', fontWeight: 600
-            }}>
-              <ChevronLeft size={15} /> Back
-            </button>
-          )}
-          {title && (
-            <div style={{ marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{title}</h2>
-              {subtitle && <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>{subtitle}</p>}
-            </div>
-          )}
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-
   // ── Alert ─────────────────────────────────────────────────────────
   const Alert = () => (
     <div style={{ marginBottom: error || success ? '14px' : 0 }}>
@@ -434,7 +409,7 @@ export default function Login() {
     return (
       <Shell showBack onBack={handleBack} title="Platform Admin Login">
         <Alert />
-        <div style={{ marginBottom: '14px' }}>
+        <div style={{ marginBottom: '18px' }}>
           <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
             Admin Phone Number
           </label>
@@ -445,29 +420,15 @@ export default function Login() {
               value={adminPhone}
               onChange={e => setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
               placeholder="10-digit mobile number"
-              style={inputStyle}
-            />
-          </div>
-        </div>
-        <div style={{ marginBottom: '18px' }}>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
-            Admin Secret Key
-          </label>
-          <div style={{ position: 'relative' }}>
-            <Shield size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input
-              type="password"
-              value={adminSecret}
-              onChange={e => setAdminSecret(e.target.value)}
-              placeholder="Admin secret key"
+              autoFocus
               style={inputStyle}
             />
           </div>
         </div>
         <button
           onClick={sendAdminOTP}
-          disabled={loading || adminPhone.length < 10 || !adminSecret}
-          style={loading || adminPhone.length < 10 || !adminSecret ? btnDisabled : btnPrimary}
+          disabled={loading || adminPhone.length < 10}
+          style={loading || adminPhone.length < 10 ? btnDisabled : btnPrimary}
         >
           {loading ? 'Sending…' : 'Send OTP'} <Send size={14} />
         </button>
