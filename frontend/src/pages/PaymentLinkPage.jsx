@@ -60,12 +60,19 @@ export default function PaymentLinkPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0F4C81] to-[#0a3460] flex flex-col items-center justify-center px-4 py-10">
-      {/* Brand */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-          <span className="text-[#0F4C81] font-black text-lg">M</span>
+      {/* Brand + Back */}
+      <div className="w-full max-w-sm flex items-center mb-6 gap-3">
+        <button onClick={() => window.history.length > 1 ? window.history.back() : window.close()}
+          className="w-9 h-9 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition text-white text-lg font-black">
+          ←
+        </button>
+        <div className="flex items-center gap-2 flex-1 justify-center">
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
+            <span className="text-[#0F4C81] font-black text-lg">M</span>
+          </div>
+          <span className="text-white font-bold text-lg tracking-tight">MobilityGrid</span>
         </div>
-        <span className="text-white font-bold text-lg tracking-tight">MobilityGrid</span>
+        <div className="w-9"/>
       </div>
 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">

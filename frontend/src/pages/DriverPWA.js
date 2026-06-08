@@ -72,6 +72,8 @@ export default function DriverPWA() {
   const [loading, setLoading] = useState(true);
   const [totalPaid, setTotalPaid] = useState(0);
   const [assignedVehicle, setAssignedVehicle] = useState(null);
+  const [fleetOwner, setFleetOwner] = useState('');
+  const [fleetCompany, setFleetCompany] = useState('');
 
   const [showNotif, setShowNotif] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false);
@@ -209,6 +211,8 @@ export default function DriverPWA() {
         setDues(d); setPayAmt(d > 0 ? d : 0);
         setTelemetry({ vehicleNumber: p.vehicle_number || '', vehicleModel: p.vehicle_model || '', dailyRent: parseFloat(p.vehicle_daily_rent || 0), dailyDepositRecovery: parseFloat(p.daily_deposit_recovery || 0) });
         if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, dailyRent: p.vehicle_daily_rent });
+        if (p.owner_name) setFleetOwner(p.owner_name);
+        if (p.company_name) setFleetCompany(p.company_name);
       }
       if (nR.ok) { const n = await nR.json(); const a = Array.isArray(n) ? n : []; setNotifs(a); setUnread(a.filter(x => !x.is_read).length); }
     } catch (e) { setDues(0); setPayAmt(0); }
@@ -435,6 +439,16 @@ export default function DriverPWA() {
           </div>
         </div>
       )}
+      {fleetOwner ? (
+        <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Fleet Owner</p>
+            <p className="text-sm font-black text-slate-800">{fleetOwner}</p>
+            {fleetCompany ? <p className="text-[9px] text-slate-500">{fleetCompany}</p> : null}
+          </div>
+          <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">OWNER</span>
+        </div>
+      ) : null}
 
       {/* Recent transactions */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -645,6 +659,16 @@ export default function DriverPWA() {
               </div>
             )}
           </div>
+          {fleetOwner && (
+            <div className="px-4 py-3 bg-white flex items-center justify-between border-t border-slate-100">
+              <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Fleet Owner</p>
+                <p className="text-xs font-black text-slate-700">{fleetOwner}</p>
+                {fleetCompany ? <p className="text-[9px] text-slate-400">{fleetCompany}</p> : null}
+              </div>
+              <span className="text-[9px] text-blue-600 font-black bg-blue-50 px-2 py-1 rounded">OWNER</span>
+            </div>
+          )}
         </div>
 
         {/* Documents via DocumentSection */}

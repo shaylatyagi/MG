@@ -2175,12 +2175,17 @@ router.get('/driver/profile', async (req, res) => {
   `SELECT 
      d.id, d.full_name as name, d.mobile_number as phone,
      d.driver_code, d.wallet_balance, d.status, d.advance_balance,
-     d.security_deposit,
+     d.security_deposit, d.owner_code,
      v.id as vehicle_id, v.vehicle_number, v.vehicle_model,
      v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,
-     v.created_at as assigned_since
+     v.created_at as assigned_since,
+     o.full_name as owner_name,
+     COALESCE(c.name, '') as company_name,
+     COALESCE(c.city, '') as company_city
    FROM public.drivers d
    LEFT JOIN public.vehicles v ON v.driver_id = d.id
+   LEFT JOIN public.owners o ON o.owner_code = d.owner_code
+   LEFT JOIN public.companies c ON c.id = o.company_id
    WHERE d.mobile_number = $1`,
   [phone]
 );
@@ -3087,15 +3092,3 @@ router.get('/manager/profile', async (req, res) => {
 });
 
 // Upgrade to premium (admin manually upgrades, or payment webhook)
-router.post('/owner/upgrade-premium', async (req, res) => {
-  try {
-    const { ownerId, months = 1 } = req.body;
-    const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + parseInt(months));
-    await pool.query(
-      `UPDATE public.owners SET plan='PREMIUM', plan_expires_at=$1 WHERE id=$2`,
-      [endDate.toISOString(), ownerId]
-    );
-    res.json({ success: true, plan: 'PREMIUM', plan_expires_at: endDate });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});

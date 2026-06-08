@@ -20,6 +20,22 @@ async function getOwner(userId) {
 }
 
 // ─── DASHBOARD STATS ──────────────────────────────────────────────────────────
+// GET /api/owner/me — real owner profile + company name
+router.get('/me', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT o.id, o.full_name, o.mobile_number, o.owner_code, o.status,
+             o.wallet_balance, o.company_id, o.created_at,
+             c.name AS company_name, c.company_code, c.city
+      FROM public.owners o
+      LEFT JOIN public.companies c ON c.id = o.company_id
+      WHERE o.id = $1
+    `, [req.user.id]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'Owner not found' });
+    res.json({ success: true, owner: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // GET /api/owner/stats
 // Returns: total_vehicles, total_drivers, active_contracts, pending_kyc,
 //          collection_today, collection_month, outstanding, collection_efficiency
