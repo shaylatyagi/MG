@@ -227,7 +227,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
       {/* Entry Modal */}
       {showEntryModal && selectedDriver && (
         <div
-          className="fixed inset-0 bg-black/50 z-[500] flex items-center justify-center p-4"
+          className="absolute inset-0 bg-black/50 z-[500] flex items-center justify-center p-4"
           onClick={e => { if (e.target === e.currentTarget) setShowEntryModal(false); }}
         >
           <div className="bg-white rounded-3xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
@@ -526,7 +526,7 @@ const DriverDetailsModal = () => {
   
   return (
     <div 
-      className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4"
+      className="absolute inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           setShowDriverDetailsModal(false);
@@ -1886,7 +1886,7 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
       </div>
 {showDriverAssignModal && selectedDriverForAssignInTab && (
   <div 
-    className="fixed inset-0 bg-black/50 z-[1000] flex items-center justify-center p-4" 
+    className="absolute inset-0 bg-black/50 z-[1000] flex items-center justify-center p-4" 
     onClick={(e) => {
       // Click outside modal to close
       if (e.target === e.currentTarget) {
@@ -2074,7 +2074,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 overflow-y-auto"
+    <div className="absolute inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 overflow-y-auto"
       onClick={(e) => { if(e.target===e.currentTarget){ setShowVehicleDetailModal(false); setSelectedVehicleDetails(null); } }}>
       <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
         
@@ -2628,7 +2628,7 @@ const PaymentsTab = () => {
 
       {/* Transaction Detail Modal */}
       {selectedTx && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => setSelectedTx(null)}>
+        <div className="absolute inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => setSelectedTx(null)}>
           <div className="bg-white rounded-t-3xl w-full max-w-[412px] p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-black text-slate-800">Transaction Details</h3>
@@ -2897,7 +2897,7 @@ const ProfileTab = () => (
 
     {/* Add Manager Modal */}
     {showAddManager && (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto">
           <div className="px-5 py-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
             <p className="font-black text-slate-800">Add Manager</p>
@@ -3083,7 +3083,7 @@ const ProfileTab = () => (
         </div>
         {/* Vehicle Detail Modal */}
         {showAssignModal && (
-  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+  <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
     <div className="bg-white rounded-3xl w-full max-w-sm p-6">
       <h3 className="text-lg font-black mb-4">Assign Vehicle to Driver</h3>
       
@@ -3362,7 +3362,7 @@ const ProfileTab = () => (
 )}
         {/* Chat Modal */}
         {showChat && selectedDriver && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl w-full max-w-sm h-[500px] flex flex-col">
               <div className="p-4 bg-indigo-600 text-white rounded-t-3xl flex justify-between items-center">
                 <div>
@@ -3392,7 +3392,7 @@ const ProfileTab = () => (
 
         {/* Add Vehicle Modal with Driver Assignment */}
 {showAddVehicle && (
-  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+  <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
     <div className="bg-white rounded-3xl w-full max-w-sm p-6">
       <h3 className="text-lg font-black mb-4">Add New Vehicle</h3>
       
@@ -3516,7 +3516,7 @@ const ProfileTab = () => (
   </div>
 )}
 {showAddDriver && (
-  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+  <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
     <div className="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
       
       {/* Header */}
@@ -3705,7 +3705,7 @@ const ProfileTab = () => (
 )}
 {/* Overdue Drivers Bottom Sheet */}
 {showOverdue && (
-  <div className="fixed inset-0 z-[999] flex flex-col justify-end" onClick={() => setShowOverdue(false)}>
+  <div className="absolute inset-0 z-[999] flex flex-col justify-end" onClick={() => setShowOverdue(false)}>
     <div className="bg-white rounded-t-3xl shadow-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-slate-100">
         <div>
@@ -3760,7 +3760,7 @@ const ProfileTab = () => (
 )}
 
 {showSOSAlert && activeSOS && (
-  <div className="fixed inset-0 z-[9999] flex flex-col bg-red-600 text-white">
+  <div className="absolute inset-0 z-[9999] flex flex-col bg-red-600 text-white">
     {/* Flashing header */}
     <div className="bg-red-800 px-4 py-3 flex items-center justify-between animate-pulse">
       <span className="font-black text-lg tracking-widest">🚨 SOS ALERT</span>
@@ -3846,7 +3846,7 @@ const ProfileTab = () => (
         {showVehicleDetailModal && <VehicleDetailModal />}
 {showDriverDetailsModal && <DriverDetailsModal />}
 {showCashModal && cashDriver && (
-  <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+  <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
     <div className="bg-white rounded-3xl w-full max-w-sm p-6">
       <h3 className="text-lg font-black mb-1">Record Cash Payment</h3>
       <p className="text-sm text-slate-500 mb-4">{cashDriver.full_name} — {cashDriver.phone_number}</p>
@@ -3890,7 +3890,7 @@ const ProfileTab = () => (
   </div>
 )}
 {showBulkModal && (
-  <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-2">
+  <div className="absolute inset-0 bg-black/50 z-[200] flex items-center justify-center p-2">
     <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[95vh] flex flex-col">
       
       {/* Header */}

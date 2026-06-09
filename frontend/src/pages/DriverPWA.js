@@ -827,7 +827,7 @@ export default function DriverPWA() {
 
         {/* Vehicle Detail Modal */}
         {showVehicleDetail && assignedVehicle && (
-          <div className="fixed inset-0 bg-black/50 z-[70] flex items-end justify-center" onClick={() => setShowVehicleDetail(false)}>
+          <div className="absolute inset-0 bg-black/50 z-[70] flex items-end justify-center" onClick={() => setShowVehicleDetail(false)}>
             <div className="bg-white rounded-t-3xl w-full max-w-sm p-5 pb-8" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
