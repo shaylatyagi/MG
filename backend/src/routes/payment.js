@@ -2845,6 +2845,69 @@ router.get('/inquiry-by-order/:payyantraOrderId', async (req, res) => {
 });
 
 
+// VERIFY SINGLE ORDER BY REFERENCE (our internal MG... order_id → PayYantra by-reference endpoint)
+router.get('/verify-by-reference/:orderId', authenticateToken, async (req, res) => {
+  const { orderId } = req.params;
+  console.log('🔍 Verify by reference for order:', orderId);
+  try {
+    const localOrderResult = await pool.query(
+      'SELECT * FROM ms_orders WHERE order_id = $1 LIMIT 1', [orderId]
+    );
+    if (localOrderResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found in DB' });
+    }
+    const order = localOrderResult.rows[0];
+    const token = await getToken();
+    const statusRes = await fetch(`${BASE_URL}/api/pay/status/by-reference/${orderId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await statusRes.json();
+    let rawStatus = data.transactionStatus || data.status;
+    let newStatus = rawStatus ? String(rawStatus).toUpperCase() : null;
+    if (newStatus === 'INITIATED') newStatus = 'PENDING';
+    if (newStatus === 'SUCCESSFUL') newStatus = 'SUCCESS';
+    const paymentMode = data.paymentMode || data.paymentMethod || data.payment_mode || data.method || null;
+    const amount = parseFloat(order.order_amount || 0);
+    if (newStatus === 'SUCCESS' && order.transaction_status !== 'SUCCESS') {
+      await pool.query(
+        `UPDATE driver_details 
+         SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
+             amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
+             updated_at = NOW()
+         WHERE user_id = (SELECT id FROM users WHERE phone_number = $2 LIMIT 1)`,
+        [amount, order.payer_mobile]
+      );
+      console.log(`💰 Wallet credited ₹${amount} for ${order.payer_mobile} via verify-by-reference`);
+    }
+    await pool.query(
+      `UPDATE ms_orders SET 
+        transaction_status = COALESCE($1, transaction_status),
+        pg_transaction_id = COALESCE($2, pg_transaction_id),
+        bank_reference_no = COALESCE($3, bank_reference_no),
+        bank_utr_no = COALESCE($4, bank_utr_no),
+        payment_mode = COALESCE($5, payment_mode),
+        order_completion_date = CASE WHEN $1 = 'SUCCESS' THEN NOW() ELSE order_completion_date END
+       WHERE order_id = $6`,
+      [newStatus, data.transactionId || data.transactionPublicId || null,
+       data.bankReferenceNo || data.rrn || null, data.bankUTRNo || null,
+       paymentMode, orderId]
+    );
+    res.json({
+      success: true,
+      orderId,
+      previousStatus: order.transaction_status,
+      newStatus: newStatus || order.transaction_status,
+      walletCredited: newStatus === 'SUCCESS' && order.transaction_status !== 'SUCCESS',
+      amount: order.order_amount,
+      payyantraRaw: data
+    });
+  } catch (err) {
+    console.error('❌ Verify by reference error:', err.message);
+    res.status(500).json({ success: false, message: 'Verification failed', error: err.message });
+  }
+});
+
+
 // SYNC ALL MISSING DATA (One-Time Backfill)
 router.post('/sync-all-orders', async (req, res) => {
 
