@@ -536,7 +536,14 @@ const DriverDetailsModal = () => {
     >
       <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Driver Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 text-white text-center rounded-t-3xl">
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 text-white text-center rounded-t-3xl relative">
+          {/* Back / Close button */}
+          <button
+            onClick={() => { setShowDriverDetailsModal(false); setSelectedDriverDetails(null); }}
+            className="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition"
+          >
+            <ChevronLeft size={18} />
+          </button>
           <div className="w-24 h-24 rounded-full bg-white/20 mx-auto flex items-center justify-center text-4xl font-black mb-3">
             {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
           </div>

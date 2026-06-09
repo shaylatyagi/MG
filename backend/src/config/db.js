@@ -24,11 +24,42 @@ if (process.env.DATABASE_URL) {
   });
 }
 
-// Test connection
+// Test connection + auto-migrate chat_messages table
 pool.connect()
-  .then((client) => {
+  .then(async (client) => {
     console.log('✅ Database connected successfully to Neon.tech');
     client.release();
+
+    // Auto-migrate chat_messages: drop+recreate if it has old column schema
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name   = 'chat_messages'
+            AND column_name  = 'sender_id'
+        ) THEN
+          DROP TABLE IF EXISTS public.chat_messages;
+          CREATE TABLE public.chat_messages (
+            id             BIGSERIAL    PRIMARY KEY,
+            sender_id      INTEGER      NOT NULL,
+            sender_role    VARCHAR(20)  NOT NULL,
+            recipient_id   INTEGER      NOT NULL,
+            recipient_role VARCHAR(20)  NOT NULL,
+            body           TEXT         NOT NULL,
+            read_at        TIMESTAMPTZ,
+            created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+          );
+          CREATE INDEX IF NOT EXISTS idx_chat_by_driver
+            ON public.chat_messages (sender_id, sender_role);
+          CREATE INDEX IF NOT EXISTS idx_chat_to_driver
+            ON public.chat_messages (recipient_id, recipient_role);
+          RAISE NOTICE 'chat_messages table migrated to new schema';
+        END IF;
+      END $$;
+    `).then(() => console.log('✅ chat_messages schema OK'))
+      .catch(e  => console.warn('⚠️  chat migration skipped:', e.message));
   })
   .catch(err => {
     console.error('❌ Database connection FAILED:', err.message);

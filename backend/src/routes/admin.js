@@ -727,7 +727,7 @@ router.get('/user-docs/:userType/:userId', async (req, res) => {
   try {
     const { userType, userId } = req.params;
     const result = await pool.query(
-      `SELECT id, doc_type, original_name, s3_key, file_size, mime_type, status, review_notes, uploaded_at, updated_at
+      `SELECT id, doc_type, original_name, s3_key, file_size, mime_type, status, review_notes, uploaded_at
        FROM public.user_documents WHERE user_id=$1 AND user_type=$2 ORDER BY uploaded_at DESC`,
       [userId, userType.toUpperCase()]
     );
@@ -781,7 +781,7 @@ router.post('/user-docs/upload', upload.single('file'), async (req, res) => {
          file_size     = EXCLUDED.file_size,
          mime_type     = EXCLUDED.mime_type,
          status        = 'UPLOADED',
-         updated_at    = NOW()`,
+         uploaded_at   = NOW()`,
       [uId, uType, doc_type, file.originalname, s3Key, file.size, file.mimetype]
     );
 
@@ -800,7 +800,7 @@ router.patch('/user-docs/:docId/status', async (req, res) => {
 
     const result = await pool.query(
       `UPDATE public.user_documents
-       SET status=$1, review_notes=$2, updated_at=NOW()
+       SET status=$1, review_notes=$2
        WHERE id=$3 RETURNING *`,
       [status, reason || null, docId]
     );
