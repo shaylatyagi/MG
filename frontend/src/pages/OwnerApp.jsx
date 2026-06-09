@@ -2606,11 +2606,11 @@ const ProfileTab = () => (
     <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500 flex items-center gap-2"><Phone size={12} /> {t.phone}</span>
-        <span className="text-xs font-black font-mono">{owner?.mobile_number || '9876542345'}</span>
+        <span className="text-xs font-black font-mono">{owner?.mobile_number || '—'}</span>
       </div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500 flex items-center gap-2"><Mail size={12} /> {t.email}</span>
-        <span className="text-xs font-black">{owner?.email || 'rajesh@mobilitygrid.com'}</span>
+        <span className="text-xs font-black">{owner?.email || '—'}</span>
         <button className="text-[9px] text-indigo-600">Edit</button>
       </div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">

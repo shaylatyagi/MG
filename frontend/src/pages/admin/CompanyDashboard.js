@@ -875,7 +875,15 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
   const totalCollection = owners.reduce((s, o) => s + parseFloat(o.collection_total || 0), 0);
 
   return (
-    <Modal title={`${company.name} — ${company.city || 'N/A'}`}
+    <Modal title={
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+          style={{ background: `hsl(${(company.name?.charCodeAt(0) || 65) * 137 % 360}, 60%, 45%)` }}>
+          {company.name?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+        <span>{company.name} — {company.city || 'N/A'}</span>
+      </div>
+    }
       onClose={onClose} onBack={onBack} breadcrumbs={breadcrumbs} wide>
       <div className="flex gap-1 border-b mb-4 -mt-2">
         {[['owners','Owners'],['docs','Documents']].map(([k,label]) => (
@@ -1031,7 +1039,15 @@ function Companies() {
               {filtered.map(c => (
                 <tr key={c.id} className="hover:bg-indigo-50 cursor-pointer"
                   onClick={() => push({ type: 'company', id: c.id, data: c, label: c.name })}>
-                  <td className="px-4 py-3 font-medium text-indigo-700 hover:underline">{c.name}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                        style={{ background: `hsl(${(c.name?.charCodeAt(0) || 65) * 137 % 360}, 60%, 45%)` }}>
+                        {c.name?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <span className="font-medium text-indigo-700 hover:underline">{c.name}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-gray-500">{c.city || '—'}</td>
                   <td className="px-4 py-3"><Badge status={c.status} /></td>
                   <td className="px-4 py-3 text-gray-400">{fmtDate(c.created_at)}</td>
