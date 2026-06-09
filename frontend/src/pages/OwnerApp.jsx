@@ -2623,12 +2623,12 @@ const ProfileTab = () => (
       </div>
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500 flex items-center gap-2"><Building size={12} /> {t.businessName}</span>
-        <span className="text-xs font-black">{owner?.business_name || 'MobilityGrid Fleet Services'}</span>
+        <span className="text-xs font-black">{owner?.company_name || '—'}</span>
         <button className="text-[9px] text-indigo-600">Edit</button>
       </div>
       <div className="flex justify-between items-center py-2">
         <span className="text-xs text-slate-500 flex items-center gap-2"><MapPin size={12} /> {t.address}</span>
-        <span className="text-xs font-black text-right">{owner?.address || 'Mumbai, Maharashtra'}</span>
+        <span className="text-xs font-black text-right">{owner?.city || '—'}</span>
         <button className="text-[9px] text-indigo-600">Edit</button>
       </div>
     </div>
