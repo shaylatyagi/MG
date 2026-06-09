@@ -69,6 +69,7 @@ app.use('/api/admin', verifyAdmin, require('./src/routes/admin'));
 
 app.use('/api/owner', ownerRoutes);
 app.use('/api/chat',  require('./src/routes/chat'));
+app.use('/api/kyc',   require('./src/routes/kyc'));
 
 const rateLimit = require('express-rate-limit');
 app.use('/api/auth/send-otp', rateLimit({

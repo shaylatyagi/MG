@@ -283,6 +283,75 @@ router.post('/verify-bank', async (req, res) => {
 });
 
 
+
+// ── Document upload (mirrors /api/driver/kyc/upload) ───────────────
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+
+const kycDocUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /jpeg|jpg|png|webp|pdf/.test(file.mimetype);
+    cb(ok ? null : new Error('Only JPEG, PNG, WebP, PDF allowed'), ok);
+  },
+});
+
+const VALID_DOC_TYPES = ['aadhaar_front','aadhaar_back','pan','driving_licence','bank_account','license','photo'];
+
+// POST /api/kyc/upload-document — called by DriverPWA KYC tab
+router.post('/upload-document', kycDocUpload.single('file'), async (req, res) => {
+  try {
+    const { doc_type, driver_id, phone } = req.body;
+    const file = req.file;
+    if (!file) return res.status(400).json({ success: false, message: 'File required' });
+
+    // Resolve driver ID from JWT if available, else from body param
+    let driverId = driver_id;
+    if (!driverId && req.headers.authorization) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(
+          req.headers.authorization.replace('Bearer ', ''),
+          process.env.JWT_SECRET || 'your_jwt_secret_key_here'
+        );
+        driverId = decoded.id || decoded.driver_id;
+      } catch (_) {}
+    }
+    if (!driverId && phone) {
+      const r = await pool.query('SELECT id FROM public.drivers WHERE mobile_number = $1', [phone]);
+      if (r.rows.length) driverId = r.rows[0].id;
+    }
+    if (!driverId) return res.status(400).json({ success: false, message: 'Could not identify driver' });
+
+    const docType = doc_type || 'license';
+    const ext     = (file.originalname.split('.').pop() || 'bin').toLowerCase();
+    const s3Key   = `drivers/${driverId}/${docType}/${uuidv4()}.${ext}`;
+
+    await pool.query(
+      `INSERT INTO public.documents (entity_type, entity_id, doc_type, s3_key, status, uploaded_at)
+       VALUES ('driver', $1, $2, $3, 'pending', NOW())
+       ON CONFLICT (entity_type, entity_id, doc_type)
+       DO UPDATE SET s3_key = EXCLUDED.s3_key, status = 'pending',
+                     rejection_reason = NULL, reviewed_at = NULL,
+                     uploaded_at = NOW()`,
+      [driverId, docType, s3Key]
+    );
+
+    await pool.query(
+      `UPDATE public.drivers SET kyc_status = 'PARTIAL', updated_at = NOW()
+       WHERE id = $1 AND kyc_status = 'PENDING'`,
+      [driverId]
+    );
+
+    res.json({ success: true, doc_type: docType, s3_key: s3Key, status: 'pending' });
+  } catch (err) {
+    console.error('KYC upload-document error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
 module.exports = router;
 
 // =====================================================================

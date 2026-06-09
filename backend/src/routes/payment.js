@@ -1438,6 +1438,52 @@ router.get('/owner/drivers/list', async (req, res) => {
 });
 
 // ============================================
+// OWNER PLAN / SUBSCRIPTION
+// ============================================
+router.get('/owner/plan', async (req, res) => {
+  try {
+    const { ownerId } = req.query;
+    if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
+    const result = await pool.query(
+      `SELECT subscription_status, subscription_expires_at FROM public.owners WHERE id = $1`,
+      [parseInt(ownerId)]
+    );
+    if (!result.rows.length) return res.status(404).json({ message: 'Owner not found' });
+    const row = result.rows[0];
+    res.json({
+      plan: row.subscription_status === 'ACTIVE' ? 'PREMIUM' : 'FREE',
+      is_premium: row.subscription_status === 'ACTIVE',
+      subscription_status: row.subscription_status,
+      expires_at: row.subscription_expires_at || null,
+    });
+  } catch (err) {
+    console.error('owner/plan error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ============================================
+// VEHICLE OPERATIONAL STATUS UPDATE
+// ============================================
+router.put('/owner/vehicles/:vehicleId/status', async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { status } = req.body;
+    const VALID = ['ACTIVE','MAINTENANCE','ACCIDENT','RECOVERY','INACTIVE'];
+    if (!status || !VALID.includes(status))
+      return res.status(400).json({ success: false, message: `status must be one of: ${VALID.join(', ')}` });
+    await pool.query(
+      `UPDATE public.vehicles SET operational_status = $1 WHERE id = $2`,
+      [status, parseInt(vehicleId)]
+    );
+    res.json({ success: true, vehicleId, operational_status: status });
+  } catch (err) {
+    console.error('vehicle status update error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ============================================
 // OWNER STATS
 // ============================================
 router.get('/owner/stats', async (req, res) => {
