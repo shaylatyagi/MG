@@ -2078,14 +2078,20 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
       onClick={(e) => { if(e.target===e.currentTarget){ setShowVehicleDetailModal(false); setSelectedVehicleDetails(null); } }}>
       <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
         
+        {/* Sticky top bar — always visible when scrolled */}
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 flex items-center px-4 py-3 rounded-t-3xl">
+          <button onClick={()=>{setShowVehicleDetailModal(false);setSelectedVehicleDetails(null);}}
+            className="flex items-center gap-1 text-indigo-600 font-black text-sm">
+            <ChevronLeft size={18}/> Back
+          </button>
+          <span className="flex-1 text-center text-sm font-black text-slate-800 truncate pr-6">
+            {vehicle.vehicle_number}
+          </span>
+        </div>
         {/* Image Header */}
-        <div className="relative h-48 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-t-3xl">
+        <div className="relative h-48 bg-gradient-to-r from-indigo-500 to-indigo-700">
           <img src={getVehicleImage(vehicle.vehicle_type||'TRUCK')} alt={vehicle.vehicle_model}
             className="w-full h-full object-contain p-4" />
-          <button onClick={()=>{setShowVehicleDetailModal(false);setSelectedVehicleDetails(null);}}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center">
-            <X size={18} />
-          </button>
         </div>
 
         <div className="p-5">

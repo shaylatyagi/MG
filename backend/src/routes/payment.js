@@ -1250,8 +1250,8 @@ router.get('/owner/vehicles', async (req, res) => {
 router.post('/owner/add-driver', async (req, res) => {
   try {
     const { full_name, mobile_number, date_of_birth, emergency_contact_name,
-        emergency_contact_number, driving_license_number, 
-        driving_license_expiry, security_deposit } = req.body;
+        emergency_contact_number, driving_license_number,
+        driving_license_expiry, security_deposit, owner_id } = req.body;
 
     if (!full_name || !mobile_number)
       return res.status(400).json({ success: false, message: 'Name and phone required' });
@@ -1262,6 +1262,18 @@ router.post('/owner/add-driver', async (req, res) => {
     if (!/^\d{10}$/.test(mobile_number))
       return res.status(400).json({ success: false, message: '❌ Phone must be 10 digits' });
 
+    // Resolve owner_code from owner_id (sent by frontend) or JWT
+    const resolvedOwnerId = owner_id || req.user?.id;
+    if (!resolvedOwnerId)
+      return res.status(400).json({ success: false, message: 'Owner ID required' });
+
+    const ownerRow = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id = $1', [parseInt(resolvedOwnerId)]
+    );
+    if (!ownerRow.rows[0])
+      return res.status(400).json({ success: false, message: 'Owner not found' });
+    const ownerCode = ownerRow.rows[0].owner_code;
+
     const existing = await pool.query(
       'SELECT id FROM public.drivers WHERE mobile_number = $1', [mobile_number]
     );
@@ -1271,18 +1283,19 @@ router.post('/owner/add-driver', async (req, res) => {
     const driverCode = 'DRV' + Date.now().toString().slice(-6);
 
     const result = await pool.query(
-  `INSERT INTO public.drivers 
+  `INSERT INTO public.drivers
     (full_name, mobile_number, owner_code, driver_code, wallet_balance, status,
      date_of_birth, emergency_contact_name, emergency_contact_number,
      driving_license_number, driving_license_expiry, security_deposit)
-   VALUES ($1,$2,'OWN701951',$3,0,'ACTIVE',$4,$5,$6,$7,$8,$9) 
+   VALUES ($1,$2,$3,$4,0,'ACTIVE',$5,$6,$7,$8,$9,$10)
    RETURNING id, driver_code`,
-  [full_name, mobile_number, driverCode,
+  [full_name, mobile_number, ownerCode, driverCode,
    date_of_birth||null, emergency_contact_name||null, emergency_contact_number||null,
    driving_license_number||null, driving_license_expiry||null, security_deposit||0]
 );
 
-    res.json({ success: true, message: '✅ Driver added!', driver_code: result.rows[0].driver_code });
+    res.json({ success: true, message: '✅ Driver added!', driver_code: result.rows[0].driver_code,
+               driver: { id: result.rows[0].id, driver_code: result.rows[0].driver_code } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to add driver: ' + err.message });
   }
