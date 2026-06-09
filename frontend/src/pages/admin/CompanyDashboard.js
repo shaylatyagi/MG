@@ -861,6 +861,69 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
 }
 
 // ── COMPANY DETAIL MODAL ──────────────────────────────────────────────────────
+// Company-level docs: all owner+driver docs for this company
+function CompanyDocsSection({ companyId }) {
+  const [docs, setDocs]     = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api(`/api/admin/companies/${companyId}/docs`)
+      .then(d => { setDocs(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [companyId]);
+
+  const updateStatus = async (docId, status) => {
+    await api(`/api/admin/user-docs/${docId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    setDocs(prev => prev.map(d => d.id === docId ? { ...d, status } : d));
+  };
+
+  if (loading) return <Spinner />;
+  if (docs.length === 0) return (
+    <p className="text-center text-gray-400 py-8 text-sm">No documents uploaded yet for this company</p>
+  );
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+          <tr>
+            <th className="px-3 py-2 text-left">User</th>
+            <th className="px-3 py-2 text-left">Type</th>
+            <th className="px-3 py-2 text-left">Document</th>
+            <th className="px-3 py-2 text-left">File</th>
+            <th className="px-3 py-2 text-left">Status</th>
+            <th className="px-3 py-2 text-left">Uploaded</th>
+            <th className="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {docs.map(d => (
+            <tr key={d.id} className="hover:bg-gray-50">
+              <td className="px-3 py-2 font-medium text-gray-800">{d.user_name || d.user_id}</td>
+              <td className="px-3 py-2 text-xs text-gray-500">{d.user_type}</td>
+              <td className="px-3 py-2">{d.doc_type?.replace(/_/g,' ')}</td>
+              <td className="px-3 py-2 text-gray-500 text-xs truncate max-w-[140px]">{d.original_name}</td>
+              <td className="px-3 py-2"><Badge status={d.status} /></td>
+              <td className="px-3 py-2 text-gray-400 text-xs">{timeSince(d.uploaded_at)}</td>
+              <td className="px-3 py-2">
+                {d.status === 'UPLOADED' && (
+                  <div className="flex gap-1">
+                    <button onClick={() => updateStatus(d.id, 'APPROVED')}
+                      className="text-xs text-green-600 hover:underline">✓ Approve</button>
+                    <button onClick={() => updateStatus(d.id, 'REJECTED')}
+                      className="text-xs text-red-500 hover:underline ml-1">✗ Reject</button>
+                  </div>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwner }) {
   const [owners, setOwners]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -938,7 +1001,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
         </>
       )}
 
-      {tab === 'docs' && <DocumentsSection userType="COMPANY" userId={company.id} />}
+      {tab === 'docs' && <CompanyDocsSection companyId={company.id} />}
     </Modal>
   );
 }

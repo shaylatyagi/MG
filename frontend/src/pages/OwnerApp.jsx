@@ -702,6 +702,65 @@ const DriverDetailsModal = () => {
   </div>
 </div>
 
+{/* ─── Agreement Upload ─── */}
+<div className="mb-5">
+  <h3 className="font-black text-slate-800 mb-3 flex items-center gap-2">
+    <FileCheck2 size={18} /> Agreement Document
+  </h3>
+  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+    {driver.agreement_uploaded ? (
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-emerald-600 text-lg">✅</span>
+          <div>
+            <p className="text-sm font-black text-slate-800">Agreement uploaded</p>
+            <p className="text-[10px] text-slate-400">Replace with new file below</p>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <p className="text-sm text-amber-600 font-black mb-2">⚠️ No agreement uploaded yet</p>
+    )}
+    <div className="mt-3 space-y-2">
+      <input
+        type="file"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+        onChange={e => setAgreementFile(e.target.files[0])}
+        className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+      />
+      {agreementFile && (
+        <button
+          onClick={async () => {
+            const fd = new FormData();
+            fd.append('document', agreementFile);
+            fd.append('driverId', driver.id);
+            try {
+              const r = await fetch(`${API}/api/uploads/agreement`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token()}` },
+                body: fd
+              });
+              const data = await r.json();
+              if (data.success) {
+                alert('✅ Agreement uploaded!');
+                setAgreementFile(null);
+                fetchAllData();
+              } else {
+                alert(data.message || 'Upload failed');
+              }
+            } catch {
+              alert('Upload failed — network error');
+            }
+          }}
+          className="w-full bg-indigo-600 text-white text-xs font-black py-2.5 rounded-xl hover:bg-indigo-700 transition"
+        >
+          📤 Upload: {agreementFile.name.length > 25 ? agreementFile.name.slice(0,25)+'…' : agreementFile.name}
+        </button>
+      )}
+    </div>
+  </div>
+</div>
+
 {/* ─── Per-Driver Incentive Rule ─── */}
 {incentiveRules.is_enabled && incentiveRules.rules.length > 0 && (
   <div className="mb-5">

@@ -735,6 +735,28 @@ router.get('/user-docs/:userType/:userId', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET all docs for a company — returns docs for all owners+drivers in that company
+router.get('/companies/:companyId/docs', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const result = await pool.query(
+      `SELECT ud.id, ud.user_id, ud.user_type, ud.doc_type,
+              ud.original_name, ud.file_size, ud.mime_type,
+              ud.status, ud.review_notes, ud.uploaded_at,
+              COALESCE(o.full_name, d.full_name) AS user_name
+       FROM public.user_documents ud
+       LEFT JOIN public.owners  o ON o.id  = ud.user_id AND ud.user_type = 'OWNER'
+       LEFT JOIN public.drivers d ON d.id  = ud.user_id AND ud.user_type = 'DRIVER'
+       WHERE o.company_id = $1 OR d.owner_code IN (
+         SELECT owner_code FROM public.owners WHERE company_id = $1
+       )
+       ORDER BY ud.uploaded_at DESC`,
+      [parseInt(companyId)]
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // POST upload doc on behalf of user (admin upload)
 // Must be registered BEFORE /:docId/status to avoid route collision
 router.post('/user-docs/upload', upload.single('file'), async (req, res) => {

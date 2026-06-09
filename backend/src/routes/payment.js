@@ -1214,32 +1214,34 @@ router.get('/owner/vehicle-stats/:vehicleId', async (req, res) => {
 router.get('/owner/vehicles', async (req, res) => {
   try {
     const { ownerId } = req.query;
-    console.log('Fetching vehicles for ownerId:', ownerId);
-    
-    if (!ownerId) {
-      return res.status(400).json({ message: 'Owner ID required' });
-    }
-    
+    if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
+
     const result = await pool.query(
-      `SELECT 
-         v.id, 
-         v.vehicle_number, 
-         v.vehicle_model, 
-         v.daily_rent, 
-         v.status, 
+      `SELECT
+         v.id,
+         v.vehicle_number,
+         v.vehicle_model,
+         v.daily_rent,
+         v.status,
          v.created_at,
          v.driver_id,
-         v.driver_name,
-         v.driver_phone
+         v.rent_type,
+         v.rent_amount,
+         v.operational_status,
+         v.vehicle_type,
+         v.insurance_expiry,
+         v.fitness_expiry,
+         -- Always get fresh driver info via JOIN (avoids stale denormalized columns)
+         d.full_name   AS driver_name,
+         d.mobile_number AS driver_phone
        FROM public.vehicles v
+       LEFT JOIN public.drivers d ON d.id = v.driver_id
        WHERE v.owner_id = $1
        ORDER BY v.created_at DESC`,
       [parseInt(ownerId)]
     );
-    
-    console.log('Vehicles found:', result.rows.length);
+
     res.json(result.rows);
-    
   } catch (err) {
     console.error('Get vehicles error:', err);
     res.status(500).json({ message: 'Failed to fetch vehicles', error: err.message });
