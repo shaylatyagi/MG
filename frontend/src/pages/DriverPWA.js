@@ -1029,8 +1029,8 @@ export default function DriverPWA() {
                 <ChevronLeft size={20}/>
               </button>
               <div>
-                <h3 className="font-black text-slate-800 text-sm">Fleet Owner</h3>
-                <p className="text-[9px] text-slate-400">MobilityGrid</p>
+                <h3 className="font-black text-slate-800 text-sm">{fleetOwner || 'Fleet Owner'}</h3>
+                <p className="text-[9px] text-slate-400">{fleetCompany || 'MobilityGrid'}</p>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">

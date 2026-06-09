@@ -2282,11 +2282,13 @@ router.get('/owner/notifications', async (req, res) => {
               n.created_at, n.metadata, d.full_name as driver_name
        FROM public.notifications n
        LEFT JOIN public.drivers d ON d.id = n.driver_id
-       WHERE (d.owner_code = $1 OR n.user_type = 'OWNER')
-       AND n.user_type != 'DRIVER'
+       WHERE (
+         (n.user_type = 'DRIVER' AND d.owner_code = $1)
+         OR (n.user_type = 'OWNER' AND n.user_id = $2)
+       )
        ORDER BY n.created_at DESC
        LIMIT 50`,
-      [ownerCode]
+      [ownerCode, parseInt(ownerId)]
     );
     
     res.json(notifResult.rows);
