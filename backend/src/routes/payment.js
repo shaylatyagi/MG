@@ -1861,24 +1861,47 @@ router.post('/chat/send', async (req, res) => {
     if (!driver.rows[0]) return res.status(404).json({ error: 'Driver not found' });
     const driverId = driver.rows[0].id;
 
+    let senderId, senderRole, recipientId, recipientRole;
+
+    if (senderType === 'OWNER') {
+      // Owner → Driver
+      senderId     = parseInt(ownerId);
+      senderRole   = 'OWNER';
+      recipientId  = driverId;
+      recipientRole = 'DRIVER';
+    } else {
+      // Driver → Owner: look up owner via driver's owner_code
+      const ownerRes = await pool.query(
+        `SELECT o.id FROM public.owners o
+         JOIN public.drivers d ON o.owner_code = d.owner_code
+         WHERE d.id = $1 LIMIT 1`,
+        [driverId]
+      );
+      senderId      = driverId;
+      senderRole    = 'DRIVER';
+      recipientId   = ownerRes.rows[0]?.id || parseInt(ownerId) || 1;
+      recipientRole = 'OWNER';
+    }
+
     await pool.query(
-      `INSERT INTO public.chat_messages (driver_id, owner_id, sender_type, message)
-       VALUES ($1, $2, $3, $4)`,
-      [driverId, ownerId || 1, senderType || 'DRIVER', message]
+      `INSERT INTO public.chat_messages (sender_id, sender_role, recipient_id, recipient_role, body)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [senderId, senderRole, recipientId, recipientRole, message]
     );
+
+    // Notification
     if (senderType === 'DRIVER') {
-  const driverNameRes = await pool.query(
-    'SELECT full_name FROM public.drivers WHERE id = $1', [driverId]
-  );
-  const driverName = driverNameRes.rows[0]?.full_name || 'Driver';
-  
-  const notifInsert = await pool.query(
-    `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
-     VALUES ($1, 'OWNER', $2, $3, NOW()) RETURNING id`,
-    [driverId, `💬 ${driverName}`, message.substring(0, 80)]
-  );
-  console.log('Owner notification inserted:', notifInsert.rows[0]?.id);
-}else {
+      const driverNameRes = await pool.query(
+        'SELECT full_name FROM public.drivers WHERE id = $1', [driverId]
+      );
+      const driverName = driverNameRes.rows[0]?.full_name || 'Driver';
+      const notifInsert = await pool.query(
+        `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+         VALUES ($1, 'OWNER', $2, $3, NOW()) RETURNING id`,
+        [driverId, `💬 ${driverName}`, message.substring(0, 80)]
+      );
+      console.log('Owner notification inserted:', notifInsert.rows[0]?.id);
+    } else {
       await pool.query(
         `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
          VALUES ($1, 'DRIVER', '💬 Owner Message', $2, NOW())`,
@@ -1895,7 +1918,7 @@ router.post('/chat/send', async (req, res) => {
 // CHAT — messages fetch karo
 router.get('/chat/messages', async (req, res) => {
   try {
-    const { driverPhone, ownerId } = req.query;
+    const { driverPhone } = req.query;
 
     const driver = await pool.query(
       'SELECT id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
@@ -1904,19 +1927,24 @@ router.get('/chat/messages', async (req, res) => {
     const driverId = driver.rows[0].id;
 
     const messages = await pool.query(
-      `SELECT id, sender_type, message, is_read, created_at
+      `SELECT id,
+              sender_role   AS sender_type,
+              body          AS message,
+              CASE WHEN read_at IS NOT NULL THEN true ELSE false END AS is_read,
+              created_at
        FROM public.chat_messages
-       WHERE driver_id = $1
+       WHERE (sender_id = $1 AND sender_role = 'DRIVER')
+          OR (recipient_id = $1 AND recipient_role = 'DRIVER')
        ORDER BY created_at ASC
        LIMIT 100`,
       [driverId]
     );
 
-    // Messages read mark karo
+    // Mark as read for the viewer
     await pool.query(
-      `UPDATE public.chat_messages SET is_read = TRUE
-       WHERE driver_id = $1 AND sender_type != $2`,
-      [driverId, ownerId ? 'OWNER' : 'DRIVER']
+      `UPDATE public.chat_messages SET read_at = NOW()
+       WHERE recipient_id = $1 AND recipient_role = 'DRIVER' AND read_at IS NULL`,
+      [driverId]
     ).catch(() => {});
 
     res.json(messages.rows);
@@ -1933,11 +1961,14 @@ router.get('/chat/unread', async (req, res) => {
       'SELECT id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
     );
     if (!driver.rows[0]) return res.json({ count: 0 });
-    
+    const driverId = driver.rows[0].id;
+
+    // viewerType = 'DRIVER' or 'OWNER'
+    const role = (viewerType || 'DRIVER').toUpperCase();
     const result = await pool.query(
       `SELECT COUNT(*) FROM public.chat_messages
-       WHERE driver_id = $1 AND is_read = FALSE AND sender_type != $2`,
-      [driver.rows[0].id, viewerType || 'DRIVER']
+       WHERE recipient_id = $1 AND recipient_role = $2 AND read_at IS NULL`,
+      [driverId, role]
     );
     res.json({ count: parseInt(result.rows[0].count) });
   } catch(err) {
