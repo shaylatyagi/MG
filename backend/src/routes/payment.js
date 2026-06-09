@@ -1870,11 +1870,25 @@ router.post('/driver/sos', async (req, res) => {
     if (!driver.rows[0]) return res.status(404).json({ success: false });
     const d = driver.rows[0];
 
-    // SOS DB mein save karo
+    // SOS DB mein save karo (owner_id via vehicles join)
+    const ownerRes = await pool.query(
+      `SELECT o.id FROM public.owners o
+       JOIN public.drivers dr ON o.owner_code = dr.owner_code
+       WHERE dr.id = $1 LIMIT 1`, [d.id]
+    ).catch(() => ({ rows: [] }));
+    const ownerId = ownerRes.rows[0]?.id || null;
     await pool.query(
-      `INSERT INTO public.sos_alerts (driver_id, driver_phone, message)
-       VALUES ($1, $2, $3)`,
-      [d.id, phone, message || 'SOS Alert!']
+      `INSERT INTO public.sos_alerts (driver_id, owner_id, status, message, created_at)
+       VALUES ($1, $2, 'ACTIVE', $3, NOW())
+       ON CONFLICT DO NOTHING`,
+      [d.id, ownerId, message || 'SOS Alert!']
+    ).catch(() =>
+      // If status/message columns don't exist yet, insert minimal
+      pool.query(
+        `INSERT INTO public.sos_alerts (driver_id, owner_id, resolved_at, created_at)
+         VALUES ($1, $2, NULL, NOW())`,
+        [d.id, ownerId]
+      )
     );
 
     // Owner ko notification bhejo
@@ -2322,10 +2336,13 @@ router.get('/owner/sos-alerts', verifyToken, requirePermission('sos_alerts'), as
   try {
     const { ownerId } = req.query;
     const result = await pool.query(
-      `SELECT s.*, d.full_name, d.mobile_number
+      `SELECT s.id, s.driver_id, s.lat, s.lng, s.created_at,
+              COALESCE(s.message, 'SOS Alert!') AS message,
+              d.full_name, d.mobile_number
        FROM public.sos_alerts s
        JOIN public.drivers d ON d.id = s.driver_id
-       WHERE s.status = 'ACTIVE'
+       WHERE s.resolved_at IS NULL
+       AND (s.status IS NULL OR s.status = 'ACTIVE')
        AND d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
        ORDER BY s.created_at DESC LIMIT 5`,
       [ownerId]
@@ -2337,7 +2354,7 @@ router.get('/owner/sos-alerts', verifyToken, requirePermission('sos_alerts'), as
 router.put('/owner/sos-dismiss/:id', async (req, res) => {
   try {
     await pool.query(
-      `UPDATE public.sos_alerts SET status='DISMISSED' WHERE id=$1`,
+      `UPDATE public.sos_alerts SET resolved_at = NOW(), status = 'DISMISSED' WHERE id=$1`,
       [req.params.id]
     );
     res.json({ success: true });

@@ -903,16 +903,12 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
-  vehicle_number: newVehicle.number,
-  vehicle_model: newVehicle.model,
-  vehicle_type: newVehicle.type,
-  daily_rent: newVehicle.rent,
-  rent_type: rentType,
-  owner_id: ownerId(),
-  insurance_expiry: newVehicle.insuranceExpiry || null,
-  fitness_expiry: newVehicle.fitnessExpiry || null,
-  chassis_number: newVehicle.chassisNumber || null
-})
+        vehicleId: parseInt(vehicleId),
+        driverId:  parseInt(driverId),
+        rentType:  rentType,
+        rentAmount: parseFloat(customRent),
+        dailyRent:  dailyRent
+      })
     });
     
     const data = await response.json();

@@ -60,6 +60,14 @@ pool.connect()
       END $$;
     `).then(() => console.log('✅ chat_messages schema OK'))
       .catch(e  => console.warn('⚠️  chat migration skipped:', e.message));
+
+    // Auto-add status + message columns to sos_alerts if missing
+    await pool.query(`
+      ALTER TABLE public.sos_alerts
+        ADD COLUMN IF NOT EXISTS status  VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+        ADD COLUMN IF NOT EXISTS message TEXT;
+    `).then(() => console.log('✅ sos_alerts columns OK'))
+      .catch(e  => console.warn('⚠️  sos_alerts migration skipped:', e.message));
   })
   .catch(err => {
     console.error('❌ Database connection FAILED:', err.message);
