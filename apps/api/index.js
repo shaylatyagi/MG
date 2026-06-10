@@ -8,8 +8,11 @@ async function bootstrap() {
   // SECOND: validate all required keys — crash loudly if missing
   const REQUIRED = [
     'DATABASE_URL', 'JWT_SECRET', 'ADMIN_SECRET_KEY', 'ADMIN_PHONE',
-    'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM',
   ];
+  // Twilio only required when actually sending OTPs (NODE_ENV=production + DEV_BYPASS_OTP off)
+  if (process.env.NODE_ENV === 'production' && process.env.DEV_BYPASS_OTP !== 'true') {
+    REQUIRED.push('TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM');
+  }
   const missing = REQUIRED.filter(k => !process.env[k]);
   if (missing.length) {
     console.error('FATAL: Missing required env vars:', missing.join(', '));
