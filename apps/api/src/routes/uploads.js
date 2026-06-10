@@ -1,5 +1,6 @@
-// apps/api/src/routes/uploads.js — TODO: migrate from backend/src/routes/uploads.js
+// apps/api/src/routes/uploads.js — static file serving placeholder
+'use strict';
 const router = require('express').Router();
-// Stub — replace with full implementation per DevSpec
-router.get('/', (_req, res) => res.json({ success: true, message: 'uploads routes — coming soon' }));
+// Uploads served from S3 signed URLs (see services/s3.js).
+// This router reserved for future local fallback in dev.
 module.exports = router;

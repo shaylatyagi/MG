@@ -386,7 +386,7 @@ export default function DriverPWA() {
   };
 
   const statusBadge = (s) => {
-    const styles = { verified: 'bg-indigo-50 text-indigo-700 border-indigo-200', failed: 'bg-red-50 text-red-600 border-red-200', pending: 'bg-slate-50 text-slate-500 border-slate-200' };
+    const styles = { verified: 'bg-blue-50 text-blue-700 border-blue-200', failed: 'bg-red-50 text-red-600 border-red-200', pending: 'bg-slate-50 text-slate-500 border-slate-200' };
     const labels = { verified: '✓ Verified', failed: '✗ Failed', pending: 'Pending' };
     return <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${styles[s] || styles.pending}`}>{labels[s] || 'Pending'}</span>;
   };
@@ -404,7 +404,7 @@ export default function DriverPWA() {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
             <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
           </div>
-          <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${dues > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+          <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${dues > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
             {dues > 0 ? t.duesPending : t.settled}
           </span>
         </div>
@@ -414,9 +414,9 @@ export default function DriverPWA() {
         <div className="flex items-center gap-2 mb-3">
           <span className="text-slate-400 font-black text-lg">₹</span>
           <input type="number" value={payAmt} onChange={e => setPayAmt(Number(e.target.value))}
-            className="flex-1 border border-slate-200 rounded-xl p-3 text-xl font-black font-mono focus:outline-none focus:border-indigo-500 bg-slate-50/50 text-slate-800"/>
+            className="flex-1 border border-slate-200 rounded-xl p-3 text-xl font-black font-mono focus:outline-none focus:border-blue-500 bg-slate-50/50 text-slate-800"/>
         </div>
-        <button onClick={pay} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition active:scale-[0.98]">
+        <button onClick={pay} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition active:scale-[0.98]">
           <CreditCard size={15}/> {t.pay}
         </button>
       </div>
@@ -425,8 +425,8 @@ export default function DriverPWA() {
       {assignedVehicle && (
         <button onClick={() => setShowVehicleDetail(true)} className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between active:bg-slate-50 transition text-left">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <Truck size={14} className="text-indigo-600"/>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+              <Truck size={14} className="text-blue-600"/>
             </div>
             <div>
               <p className="text-sm font-black text-slate-800">{assignedVehicle.number}</p>
@@ -434,9 +434,9 @@ export default function DriverPWA() {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs font-black text-indigo-600">₹{assignedVehicle.dailyRent}/day</p>
+            <p className="text-xs font-black text-blue-600">₹{assignedVehicle.dailyRent}/day</p>
             <span className="text-[9px] font-black text-slate-400 flex items-center gap-1 justify-end">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block animate-pulse"/>Active · tap for details
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse"/>Active · tap for details
             </span>
           </div>
         </button>
@@ -448,7 +448,7 @@ export default function DriverPWA() {
             <p className="text-sm font-black text-slate-800">{fleetOwner}</p>
             {fleetCompany ? <p className="text-[9px] text-slate-500">{fleetCompany}</p> : null}
           </div>
-          <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">OWNER</span>
+          <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">OWNER</span>
         </div>
       ) : null}
 
@@ -457,15 +457,15 @@ export default function DriverPWA() {
         <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.recent}</h3>
           <button onClick={() => { setHistoryFrom('transaction'); setTab('wallet'); setActiveTab('wallet'); }}
-            className="text-[10px] text-indigo-600 font-black flex items-center gap-1">{t.viewAll} <ArrowUpRight size={10}/></button>
+            className="text-[10px] text-blue-600 font-black flex items-center gap-1">{t.viewAll} <ArrowUpRight size={10}/></button>
         </div>
         <div className="divide-y divide-slate-50">
           {payments.slice(0, 3).map((p, i) => (
             <div key={i} onClick={() => { setSelTxn(p); setShowReceipt(true); }}
               className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition">
               <div className="flex items-center gap-3">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${p.status === 'SUCCESS' ? 'bg-indigo-50' : 'bg-slate-100'}`}>
-                  {p.status === 'SUCCESS' ? <CheckCircle size={12} className="text-indigo-600"/> : <Clock size={12} className="text-slate-400"/>}
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${p.status === 'SUCCESS' ? 'bg-blue-50' : 'bg-slate-100'}`}>
+                  {p.status === 'SUCCESS' ? <CheckCircle size={12} className="text-blue-600"/> : <Clock size={12} className="text-slate-400"/>}
                 </div>
                 <div>
                   <p className="text-xs font-black text-slate-800">{p.type}</p>
@@ -491,7 +491,7 @@ export default function DriverPWA() {
       <div className="space-y-3 pb-4">
         {historyFrom === 'transaction' && (
           <button onClick={() => { setHistoryFrom('tab'); setTab('home'); setActiveTab('dashboard'); }}
-            className="flex items-center gap-1 text-indigo-600 font-black text-sm bg-white border border-slate-200 px-3 py-2 rounded-xl">
+            className="flex items-center gap-1 text-blue-600 font-black text-sm bg-white border border-slate-200 px-3 py-2 rounded-xl">
             <ChevronLeft size={15}/> Back to Dashboard
           </button>
         )}
@@ -506,7 +506,7 @@ export default function DriverPWA() {
             </button>
           </div>
           <div className="flex gap-2">
-            <button onClick={addFloat} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
+            <button onClick={addFloat} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
               <PlusCircle size={12}/> {t.addFloat2}
             </button>
             <button onClick={() => alert('Coming soon')} className="flex-1 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition hover:border-slate-300">
@@ -548,7 +548,7 @@ export default function DriverPWA() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-black text-slate-800">₹{p.amount}</p>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${p.status === 'SUCCESS' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${p.status === 'SUCCESS' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                     {p.status === 'SUCCESS' ? 'Paid' : p.status}
                   </span>
                 </div>
@@ -558,7 +558,7 @@ export default function DriverPWA() {
           {payments.length > 5 && (
             <div className="px-4 py-3 border-t border-slate-100">
               <button onClick={() => setShowAll(!showAll)}
-                className="w-full text-[11px] font-black text-indigo-600 py-2 rounded-xl hover:bg-indigo-50 transition">
+                className="w-full text-[11px] font-black text-blue-600 py-2 rounded-xl hover:bg-blue-50 transition">
                 {showAll ? 'Show less ↑' : `Load ${payments.length - 5} more ↓`}
               </button>
             </div>
@@ -638,20 +638,20 @@ export default function DriverPWA() {
       <div className="space-y-3 pb-4">
         {/* Profile card — fixed layout */}
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="bg-indigo-600 px-5 pt-6 pb-5">
+          <div className="bg-blue-600 px-5 pt-6 pb-5">
             <div className="flex flex-col items-center text-white text-center">
               <div className="w-16 h-16 rounded-full bg-white/15 border-2 border-white/30 flex items-center justify-center text-2xl font-black mb-3">
                 {driverName.charAt(0).toUpperCase()}
               </div>
               <h2 className="text-lg font-black tracking-tight">{driverName}</h2>
-              <p className="text-sm text-indigo-100 mt-0.5">{phone()}</p>
-              <p className="text-[10px] text-indigo-200 font-mono mt-0.5">{driverCode}</p>
+              <p className="text-sm text-blue-100 mt-0.5">{phone()}</p>
+              <p className="text-[10px] text-blue-200 font-mono mt-0.5">{driverCode}</p>
             </div>
           </div>
           {/* Status + vehicle — BELOW blue header, outside overflow */}
           <div className="px-4 py-3 bg-white flex items-center justify-between border-t border-slate-100">
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${assignedVehicle ? 'bg-indigo-500 animate-pulse' : 'bg-slate-300'}`}/>
+              <span className={`w-2 h-2 rounded-full ${assignedVehicle ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'}`}/>
               <span className="text-xs font-black text-slate-700">{assignedVehicle ? 'Active' : 'Inactive'}</span>
             </div>
             {assignedVehicle && (
@@ -668,7 +668,7 @@ export default function DriverPWA() {
                 <p className="text-xs font-black text-slate-700">{fleetOwner}</p>
                 {fleetCompany ? <p className="text-[9px] text-slate-400">{fleetCompany}</p> : null}
               </div>
-              <span className="text-[9px] text-indigo-600 font-black bg-indigo-50 px-2 py-1 rounded">OWNER</span>
+              <span className="text-[9px] text-blue-600 font-black bg-blue-50 px-2 py-1 rounded">OWNER</span>
             </div>
           )}
         </div>
@@ -690,20 +690,20 @@ export default function DriverPWA() {
           {/* Aadhaar */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-black text-slate-800 flex items-center gap-2"><Fingerprint size={14} className="text-indigo-600"/> Aadhaar</span>
+              <span className="text-sm font-black text-slate-800 flex items-center gap-2"><Fingerprint size={14} className="text-blue-600"/> Aadhaar</span>
               {statusBadge(kycState.aadhaar.status)}
             </div>
             <div className="flex gap-2 mb-2">
               <input value={kycState.aadhaar.value} maxLength={12}
                 onChange={e => setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, value: e.target.value.replace(/\D/g,'').slice(0,12) } }))}
-                placeholder="12-digit Aadhaar" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm bg-slate-50 focus:outline-none focus:border-indigo-500"/>
+                placeholder="12-digit Aadhaar" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm bg-slate-50 focus:outline-none focus:border-blue-500"/>
               <button onClick={kycAadhaarInit} disabled={kycLoading === 'aadhaar'}
-                className="bg-indigo-600 text-white px-4 rounded-xl text-xs font-black hover:bg-indigo-700 transition">OTP</button>
+                className="bg-blue-600 text-white px-4 rounded-xl text-xs font-black hover:bg-blue-700 transition">OTP</button>
             </div>
             {kycState.aadhaar.showOtp && (
               <div className="flex gap-2 mb-2">
                 <input value={kycState.aadhaar.otp} onChange={e => setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, otp: e.target.value } }))}
-                  placeholder="Enter OTP" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm bg-slate-50 focus:outline-none focus:border-indigo-500"/>
+                  placeholder="Enter OTP" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm bg-slate-50 focus:outline-none focus:border-blue-500"/>
                 <button onClick={kycAadhaarVerify} className="bg-slate-800 text-white px-4 rounded-xl text-xs font-black">Verify</button>
               </div>
             )}
@@ -716,17 +716,17 @@ export default function DriverPWA() {
           {/* PAN */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-black text-slate-800 flex items-center gap-2"><FileText size={14} className="text-indigo-600"/> PAN</span>
+              <span className="text-sm font-black text-slate-800 flex items-center gap-2"><FileText size={14} className="text-blue-600"/> PAN</span>
               {statusBadge(kycState.pan.status)}
             </div>
             <div className="flex gap-2 mb-2">
               <input value={kycState.pan.value} maxLength={10}
                 onChange={e => setKycState(s => ({ ...s, pan: { ...s.pan, value: e.target.value.toUpperCase() } }))}
-                placeholder="ABCDE1234F" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm uppercase bg-slate-50 focus:outline-none focus:border-indigo-500"/>
+                placeholder="ABCDE1234F" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm uppercase bg-slate-50 focus:outline-none focus:border-blue-500"/>
               <button onClick={kycVerifyPAN} disabled={kycLoading === 'pan'}
-                className="bg-indigo-600 text-white px-4 rounded-xl text-xs font-black hover:bg-indigo-700 transition">Verify</button>
+                className="bg-blue-600 text-white px-4 rounded-xl text-xs font-black hover:bg-blue-700 transition">Verify</button>
             </div>
-            {kycState.pan.verifiedName && <p className="text-[10px] text-indigo-600 font-black mb-2">✓ {kycState.pan.verifiedName}</p>}
+            {kycState.pan.verifiedName && <p className="text-[10px] text-blue-600 font-black mb-2">✓ {kycState.pan.verifiedName}</p>}
             <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
               <Camera size={11}/> Upload PAN
               <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload('PAN', e.target.files[0])}/>
@@ -736,19 +736,19 @@ export default function DriverPWA() {
           {/* DL */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-black text-slate-800 flex items-center gap-2"><FileCheck2 size={14} className="text-indigo-600"/> Driving License</span>
+              <span className="text-sm font-black text-slate-800 flex items-center gap-2"><FileCheck2 size={14} className="text-blue-600"/> Driving License</span>
               {statusBadge(kycState.dl.status)}
             </div>
             <div className="flex gap-2 mb-2">
               <input value={kycState.dl.value}
                 onChange={e => setKycState(s => ({ ...s, dl: { ...s.dl, value: e.target.value.toUpperCase() } }))}
-                placeholder="License Number" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm bg-slate-50 focus:outline-none focus:border-indigo-500"/>
+                placeholder="License Number" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm bg-slate-50 focus:outline-none focus:border-blue-500"/>
               <button onClick={kycVerifyDL} disabled={kycLoading === 'dl'}
-                className="bg-indigo-600 text-white px-4 rounded-xl text-xs font-black hover:bg-indigo-700 transition">Verify</button>
+                className="bg-blue-600 text-white px-4 rounded-xl text-xs font-black hover:bg-blue-700 transition">Verify</button>
             </div>
             <input type="date" value={kycState.dl.dob}
               onChange={e => setKycState(s => ({ ...s, dl: { ...s.dl, dob: e.target.value } }))}
-              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm mb-2 bg-slate-50 focus:outline-none focus:border-indigo-500"/>
+              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm mb-2 bg-slate-50 focus:outline-none focus:border-blue-500"/>
             <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
               <Camera size={11}/> Upload License
               <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload('DL', e.target.files[0])}/>
@@ -758,18 +758,18 @@ export default function DriverPWA() {
           {/* Bank */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-black text-slate-800 flex items-center gap-2"><Landmark size={14} className="text-indigo-600"/> Bank Account</span>
+              <span className="text-sm font-black text-slate-800 flex items-center gap-2"><Landmark size={14} className="text-blue-600"/> Bank Account</span>
               {statusBadge(kycState.bank.status)}
             </div>
             <input value={kycState.bank.acc}
               onChange={e => setKycState(s => ({ ...s, bank: { ...s.bank, acc: e.target.value } }))}
-              placeholder="Account Number" className="w-full border border-slate-200 rounded-xl p-2.5 text-sm mb-2 bg-slate-50 focus:outline-none focus:border-indigo-500"/>
+              placeholder="Account Number" className="w-full border border-slate-200 rounded-xl p-2.5 text-sm mb-2 bg-slate-50 focus:outline-none focus:border-blue-500"/>
             <div className="flex gap-2 mb-2">
               <input value={kycState.bank.ifsc}
                 onChange={e => setKycState(s => ({ ...s, bank: { ...s.bank, ifsc: e.target.value.toUpperCase() } }))}
-                placeholder="IFSC Code" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm uppercase bg-slate-50 focus:outline-none focus:border-indigo-500"/>
+                placeholder="IFSC Code" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm uppercase bg-slate-50 focus:outline-none focus:border-blue-500"/>
               <button onClick={kycVerifyBank} disabled={kycLoading === 'bank'}
-                className="bg-indigo-600 text-white px-4 rounded-xl text-xs font-black hover:bg-indigo-700 transition">Verify</button>
+                className="bg-blue-600 text-white px-4 rounded-xl text-xs font-black hover:bg-blue-700 transition">Verify</button>
             </div>
             <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
               <Camera size={11}/> Upload Cheque
@@ -792,7 +792,7 @@ export default function DriverPWA() {
 
         {/* Status bar */}
         <div className="bg-slate-900 text-white text-[10px] px-4 py-2 flex justify-between items-center shrink-0">
-          <span className="font-black tracking-widest text-indigo-400">DRIVER</span>
+          <span className="font-black tracking-widest text-blue-400">DRIVER</span>
           <span className="font-mono text-slate-400">{time}</span>
           <div className="flex gap-1.5 items-center"><Wifi size={10} className="text-slate-400"/><Battery size={10} className="text-slate-400"/></div>
         </div>
@@ -800,7 +800,7 @@ export default function DriverPWA() {
         {/* Header */}
         <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs">MG</div>
+            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xs">MG</div>
             <div>
               <p className="text-sm font-black text-slate-800 leading-none">{tab === 'home' ? 'Dashboard' : tab === 'wallet' ? 'Wallet' : 'Account'}</p>
               <p className="text-[9px] text-slate-400 font-mono mt-0.5">{driverName}</p>
@@ -808,15 +808,15 @@ export default function DriverPWA() {
           </div>
           <div className="flex items-center gap-1.5">
             <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-              <button onClick={() => setLang('en')} className={`px-2.5 py-1 text-[10px] font-black rounded-md transition ${lang==='en'?'bg-white text-indigo-600 shadow-sm':'text-slate-400'}`}>EN</button>
-              <button onClick={() => setLang('hi')} className={`px-2.5 py-1 text-[10px] font-black rounded-md transition ${lang==='hi'?'bg-white text-indigo-600 shadow-sm':'text-slate-400'}`}>हिं</button>
+              <button onClick={() => setLang('en')} className={`px-2.5 py-1 text-[10px] font-black rounded-md transition ${lang==='en'?'bg-white text-blue-600 shadow-sm':'text-slate-400'}`}>EN</button>
+              <button onClick={() => setLang('hi')} className={`px-2.5 py-1 text-[10px] font-black rounded-md transition ${lang==='hi'?'bg-white text-blue-600 shadow-sm':'text-slate-400'}`}>हिं</button>
             </div>
-            <button onClick={() => setShowChatbot(true)} className="p-2 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 transition text-slate-500 border border-slate-200">
+            <button onClick={() => setShowChatbot(true)} className="p-2 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 transition text-slate-500 border border-slate-200">
               <MessageCircle size={15}/>
             </button>
-            <button onClick={() => { setShowNotif(!showNotif); if (!showNotif) markRead(); }} className="relative p-2 rounded-lg bg-slate-100 hover:bg-indigo-50 transition border border-slate-200">
-              {unread > 0 ? <BellRing size={15} className="text-indigo-600"/> : <Bell size={15} className="text-slate-500"/>}
-              {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-indigo-600 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unread > 9 ? '9+' : unread}</span>}
+            <button onClick={() => { setShowNotif(!showNotif); if (!showNotif) markRead(); }} className="relative p-2 rounded-lg bg-slate-100 hover:bg-blue-50 transition border border-slate-200">
+              {unread > 0 ? <BellRing size={15} className="text-blue-600"/> : <Bell size={15} className="text-slate-500"/>}
+              {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-600 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unread > 9 ? '9+' : unread}</span>}
             </button>
             <ThemeToggle />
             <button onClick={logout} className="p-2 rounded-lg bg-red-50 hover:bg-red-100 transition border border-red-100">
@@ -831,7 +831,7 @@ export default function DriverPWA() {
             <div className="bg-white rounded-t-3xl w-full max-w-sm p-5 pb-8" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center"><Truck size={16} className="text-indigo-600"/></div>
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center"><Truck size={16} className="text-blue-600"/></div>
                   <div>
                     <p className="text-base font-black text-slate-800">{assignedVehicle.number}</p>
                     <p className="text-[10px] text-slate-400">{assignedVehicle.model || '—'}</p>
@@ -870,7 +870,7 @@ export default function DriverPWA() {
               {notifs.length === 0 ? <div className="p-5 text-center text-xs text-slate-400">All clear</div>
                 : notifs.slice(0, 10).map((n, i) => (
                   <div key={i}
-                    className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-indigo-50/30' : ''}`}
+                    className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition ${!n.is_read ? 'bg-blue-50/30' : ''}`}
                     onClick={() => {
                       setNotifs(prev => prev.map((x, idx) => idx === i ? { ...x, is_read: true } : x));
                       setUnread(prev => Math.max(0, prev - 1)); setShowNotif(false);
@@ -880,7 +880,7 @@ export default function DriverPWA() {
                     }}>
                     <p className="text-xs font-black text-slate-800">{n.title}</p>
                     <p className="text-[10px] text-slate-400 mt-0.5">{n.message}</p>
-                    {!n.is_read && <p className="text-[9px] text-indigo-500 font-black mt-0.5">Tap to view →</p>}
+                    {!n.is_read && <p className="text-[9px] text-blue-500 font-black mt-0.5">Tap to view →</p>}
                   </div>
                 ))}
             </div>
@@ -901,7 +901,7 @@ export default function DriverPWA() {
         {/* Emergency bar */}
         <div className="absolute left-0 right-0 bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between" style={{ bottom: '64px' }}>
           <button onClick={() => { setShowOwnerChat(true); fetchChat(); }}
-            className="flex items-center gap-1.5 text-[10px] font-black text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-indigo-200 hover:text-indigo-600 transition">
+            className="flex items-center gap-1.5 text-[10px] font-black text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-blue-200 hover:text-blue-600 transition">
             <MessageCircle size={11}/> Owner Chat
           </button>
           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.emergency}</span>
@@ -919,7 +919,7 @@ export default function DriverPWA() {
             { id: 'account', tabVal: 'account', Icon: User, label: 'Account' },
           ].map(({ id, tabVal, Icon, label }) => (
             <button key={id} onClick={() => { setActiveTab(id); setTab(tabVal); }}
-              className={`flex flex-col items-center gap-1 transition-all px-4 ${activeTab === id ? 'text-indigo-600' : 'text-slate-400'}`}>
+              className={`flex flex-col items-center gap-1 transition-all px-4 ${activeTab === id ? 'text-blue-600' : 'text-slate-400'}`}>
               <Icon size={activeTab === id ? 21 : 19}/>
               <span className="text-[9px] font-black">{label}</span>
             </button>
@@ -943,8 +943,8 @@ export default function DriverPWA() {
               </button>
               {sosSent ? (
                 <div className="text-center py-4">
-                  <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle size={24} className="text-indigo-600"/>
+                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle size={24} className="text-blue-600"/>
                   </div>
                   <h3 className="font-black text-slate-800">Alert Sent</h3>
                   <p className="text-sm text-slate-400 mt-1">Owner has been notified</p>
@@ -955,7 +955,7 @@ export default function DriverPWA() {
                   <p className="text-xs text-slate-400 mb-4">Immediately notifies your fleet owner</p>
                   <textarea value={sosMsg} onChange={e => setSosMsg(e.target.value)}
                     placeholder="Describe the situation..."
-                    rows={3} className="w-full border border-slate-200 rounded-xl p-3 text-sm mb-4 focus:outline-none focus:border-indigo-500 bg-slate-50 resize-none"/>
+                    rows={3} className="w-full border border-slate-200 rounded-xl p-3 text-sm mb-4 focus:outline-none focus:border-blue-500 bg-slate-50 resize-none"/>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSOS(false)} className="flex-1 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
                     <button onClick={sendSOS} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-3 rounded-xl text-sm transition">Send SOS</button>
@@ -970,7 +970,7 @@ export default function DriverPWA() {
         {showPaying && (
           <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-[100] flex items-center justify-center">
             <div className="text-center">
-              <div className="w-10 h-10 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"/>
+              <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"/>
               <p className="font-black text-slate-800 text-sm">Redirecting...</p>
               <button onClick={() => { payAbortRef.current = true; setShowPaying(false); }} className="mt-3 text-xs text-slate-400 underline">Cancel</button>
             </div>
@@ -1012,7 +1012,7 @@ export default function DriverPWA() {
                 {[['ID', selTxn.id], ['Date', selTxn.date], ['Status', selTxn.status]].map(([k, v]) => (
                   <div key={k} className="flex justify-between items-center">
                     <span className="text-xs text-slate-400">{k}</span>
-                    <span className={`text-xs font-black ${k === 'Status' ? (selTxn.status === 'SUCCESS' ? 'text-indigo-600' : 'text-red-500') : 'text-slate-700 font-mono'}`}>{v}</span>
+                    <span className={`text-xs font-black ${k === 'Status' ? (selTxn.status === 'SUCCESS' ? 'text-blue-600' : 'text-red-500') : 'text-slate-700 font-mono'}`}>{v}</span>
                   </div>
                 ))}
               </div>
@@ -1043,11 +1043,11 @@ export default function DriverPWA() {
                 <div key={i} className={`flex ${msg.sender_type === 'DRIVER' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[75%] px-3 py-2.5 rounded-2xl text-sm ${
                     msg.sender_type === 'DRIVER'
-                      ? 'bg-indigo-600 text-white rounded-br-sm'
+                      ? 'bg-blue-600 text-white rounded-br-sm'
                       : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
                   }`}>
                     <p className="text-sm">{msg.message}</p>
-                    <p className={`text-[9px] mt-1 ${msg.sender_type === 'DRIVER' ? 'text-indigo-200' : 'text-slate-400'}`}>
+                    <p className={`text-[9px] mt-1 ${msg.sender_type === 'DRIVER' ? 'text-blue-200' : 'text-slate-400'}`}>
                       {formatChatTime(msg.created_at)}
                     </p>
                   </div>
@@ -1057,8 +1057,8 @@ export default function DriverPWA() {
             <div className="p-3 bg-white border-t border-slate-200 flex gap-2">
               <input value={chatInput} onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
-                placeholder="Message..." className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500"/>
-              <button onClick={sendChatMessage} className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl transition">
+                placeholder="Message..." className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"/>
+              <button onClick={sendChatMessage} className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-xl transition">
                 <Send size={15}/>
               </button>
             </div>

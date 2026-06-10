@@ -1,0 +1,370 @@
+// apps/api/src/controllers/admin.controller.js
+// DevSpec §13.8 — Super Admin module.
+// Schema: ms_orders uses order_amount + COALESCE(order_completion_date, order_initiation_date)
+//         vehicles use registration_number (not reg_number), join on v.driver_id = d.id
+//         kyc docs in kyc_documents (not documents), col = document_type
+'use strict';
+
+const pool         = require('../config/db');
+const { AppError } = require('../utils/errors');
+
+// ── PLATFORM STATS ──────────────────────────────────────────────────────────
+exports.getPlatformStats = async (req, res, next) => {
+  try {
+    const [countsRes, collectionRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM public.client_companies)::int          AS total_companies,
+          (SELECT COUNT(*) FROM public.owners)::int                    AS total_owners,
+          (SELECT COUNT(*) FROM public.drivers WHERE status != 'INACTIVE')::int AS total_drivers,
+          (SELECT COUNT(*) FROM public.vehicles WHERE status != 'INACTIVE')::int AS total_vehicles
+      `),
+      pool.query(`
+        SELECT
+          COALESCE(SUM(CASE WHEN
+            COALESCE(order_completion_date, order_initiation_date)::date = CURRENT_DATE
+            AND transaction_status = 'SUCCESS'
+            THEN order_amount END), 0) AS collection_today,
+          COALESCE(SUM(CASE WHEN
+            COALESCE(order_completion_date, order_initiation_date)::date
+              >= DATE_TRUNC('month', CURRENT_DATE)
+            AND transaction_status = 'SUCCESS'
+            THEN order_amount END), 0) AS collection_month,
+          COALESCE(SUM(CASE WHEN transaction_status = 'SUCCESS' THEN order_amount END), 0) AS collection_total
+        FROM public.ms_orders
+      `),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        ...countsRes.rows[0],
+        ...collectionRes.rows[0],
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+// ── COMPANIES — single CTE, never N+1 ──────────────────────────────────────
+exports.listCompanies = async (req, res, next) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit)  || 50, 200);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const { rows } = await pool.query(`
+      SELECT
+        c.id,
+        c.company_name,
+        c.company_code,
+        c.company_status,
+        c.city,
+        c.cin,
+        c.created_at,
+        COUNT(DISTINCT o.id)::int  AS owner_count,
+        COUNT(DISTINCT d.id)::int  AS driver_count,
+        COUNT(DISTINCT v.id)::int  AS vehicle_count,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date = CURRENT_DATE
+        ), 0) AS collection_today,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date
+                >= DATE_TRUNC('month', CURRENT_DATE)
+        ), 0) AS collection_month,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+        ), 0) AS total_revenue
+      FROM public.client_companies c
+      LEFT JOIN public.owners  o  ON o.company_id = c.id
+      LEFT JOIN public.drivers d  ON d.owner_id = o.id AND d.status != 'INACTIVE'
+      LEFT JOIN public.vehicles v ON v.owner_id = o.id AND v.status != 'INACTIVE'
+      LEFT JOIN public.ms_orders mo ON mo.owner_code IN (
+        SELECT owner_code FROM public.owners WHERE company_id = c.id
+      )
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+// POST /api/admin/companies
+exports.createCompany = async (req, res, next) => {
+  try {
+    const { company_name, cin, city } = req.body;
+    if (!company_name) throw new AppError('company_name required', 400, 'VALIDATION_ERROR');
+
+    const code = company_name
+      .replace(/\s+/g, '_').toUpperCase().slice(0, 20) +
+      '_' + Date.now().toString(36).toUpperCase();
+
+    const { rows } = await pool.query(
+      `INSERT INTO public.client_companies (company_name, company_code, cin, city)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [company_name, code, cin || null, city || null]
+    );
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) { next(err); }
+};
+
+// PATCH /api/admin/companies/:id/status
+exports.updateCompanyStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const VALID = ['ACTIVE', 'SUSPENDED', 'INACTIVE'];
+    if (!VALID.includes(status))
+      throw new AppError(`status must be one of: ${VALID.join(', ')}`, 400, 'VALIDATION_ERROR');
+
+    const { rows } = await pool.query(
+      `UPDATE public.client_companies
+          SET company_status = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!rows[0]) throw new AppError('Company not found', 404, 'NOT_FOUND');
+    res.json({ success: true, data: rows[0] });
+  } catch (err) { next(err); }
+};
+
+// GET /api/admin/companies/:id/owners
+exports.getCompanyOwners = async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        o.id,
+        o.name,
+        o.phone_number,
+        o.status,
+        o.subscription_status,
+        o.created_at,
+        COUNT(DISTINCT d.id)::int  AS driver_count,
+        COUNT(DISTINCT v.id)::int  AS vehicle_count,
+        COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'ASSIGNED')::int AS assigned_vehicle_count,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date = CURRENT_DATE
+        ), 0) AS collection_today,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date
+                >= DATE_TRUNC('month', CURRENT_DATE)
+        ), 0) AS collection_month,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+        ), 0) AS collection_total
+      FROM public.owners o
+      LEFT JOIN public.drivers  d  ON d.owner_id = o.id AND d.status != 'INACTIVE'
+      LEFT JOIN public.vehicles v  ON v.owner_id = o.id AND v.status != 'INACTIVE'
+      LEFT JOIN public.ms_orders mo ON mo.owner_code = o.owner_code
+      WHERE o.company_id = $1
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
+    `, [req.params.id]);
+
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+// GET /api/admin/owners/:id/drivers
+exports.getOwnerDrivers = async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        d.id,
+        d.name,
+        d.phone_number,
+        d.status,
+        d.kyc_status,
+        d.wallet_balance,
+        d.created_at,
+        v.registration_number AS vehicle_number,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date = CURRENT_DATE
+        ), 0) AS paid_today,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date
+                >= DATE_TRUNC('month', CURRENT_DATE)
+        ), 0) AS paid_month,
+        COALESCE(SUM(mo.order_amount) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+        ), 0) AS total_paid,
+        MAX(COALESCE(mo.order_completion_date, mo.order_initiation_date)) FILTER (
+          WHERE mo.transaction_status = 'SUCCESS'
+        ) AS last_payment_date
+      FROM public.drivers d
+      LEFT JOIN public.vehicles  v  ON v.driver_id = d.id AND v.status = 'ASSIGNED'
+      LEFT JOIN public.ms_orders mo ON mo.driver_code = d.driver_code
+      WHERE d.owner_id = $1 AND d.status != 'INACTIVE'
+      GROUP BY d.id, v.registration_number
+      ORDER BY d.created_at DESC
+    `, [req.params.id]);
+
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+// GET /api/admin/drivers/:id
+exports.getDriverDetail = async (req, res, next) => {
+  try {
+    const id = req.params.id;
+
+    const [driverRes, ledgerRes, statsRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          d.id, d.name, d.phone_number,
+          d.status, d.kyc_status, d.wallet_balance, d.created_at,
+          o.name         AS owner_name,
+          o.phone_number AS owner_phone,
+          c.company_name,
+          v.registration_number AS vehicle_number,
+          v.model               AS vehicle_model
+        FROM public.drivers d
+        LEFT JOIN public.owners           o ON o.id = d.owner_id
+        LEFT JOIN public.client_companies c ON c.id = d.company_id
+        LEFT JOIN public.vehicles         v ON v.driver_id = d.id AND v.status = 'ASSIGNED'
+        WHERE d.id = $1
+      `, [id]),
+
+      pool.query(`
+        SELECT id, entry_type, amount, description, created_at
+        FROM public.driver_ledger
+        WHERE driver_id = $1
+        ORDER BY created_at DESC
+        LIMIT 20
+      `, [id]),
+
+      pool.query(`
+        SELECT
+          COALESCE(SUM(order_amount) FILTER (WHERE transaction_status = 'SUCCESS'), 0) AS total_paid,
+          COALESCE(SUM(order_amount) FILTER (
+            WHERE transaction_status = 'SUCCESS'
+            AND   COALESCE(order_completion_date, order_initiation_date)::date = CURRENT_DATE
+          ), 0) AS paid_today,
+          COUNT(*) FILTER (WHERE transaction_status = 'SUCCESS')::int AS payment_count
+        FROM public.ms_orders
+        WHERE driver_code = (SELECT driver_code FROM public.drivers WHERE id = $1)
+      `, [id]),
+    ]);
+
+    if (!driverRes.rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+
+    res.json({
+      success: true,
+      data: {
+        driver: { ...driverRes.rows[0], ...statsRes.rows[0] },
+        ledger: ledgerRes.rows,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+// ── KYC ────────────────────────────────────────────────────────────────────
+exports.getKycSummary = async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT kyc_status AS status, COUNT(*)::int AS count
+      FROM public.drivers
+      WHERE status != 'INACTIVE'
+      GROUP BY kyc_status
+      ORDER BY kyc_status
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+async function fetchKycDrivers(statusFilter) {
+  const where  = statusFilter ? 'AND d.kyc_status = $1' : '';
+  const params = statusFilter ? [statusFilter] : [];
+  const { rows } = await pool.query(`
+    SELECT
+      d.id,
+      d.name,
+      d.phone_number,
+      d.kyc_status,
+      d.wallet_balance,
+      d.created_at,
+      o.name         AS owner_name,
+      c.company_name,
+      v.registration_number AS vehicle_number,
+      COALESCE(
+        json_agg(doc.document_type ORDER BY doc.uploaded_at DESC)
+          FILTER (WHERE doc.id IS NOT NULL),
+        '[]'::json
+      ) AS uploaded_docs
+    FROM public.drivers d
+    LEFT JOIN public.owners           o   ON o.id = d.owner_id
+    LEFT JOIN public.client_companies c   ON c.id = d.company_id
+    LEFT JOIN public.vehicles         v   ON v.driver_id = d.id AND v.status = 'ASSIGNED'
+    LEFT JOIN public.kyc_documents    doc ON doc.driver_id = d.id
+    WHERE d.status != 'INACTIVE' ${where}
+    GROUP BY d.id, o.name, c.company_name, v.registration_number
+    ORDER BY d.created_at DESC
+    LIMIT 500
+  `, params);
+  return rows;
+}
+
+exports.getKycPending = async (req, res, next) => {
+  try {
+    const rows = await fetchKycDrivers('PENDING_REVIEW');
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+exports.getAllKyc = async (req, res, next) => {
+  try {
+    const status = (req.query.status && req.query.status !== 'ALL')
+      ? req.query.status
+      : null;
+    const rows = await fetchKycDrivers(status);
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+exports.approveKyc = async (req, res, next) => {
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE public.drivers SET kyc_status = 'APPROVED', updated_at = NOW() WHERE id = $1",
+      [req.params.id]
+    );
+    if (!rowCount) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+    res.json({ success: true });
+  } catch (err) { next(err); }
+};
+
+exports.rejectKyc = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    if (!reason) throw new AppError('rejection reason required', 400, 'VALIDATION_ERROR');
+    const { rowCount } = await pool.query(
+      "UPDATE public.drivers SET kyc_status = 'REJECTED', updated_at = NOW() WHERE id = $1",
+      [req.params.id]
+    );
+    if (!rowCount) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+    res.json({ success: true });
+  } catch (err) { next(err); }
+};
+
+// ── AUDIT LOG ───────────────────────────────────────────────────────────────
+exports.getAuditLogs = async (req, res, next) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit)  || 50, 200);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const { rows } = await pool.query(`
+      SELECT id, actor_id, actor_role, action, entity_type, entity_id,
+             before_state, after_state, ip_address, created_at
+      FROM public.audit_log
+      ORDER BY created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
