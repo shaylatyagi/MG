@@ -95,7 +95,7 @@ exports.listDrivers = async (req, res, next) => {
       pool.query(
         `SELECT d.id, d.name, d.phone_number, d.driver_code, d.status,
                 d.wallet_balance, d.created_at,
-                v.registration_number, v.model
+                v.reg_number, v.model
            FROM public.drivers d
            LEFT JOIN public.vehicles v ON v.driver_id = d.id AND v.status = 'ASSIGNED'
            ${baseWhere}
@@ -160,7 +160,7 @@ exports.getDriver = async (req, res, next) => {
     const { rows } = await pool.query(
       `SELECT d.id, d.name, d.phone_number, d.driver_code, d.status,
               d.wallet_balance, d.owner_id, d.company_id, d.created_at,
-              v.id AS vehicle_id, v.registration_number, v.model, v.status AS vehicle_status
+              v.id AS vehicle_id, v.reg_number, v.model, v.status AS vehicle_status
          FROM public.drivers d
          LEFT JOIN public.vehicles v ON v.driver_id = d.id AND v.status = 'ASSIGNED'
         WHERE d.id = $1 AND d.owner_id = $2
@@ -194,7 +194,7 @@ exports.listVehicles = async (req, res, next) => {
   try {
     const ownerId = resolveOwnerId(req);
     const { rows } = await pool.query(
-      `SELECT v.id, v.registration_number, v.model, v.status,
+      `SELECT v.id, v.reg_number, v.model, v.status,
               v.driver_id, d.name AS driver_name, d.phone_number AS driver_phone,
               v.created_at
          FROM public.vehicles v
@@ -211,20 +211,20 @@ exports.listVehicles = async (req, res, next) => {
 exports.createVehicle = async (req, res, next) => {
   try {
     const ownerId = resolveOwnerId(req);
-    const { registration_number, model } = req.body;
+    const { reg_number, model } = req.body;
 
     const duplicate = await pool.query(
-      'SELECT id FROM public.vehicles WHERE registration_number = $1 LIMIT 1',
-      [registration_number.toUpperCase()]
+      'SELECT id FROM public.vehicles WHERE reg_number = $1 LIMIT 1',
+      [reg_number.toUpperCase()]
     );
     if (duplicate.rows[0])
       throw new AppError('Vehicle already registered', 409, 'CONFLICT');
 
     const { rows } = await pool.query(
-      `INSERT INTO public.vehicles (registration_number, model, owner_id, status)
+      `INSERT INTO public.vehicles (reg_number, model, owner_id, status)
        VALUES ($1, $2, $3, 'AVAILABLE')
-       RETURNING id, registration_number, model, status, created_at`,
-      [registration_number.toUpperCase(), model || null, ownerId]
+       RETURNING id, reg_number, model, status, created_at`,
+      [reg_number.toUpperCase(), model || null, ownerId]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) { next(err); }

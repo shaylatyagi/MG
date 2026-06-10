@@ -1,8 +1,8 @@
 // apps/api/src/controllers/admin.controller.js
 // DevSpec §13.8 — Super Admin module.
-// Schema: ms_orders uses order_amount + COALESCE(order_completion_date, order_initiation_date)
-//         vehicles use registration_number (not reg_number), join on v.driver_id = d.id
-//         kyc docs in kyc_documents (not documents), col = document_type
+// Schema: ms_orders.(amount, payment_date, driver_id, owner_id)
+//         documents table: entity_type/entity_id/doc_type  (NOT kyc_documents/document_type)
+//         vehicles: reg_number  (NOT registration_number)
 'use strict';
 
 const pool         = require('../config/db');
@@ -22,15 +22,12 @@ exports.getPlatformStats = async (req, res, next) => {
       pool.query(`
         SELECT
           COALESCE(SUM(CASE WHEN
-            COALESCE(order_completion_date, order_initiation_date)::date = CURRENT_DATE
-            AND transaction_status = 'SUCCESS'
-            THEN order_amount END), 0) AS collection_today,
+            payment_date::date = CURRENT_DATE AND transaction_status = 'SUCCESS'
+            THEN amount END), 0) AS collection_today,
           COALESCE(SUM(CASE WHEN
-            COALESCE(order_completion_date, order_initiation_date)::date
-              >= DATE_TRUNC('month', CURRENT_DATE)
-            AND transaction_status = 'SUCCESS'
-            THEN order_amount END), 0) AS collection_month,
-          COALESCE(SUM(CASE WHEN transaction_status = 'SUCCESS' THEN order_amount END), 0) AS collection_total
+            payment_date >= DATE_TRUNC('month', CURRENT_DATE) AND transaction_status = 'SUCCESS'
+            THEN amount END), 0) AS collection_month,
+          COALESCE(SUM(CASE WHEN transaction_status = 'SUCCESS' THEN amount END), 0) AS collection_total
         FROM public.ms_orders
       `),
     ]);
@@ -63,24 +60,23 @@ exports.listCompanies = async (req, res, next) => {
         COUNT(DISTINCT o.id)::int  AS owner_count,
         COUNT(DISTINCT d.id)::int  AS driver_count,
         COUNT(DISTINCT v.id)::int  AS vehicle_count,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
-          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date = CURRENT_DATE
+          AND   mo.payment_date::date = CURRENT_DATE
         ), 0) AS collection_today,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
-          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date
-                >= DATE_TRUNC('month', CURRENT_DATE)
+          AND   mo.payment_date >= DATE_TRUNC('month', CURRENT_DATE)
         ), 0) AS collection_month,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
         ), 0) AS total_revenue
       FROM public.client_companies c
-      LEFT JOIN public.owners  o  ON o.company_id = c.id
-      LEFT JOIN public.drivers d  ON d.owner_id = o.id AND d.status != 'INACTIVE'
-      LEFT JOIN public.vehicles v ON v.owner_id = o.id AND v.status != 'INACTIVE'
-      LEFT JOIN public.ms_orders mo ON mo.owner_code IN (
-        SELECT owner_code FROM public.owners WHERE company_id = c.id
+      LEFT JOIN public.owners   o  ON o.company_id = c.id
+      LEFT JOIN public.drivers  d  ON d.owner_id = o.id AND d.status != 'INACTIVE'
+      LEFT JOIN public.vehicles v  ON v.owner_id = o.id AND v.status != 'INACTIVE'
+      LEFT JOIN public.ms_orders mo ON mo.owner_id IN (
+        SELECT id FROM public.owners WHERE company_id = c.id
       )
       GROUP BY c.id
       ORDER BY c.created_at DESC
@@ -144,22 +140,21 @@ exports.getCompanyOwners = async (req, res, next) => {
         COUNT(DISTINCT d.id)::int  AS driver_count,
         COUNT(DISTINCT v.id)::int  AS vehicle_count,
         COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'ASSIGNED')::int AS assigned_vehicle_count,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
-          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date = CURRENT_DATE
+          AND   mo.payment_date::date = CURRENT_DATE
         ), 0) AS collection_today,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
-          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date
-                >= DATE_TRUNC('month', CURRENT_DATE)
+          AND   mo.payment_date >= DATE_TRUNC('month', CURRENT_DATE)
         ), 0) AS collection_month,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
         ), 0) AS collection_total
       FROM public.owners o
       LEFT JOIN public.drivers  d  ON d.owner_id = o.id AND d.status != 'INACTIVE'
       LEFT JOIN public.vehicles v  ON v.owner_id = o.id AND v.status != 'INACTIVE'
-      LEFT JOIN public.ms_orders mo ON mo.owner_code = o.owner_code
+      LEFT JOIN public.ms_orders mo ON mo.owner_id = o.id
       WHERE o.company_id = $1
       GROUP BY o.id
       ORDER BY o.created_at DESC
@@ -181,27 +176,26 @@ exports.getOwnerDrivers = async (req, res, next) => {
         d.kyc_status,
         d.wallet_balance,
         d.created_at,
-        v.registration_number AS vehicle_number,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        v.reg_number AS vehicle_number,
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
-          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date = CURRENT_DATE
+          AND   mo.payment_date::date = CURRENT_DATE
         ), 0) AS paid_today,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
-          AND   COALESCE(mo.order_completion_date, mo.order_initiation_date)::date
-                >= DATE_TRUNC('month', CURRENT_DATE)
+          AND   mo.payment_date >= DATE_TRUNC('month', CURRENT_DATE)
         ), 0) AS paid_month,
-        COALESCE(SUM(mo.order_amount) FILTER (
+        COALESCE(SUM(mo.amount) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
         ), 0) AS total_paid,
-        MAX(COALESCE(mo.order_completion_date, mo.order_initiation_date)) FILTER (
+        MAX(mo.payment_date) FILTER (
           WHERE mo.transaction_status = 'SUCCESS'
         ) AS last_payment_date
       FROM public.drivers d
       LEFT JOIN public.vehicles  v  ON v.driver_id = d.id AND v.status = 'ASSIGNED'
-      LEFT JOIN public.ms_orders mo ON mo.driver_code = d.driver_code
+      LEFT JOIN public.ms_orders mo ON mo.driver_id = d.id
       WHERE d.owner_id = $1 AND d.status != 'INACTIVE'
-      GROUP BY d.id, v.registration_number
+      GROUP BY d.id, v.reg_number
       ORDER BY d.created_at DESC
     `, [req.params.id]);
 
@@ -222,8 +216,8 @@ exports.getDriverDetail = async (req, res, next) => {
           o.name         AS owner_name,
           o.phone_number AS owner_phone,
           c.company_name,
-          v.registration_number AS vehicle_number,
-          v.model               AS vehicle_model
+          v.reg_number AS vehicle_number,
+          v.model      AS vehicle_model
         FROM public.drivers d
         LEFT JOIN public.owners           o ON o.id = d.owner_id
         LEFT JOIN public.client_companies c ON c.id = d.company_id
@@ -241,14 +235,14 @@ exports.getDriverDetail = async (req, res, next) => {
 
       pool.query(`
         SELECT
-          COALESCE(SUM(order_amount) FILTER (WHERE transaction_status = 'SUCCESS'), 0) AS total_paid,
-          COALESCE(SUM(order_amount) FILTER (
+          COALESCE(SUM(amount) FILTER (WHERE transaction_status = 'SUCCESS'), 0) AS total_paid,
+          COALESCE(SUM(amount) FILTER (
             WHERE transaction_status = 'SUCCESS'
-            AND   COALESCE(order_completion_date, order_initiation_date)::date = CURRENT_DATE
+            AND   payment_date::date = CURRENT_DATE
           ), 0) AS paid_today,
           COUNT(*) FILTER (WHERE transaction_status = 'SUCCESS')::int AS payment_count
         FROM public.ms_orders
-        WHERE driver_code = (SELECT driver_code FROM public.drivers WHERE id = $1)
+        WHERE driver_id = $1
       `, [id]),
     ]);
 
@@ -291,9 +285,9 @@ async function fetchKycDrivers(statusFilter) {
       d.created_at,
       o.name         AS owner_name,
       c.company_name,
-      v.registration_number AS vehicle_number,
+      v.reg_number AS vehicle_number,
       COALESCE(
-        json_agg(doc.document_type ORDER BY doc.uploaded_at DESC)
+        json_agg(doc.doc_type ORDER BY doc.uploaded_at DESC)
           FILTER (WHERE doc.id IS NOT NULL),
         '[]'::json
       ) AS uploaded_docs
@@ -301,9 +295,9 @@ async function fetchKycDrivers(statusFilter) {
     LEFT JOIN public.owners           o   ON o.id = d.owner_id
     LEFT JOIN public.client_companies c   ON c.id = d.company_id
     LEFT JOIN public.vehicles         v   ON v.driver_id = d.id AND v.status = 'ASSIGNED'
-    LEFT JOIN public.kyc_documents    doc ON doc.driver_id = d.id
+    LEFT JOIN public.documents        doc ON doc.entity_type = 'driver' AND doc.entity_id = d.id
     WHERE d.status != 'INACTIVE' ${where}
-    GROUP BY d.id, o.name, c.company_name, v.registration_number
+    GROUP BY d.id, o.name, c.company_name, v.reg_number
     ORDER BY d.created_at DESC
     LIMIT 500
   `, params);
@@ -312,7 +306,7 @@ async function fetchKycDrivers(statusFilter) {
 
 exports.getKycPending = async (req, res, next) => {
   try {
-    const rows = await fetchKycDrivers('PENDING_REVIEW');
+    const rows = await fetchKycDrivers('PENDING');
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 };

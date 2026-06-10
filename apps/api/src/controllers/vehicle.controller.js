@@ -20,7 +20,7 @@ exports.list = async (req, res, next) => {
     const params      = ownerId ? [ownerId] : [];
 
     const { rows } = await pool.query(
-      `SELECT v.id, v.registration_number, v.model, v.status,
+      `SELECT v.id, v.reg_number, v.model, v.status,
               v.driver_id, d.name AS driver_name, d.phone_number AS driver_phone,
               d.driver_code, v.created_at, v.updated_at
          FROM public.vehicles v
@@ -40,20 +40,20 @@ exports.create = async (req, res, next) => {
     const ownerId = resolveOwnerId(req);
     if (!ownerId) throw new AppError('owner_id required for admin', 400, 'VALIDATION_ERROR');
 
-    const { registration_number, model } = req.body;
-    const normalised = registration_number.toUpperCase().replace(/\s/g, '');
+    const { reg_number, model } = req.body;
+    const normalised = reg_number.toUpperCase().replace(/\s/g, '');
 
     const duplicate = await pool.query(
-      'SELECT id FROM public.vehicles WHERE registration_number = $1 LIMIT 1',
+      'SELECT id FROM public.vehicles WHERE reg_number = $1 LIMIT 1',
       [normalised]
     );
     if (duplicate.rows[0])
       throw new AppError('Vehicle with this registration already exists', 409, 'CONFLICT');
 
     const { rows } = await pool.query(
-      `INSERT INTO public.vehicles (registration_number, model, owner_id, status)
+      `INSERT INTO public.vehicles (reg_number, model, owner_id, status)
        VALUES ($1, $2, $3, 'AVAILABLE')
-       RETURNING id, registration_number, model, status, owner_id, created_at`,
+       RETURNING id, reg_number, model, status, owner_id, created_at`,
       [normalised, model || null, ownerId]
     );
 
@@ -66,7 +66,7 @@ exports.update = async (req, res, next) => {
   try {
     const ownerId   = resolveOwnerId(req);
     const vehicleId = req.params.id;
-    const { model, registration_number } = req.body;
+    const { model, reg_number } = req.body;
 
     const setClauses = [];
     const values     = [];
@@ -75,9 +75,9 @@ exports.update = async (req, res, next) => {
       values.push(model);
       setClauses.push(`model = $${values.length}`);
     }
-    if (registration_number !== undefined) {
-      values.push(registration_number.toUpperCase().replace(/\s/g, ''));
-      setClauses.push(`registration_number = $${values.length}`);
+    if (reg_number !== undefined) {
+      values.push(reg_number.toUpperCase().replace(/\s/g, ''));
+      setClauses.push(`reg_number = $${values.length}`);
     }
 
     if (setClauses.length === 0)
@@ -95,7 +95,7 @@ exports.update = async (req, res, next) => {
       `UPDATE public.vehicles
           SET ${setClauses.join(', ')}
         WHERE id = $${idParam} ${ownerClause}
-        RETURNING id, registration_number, model, status, updated_at`,
+        RETURNING id, reg_number, model, status, updated_at`,
       values
     );
     if (rowCount === 0) throw new AppError('Vehicle not found', 404, 'NOT_FOUND');
@@ -122,7 +122,7 @@ exports.updateStatus = async (req, res, next) => {
       `UPDATE public.vehicles
           SET status = $1, updated_at = NOW()
         WHERE id = $2 ${ownerClause}
-        RETURNING id, registration_number, status, updated_at`,
+        RETURNING id, reg_number, status, updated_at`,
       params
     );
     if (rowCount === 0) throw new AppError('Vehicle not found', 404, 'NOT_FOUND');

@@ -52,10 +52,10 @@ exports.uploadDocument = async ({ buffer, originalname, mimetype, entityId, docT
  * Generate a pre-signed GET URL for a private S3 object.
  *
  * @param {string} s3Key
- * @param {number} [expiresIn=3600] seconds
+ * @param {number} [expiresIn=900] seconds
  * @returns {string} signed URL
  */
-exports.getSignedUrl = async (s3Key, expiresIn = 3600) => {
+exports.getSignedUrl = async (s3Key, expiresIn = 900) => {
   if (!isS3Configured()) return `local://tmp/${s3Key}`;
 
   const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');

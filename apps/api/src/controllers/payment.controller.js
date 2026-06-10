@@ -1,5 +1,6 @@
 // apps/api/src/controllers/payment.controller.js
-// DevSpec §13.6 — Payment layer.  No axios/PayYantra calls here — use payyantraService.
+// DevSpec §13.6 — Payment layer. No axios/PayYantra calls here — use payyantraService.
+// TODO (ADR-007): webhook should publish to SQS and return immediately; worker does DB work.
 'use strict';
 
 const pool             = require('../config/db');
@@ -16,27 +17,25 @@ exports.initiatePayment = async (req, res, next) => {
     const driverId   = req.user.id;
 
     const driverRes = await pool.query(
-      'SELECT driver_code, owner_code, phone_number FROM public.drivers WHERE id = $1 LIMIT 1',
+      'SELECT owner_id, phone_number FROM public.drivers WHERE id = $1 LIMIT 1',
       [driverId]
     );
     if (!driverRes.rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
-    const { driver_code, owner_code, phone_number } = driverRes.rows[0];
+    const { owner_id, phone_number } = driverRes.rows[0];
 
     const orderId = generateOrderId();
 
     const pgResponse = await payyantraService.createOrder({
-      amount:      Number(amount),
-      driverCode:  driver_code,
-      mobile:      phone_number,
+      amount:  Number(amount),
+      mobile:  phone_number,
       orderId,
     });
 
     await pool.query(
       `INSERT INTO public.ms_orders
-         (order_id, order_amount, payer_mobile, transaction_status, payment_mode,
-          driver_code, owner_code, order_initiation_date)
-       VALUES ($1, $2, $3, 'PENDING', 'UPI', $4, $5, NOW())`,
-      [orderId, Number(amount), phone_number, driver_code, owner_code]
+         (order_id, amount, transaction_status, payment_mode, driver_id, owner_id)
+       VALUES ($1, $2, 'PENDING', 'ONLINE', $3, $4)`,
+      [orderId, Number(amount), driverId, owner_id]
     );
 
     res.status(201).json({
@@ -51,6 +50,7 @@ exports.initiatePayment = async (req, res, next) => {
 };
 
 // POST /api/payment/webhook — PUBLIC, HMAC-verified
+// NOTE: inline DB work here is a temporary measure until services/sqs.js is created (ADR-007).
 exports.webhook = async (req, res, next) => {
   const client = await pool.connect();
   try {
@@ -60,13 +60,13 @@ exports.webhook = async (req, res, next) => {
     if (!payyantraService.verifyWebhookSignature(rawBody, signature))
       throw new AppError('Invalid webhook signature', 401, 'UNAUTHORIZED');
 
-    const { order_id, transaction_status, payment_mode, order_amount } = req.body;
+    const { order_id, transaction_status, payment_mode, txn_id } = req.body;
     if (!order_id) throw new AppError('order_id required', 400, 'VALIDATION_ERROR');
 
     if (transaction_status !== 'SUCCESS') {
       await pool.query(
         `UPDATE public.ms_orders
-            SET transaction_status = $1, order_completion_date = NOW()
+            SET transaction_status = $1, payment_date = NOW()
           WHERE order_id = $2 AND transaction_status = 'PENDING'`,
         [transaction_status, order_id]
       );
@@ -92,33 +92,35 @@ exports.webhook = async (req, res, next) => {
 
     await client.query(
       `UPDATE public.ms_orders
-          SET transaction_status    = 'SUCCESS',
-              payment_mode          = $1,
-              order_completion_date = NOW()
-        WHERE order_id = $2`,
-      [payment_mode || order.payment_mode, order_id]
+          SET transaction_status = 'SUCCESS',
+              payment_mode       = $1,
+              txn_id             = $2,
+              payment_date       = NOW()
+        WHERE order_id = $3`,
+      [payment_mode || order.payment_mode, txn_id || null, order_id]
     );
 
-    const driverRes = await client.query(
-      'SELECT id FROM public.drivers WHERE driver_code = $1 LIMIT 1',
-      [order.driver_code]
+    const driverId = order.driver_id;
+    const amt      = Number(order.amount);
+
+    // Lock driver row for wallet update
+    const drRes = await client.query(
+      'SELECT wallet_balance FROM public.drivers WHERE id = $1 FOR UPDATE',
+      [driverId]
     );
-    if (driverRes.rows[0]) {
-      const driverId = driverRes.rows[0].id;
-      const amt      = Number(order.order_amount || order_amount || 0);
+    const newBalance = Number(drRes.rows[0].wallet_balance) + amt;
 
-      await client.query(
-        `INSERT INTO public.driver_ledger
-           (driver_id, entry_type, amount, description, reference_id)
-         VALUES ($1, 'PAYMENT', $2, 'Online payment received', $3)`,
-        [driverId, amt, order_id]
-      );
+    await client.query(
+      `INSERT INTO public.driver_ledger
+         (driver_id, owner_id, entry_type, amount, description, balance_after, order_id)
+       VALUES ($1, $2, 'PAYMENT', $3, 'Online payment received', $4, $5)`,
+      [driverId, order.owner_id, amt, newBalance, order.id]
+    );
 
-      await client.query(
-        'UPDATE public.drivers SET wallet_balance = wallet_balance + $1 WHERE id = $2',
-        [amt, driverId]
-      );
-    }
+    await client.query(
+      'UPDATE public.drivers SET wallet_balance = $1, updated_at = NOW() WHERE id = $2',
+      [newBalance, driverId]
+    );
 
     await client.query('COMMIT');
     res.json({ success: true });
@@ -135,8 +137,8 @@ exports.getStatus = async (req, res, next) => {
   try {
     const { orderId } = req.params;
     const { rows } = await pool.query(
-      `SELECT order_id, order_amount, transaction_status, payment_mode,
-              driver_code, owner_code, order_initiation_date, order_completion_date
+      `SELECT order_id, amount, transaction_status, payment_mode,
+              driver_id, owner_id, txn_id, payment_date, created_at
          FROM public.ms_orders
         WHERE order_id = $1 LIMIT 1`,
       [orderId]
@@ -153,23 +155,15 @@ exports.getHistory = async (req, res, next) => {
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize || '20', 10)));
     const offset   = (page - 1) * pageSize;
 
-    let driverCode = null;
+    let filterDriverId = null;
     if (req.user.role === 'driver') {
-      const dr = await pool.query(
-        'SELECT driver_code FROM public.drivers WHERE id = $1 LIMIT 1',
-        [req.user.id]
-      );
-      driverCode = dr.rows[0]?.driver_code;
+      filterDriverId = req.user.id;
     } else if (req.query.driverId) {
-      const dr = await pool.query(
-        'SELECT driver_code FROM public.drivers WHERE id = $1 LIMIT 1',
-        [req.query.driverId]
-      );
-      driverCode = dr.rows[0]?.driver_code;
+      filterDriverId = parseInt(req.query.driverId, 10);
     }
 
-    const whereClause = driverCode ? 'WHERE driver_code = $1' : 'WHERE TRUE';
-    const params      = driverCode ? [driverCode] : [];
+    const whereClause = filterDriverId ? 'WHERE driver_id = $1' : 'WHERE TRUE';
+    const params      = filterDriverId ? [filterDriverId] : [];
 
     const [countRes, rowsRes] = await Promise.all([
       pool.query(
@@ -177,11 +171,11 @@ exports.getHistory = async (req, res, next) => {
         params
       ),
       pool.query(
-        `SELECT order_id, order_amount, transaction_status, payment_mode,
-                driver_code, owner_code, order_initiation_date, order_completion_date
+        `SELECT order_id, amount, transaction_status, payment_mode,
+                driver_id, owner_id, txn_id, payment_date, created_at
            FROM public.ms_orders
            ${whereClause}
-           ORDER BY order_initiation_date DESC
+           ORDER BY created_at DESC
            LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
         [...params, pageSize, offset]
       ),
@@ -200,7 +194,7 @@ exports.getHistory = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/payment/verify-by-reference/:orderId — manual re-sync
+// GET /api/payment/verify-by-reference/:orderId — manual re-sync with PayYantra
 exports.verifyByReference = async (req, res, next) => {
   try {
     const { orderId } = req.params;
@@ -215,7 +209,7 @@ exports.verifyByReference = async (req, res, next) => {
     const order    = localOrderResult.rows[0];
     const previous = order.transaction_status;
 
-    const rawData = await payyantraService.getOrderStatusByReference(orderId);
+    const rawData   = await payyantraService.getOrderStatusByReference(orderId);
     const newStatus = payyantraService.normaliseStatus(rawData.transactionStatus || rawData.status);
 
     let walletCredited = false;
@@ -227,42 +221,42 @@ exports.verifyByReference = async (req, res, next) => {
 
         await client.query(
           `UPDATE public.ms_orders
-              SET transaction_status = 'SUCCESS', order_completion_date = NOW()
+              SET transaction_status = 'SUCCESS', payment_date = NOW()
             WHERE order_id = $1`,
           [orderId]
         );
 
-        const driverRes = await client.query(
-          'SELECT id FROM public.drivers WHERE driver_code = $1 LIMIT 1',
-          [order.driver_code]
-        );
-        if (driverRes.rows[0]) {
-          const driverId = driverRes.rows[0].id;
-          const amt      = Number(order.order_amount || 0);
+        const driverId = order.driver_id;
+        const amt      = Number(order.amount);
 
-          await client.query(
-            `INSERT INTO public.driver_ledger
-               (driver_id, entry_type, amount, description, reference_id)
-             VALUES ($1, 'PAYMENT', $2, 'Online payment (re-verified)', $3)`,
-            [driverId, amt, orderId]
-          );
-          await client.query(
-            'UPDATE public.drivers SET wallet_balance = wallet_balance + $1 WHERE id = $2',
-            [amt, driverId]
-          );
-          walletCredited = true;
-        }
+        const drRes = await client.query(
+          'SELECT wallet_balance FROM public.drivers WHERE id = $1 FOR UPDATE',
+          [driverId]
+        );
+        const newBalance = Number(drRes.rows[0].wallet_balance) + amt;
+
+        await client.query(
+          `INSERT INTO public.driver_ledger
+             (driver_id, owner_id, entry_type, amount, description, balance_after, order_id)
+           VALUES ($1, $2, 'PAYMENT', $3, 'Online payment (re-verified)', $4, $5)`,
+          [driverId, order.owner_id, amt, newBalance, order.id]
+        );
+        await client.query(
+          'UPDATE public.drivers SET wallet_balance = $1, updated_at = NOW() WHERE id = $2',
+          [newBalance, driverId]
+        );
+        walletCredited = true;
 
         await client.query('COMMIT');
       } catch (err) {
         await client.query('ROLLBACK').catch(() => {});
         throw err;
+      } finally {
+        client.release();
       }
     } else if (newStatus !== previous) {
       await pool.query(
-        `UPDATE public.ms_orders
-            SET transaction_status = $1
-          WHERE order_id = $2`,
+        `UPDATE public.ms_orders SET transaction_status = $1 WHERE order_id = $2`,
         [newStatus, orderId]
       );
     }
@@ -273,8 +267,8 @@ exports.verifyByReference = async (req, res, next) => {
       previousStatus: previous,
       newStatus,
       walletCredited,
-      amount:        Number(order.order_amount),
-      payyantraRaw:  rawData,
+      amount:       Number(order.amount),
+      payyantraRaw: rawData,
     });
   } catch (err) { next(err); }
 };
