@@ -1,11 +1,12 @@
 // apps/api/src/controllers/payment.controller.js
 // DevSpec §13.6 — Payment layer. No axios/PayYantra calls here — use payyantraService.
-// TODO (ADR-007): webhook should publish to SQS and return immediately; worker does DB work.
+// ADR-007: webhook verifies HMAC then publishes to SQS; DB work done by webhookWorker.
 'use strict';
 
 const pool             = require('../config/db');
 const { AppError }     = require('../utils/errors');
 const payyantraService = require('../services/payyantra');
+const { publishWebhook } = require('../services/sqs');
 
 const generateOrderId = () =>
   `MG${Date.now()}${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -50,9 +51,8 @@ exports.initiatePayment = async (req, res, next) => {
 };
 
 // POST /api/payment/webhook — PUBLIC, HMAC-verified
-// NOTE: inline DB work here is a temporary measure until services/sqs.js is created (ADR-007).
+// ADR-007: verify signature here, then enqueue to SQS. DB work is done by webhookWorker.
 exports.webhook = async (req, res, next) => {
-  const client = await pool.connect();
   try {
     const rawBody   = JSON.stringify(req.body);
     const signature = req.headers['x-payyantra-signature'] || '';
@@ -60,76 +60,18 @@ exports.webhook = async (req, res, next) => {
     if (!payyantraService.verifyWebhookSignature(rawBody, signature))
       throw new AppError('Invalid webhook signature', 401, 'UNAUTHORIZED');
 
-    const { order_id, transaction_status, payment_mode, txn_id } = req.body;
+    const { order_id } = req.body;
     if (!order_id) throw new AppError('order_id required', 400, 'VALIDATION_ERROR');
 
-    if (transaction_status !== 'SUCCESS') {
-      await pool.query(
-        `UPDATE public.ms_orders
-            SET transaction_status = $1, payment_date = NOW()
-          WHERE order_id = $2 AND transaction_status = 'PENDING'`,
-        [transaction_status, order_id]
-      );
-      return res.json({ success: true });
-    }
+    // Publish to SQS — worker handles all DB mutations
+    await publishWebhook({
+      ...req.body,
+      raw_body:  rawBody,
+      signature,
+    });
 
-    // SUCCESS path — atomic
-    await client.query('BEGIN');
-
-    const orderRes = await client.query(
-      'SELECT * FROM public.ms_orders WHERE order_id = $1 FOR UPDATE',
-      [order_id]
-    );
-    const order = orderRes.rows[0];
-    if (!order) {
-      await client.query('ROLLBACK');
-      return res.json({ success: true }); // unknown order — idempotent
-    }
-    if (order.transaction_status === 'SUCCESS') {
-      await client.query('ROLLBACK');
-      return res.json({ success: true }); // already processed
-    }
-
-    await client.query(
-      `UPDATE public.ms_orders
-          SET transaction_status = 'SUCCESS',
-              payment_mode       = $1,
-              txn_id             = $2,
-              payment_date       = NOW()
-        WHERE order_id = $3`,
-      [payment_mode || order.payment_mode, txn_id || null, order_id]
-    );
-
-    const driverId = order.driver_id;
-    const amt      = Number(order.amount);
-
-    // Lock driver row for wallet update
-    const drRes = await client.query(
-      'SELECT wallet_balance FROM public.drivers WHERE id = $1 FOR UPDATE',
-      [driverId]
-    );
-    const newBalance = Number(drRes.rows[0].wallet_balance) + amt;
-
-    await client.query(
-      `INSERT INTO public.driver_ledger
-         (driver_id, owner_id, entry_type, amount, description, balance_after, order_id)
-       VALUES ($1, $2, 'PAYMENT', $3, 'Online payment received', $4, $5)`,
-      [driverId, order.owner_id, amt, newBalance, order.id]
-    );
-
-    await client.query(
-      'UPDATE public.drivers SET wallet_balance = $1, updated_at = NOW() WHERE id = $2',
-      [newBalance, driverId]
-    );
-
-    await client.query('COMMIT');
     res.json({ success: true });
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    next(err);
-  } finally {
-    client.release();
-  }
+  } catch (err) { next(err); }
 };
 
 // GET /api/payment/status/:orderId
