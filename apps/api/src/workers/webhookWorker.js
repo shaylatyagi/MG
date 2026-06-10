@@ -1,11 +1,12 @@
-// apps/api/src/workers/webhookWorker.js — DevSpec §64, ADR-007
+// apps/api/src/workers/webhookWorker.js -- DevSpec 64, ADR-007
 // SQS long-poll consumer for mg-webhook-processing queue.
 // Processes PayYantra webhook payloads that the HTTP handler enqueued.
 // Run via: node apps/api/worker.js
 'use strict';
 
-const pool             = require('../config/db');
-const payyantraService = require('../services/payyantra');
+const pool                    = require('../config/db');
+const payyantraService        = require('../services/payyantra');
+const { publishNotification } = require('../services/sqs');
 
 // Lazy AWS SDK
 let _sqs = null;
@@ -27,11 +28,11 @@ const WAIT_SECONDS = 20; // long-poll
 async function processWebhook(payload) {
   const { order_id, transaction_status, payment_mode, txn_id, raw_body, signature } = payload;
 
-  // Re-verify HMAC so a bad SQS message can't corrupt the DB
+  // Re-verify HMAC so a bad SQS message cannot corrupt the DB
   if (raw_body && signature) {
     if (!payyantraService.verifyWebhookSignature(raw_body, signature)) {
       console.error('[webhookWorker] HMAC verification failed for order', order_id);
-      return; // don't throw — message will be deleted (bad sig is unrecoverable)
+      return;
     }
   }
 
@@ -51,7 +52,7 @@ async function processWebhook(payload) {
     return;
   }
 
-  // SUCCESS path — atomic
+  // SUCCESS path -- atomic
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -64,7 +65,7 @@ async function processWebhook(payload) {
 
     if (!order) {
       await client.query('ROLLBACK');
-      console.warn('[webhookWorker] Unknown order_id', order_id, '— skipping');
+      console.warn('[webhookWorker] Unknown order_id', order_id, '-- skipping');
       return;
     }
 
@@ -90,7 +91,7 @@ async function processWebhook(payload) {
       'SELECT wallet_balance FROM public.drivers WHERE id = $1 FOR UPDATE',
       [order.driver_id]
     );
-    const currentBalance = Number(driverRes.rows[0]?.wallet_balance ?? 0);
+    const currentBalance = Number(driverRes.rows[0]?.wallet_balance || 0);
     const newBalance     = currentBalance - Number(order.amount);
 
     await client.query(
@@ -107,7 +108,7 @@ async function processWebhook(payload) {
         order.driver_id,
         order.owner_id,
         Number(order.amount),
-        `Rent payment — order ${order_id}`,
+        'Rent payment -- order ' + order_id,
         newBalance,
         order.id,
         order.owner_id,
@@ -116,21 +117,32 @@ async function processWebhook(payload) {
 
     await client.query('COMMIT');
     console.log('[webhookWorker] SUCCESS processed', order_id, '| new balance', newBalance);
+
+    // PAY-04: FCM push via notification queue (fire-and-forget after COMMIT)
+    publishNotification({
+      recipientId:   order.driver_id,
+      recipientRole: 'driver',
+      type:          'PAYMENT_SUCCESS',
+      title:         'Payment Confirmed',
+      body:          'Rs.' + Number(order.amount) + ' received. Wallet updated.',
+      data:          { orderId: order_id, amount: String(order.amount) },
+    }).catch(e => console.error('[webhookWorker] publishNotification error:', e.message));
+
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    throw err; // re-throw so message is NOT deleted from SQS — will retry
+    throw err; // re-throw so message is NOT deleted from SQS -- will retry
   } finally {
     client.release();
   }
 }
 
 /**
- * Main poll loop — runs forever until SIGTERM/SIGINT.
+ * Main poll loop -- runs forever until SIGTERM/SIGINT.
  */
 let running = true;
 
-process.on('SIGTERM', () => { console.log('[webhookWorker] SIGTERM — draining...'); running = false; });
-process.on('SIGINT',  () => { console.log('[webhookWorker] SIGINT  — draining...'); running = false; });
+process.on('SIGTERM', () => { console.log('[webhookWorker] SIGTERM -- draining...'); running = false; });
+process.on('SIGINT',  () => { console.log('[webhookWorker] SIGINT  -- draining...'); running = false; });
 
 async function poll() {
   const { ReceiveMessageCommand, DeleteMessageCommand } = require('@aws-sdk/client-sqs');
@@ -146,7 +158,7 @@ async function poll() {
       }));
     } catch (err) {
       console.error('[webhookWorker] SQS receive error:', err.message);
-      await new Promise(r => setTimeout(r, 5000)); // back-off on AWS errors
+      await new Promise(r => setTimeout(r, 5000));
       continue;
     }
 
@@ -159,13 +171,11 @@ async function poll() {
         try {
           payload = JSON.parse(msg.Body);
           await processWebhook(payload);
-          // Delete only on success
           await getSqs().send(new DeleteMessageCommand({
             QueueUrl:      QUEUE_URL,
             ReceiptHandle: msg.ReceiptHandle,
           }));
         } catch (err) {
-          // Leave on queue for SQS retry / DLQ after maxReceiveCount
           console.error('[webhookWorker] Failed to process message', msg.MessageId, err.message);
         }
       })
