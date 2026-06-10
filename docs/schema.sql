@@ -277,18 +277,3 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_audit_actor  ON audit_log(actor_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
-
--- ── DEVICE TOKENS (FCM push — COM-02 / PAY-04) ───────────────────────────────
-CREATE TABLE IF NOT EXISTS public.device_tokens (
-  id         SERIAL PRIMARY KEY,
-  user_id    INTEGER      NOT NULL,
-  user_role  VARCHAR(20)  NOT NULL CHECK (user_role IN ('driver','owner','manager')),
-  fcm_token  TEXT         NOT NULL,
-  platform   VARCHAR(20)  NOT NULL DEFAULT 'web',
-  created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  UNIQUE (user_id, user_role, fcm_token)
-);
-
-CREATE INDEX IF NOT EXISTS idx_device_tokens_user
-  ON public.device_tokens(user_id, user_role);
