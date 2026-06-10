@@ -557,7 +557,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
       )}
 
       {tab === 'docs' && (
-        <DocumentsSection userType="OWNER" userId={v.owner_id || v.owner_name} />
+        <DocumentsSection userType="VEHICLE" userId={vehicleId} />
       )}
     </Modal>
   );

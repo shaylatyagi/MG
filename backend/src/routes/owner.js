@@ -46,7 +46,6 @@ router.get('/stats', async (req, res) => {
 
     const oid = owner.id;
 
-    const oCode = owner.owner_code;
     const [vehicles, drivers, contracts, pendingKyc, today, month, total] = await Promise.all([
       pool.query('SELECT COUNT(*) FROM vehicles WHERE owner_id = $1', [oid]),
       pool.query('SELECT COUNT(*) FROM drivers WHERE owner_id = $1 AND deleted_at IS NULL', [oid]),
@@ -59,25 +58,25 @@ router.get('/stats', async (req, res) => {
         [oid]
       ),
       pool.query(
-        `SELECT COALESCE(SUM(order_amount),0) AS total
+        `SELECT COALESCE(SUM(amount),0) AS total
          FROM ms_orders
-         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'
-           AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
-        [oCode]
+         WHERE owner_id = $1 AND transaction_status = 'SUCCESS'
+           AND DATE(payment_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
+        [oid]
       ),
       pool.query(
-        `SELECT COALESCE(SUM(order_amount),0) AS total
+        `SELECT COALESCE(SUM(amount),0) AS total
          FROM ms_orders
-         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'
-           AND DATE_TRUNC('month', order_completion_date AT TIME ZONE 'Asia/Kolkata')
+         WHERE owner_id = $1 AND transaction_status = 'SUCCESS'
+           AND DATE_TRUNC('month', payment_date AT TIME ZONE 'Asia/Kolkata')
              = DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Kolkata')`,
-        [oCode]
+        [oid]
       ),
       pool.query(
-        `SELECT COALESCE(SUM(order_amount),0) AS total
+        `SELECT COALESCE(SUM(amount),0) AS total
          FROM ms_orders
-         WHERE owner_code = $1 AND transaction_status = 'SUCCESS'`,
-        [oCode]
+         WHERE owner_id = $1 AND transaction_status = 'SUCCESS'`,
+        [oid]
       ),
     ]);
 

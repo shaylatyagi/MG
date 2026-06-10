@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../middleware/auth.middleware');
+const notify = require('../services/notify');
 
 // ==================== EXISTING ROUTE ====================
 router.post('/profile', verifyToken, async (req, res) => {
@@ -321,11 +322,24 @@ router.post('/sos', verifyToken, async (req, res) => {
       ? `${message} | ${locStr}`
       : `Driver pressed SOS. ${locStr}`;
 
-    await pool.query(
+    // In-app notification row
+    pool.query(
       `INSERT INTO notifications (recipient_id, recipient_role, type, title, body, created_at)
        VALUES ($1, 'owner', 'SOS', $2, $3, NOW())`,
       [ownerId, `🚨 SOS from ${driverName}`, body]
-    ).catch(err => console.error('SOS notification failed (non-fatal):', err.message));
+    ).catch(err => console.error('SOS db notification failed:', err.message));
+
+    // WhatsApp push to owner (fire-and-forget)
+    pool.query(
+      'SELECT mobile_number FROM owners WHERE id = $1 LIMIT 1',
+      [ownerId]
+    ).then(r => {
+      if (r.rows[0]?.mobile_number) {
+        const waMsg = `🚨 *SOS Alert* from your driver *${driverName}*\n${locStr}`;
+        notify.send(r.rows[0].mobile_number, waMsg)
+          .catch(e => console.error('SOS WhatsApp failed:', e.message));
+      }
+    }).catch(e => console.error('SOS owner lookup failed:', e.message));
 
     res.json({
       success: true,
