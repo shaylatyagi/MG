@@ -34,13 +34,15 @@ app.use(morgan((tokens, req, res) => JSON.stringify({
   role:   req.user?.role,
 })));
 
-// ── RATE LIMITING (Redis-backed) ──────────────────────────────
+// ── RATE LIMITING (Redis-backed in prod, memory in dev) ───────
 let rateLimitStore;
-try {
-  const redis = require('./config/redis');
-  rateLimitStore = new RedisStore({ sendCommand: (...a) => redis.sendCommand(a) });
-} catch (_) {
-  // Redis unavailable in dev — fall back to memory store (default)
+if (process.env.REDIS_URL) {
+  try {
+    const redis = require('./config/redis');
+    rateLimitStore = new RedisStore({ sendCommand: (...a) => redis.sendCommand(a) });
+  } catch (_) {
+    // fall back to memory store
+  }
 }
 app.use('/api/', rateLimit({
   windowMs: 60_000, max: 100, standardHeaders: true,

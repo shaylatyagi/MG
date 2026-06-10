@@ -4,9 +4,8 @@
 // Run via: node apps/api/worker.js
 'use strict';
 
-const pool                    = require('../config/db');
-const payyantraService        = require('../services/payyantra');
-const { publishNotification } = require('../services/sqs');
+const pool             = require('../config/db');
+const payyantraService = require('../services/payyantra');
 
 // Lazy AWS SDK
 let _sqs = null;
@@ -117,16 +116,6 @@ async function processWebhook(payload) {
 
     await client.query('COMMIT');
     console.log('[webhookWorker] SUCCESS processed', order_id, '| new balance', newBalance);
-
-    // PAY-04: FCM push via notification queue (fire-and-forget after COMMIT)
-    publishNotification({
-      recipientId:   order.driver_id,
-      recipientRole: 'driver',
-      type:          'PAYMENT_SUCCESS',
-      title:         'Payment Confirmed',
-      body:          'Rs.' + Number(order.amount) + ' received. Wallet updated.',
-      data:          { orderId: order_id, amount: String(order.amount) },
-    }).catch(e => console.error('[webhookWorker] publishNotification error:', e.message));
 
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});

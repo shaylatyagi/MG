@@ -3,7 +3,6 @@ require('dotenv').config();
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const notify = require('../services/notify');
 
 // ── Webhook HMAC verifier ─────────────────────────────────────────────────────
 // Set PAYANTRA_WEBHOOK_SECRET in Render env once PayYantra confirms the value.
@@ -2138,11 +2137,6 @@ if (driverUser.rows.length === 0) {
     
     console.log(`📢 Notification sent to DRIVER ${driverPhone}`);
 
-    // PAY-04: WhatsApp confirmation to driver
-    notify.send(driverPhone,
-      `✅ MobilityGrid: Payment of ₹${amount} received successfully. Your wallet has been updated.`
-    ).catch(() => {});
-    
     // ============================================
     // 3. GET OWNER AND SEND NOTIFICATION
     // ============================================
@@ -3265,4 +3259,4 @@ router.get('/manager/profile', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Upgrade to premium (admin manually upgrades, or payment webhook)
+// Upgrade to premium (admin manually upgrades, or payment webhook)                                                                                                                                                                                                               

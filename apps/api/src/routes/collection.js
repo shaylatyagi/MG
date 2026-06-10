@@ -13,4 +13,7 @@ router.post('/cash',
   ctrl.recordCash
 );
 
+router.get('/summary',    requireRole('owner', 'admin', 'manager'), ctrl.getSummary);
+router.get('/by-driver',  requireRole('owner', 'admin', 'manager'), ctrl.getByDriver);
+
 module.exports = router;

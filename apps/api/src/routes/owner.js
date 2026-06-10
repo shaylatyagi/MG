@@ -19,4 +19,16 @@ router.post('/wallet-entry',           requireRole('owner', 'admin', 'manager'),
                                        requirePermission('record_cash'),
                                        validate(v.createWalletEntry),                                  ctrl.createWalletEntry);
 
-// Incentive config — D
+// Incentive config — DevSpec §13.3
+router.get('/incentive-config',        requireRole('owner', 'admin', 'manager'),                       ctrl.getIncentiveConfig);
+router.post('/incentive-config',       requireRole('owner', 'admin'),                                  ctrl.upsertIncentiveConfig);
+
+// Per-driver ledger view for owner — DevSpec §13.3
+router.get('/drivers/:id/ledger',      requireRole('owner', 'admin', 'manager'),                       ctrl.getDriverLedger);
+
+// Bulk CSV driver import — DevSpec §13.3
+const multer = require('multer');
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+router.post('/drivers/csv-upload',     requireRole('owner', 'admin'), csvUpload.single('file'),         ctrl.csvUploadDrivers);
+
+module.exports = router;

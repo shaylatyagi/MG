@@ -6,3 +6,11 @@ exports.createSos = [
   body('lat').isNumeric().withMessage('lat must be a number'),
   body('lng').isNumeric().withMessage('lng must be a number'),
 ];
+
+exports.updateProfile = [
+  body('name').optional().trim().notEmpty().withMessage('name cannot be empty'),
+  body('emergency_contact')
+    .optional()
+    .matches(/^[6-9]\d{9}$/)
+    .withMessage('Valid 10-digit Indian mobile required'),
+];

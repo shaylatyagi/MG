@@ -5,7 +5,6 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/db');
 const { verifyToken } = require('../middleware/auth.middleware');
-const notify  = require('../services/notify');
 
 // All owner routes require a valid JWT
 router.use(verifyToken);
@@ -259,12 +258,6 @@ router.post('/drivers', async (req, res) => {
        emergency_contact || null]
     );
 
-    // DRV-01: WhatsApp welcome (fire-and-forget)
-    notify.send(phone_number,
-      `👋 Welcome to MobilityGrid! Hi ${name.trim()}, you've been added to your fleet. ` +
-      `Download the driver app and complete your KYC to get started.`
-    ).catch(() => {});
-
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error('owner/drivers POST:', err);
@@ -393,18 +386,6 @@ router.post('/unassign', async (req, res) => {
     );
 
     await client.query('COMMIT');
-
-    // INC-05: WhatsApp incentive notification (fire-and-forget)
-    try {
-      const driverInfo = await pool.query(
-        'SELECT name, phone_number FROM drivers WHERE id = $1', [driver.id]
-      );
-      if (driverInfo.rows[0]?.phone_number) {
-        notify.send(driverInfo.rows[0].phone_number,
-          `🏆 MobilityGrid: Hi ${driverInfo.rows[0].name}, you have been unassigned from your vehicle. If an incentive was earned, it has been applied to your wallet. Check the app for details.`
-        );
-      }
-    } catch (_) {}
 
     res.json({ success: true, message: 'Vehicle unassigned successfully' });
   } catch (err) {

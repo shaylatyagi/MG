@@ -1,12 +1,11 @@
-// apps/api/src/controllers/driver.controller.js — DevSpec §13.3
+// apps/api/src/controllers/driver.controller.js — DevSpec §13.2
 'use strict';
 
 const pool         = require('../config/db');
 const { AppError } = require('../utils/errors');
 
 const resolveDriverId = (req) => {
-  const { role, id } = req.user;
-  if (role === 'driver') return id;
+  if (req.user.role === 'driver') return req.user.id;
   const driverId = req.query.driverId || req.body.driverId;
   if (!driverId)
     throw new AppError('driverId query param required for this role', 400, 'VALIDATION_ERROR');
@@ -18,9 +17,10 @@ exports.getProfile = async (req, res, next) => {
   try {
     const driverId = resolveDriverId(req);
     const { rows } = await pool.query(
-      `SELECT d.id, d.name, d.phone_number, d.driver_code, d.status,
+      `SELECT d.id, d.name, d.phone_number, d.status,
+              d.kyc_status, d.wallet_balance,
               d.owner_id, d.company_id, d.created_at,
-              v.registration_number, v.model, v.status AS vehicle_status
+              v.reg_number, v.model, v.status AS vehicle_status
          FROM public.drivers d
          LEFT JOIN public.vehicles v ON v.driver_id = d.id AND v.status = 'ASSIGNED'
         WHERE d.id = $1
@@ -29,6 +29,53 @@ exports.getProfile = async (req, res, next) => {
     );
     if (!rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
     res.json({ success: true, data: rows[0] });
+  } catch (err) { next(err); }
+};
+
+// PUT /api/driver/profile — DevSpec §13.2
+exports.updateProfile = async (req, res, next) => {
+  try {
+    const driverId = req.user.id;
+    const { name, emergency_contact } = req.body;
+
+    const updates = [];
+    const values  = [];
+
+    if (name !== undefined) {
+      values.push(name.trim());
+      updates.push(`name = $${values.length}`);
+    }
+    if (emergency_contact !== undefined) {
+      values.push(emergency_contact);
+      updates.push(`emergency_contact = $${values.length}`);
+    }
+
+    if (!updates.length) throw new AppError('No fields to update', 400, 'VALIDATION_ERROR');
+
+    values.push(driverId);
+    const { rows } = await pool.query(
+      `UPDATE public.drivers
+          SET ${updates.join(', ')}, updated_at = NOW()
+        WHERE id = $${values.length}
+        RETURNING id, name, phone_number, emergency_contact, status, kyc_status, updated_at`,
+      values
+    );
+    if (!rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+    res.json({ success: true, data: rows[0] });
+  } catch (err) { next(err); }
+};
+
+// GET /api/driver/activity/ping — DevSpec §13.2 heartbeat
+exports.activityPing = async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, status, wallet_balance FROM public.drivers WHERE id = $1 LIMIT 1',
+      [req.user.id]
+    );
+    if (!rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+    if (rows[0].status === 'INACTIVE')
+      throw new AppError('Account is deactivated', 403, 'DEACTIVATED');
+    res.json({ success: true, data: { pong: true, ...rows[0] } });
   } catch (err) { next(err); }
 };
 
@@ -67,10 +114,10 @@ exports.getWallet = async (req, res, next) => {
 // GET /api/driver/ledger?page=1&pageSize=20
 exports.getLedger = async (req, res, next) => {
   try {
-    const driverId  = resolveDriverId(req);
-    const page      = Math.max(1, parseInt(req.query.page     || '1',  10));
-    const pageSize  = Math.min(100, Math.max(1, parseInt(req.query.pageSize || '20', 10)));
-    const offset    = (page - 1) * pageSize;
+    const driverId = resolveDriverId(req);
+    const page     = Math.max(1, parseInt(req.query.page     || '1',  10));
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize || '20', 10)));
+    const offset   = (page - 1) * pageSize;
 
     const [countRes, rowsRes] = await Promise.all([
       pool.query(
@@ -78,7 +125,7 @@ exports.getLedger = async (req, res, next) => {
         [driverId]
       ),
       pool.query(
-        `SELECT id, entry_type, amount, description, reference_id, created_at
+        `SELECT id, entry_type, amount, balance_after, description, order_id, created_at
            FROM public.driver_ledger
           WHERE driver_id = $1
           ORDER BY created_at DESC
@@ -128,7 +175,7 @@ exports.createSos = async (req, res, next) => {
         [
           owner_id,
           'SOS Alert',
-          `Driver ${name || driverId} has triggered an SOS at (${lat}, ${lng})`,
+          `Driver ${name || driverId} triggered SOS at (${lat}, ${lng})`,
         ]
       );
     }
@@ -148,7 +195,8 @@ exports.getNotifications = async (req, res, next) => {
 
     const [countRes, rowsRes] = await Promise.all([
       pool.query(
-        'SELECT COUNT(*)::int AS total FROM public.notifications WHERE recipient_id = $1 AND recipient_role = $2',
+        `SELECT COUNT(*)::int AS total FROM public.notifications
+          WHERE recipient_id = $1 AND recipient_role = $2`,
         [recipientId, recipientRole]
       ),
       pool.query(

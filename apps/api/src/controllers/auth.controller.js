@@ -71,7 +71,7 @@ exports.verifyOtp = async (req, res, next) => {
 
     const [ownerRes, driverRes, managerRes] = await Promise.all([
       pool.query(
-        "SELECT id, name, phone_number, status, company_id, owner_code, 'owner' AS role FROM public.owners WHERE phone_number = $1 LIMIT 1",
+        "SELECT id, name, phone_number, status, company_id, 'owner' AS role FROM public.owners WHERE phone_number = $1 LIMIT 1",
         [phone]
       ),
       pool.query(

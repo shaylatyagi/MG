@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
 export function useTheme() {
-  const [isDark, setIsDark] = useState(
-    () => document.documentElement.classList.contains('dark')
-  );
+  const [isDark, setIsDark] = useState(() => {
+    // localStorage is authoritative; fall back to current DOM class
+    const saved = localStorage.getItem('mg_theme');
+    if (saved) return saved === 'dark';
+    return document.documentElement.classList.contains('dark');
+  });
 
   useEffect(() => {
     if (isDark) {

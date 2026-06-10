@@ -3,7 +3,6 @@ const multer  = require('multer');
 const router  = express.Router();
 const pool    = require('../config/db');
 const { logAudit } = require('../utils/audit');
-const notify  = require('../services/notify');
 
 // multer — memory storage for admin uploads (S3 not wired yet)
 const upload = multer({
@@ -580,10 +579,6 @@ router.patch('/kyc/:driverId/approve', async (req, res) => {
        VALUES ($1, 'DRIVER', '✅ KYC Approved', 'Your documents have been verified. You can now be assigned a vehicle.', NOW())`,
       [req.params.driverId]
     ).catch(() => {});
-    // WhatsApp notification
-    pool.query('SELECT COALESCE(phone_number, mobile_number) AS phone FROM drivers WHERE id = $1', [req.params.driverId])
-      .then(pr => { if (pr.rows[0]?.phone) notify.send(pr.rows[0].phone, `✅ MobilityGrid: Your KYC documents have been verified, ${r.rows[0]?.full_name || ''}. You can now be assigned a vehicle.`); })
-      .catch(() => {});
     // ADM-06: Audit log
     logAudit('KYC_APPROVED', 'driver', req.params.driverId, req.headers['x-admin-phone'] || 'admin', { driver_name: r.rows[0]?.full_name });
     res.json({ success: true, driver: r.rows[0] });
@@ -613,10 +608,6 @@ router.patch('/kyc/:driverId/reject', async (req, res) => {
        VALUES ($1, 'DRIVER', '❌ KYC Rejected', $2, NOW())`,
       [req.params.driverId, `Your KYC was rejected: ${reason}. Please re-upload correct documents.`]
     ).catch(() => {});
-    // WhatsApp notification
-    pool.query('SELECT COALESCE(phone_number, mobile_number) AS phone FROM drivers WHERE id = $1', [req.params.driverId])
-      .then(pr => { if (pr.rows[0]?.phone) notify.send(pr.rows[0].phone, `❌ MobilityGrid: Your KYC was rejected. Reason: ${reason}. Please re-upload correct documents on the app.`); })
-      .catch(() => {});
     // ADM-06: Audit log
     logAudit('KYC_REJECTED', 'driver', req.params.driverId, req.headers['x-admin-phone'] || 'admin', { driver_name: r.rows[0]?.full_name, reason });
     res.json({ success: true, driver: r.rows[0] });
