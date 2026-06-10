@@ -19,4 +19,4 @@ router.post('/wallet-entry',           requireRole('owner', 'admin', 'manager'),
                                        requirePermission('record_cash'),
                                        validate(v.createWalletEntry),                                  ctrl.createWalletEntry);
 
-module.exports = router;
+// Incentive config — D

@@ -22,7 +22,7 @@ exports.list = async (req, res, next) => {
     const { rows } = await pool.query(
       `SELECT v.id, v.reg_number, v.model, v.status,
               v.driver_id, d.name AS driver_name, d.phone_number AS driver_phone,
-              d.driver_code, v.created_at, v.updated_at
+              v.created_at, v.updated_at
          FROM public.vehicles v
          LEFT JOIN public.drivers d ON d.id = v.driver_id
          ${whereClause}
@@ -111,7 +111,7 @@ exports.updateStatus = async (req, res, next) => {
     const vehicleId = req.params.id;
     const { status } = req.body;
 
-    const VALID_STATUSES = ['AVAILABLE', 'ASSIGNED', 'MAINTENANCE', 'INACTIVE'];
+    const VALID_STATUSES = ['AVAILABLE', 'ASSIGNED', 'UNDER_MAINTENANCE', 'INACTIVE'];
     if (!status || !VALID_STATUSES.includes(status))
       throw new AppError(`status must be one of: ${VALID_STATUSES.join(', ')}`, 400, 'VALIDATION_ERROR');
 
@@ -128,5 +128,51 @@ exports.updateStatus = async (req, res, next) => {
     if (rowCount === 0) throw new AppError('Vehicle not found', 404, 'NOT_FOUND');
 
     res.json({ success: true, data: rows[0] });
+  } catch (err) { next(err); }
+};
+
+// GET /api/vehicle/:id/history — DevSpec §13.4
+exports.getHistory = async (req, res, next) => {
+  try {
+    const vehicleId = req.params.id;
+    const page      = Math.max(1, parseInt(req.query.page     || '1',  10));
+    const pageSize  = Math.min(100, Math.max(1, parseInt(req.query.pageSize || '20', 10)));
+    const offset    = (page - 1) * pageSize;
+
+    const ownerId     = resolveOwnerId(req);
+    const ownerClause = ownerId ? 'AND h.owner_id = $2' : '';
+    const params      = ownerId ? [vehicleId, ownerId] : [vehicleId];
+
+    const [countRes, rowsRes] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::int AS total FROM public.driver_vehicle_history h
+          WHERE h.vehicle_id = $1 ${ownerClause}`,
+        params
+      ),
+      pool.query(
+        `SELECT h.id, h.driver_id, h.vehicle_id, h.owner_id,
+                h.rent_type, h.rent_amount, h.deposit_amount,
+                h.assigned_at, h.unassigned_at,
+                h.incentive_applied, h.incentive_amount,
+                d.name AS driver_name, d.phone_number AS driver_phone
+           FROM public.driver_vehicle_history h
+           LEFT JOIN public.drivers d ON d.id = h.driver_id
+          WHERE h.vehicle_id = $1 ${ownerClause}
+          ORDER BY h.assigned_at DESC
+          LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, pageSize, offset]
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      data:       rowsRes.rows,
+      pagination: {
+        page,
+        pageSize,
+        total:      countRes.rows[0].total,
+        totalPages: Math.ceil(countRes.rows[0].total / pageSize),
+      },
+    });
   } catch (err) { next(err); }
 };
