@@ -2516,7 +2516,8 @@ const PaymentsTab = () => {
   return (
     <div className="space-y-4 pb-4">
 
-      {/* Pay Links shortcut */}
+      {/* Pay Links shortcut — hidden for CASH_ONLY companies */}
+      {owner?.payment_mode !== 'CASH_ONLY' && (
       <button
         onClick={() => setActiveTab('links')}
         className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 flex items-center justify-between text-white shadow-sm"
@@ -2530,23 +2531,26 @@ const PaymentsTab = () => {
         </div>
         <span className="text-xs font-black opacity-80">→</span>
       </button>
+      )}
 
       {/* Total Banner — clean minimal */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">{t.totalCol}</p>
         <div className="flex items-end justify-between">
+          {owner?.payment_mode !== 'CASH_ONLY' && (
           <div>
             <p className="text-[9px] text-slate-400 mb-0.5">Online + UPI</p>
             <p className="text-2xl font-black text-slate-800">₹{stats.todayCollection.toLocaleString('en-IN')}</p>
           </div>
-          <div className="text-right">
+          )}
+          <div className={owner?.payment_mode === 'CASH_ONLY' ? '' : 'text-right'}>
             <p className="text-[9px] text-slate-400 mb-0.5">Cash Collected</p>
             <p className="text-2xl font-black text-indigo-600">₹{cashTotal.toLocaleString('en-IN')}</p>
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center">
-          <p className="text-[9px] text-slate-400">Total (Online + Cash)</p>
-          <p className="text-sm font-black text-slate-700">₹{(stats.todayCollection + cashTotal).toLocaleString('en-IN')}</p>
+          <p className="text-[9px] text-slate-400">{owner?.payment_mode === 'CASH_ONLY' ? 'Total Collected' : 'Total (Online + Cash)'}</p>
+          <p className="text-sm font-black text-slate-700">₹{(owner?.payment_mode === 'CASH_ONLY' ? cashTotal : stats.todayCollection + cashTotal).toLocaleString('en-IN')}</p>
         </div>
         <p className="text-[9px] text-slate-400 mt-1">Last 30 days</p>
       </div>

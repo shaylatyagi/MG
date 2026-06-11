@@ -403,17 +403,41 @@ export default function DriverPWA() {
   // ── HOME TAB ─────────────────────────────────────────────────────────────
   const HomeTab = () => (
     <div className="space-y-3 pb-4">
-      {/* Outstanding / Pay card — hidden if company is CASH_ONLY */}
-      {companyPayMode !== 'CASH_ONLY' ? (
+      {/* Outstanding / Pay card */}
+      {dues <= 0 ? (
+        /* SETTLED — show simple confirmation, no pay option */
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
+            <CreditCard size={20} className="text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-black text-indigo-700">All Settled ✓</p>
+            <p className="text-[10px] text-indigo-500 mt-0.5">No dues pending. You're up to date.</p>
+          </div>
+        </div>
+      ) : companyPayMode === 'CASH_ONLY' ? (
+        /* DUES PENDING but CASH ONLY — show amount, no pay button */
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
+            </div>
+            <span className="text-[10px] font-black px-3 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">Due</span>
+          </div>
+          <p className="text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2.5">
+            💵 Pay cash directly to your fleet owner
+          </p>
+        </div>
+      ) : (
+        /* DUES PENDING + ONLINE ALLOWED — show pay card */
         <div className="bg-white border border-slate-200 rounded-2xl p-5">
           <div className="flex items-start justify-between mb-4">
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
               <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
             </div>
-            <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${dues > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
-              {dues > 0 ? t.duesPending : t.settled}
-            </span>
+            <span className="text-[10px] font-black px-3 py-1 rounded-full border bg-slate-900 text-white border-slate-900">{t.duesPending}</span>
           </div>
           {telemetry.dailyDepositRecovery > 0 && (
             <p className="text-[9px] text-slate-400 mb-3">Includes ₹{telemetry.dailyDepositRecovery}/day deposit recovery</p>
@@ -426,21 +450,6 @@ export default function DriverPWA() {
           <button onClick={pay} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition active:scale-[0.98]">
             <CreditCard size={15}/> {t.pay}
           </button>
-        </div>
-      ) : (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <div className="flex items-start justify-between mb-2">
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
-            </div>
-            <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${dues > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
-              {dues > 0 ? t.duesPending : t.settled}
-            </span>
-          </div>
-          <p className="text-[10px] text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
-            💵 Cash payments only — pay your fleet owner directly
-          </p>
         </div>
       )}
 
