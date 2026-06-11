@@ -67,9 +67,10 @@ app.use('/api/payment-links', require('./src/routes/paymentLinks'));
 // Admin — single registration with verifyAdmin guard
 app.use('/api/admin', verifyAdmin, require('./src/routes/admin'));
 
-app.use('/api/owner', ownerRoutes);
-app.use('/api/chat',  require('./src/routes/chat'));
-app.use('/api/kyc',   require('./src/routes/kyc'));
+app.use('/api/owner',  ownerRoutes);
+app.use('/api/chat',   require('./src/routes/chat'));
+app.use('/api/kyc',    require('./src/routes/kyc'));
+app.use('/api/device', verifyToken, require('./src/routes/device'));
 
 const rateLimit = require('express-rate-limit');
 app.use('/api/auth/send-otp', rateLimit({
