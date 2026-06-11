@@ -968,15 +968,34 @@ function CompanyDocsSection({ companyId }) {
 }
 
 function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwner }) {
-  const [owners, setOwners]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab]         = useState('owners');
+  const [owners, setOwners]           = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [tab, setTab]                 = useState('owners');
+  const [payMode, setPayMode]         = useState(company.payment_mode || 'BOTH');
+  const [payModeSaving, setPayModeSaving] = useState(false);
+  const [payModeMsg, setPayModeMsg]   = useState('');
 
   useEffect(() => {
     api(`/api/admin/companies/${company.id}/owners`)
       .then(d => { setOwners(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, [company.id]);
+
+  const savePaymentMode = async () => {
+    setPayModeSaving(true); setPayModeMsg('');
+    try {
+      await api(`/api/admin/companies/${company.id}/payment-mode`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_mode: payMode }),
+      });
+      setPayModeMsg('✓ Saved');
+    } catch (e) {
+      setPayModeMsg('Error: ' + (e.message || 'failed'));
+    } finally {
+      setPayModeSaving(false);
+    }
+  };
 
   const totalCollection = owners.reduce((s, o) => s + parseFloat(o.collection_total || 0), 0);
 
@@ -992,7 +1011,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
     }
       onClose={onClose} onBack={onBack} breadcrumbs={breadcrumbs} wide>
       <div className="flex gap-1 border-b dark:border-gray-700 mb-4 -mt-2">
-        {[['owners','Owners'],['docs','Documents']].map(([k,label]) => (
+        {[['owners','Owners'],['docs','Documents'],['settings','Settings']].map(([k,label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab===k ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
             {label}
@@ -1045,6 +1064,40 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
       )}
 
       {tab === 'docs' && <CompanyDocsSection companyId={company.id} />}
+
+      {tab === 'settings' && (
+        <div className="space-y-6 max-w-md">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Payment Mode</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Controls which payment options drivers of this company can use.
+            </p>
+            <select
+              value={payMode}
+              onChange={e => { setPayMode(e.target.value); setPayModeMsg(''); }}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              <option value="BOTH">Both (Cash + Online)</option>
+              <option value="CASH_ONLY">Cash Only</option>
+              <option value="ONLINE_ONLY">Online Only</option>
+            </select>
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                onClick={savePaymentMode}
+                disabled={payModeSaving}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg disabled:opacity-50"
+              >
+                {payModeSaving ? 'Saving…' : 'Save'}
+              </button>
+              {payModeMsg && (
+                <span className={`text-sm ${payModeMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>
+                  {payModeMsg}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
@@ -1902,58 +1955,4 @@ function AdminPanelInner() {
       <aside className="w-56 bg-gray-900 flex flex-col shrink-0">
         <div className="p-5 border-b border-gray-700">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>
-            <div>
-              <p className="text-white text-sm font-semibold">MobilityGrid</p>
-              <p className="text-gray-400 text-xs">Super Admin</p>
-            </div>
-          </div>
-        </div>
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(item => (
-            <button key={item.key} onClick={() => setTab(item.key)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                tab === item.key ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              }`}>
-              <span>{item.icon}</span> {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="p-3 border-t border-gray-700">
-          <button onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition">
-            <span>🚪</span> Logout
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white dark:bg-gray-900 border-b dark:border-gray-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-          <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200">{tabLabel}</h1>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <span className="text-xs text-gray-400 dark:text-gray-500">Super Admin · MobilityGrid</span>
-          </div>
-        </header>
-        <div className="p-6">
-          {tab === 'dashboard'    && <Dashboard />}
-          {tab === 'companies'    && <Companies />}
-          {tab === 'owners'       && <AllOwners />}
-          {tab === 'drivers'      && <AllDrivers />}
-          {tab === 'kyc'          && <KycReview />}
-          {tab === 'transactions' && <Transactions />}
-          {tab === 'chat'         && <ChatViewer />}
-          {tab === 'audit'        && <AuditLog />}
-        </div>
-      </main>
-    </div>
-  );
-}
-
-export default function AdminPanel() {
-  return (
-    <ErrorBoundary>
-      <AdminPanelInner />
-    </ErrorBoundary>
-  );
-}
+          
