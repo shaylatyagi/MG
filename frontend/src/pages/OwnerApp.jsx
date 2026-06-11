@@ -1617,9 +1617,13 @@ const removeRule = (i) => setIncentiveRules(prev => ({
                 formatter={(val, name) => [`₹${val.toLocaleString('en-IN')}`, name === 'online' ? 'UPI' : 'Cash']}
                 contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0' }}
               />
-              <Legend formatter={v => v === 'online' ? 'UPI' : 'Cash'} iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-              <Bar dataKey="online" stackId="a" fill="#2563eb" radius={[0,0,0,0]} />
-              <Bar dataKey="cash"   stackId="a" fill="#93c5fd" radius={[3,3,0,0]} />
+              {owner?.payment_mode !== 'CASH_ONLY' && (
+                <Legend formatter={v => v === 'online' ? 'UPI' : 'Cash'} iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+              )}
+              {owner?.payment_mode !== 'CASH_ONLY' && (
+                <Bar dataKey="online" stackId="a" fill="#2563eb" radius={[0,0,0,0]} />
+              )}
+              <Bar dataKey="cash" stackId="a" fill="#93c5fd" radius={[3,3,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
@@ -1707,11 +1711,22 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   } catch (err) { alert('Network error'); }
 };
 const DriversTab = () => {
+  const [localSearch, setLocalSearch] = useState('');
   const [selectedDriverForAssignInTab, setSelectedDriverForAssignInTab] = useState(null);
   const [showDriverAssignModal, setShowDriverAssignModal] = useState(false);
   const [availableVehiclesForDriverTab, setAvailableVehiclesForDriverTab] = useState([]);
   const [driverRentType, setDriverRentType] = useState('DAILY');
   const [driverRentAmount, setDriverRentAmount] = useState('');
+  const localFilteredDrivers = drivers
+    .filter(d =>
+      (d.full_name || d.name || '').toLowerCase().includes(localSearch.toLowerCase()) ||
+      (d.phone_number || d.phone || '').includes(localSearch)
+    )
+    .sort((a, b) => {
+      const aHas = vehicles.some(v => v.driver_id === a.id);
+      const bHas = vehicles.some(v => v.driver_id === b.id);
+      return aHas === bHas ? 0 : aHas ? 1 : -1;
+    });
   
   const fetchAvailableVehiclesForDriverTab = async (driverId) => {
     try {
@@ -1773,18 +1788,18 @@ const DriversTab = () => {
   
   return (
     <div className="space-y-3 pb-4">
-      {/* SEARCH BAR */}
+      {/* SEARCH BAR — local state so parent re-renders don't kill focus */}
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
           placeholder={t.search}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500"
         />
-        {searchQuery && (
-          <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+        {localSearch && (
+          <button onClick={() => setLocalSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
             <X size={14} className="text-slate-400" />
           </button>
         )}
@@ -1803,12 +1818,12 @@ const DriversTab = () => {
       
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="divide-y">
-          {filteredDrivers.length === 0 ? (
+          {localFilteredDrivers.length === 0 ? (
             <div className="p-8 text-center text-slate-400">
-              {searchQuery ? 'No drivers match your search' : 'No drivers added yet'}
+              {localSearch ? 'No drivers match your search' : 'No drivers added yet'}
             </div>
           ) : (
-            filteredDrivers.map((driver, i) => {
+            localFilteredDrivers.map((driver, i) => {
               // Check if driver has assigned vehicle
               const hasVehicle = driver.vehicle_id != null;
 const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicle_id));
@@ -2505,7 +2520,11 @@ const PaymentsTab = () => {
     finally { setLoadingTx(false); }
   };
   
-  useEffect(() => { fetchTransactions(); }, []);
+  useEffect(() => {
+    fetchTransactions();
+    const iv = setInterval(fetchTransactions, 5 * 60 * 1000); // auto-refresh every 5 min
+    return () => clearInterval(iv);
+  }, []);
   
   const liveTx = transactions.filter(tx => tx.payment_mode !== 'CASH');
   const cashTx = transactions.filter(tx => tx.payment_mode === 'CASH');
@@ -2665,7 +2684,30 @@ const PaymentsTab = () => {
 };
 
 // PROFILE TAB - Complete
-const ProfileTab = () => (
+const ProfileTab = () => {
+  const [payMode, setPayMode] = useState(owner?.payment_mode || 'BOTH');
+  const [payModeSaving, setPayModeSaving] = useState(false);
+  const [payModeMsg, setPayModeMsg] = useState('');
+
+  const savePayMode = async () => {
+    setPayModeSaving(true); setPayModeMsg('');
+    try {
+      const res = await fetch(`${API}/api/owner/payment-mode`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ payment_mode: payMode })
+      });
+      const d = await res.json();
+      if (d.success) {
+        setPayModeMsg('✅ Saved');
+        setOwner(prev => ({ ...prev, payment_mode: payMode }));
+      } else setPayModeMsg(d.error || 'Failed');
+    } catch { setPayModeMsg('Network error'); }
+    setPayModeSaving(false);
+    setTimeout(() => setPayModeMsg(''), 3000);
+  };
+
+  return (
   <div className="space-y-4 pb-4">
     <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white text-center">
       <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3 cursor-pointer hover:bg-white/30 transition">
@@ -2709,6 +2751,34 @@ const ProfileTab = () => (
     <button className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
       <Edit2 size={14} /> {t.editProfile}
     </button>
+
+    {/* ─── Payment Mode Config ─── */}
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">
+      <div className="flex items-center gap-2 mb-1">
+        <CreditCard size={16} className="text-indigo-600"/>
+        <p className="text-sm font-black text-slate-800">Payment Mode</p>
+      </div>
+      <p className="text-[10px] text-slate-400">Apni company ke liye payment mode set karo. Admin bhi change kar sakta hai.</p>
+      <select
+        value={payMode}
+        onChange={e => setPayMode(e.target.value)}
+        className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white focus:outline-none focus:border-indigo-500"
+      >
+        <option value="BOTH">💳 Both — Cash + Online</option>
+        <option value="CASH_ONLY">💵 Cash Only</option>
+        <option value="ONLINE_ONLY">📲 Online / UPI Only</option>
+      </select>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={savePayMode}
+          disabled={payModeSaving}
+          className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
+        >
+          {payModeSaving ? 'Saving...' : 'Save'}
+        </button>
+        {payModeMsg && <span className="text-xs font-black text-emerald-600">{payModeMsg}</span>}
+      </div>
+    </div>
 
     {/* ─── Manager Role (Premium) ─── */}
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -3036,11 +3106,12 @@ const ProfileTab = () => (
       <LogOut size={14} /> {t.logout}
     </button>
   </div>
-);
+  );
+};
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-start justify-center">
-      <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, minHeight:'100dvh'}}>
+      <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, height:'100dvh'}}>
         {/* Status bar */}
         <div className="bg-indigo-700 text-white text-[11px] px-4 py-1.5 flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -3071,7 +3142,7 @@ const ProfileTab = () => (
               <MessageCircle size={15} className="text-indigo-600" />
             </button>
             {/* Notification bell */}
-            <button onClick={() => setShowNotif(!showNotif)} className="relative w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center">
+            <button onClick={() => { if (!showNotif && unreadCount > 0) markRead(); setShowNotif(!showNotif); }} className="relative w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center">
               {unreadCount > 0 ? <BellRing size={15} className="text-indigo-600" /> : <Bell size={15} className="text-slate-500" />}
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">
