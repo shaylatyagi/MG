@@ -2840,7 +2840,7 @@ router.get('/inquiry-by-order/:payyantraOrderId', async (req, res) => {
 
 
 // VERIFY SINGLE ORDER BY REFERENCE (our internal MG... order_id → PayYantra by-reference endpoint)
-router.get('/verify-by-reference/:orderId', authenticateToken, async (req, res) => {
+router.get('/verify-by-reference/:orderId', verifyToken, async (req, res) => {
   const { orderId } = req.params;
   console.log('🔍 Verify by reference for order:', orderId);
   try {
