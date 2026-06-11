@@ -54,7 +54,6 @@ exports.listCompanies = async (req, res, next) => {
         c.company_name,
         c.company_code,
         c.company_status,
-        c.payment_mode,
         c.city,
         c.cin,
         c.created_at,
@@ -399,6 +398,49 @@ exports.rejectKyc = async (req, res, next) => {
     );
     if (!rowCount) throw new AppError('Driver not found', 404, 'NOT_FOUND');
     res.json({ success: true });
+  } catch (err) { next(err); }
+};
+
+// ── VEHICLES ────────────────────────────────────────────────────────────────
+exports.listVehicles = async (req, res, next) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
+    const offset = parseInt(req.query.offset) || 0;
+    const status = req.query.status && req.query.status !== 'ALL' ? req.query.status : null;
+
+    const params = [limit, offset];
+    let whereClause = "v.status != 'INACTIVE'";
+    if (status) {
+      params.push(status);
+      whereClause = `v.status = $${params.length}`;
+    }
+
+    const { rows } = await pool.query(`
+      SELECT
+        v.id,
+        v.reg_number,
+        v.type,
+        v.model,
+        v.status,
+        v.rent_type,
+        v.daily_rent,
+        v.created_at,
+        o.name         AS owner_name,
+        o.phone_number AS owner_phone,
+        c.company_name,
+        d.name         AS driver_name,
+        d.phone_number AS driver_phone,
+        d.status       AS driver_status
+      FROM public.vehicles v
+      LEFT JOIN public.owners           o ON o.id = v.owner_id
+      LEFT JOIN public.client_companies c ON c.id = v.company_id
+      LEFT JOIN public.drivers          d ON d.id = v.driver_id
+      WHERE ${whereClause}
+      ORDER BY v.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, params);
+
+    res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 };
 

@@ -19,6 +19,7 @@ router.get('/owners/:id/drivers',            ctrl.getOwnerDrivers);
 router.post('/drivers',                      ctrl.createDriver);
 router.get('/drivers/:id',                   ctrl.getDriverDetail);
 router.patch('/drivers/:id/status',          ctrl.updateDriverStatus);
+router.get('/vehicles',                  ctrl.listVehicles);
 router.get('/kyc/summary',               ctrl.getKycSummary);
 router.get('/kyc/pending',               ctrl.getKycPending);
 router.get('/kyc/all',                   ctrl.getAllKyc);
