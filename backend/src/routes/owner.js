@@ -743,7 +743,7 @@ router.patch('/payment-mode', async (req, res) => {
     if (!owner || !owner.company_id)
       return res.status(404).json({ error: 'No company linked to this owner' });
     await pool.query(
-      'UPDATE public.companies SET payment_mode=$1, updated_at=NOW() WHERE id=$2',
+      'UPDATE public.companies SET payment_mode=$1 WHERE id=$2',
       [payment_mode, owner.company_id]
     );
     res.json({ success: true, payment_mode });

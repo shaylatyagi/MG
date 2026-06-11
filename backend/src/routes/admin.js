@@ -529,7 +529,7 @@ router.patch('/companies/:id/payment-mode', async (req, res) => {
     if (!VALID.includes(payment_mode))
       return res.status(400).json({ error: `payment_mode must be one of: ${VALID.join(', ')}` });
     const r = await pool.query(
-      `UPDATE public.companies SET payment_mode=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+      `UPDATE public.companies SET payment_mode=$1 WHERE id=$2 RETURNING *`,
       [payment_mode, req.params.id]
     );
     if (!r.rows[0]) return res.status(404).json({ error: 'Company not found' });
