@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveAdminToken } from '@/lib/api';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://mg-qw5s.onrender.com';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://newmg.onrender.com';
 
 export default function LoginPage() {
   const router = useRouter();

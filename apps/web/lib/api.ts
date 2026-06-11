@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://mg-qw5s.onrender.com';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://newmg.onrender.com';
 
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
