@@ -1287,7 +1287,28 @@ const PaymentsTab = () => {
   // PROFILE TAB
   // PROFILE TAB in OwnerDashboard.js
 // PROFILE TAB - Complete
-const ProfileTab = () => (
+const ProfileTab = () => {
+  const [payMode, setPayMode] = useState(owner?.payment_mode || 'BOTH');
+  const [payModeSaving, setPayModeSaving] = useState(false);
+  const [payModeMsg, setPayModeMsg] = useState('');
+
+  const savePayMode = async () => {
+    setPayModeSaving(true); setPayModeMsg('');
+    try {
+      const res = await fetch(`${API}/api/owner/payment-mode`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ payment_mode: payMode }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      setPayModeMsg('✓ Saved');
+    } catch (e) {
+      setPayModeMsg('Error: ' + e.message);
+    } finally { setPayModeSaving(false); }
+  };
+
+  return (
   <div className="space-y-4 pb-4">
     <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-5 text-white text-center">
       <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3 cursor-pointer hover:bg-white/30 transition">
@@ -1297,7 +1318,7 @@ const ProfileTab = () => (
       <p className="text-xs text-blue-200">Owner Code: {owner?.owner_code || 'OWN701951'}</p>
       <p className="text-[10px] text-blue-200 mt-1">Member since {new Date().toLocaleDateString()}</p>
     </div>
-    
+
     <div className="bg-white rounded-2xl p-4 space-y-3 shadow-sm border border-slate-100">
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-xs text-slate-500 flex items-center gap-2"><Phone size={12} /> Phone</span>
@@ -1331,18 +1352,44 @@ const ProfileTab = () => (
         <button className="text-[9px] text-blue-600">Edit</button>
       </div>
     </div>
-    
-    <button 
+
+    {/* Payment Mode Card */}
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <p className="text-xs font-black text-slate-700 mb-1">💳 Driver Payment Mode</p>
+      <p className="text-[10px] text-slate-400 mb-3">Controls how your drivers can pay rent</p>
+      <select
+        value={payMode}
+        onChange={e => { setPayMode(e.target.value); setPayModeMsg(''); }}
+        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50 focus:outline-none focus:border-blue-400 mb-3"
+      >
+        <option value="BOTH">Both (Cash + Online)</option>
+        <option value="CASH_ONLY">Cash Only</option>
+        <option value="ONLINE_ONLY">Online Only</option>
+      </select>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={savePayMode}
+          disabled={payModeSaving}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl disabled:opacity-50"
+        >
+          {payModeSaving ? 'Saving…' : 'Save'}
+        </button>
+        {payModeMsg && <span className={`text-xs ${payModeMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{payModeMsg}</span>}
+      </div>
+    </div>
+
+    <button
       onClick={() => alert('Profile editing coming soon! Contact admin at admin@mobilitygrid.com to update your details.')}
       className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
       <Edit2 size={14} /> Edit Profile
     </button>
-    
+
     <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2 border border-red-100">
       <LogOut size={14} /> Logout
     </button>
   </div>
-);
+  );
+};
 
   return (
     <div className="min-h-screen bg-slate-100">

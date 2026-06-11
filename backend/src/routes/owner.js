@@ -25,7 +25,8 @@ router.get('/me', async (req, res) => {
     const r = await pool.query(`
       SELECT o.id, o.full_name, o.mobile_number, o.owner_code, o.status,
              o.wallet_balance, o.company_id, o.created_at, o.email,
-             c.name AS company_name, c.company_code, c.city
+             c.name AS company_name, c.company_code, c.city,
+             COALESCE(c.payment_mode, 'BOTH') AS payment_mode
       FROM public.owners o
       LEFT JOIN public.companies c ON c.id = o.company_id
       WHERE o.id = $1
@@ -728,8 +729,25 @@ router.post('/sos/:id/resolve', async (req, res) => {
 
     res.json({ success: true, message: 'SOS resolved' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+    res.status(500).json({ success: false, message: err.message }); }
+});
+
+// PATCH /api/owner/payment-mode
+router.patch('/payment-mode', async (req, res) => {
+  try {
+    const VALID = ['CASH_ONLY', 'ONLINE_ONLY', 'BOTH'];
+    const { payment_mode } = req.body;
+    if (!VALID.includes(payment_mode))
+      return res.status(400).json({ error: 'payment_mode must be CASH_ONLY, ONLINE_ONLY, or BOTH' });
+    const owner = await getOwner(req.user.id);
+    if (!owner || !owner.company_id)
+      return res.status(404).json({ error: 'No company linked to this owner' });
+    await pool.query(
+      'UPDATE public.companies SET payment_mode=$1, updated_at=NOW() WHERE id=$2',
+      [payment_mode, owner.company_id]
+    );
+    res.json({ success: true, payment_mode });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;

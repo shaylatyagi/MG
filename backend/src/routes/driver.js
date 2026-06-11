@@ -513,4 +513,22 @@ router.post('/pay/initiate', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/driver/company-config — returns company's payment_mode for this driver
+router.get('/company-config', verifyToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT c.id, c.company_name, COALESCE(c.payment_mode, 'BOTH') AS payment_mode
+      FROM public.companies c
+      JOIN public.owners o ON o.company_id = c.id
+      JOIN public.drivers d ON d.owner_code = o.owner_code
+      WHERE d.id = $1
+      LIMIT 1
+    `, [req.user.id]);
+    if (!rows[0]) return res.json({ success: true, data: { payment_mode: 'BOTH' } });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

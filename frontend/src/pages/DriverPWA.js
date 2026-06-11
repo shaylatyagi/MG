@@ -21,6 +21,7 @@ export default function DriverPWA() {
   const [tab, setTab] = useState('home');
   const [historyFrom, setHistoryFrom] = useState('tab');
   const [lang, setLang] = useState('en');
+  const [companyPayMode, setCompanyPayMode] = useState('BOTH'); // CASH_ONLY | ONLINE_ONLY | BOTH
 
   const T = {
     en: {
@@ -217,6 +218,11 @@ export default function DriverPWA() {
         if (p.company_name) setFleetCompany(p.company_name);
       }
       if (nR.ok) { const n = await nR.json(); const a = Array.isArray(n) ? n : []; setNotifs(a); setUnread(a.filter(x => !x.is_read).length); }
+      // Fetch company payment mode
+      try {
+        const cfgR = await fetch(`${API}/api/driver/company-config`, { headers: H });
+        if (cfgR.ok) { const cfg = await cfgR.json(); if (cfg.data?.payment_mode) setCompanyPayMode(cfg.data.payment_mode); }
+      } catch (_) {}
     } catch (e) { setDues(0); setPayAmt(0); }
     finally { setLoading(false); }
   }, [user]);
@@ -397,29 +403,46 @@ export default function DriverPWA() {
   // ── HOME TAB ─────────────────────────────────────────────────────────────
   const HomeTab = () => (
     <div className="space-y-3 pb-4">
-      {/* Outstanding card */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
-            <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
+      {/* Outstanding / Pay card — hidden if company is CASH_ONLY */}
+      {companyPayMode !== 'CASH_ONLY' ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
+            </div>
+            <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${dues > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+              {dues > 0 ? t.duesPending : t.settled}
+            </span>
           </div>
-          <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${dues > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
-            {dues > 0 ? t.duesPending : t.settled}
-          </span>
+          {telemetry.dailyDepositRecovery > 0 && (
+            <p className="text-[9px] text-slate-400 mb-3">Includes ₹{telemetry.dailyDepositRecovery}/day deposit recovery</p>
+          )}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-slate-400 font-black text-lg">₹</span>
+            <input type="number" value={payAmt} onChange={e => setPayAmt(Number(e.target.value))}
+              className="flex-1 border border-slate-200 rounded-xl p-3 text-xl font-black font-mono focus:outline-none focus:border-indigo-500 bg-slate-50/50 text-slate-800"/>
+          </div>
+          <button onClick={pay} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition active:scale-[0.98]">
+            <CreditCard size={15}/> {t.pay}
+          </button>
         </div>
-        {telemetry.dailyDepositRecovery > 0 && (
-          <p className="text-[9px] text-slate-400 mb-3">Includes ₹{telemetry.dailyDepositRecovery}/day deposit recovery</p>
-        )}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-slate-400 font-black text-lg">₹</span>
-          <input type="number" value={payAmt} onChange={e => setPayAmt(Number(e.target.value))}
-            className="flex-1 border border-slate-200 rounded-xl p-3 text-xl font-black font-mono focus:outline-none focus:border-indigo-500 bg-slate-50/50 text-slate-800"/>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
+              <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
+            </div>
+            <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${dues > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+              {dues > 0 ? t.duesPending : t.settled}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
+            💵 Cash payments only — pay your fleet owner directly
+          </p>
         </div>
-        <button onClick={pay} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition active:scale-[0.98]">
-          <CreditCard size={15}/> {t.pay}
-        </button>
-      </div>
+      )}
 
       {/* Vehicle info strip */}
       {assignedVehicle && (
