@@ -1955,4 +1955,58 @@ function AdminPanelInner() {
       <aside className="w-56 bg-gray-900 flex flex-col shrink-0">
         <div className="p-5 border-b border-gray-700">
           <div className="flex items-center gap-2">
-          
+            <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>
+            <div>
+              <p className="text-white text-sm font-semibold">MobilityGrid</p>
+              <p className="text-gray-400 text-xs">Super Admin</p>
+            </div>
+          </div>
+        </div>
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+          {navItems.map(item => (
+            <button key={item.key} onClick={() => setTab(item.key)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                tab === item.key ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+              }`}>
+              <span>{item.icon}</span> {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="p-3 border-t border-gray-700">
+          <button onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition">
+            <span>🚪</span> Logout
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 overflow-auto">
+        <header className="bg-white dark:bg-gray-900 border-b dark:border-gray-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+          <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200">{tabLabel}</h1>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <span className="text-xs text-gray-400 dark:text-gray-500">Super Admin · MobilityGrid</span>
+          </div>
+        </header>
+        <div className="p-6">
+          {tab === 'dashboard'    && <Dashboard />}
+          {tab === 'companies'    && <Companies />}
+          {tab === 'owners'       && <AllOwners />}
+          {tab === 'drivers'      && <AllDrivers />}
+          {tab === 'kyc'          && <KycReview />}
+          {tab === 'transactions' && <Transactions />}
+          {tab === 'chat'         && <ChatViewer />}
+          {tab === 'audit'        && <AuditLog />}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export default function AdminPanel() {
+  return (
+    <ErrorBoundary>
+      <AdminPanelInner />
+    </ErrorBoundary>
+  );
+}
