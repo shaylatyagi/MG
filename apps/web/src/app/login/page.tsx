@@ -163,4 +163,57 @@ export default function LoginPage() {
                 className="w-full text-xs text-indigo-500 hover:text-indigo-700 mt-1 py-1"
               >
                 Forgot password? Sign in with OTP →
-            
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={verifyOtp} className="space-y-4">
+              <div>
+                <h2 className="text-slate-900 text-lg font-semibold">Enter OTP</h2>
+                <p className="text-slate-500 text-sm mt-0.5">Sent to +91 {phone}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">6-digit OTP</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  required
+                  autoFocus
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-center tracking-widest text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || otp.length !== 6}
+                className="w-full py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? 'Verifying…' : 'Verify & Sign In'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setStep('login'); setOtp(''); setError(''); }}
+                className="w-full text-sm text-slate-500 hover:text-slate-700"
+              >
+                ← Back to password login
+              </button>
+            </form>
+          )}
+        </div>
+
+        <p className="text-center text-slate-500 text-xs mt-6">
+          MobilityGrid by PayYantra · Confidential
+        </p>
+      </div>
+    </div>
+  );
+}

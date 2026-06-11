@@ -307,4 +307,15 @@ export default function KycPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setDocRejectModal(null)}
-                className="flex-1 py-2 border border-slate-3
+                className="flex-1 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50">Cancel</button>
+              <button onClick={rejectDoc} disabled={docActionId !== null || !docRejectReason.trim()}
+                className="flex-1 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50">
+                {docActionId !== null ? 'Rejecting…' : 'Confirm Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

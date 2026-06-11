@@ -426,49 +426,69 @@ export default function DriverPWA() {
       {/* Outstanding / Pay card */}
       {dues <= 0 ? (
         /* SETTLED — show simple confirmation, no pay option */
-        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
-            <CreditCard size={20} className="text-white" />
+        <div style={{background:'linear-gradient(135deg,#059669 0%,#10b981 100%)',borderRadius:20,padding:20,display:'flex',alignItems:'center',gap:16}}>
+          <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            <CheckCircle size={26} color="white"/>
           </div>
           <div>
-            <p className="text-sm font-black text-indigo-700">All Settled ✓</p>
-            <p className="text-[10px] text-indigo-500 mt-0.5">No dues pending. You're up to date.</p>
+            <p style={{fontSize:16,fontWeight:900,color:'white'}}>All Settled ✓</p>
+            <p style={{fontSize:10,color:'rgba(255,255,255,0.65)',marginTop:3}}>No dues pending. You're up to date.</p>
           </div>
         </div>
       ) : companyPayMode === 'CASH_ONLY' ? (
         /* DUES PENDING but CASH ONLY — show amount, no pay button */
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+        <div style={{background:'linear-gradient(135deg,#b45309 0%,#f59e0b 100%)',borderRadius:20,padding:20}}>
           <div className="flex items-start justify-between mb-3">
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
+              <p style={{fontSize:10,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)',marginBottom:6}}>{t.outstanding}</p>
+              <p style={{fontSize:36,fontWeight:900,color:'white',fontFamily:'monospace',letterSpacing:'-0.02em',lineHeight:1}}><span style={{fontSize:20,opacity:.7,marginRight:2}}>₹</span>{dues.toLocaleString('en-IN')}</p>
             </div>
-            <span className="text-[10px] font-black px-3 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">Due</span>
+            <span style={{fontSize:10,fontWeight:900,background:'rgba(0,0,0,0.2)',color:'white',padding:'4px 12px',borderRadius:20}}>Due</span>
           </div>
-          <p className="text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2.5">
+          <div style={{background:'rgba(0,0,0,0.15)',borderRadius:12,padding:'10px 14px',color:'white',fontSize:12,fontWeight:700}}>
             💵 Pay cash directly to your fleet owner
-          </p>
+          </div>
         </div>
       ) : (
         /* DUES PENDING + ONLINE ALLOWED — show pay card */
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <div className="flex items-start justify-between mb-4">
+        <div style={{background:'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',borderRadius:20,padding:20}}>
+          <div className="flex items-start justify-between mb-2">
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.outstanding}</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tight">₹{dues.toLocaleString('en-IN')}</p>
+              <p style={{fontSize:10,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)',marginBottom:6}}>{t.outstanding}</p>
+              <p style={{fontSize:36,fontWeight:900,color:'white',fontFamily:'monospace',letterSpacing:'-0.02em',lineHeight:1}}><span style={{fontSize:20,opacity:.7,marginRight:2}}>₹</span>{dues.toLocaleString('en-IN')}</p>
+              {telemetry.dailyRent > 0 && <p style={{fontSize:10,color:'rgba(255,255,255,0.55)',marginTop:4}}>₹{telemetry.dailyRent}/day{telemetry.dailyDepositRecovery > 0 ? ` · +₹${telemetry.dailyDepositRecovery} deposit` : ''}</p>}
             </div>
-            <span className="text-[10px] font-black px-3 py-1 rounded-full border bg-slate-900 text-white border-slate-900">{t.duesPending}</span>
+            <span style={{fontSize:10,fontWeight:900,background:'rgba(255,255,255,0.2)',color:'white',padding:'4px 12px',borderRadius:20}}>{t.duesPending}</span>
           </div>
-          {telemetry.dailyDepositRecovery > 0 && (
-            <p className="text-[9px] text-slate-400 mb-3">Includes ₹{telemetry.dailyDepositRecovery}/day deposit recovery</p>
-          )}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-slate-400 font-black text-lg">₹</span>
+          {assignedVehicle?.assignedSince && (() => {
+            const since = new Date(assignedVehicle.assignedSince);
+            const now = new Date();
+            const daysPassed = Math.max(0, Math.floor((now - since) / 86400000));
+            const cycleDay = (daysPassed % 30) || 30;
+            const pct = Math.min(100, Math.round((cycleDay / 30) * 100));
+            return (
+              <div style={{marginTop:12,marginBottom:14}}>
+                <div style={{background:'rgba(255,255,255,0.2)',borderRadius:10,height:5}}>
+                  <div style={{background:'white',borderRadius:10,height:5,width:`${pct}%`,transition:'width 1s ease'}}/>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',marginTop:5,fontSize:9,color:'rgba(255,255,255,0.5)',fontWeight:700}}>
+                  <span>Day {cycleDay} of 30</span><span>{100-pct}% remaining</span>
+                </div>
+              </div>
+            );
+          })()}
+          <div style={{background:'rgba(0,0,0,0.18)',borderRadius:14,padding:'8px 14px',display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+            <span style={{color:'rgba(255,255,255,0.5)',fontWeight:900,fontSize:18}}>₹</span>
             <input type="number" value={payAmt} onChange={e => setPayAmt(Number(e.target.value))}
-              className="flex-1 border border-slate-200 rounded-xl p-3 text-xl font-black font-mono focus:outline-none focus:border-indigo-500 bg-slate-50/50 text-slate-800"/>
+              style={{flex:1,background:'transparent',border:'none',outline:'none',fontSize:22,fontWeight:900,fontFamily:'monospace',color:'white'}}/>
           </div>
-          <button onClick={pay} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition active:scale-[0.98]">
-            <CreditCard size={15}/> {t.pay}
+          <button onClick={pay}
+            style={{width:'100%',background:'white',color:'#4f46e5',fontWeight:900,padding:'14px',borderRadius:14,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,0,0,0.2)',transition:'transform 0.15s cubic-bezier(0.34,1.56,0.64,1)'}}
+            onTouchStart={e=>{e.currentTarget.style.transform='scale(0.97)';try{navigator.vibrate&&navigator.vibrate(30)}catch{}}}
+            onTouchEnd={e=>e.currentTarget.style.transform='scale(1)'}
+            onMouseDown={e=>e.currentTarget.style.transform='scale(0.97)'}
+            onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
+            <CreditCard size={16}/> {t.pay}
           </button>
         </div>
       )}
@@ -1026,7 +1046,7 @@ export default function DriverPWA() {
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 pt-4 bg-slate-50 pb-32">
+        <div className="flex-1 overflow-y-auto px-4 pt-4 bg-slate-50 pb-40">
           {loading ? <div className="text-center py-16 text-xs font-black text-slate-400 animate-pulse">Loading…</div> : (
             <>
               {tab === 'home' && <HomeTab/>}
@@ -1038,32 +1058,40 @@ export default function DriverPWA() {
         </div>
 
         {/* Emergency bar */}
-        <div className="absolute left-0 right-0 bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between" style={{ bottom: '64px' }}>
+        <div className="absolute left-0 right-0 px-4 py-2 flex items-center justify-between" style={{ bottom: '68px', background:'#0f172a', borderTop:'1px solid #1e293b' }}>
           <button onClick={() => { setShowOwnerChat(true); fetchChat(); }}
-            className="flex items-center gap-1.5 text-[10px] font-black text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-indigo-200 hover:text-indigo-600 transition">
+            className="flex items-center gap-1.5 text-[10px] font-black transition active:scale-[0.96]"
+            style={{color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',borderRadius:8,padding:'6px 12px'}}>
             <MessageCircle size={11}/> Owner Chat
           </button>
-          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.emergency}</span>
-          <button onClick={() => setShowSOS(true)}
-            className="flex items-center gap-1.5 text-[10px] font-black text-white bg-red-500 px-3 py-1.5 rounded-lg hover:bg-red-600 transition">
+          <span className="text-[9px] font-black uppercase tracking-widest" style={{color:'rgba(255,255,255,0.25)'}}>{t.emergency}</span>
+          <button onClick={() => { setShowSOS(true); try{navigator.vibrate&&navigator.vibrate(50)}catch{}; }}
+            className="flex items-center gap-1.5 text-[10px] font-black text-white bg-red-500 px-3 py-1.5 rounded-lg hover:bg-red-600 transition active:scale-[0.96]">
             <ShieldAlert size={11}/> {t.triggerSos}
           </button>
         </div>
 
         {/* Bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50">
-          {[
-            { id: 'dashboard', tabVal: 'home',     Icon: Home,   label: 'Home' },
-            { id: 'wallet',    tabVal: 'wallet',   Icon: Wallet, label: 'Wallet' },
-            { id: 'stations',  tabVal: 'stations', Icon: Zap,    label: 'Stations' },
-            { id: 'account',   tabVal: 'account',  Icon: User,   label: 'Account' },
-          ].map(({ id, tabVal, Icon, label }) => (
-            <button key={id} onClick={() => { setActiveTab(id); setTab(tabVal); }}
-              className={`flex flex-col items-center gap-1 transition-all px-4 ${activeTab === id ? 'text-indigo-600' : 'text-slate-400'}`}>
-              <Icon size={activeTab === id ? 21 : 19}/>
-              <span className="text-[9px] font-black">{label}</span>
-            </button>
-          ))}
+        <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto z-50" style={{padding:'0 12px 10px'}}>
+          <div style={{background:'#1e1b4b',borderRadius:24,padding:8,display:'flex',boxShadow:'0 -4px 30px rgba(79,70,229,0.25)'}}>
+            {[
+              { id: 'dashboard', tabVal: 'home',     Icon: Home,   label: 'Home' },
+              { id: 'wallet',    tabVal: 'wallet',   Icon: Wallet, label: 'Wallet' },
+              { id: 'stations',  tabVal: 'stations', Icon: Zap,    label: 'Stations' },
+              { id: 'account',   tabVal: 'account',  Icon: User,   label: 'Account' },
+            ].map(({ id, tabVal, Icon, label }) => {
+              const active = activeTab === id;
+              return (
+                <button key={id}
+                  onClick={() => { setActiveTab(id); setTab(tabVal); }}
+                  style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'8px 4px',borderRadius:16,border:'none',cursor:'pointer',background:active?'rgba(99,102,241,0.25)':'transparent',color:active?'#a5b4fc':'rgba(255,255,255,0.3)',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'}}>
+                  <Icon size={active?20:18}/>
+                  <span style={{fontSize:9,fontWeight:900,letterSpacing:'0.04em'}}>{label}</span>
+                  {active && <div style={{width:4,height:4,borderRadius:'50%',background:'#6366f1'}}/>}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Chatbot */}
@@ -1098,7 +1126,7 @@ export default function DriverPWA() {
                     rows={3} className="w-full border border-slate-200 rounded-xl p-3 text-sm mb-4 focus:outline-none focus:border-indigo-500 bg-slate-50 resize-none"/>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSOS(false)} className="flex-1 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
-                    <button onClick={sendSOS} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-3 rounded-xl text-sm transition">Send SOS</button>
+                    <button onClick={() => { try{navigator.vibrate&&navigator.vibrate([100,50,100])}catch{}; sendSOS(); }} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-black py-3 rounded-xl text-sm transition active:scale-[0.96]">Send SOS</button>
                   </div>
                 </>
               )}
@@ -1119,22 +1147,29 @@ export default function DriverPWA() {
 
         {/* Payment Success overlay */}
         {paymentSuccess && (
-          <div className="absolute inset-0 bg-white z-[110] flex flex-col items-center justify-center px-8">
-            <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mb-6">
-              <CheckCircle size={44} className="text-emerald-500"/>
+          <div className="absolute inset-0 z-[110] flex flex-col items-center justify-center px-8"
+            style={{background:'linear-gradient(160deg,#059669 0%,#0d9488 50%,#0f172a 100%)'}}
+            ref={el => { if (el) { try{navigator.vibrate&&navigator.vibrate([100,50,200])}catch{} } }}>
+            <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:24,boxShadow:'0 0 0 14px rgba(255,255,255,0.06)'}}>
+              <CheckCircle size={44} color="white"/>
             </div>
-            <h2 className="text-2xl font-black text-slate-900 mb-1">Payment Done!</h2>
+            <h2 style={{fontSize:26,fontWeight:900,color:'white',marginBottom:4,letterSpacing:'-0.01em'}}>Payment Done!</h2>
             {paymentSuccess.amount && (
-              <p className="text-3xl font-black text-emerald-600 mb-2">₹{parseFloat(paymentSuccess.amount).toLocaleString('en-IN')}</p>
+              <p style={{fontSize:42,fontWeight:900,color:'white',fontFamily:'monospace',letterSpacing:'-0.03em',marginBottom:4,lineHeight:1}}>
+                <span style={{fontSize:22,opacity:.6}}>₹</span>{parseFloat(paymentSuccess.amount).toLocaleString('en-IN')}
+              </p>
             )}
-            <p className="text-xs text-slate-400 mb-8">
+            <p style={{fontSize:11,color:'rgba(255,255,255,0.45)',marginBottom:44}}>
               {paymentSuccess.timestamp.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
             </p>
             <button
               onClick={() => setPaymentSuccess(null)}
-              className="w-full max-w-xs py-4 bg-emerald-600 text-white font-black text-base rounded-2xl active:bg-emerald-700"
-            >
-              Done
+              style={{width:'100%',maxWidth:280,padding:'16px',background:'rgba(255,255,255,0.15)',border:'1.5px solid rgba(255,255,255,0.25)',color:'white',fontWeight:900,fontSize:16,borderRadius:20,cursor:'pointer',transition:'transform 0.15s'}}
+              onTouchStart={e=>e.currentTarget.style.transform='scale(0.97)'}
+              onTouchEnd={e=>e.currentTarget.style.transform='scale(1)'}
+              onMouseDown={e=>e.currentTarget.style.transform='scale(0.97)'}
+              onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}>
+              Done ✓
             </button>
           </div>
         )}

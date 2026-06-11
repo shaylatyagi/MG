@@ -231,4 +231,52 @@ export default function CompaniesPage() {
                 <input
                   type="text"
                   value={newCo.name}
-                  onChange={e => setNewCo(n => ({ ...n, na
+                  onChange={e => setNewCo(n => ({ ...n, name: e.target.value }))}
+                  required
+                  placeholder="e.g. Ravi EV Fleet"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">CIN (optional)</label>
+                <input
+                  type="text"
+                  value={newCo.cin}
+                  onChange={e => setNewCo(n => ({ ...n, cin: e.target.value }))}
+                  placeholder="Corporate Identity Number"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
+                <input
+                  type="text"
+                  value={newCo.city}
+                  onChange={e => setNewCo(n => ({ ...n, city: e.target.value }))}
+                  placeholder="e.g. Bengaluru"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdd(false)}
+                  className="flex-1 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={adding || !newCo.name}
+                  className="flex-1 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {adding ? 'Adding…' : 'Onboard Company'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

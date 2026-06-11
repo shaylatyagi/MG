@@ -47,4 +47,4 @@ router.patch('/documents/:id/reject',        ctrl.rejectDocument);
 // Audit log
 router.get('/audit-logs',                    ctrl.getAuditLogs);
 
-mo
+module.exports = router;
