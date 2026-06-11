@@ -1,13 +1,9 @@
 'use client';
-// Identical to app/login/page.tsx — kept in sync to resolve Next.js routing conflict.
-// Both app/login and app/(auth)/login resolve to /login; this ensures the correct
-// admin login is shown regardless of which one Next.js decides to serve.
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveAdminToken, getAdminToken } from '@/lib/api';
+import { saveAdminToken } from '@/lib/api';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://mg-qw5s.onrender.com';
-const DEV = process.env.NODE_ENV !== 'production';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,18 +13,6 @@ export default function LoginPage() {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Auto-redirect if already logged in
-  useEffect(() => {
-    const token = getAdminToken();
-    if (!token) return;
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      if (payload.role === 'admin' && payload.exp * 1000 > Date.now()) {
-        router.replace('/admin/dashboard');
-      }
-    } catch { /* invalid token — stay on login */ }
-  }, [router]);
 
   const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +26,6 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Failed to send OTP');
-      if (DEV) setOtp('000000');
       setStep('otp');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Request failed');
@@ -63,7 +46,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!data.success || !data.token) throw new Error(data.message || 'Verification failed');
-      saveAdminToken(data.token, secret);
+      saveAdminToken(data.token, secret); // save JWT + admin key cookie (for x-admin-key header)
       router.push('/admin/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Verification failed');
@@ -73,13 +56,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)' }}>
       <div className="w-full max-w-sm">
+        {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-white text-2xl font-bold tracking-tight">MobilityGrid</h1>
-          <p className="text-slate-400 text-sm mt-1">Platform Admin Access</p>
+          <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style={{ background: '#4f46e5', boxShadow: '0 6px 20px rgba(79,70,229,0.4)' }}>
+            <span className="text-white font-black text-xl">M</span>
+          </div>
+          <h1 className="text-white text-xl font-black tracking-tight">MobilityGrid</h1>
+          <p className="text-slate-400 text-xs mt-1 tracking-widest uppercase">Platform Admin</p>
         </div>
 
+        {/* Card */}
         <div className="bg-white rounded-2xl p-8 shadow-xl">
           {step === 'credentials' ? (
             <form onSubmit={sendOtp} className="space-y-4">
@@ -134,7 +122,6 @@ export default function LoginPage() {
                 <h2 className="text-slate-900 text-lg font-semibold">Enter OTP</h2>
                 <p className="text-slate-500 text-sm mt-0.5">
                   Sent to +91 {phone}
-                  {DEV && <span className="ml-1 text-xs text-green-600">(dev: use 000000)</span>}
                 </p>
               </div>
 

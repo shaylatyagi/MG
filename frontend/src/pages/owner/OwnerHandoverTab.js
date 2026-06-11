@@ -150,19 +150,4 @@ export default function OwnerHandoverTab({ lang }) {
           }
 
           {drivers.length === 0
-            ? <div style={{ backgroundColor: '#FEF3C7', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}><p style={{ fontSize: '12px', color: '#D97706', margin: 0 }}>⚠️ {lang === 'en' ? 'No unassigned drivers.' : 'कोई अनअसाइन्ड ड्राइवर नहीं।'}</p></div>
-            : <select value={aForm.driver_id} onChange={e => setAForm(f => ({ ...f, driver_id: e.target.value }))} style={{ ...inp, backgroundColor: 'white' }}>
-                <option value="">{lang === 'en' ? '— Select Driver —' : '— ड्राइवर चुनें —'}</option>
-                {drivers.map(d => <option key={d.id} value={d.id}>{d.name} — {d.phone_number}</option>)}
-              </select>
-          }
-
-          <input type="number" placeholder={lang === 'en' ? 'Deposit Amount ₹ (default 0)' : 'जमा राशि ₹'} value={aForm.deposit_amount} onChange={e => setAForm(f => ({ ...f, deposit_amount: e.target.value }))} style={inp} />
-          <button type="submit" disabled={loading || !vehicles.length || !drivers.length} style={{ ...btn, opacity: (!vehicles.length || !drivers.length) ? 0.5 : 1 }}>
-            {loading ? '…' : (lang === 'en' ? 'Assign Vehicle' : 'वाहन असाइन करें')}
-          </button>
-        </form>
-      )}
-    </div>
-  );
-}
+            ? <div style={{ backgroundColor: '#FEF3C7', borderRadius: '8px', 

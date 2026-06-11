@@ -7,7 +7,8 @@ const nav = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: '◼' },
   { href: '/admin/companies', label: 'Companies', icon: '🏢' },
   { href: '/admin/kyc',       label: 'KYC Review', icon: '📋' },
-  { href: '/admin/drivers',   label: 'All Drivers', icon: '👤' },
+  { href: '/admin/drivers',    label: 'All Drivers', icon: '👤' },
+  { href: '/admin/audit-logs', label: 'Audit Logs',  icon: '📜' },
 ];
 
 export default function Sidebar() {
