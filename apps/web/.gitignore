@@ -1,1 +1,4 @@
 .vercel
+
+# Legacy root app/ directory — all routing lives in src/app/
+/app/
