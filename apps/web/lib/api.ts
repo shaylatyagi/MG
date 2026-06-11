@@ -1,72 +1,51 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://newmg.onrender.com';
+// apps/web/lib/api.ts — per DevSpec §10.4
+import axios from 'axios';
 
-function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]+)'));
-  return match ? decodeURIComponent(match[1]) : null;
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  withCredentials: true,   // Sends httpOnly cookie automatically
+  timeout: 15_000,
+});
+
+export default api;
+
+// For Server Components (no Axios — use fetch with server-side token)
+export async function serverFetch<T>(path: string): Promise<T> {
+  const { cookies } = await import('next/headers');
+  const token = (await cookies()).get('mg_token')?.value;
+  const res = await fetch(`${process.env.API_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Server fetch failed: ${res.status}`);
+  return (await res.json()).data;
 }
 
-function setCookie(name: string, value: string, days = 30) {
-  const expires = new Date(Date.now() + days * 86400000).toUTCString();
-  document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/; SameSite=Lax';
-}
-
-function deleteCookie(name: string) {
-  document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-}
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getCookie('mg_admin_token');
-  const adminKey = getCookie('mg_admin_key');
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
-  if (token) headers['Authorization'] = 'Bearer ' + token;
-  if (adminKey) headers['x-admin-key'] = adminKey;
-
-  const res = await fetch(API_BASE + path, { ...options, headers });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const json: any = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const msg: string = (json && json.error && json.error.message) || (json && json.message) || ('HTTP ' + String(res.status));
-    throw new Error(msg);
-  }
-
-  return (json.data !== undefined ? json.data : json) as T;
-}
-
-export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
-  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+// Auth helpers
+export const saveToken = (token: string) => {
+  document.cookie = `mg_token=${token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Strict`;
 };
 
-export function saveAdminToken(token: string, adminKey?: string) {
-  setCookie('mg_admin_token', token, 30);
-  if (adminKey) setCookie('mg_admin_key', adminKey, 30);
-}
+export const clearToken = () => {
+  document.cookie = 'mg_token=; path=/; max-age=0';
+};
 
-export function clearAdminToken() {
-  deleteCookie('mg_admin_token');
-  deleteCookie('mg_admin_key');
-}
+// Admin auth helpers — saves JWT + optional admin key as cookies (read by middleware)
+export const saveAdminToken = (token: string, adminKey?: string) => {
+  const maxAge = 60 * 60 * 24 * 30; // 30 days
+  document.cookie = `mg_admin_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  if (adminKey) {
+    document.cookie = `mg_admin_key=${encodeURIComponent(adminKey)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  }
+};
 
-export const fmt = {
-  inr: (n: number | string | null | undefined): string => {
-    const num = parseFloat(String(n != null ? n : 0));
-    return '₹' + num.toLocaleString('en-IN');
-  },
-  date: (d: string | null | undefined): string =>
-    d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
-  ago: (d: string | null | undefined): string => {
-    if (!d) return '—';
-    const hrs = Math.floor((Date.now() - new Date(d).getTime()) / 3600000);
-    if (hrs < 24) return hrs + 'h ago';
-    const days = Math.floor(hrs / 24);
-    return days < 30 ? days + 'd ago' : fmt.date(d);
-  },
+export const clearAdminToken = () => {
+  document.cookie = 'mg_admin_token=; path=/; max-age=0';
+  document.cookie = 'mg_admin_key=; path=/; max-age=0';
+};
+
+export const getAdminToken = (): string | null => {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.match(/(?:^|; )mg_admin_token=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
 };
