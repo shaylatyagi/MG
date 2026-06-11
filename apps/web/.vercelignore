@@ -1,2 +1,2 @@
-# Exclude the duplicate root app/ directory — Next.js uses src/app/ for routing
-app/
+# Exclude ONLY the root-level app/ directory (duplicate of src/app/)
+# Leading slash an
