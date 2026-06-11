@@ -16,6 +16,7 @@ interface DocRecord {
   doc_type:         string;
   status:           string;   // pending | under_review | approved | rejected
   rejection_reason: string | null;
+  file_url:         string | null;
 }
 
 interface KycDriver {
@@ -225,6 +226,14 @@ export default function KycPage() {
                             — {doc.rejection_reason}
                           </span>
                         )}
+                        {/* View document */}
+                        {doc.file_url && (
+                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
+                            className="text-indigo-600 hover:text-indigo-800 font-semibold underline underline-offset-2 ml-1"
+                            title="View document">
+                            View
+                          </a>
+                        )}
                         {/* Per-doc actions — only show for pending/under_review */}
                         {(doc.status === 'pending' || doc.status === 'under_review') && (
                           <span className="flex gap-1 ml-1">
@@ -298,15 +307,4 @@ export default function KycPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setDocRejectModal(null)}
-                className="flex-1 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50">Cancel</button>
-              <button onClick={rejectDoc} disabled={docActionId !== null || !docRejectReason.trim()}
-                className="flex-1 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50">
-                {docActionId !== null ? 'Rejecting…' : 'Confirm Reject'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                className="flex-1 py-2 border border-slate-3

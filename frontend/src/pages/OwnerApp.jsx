@@ -346,6 +346,8 @@ const [ledger, setLedger] = useState({ received: 0, outstanding: 0 });
   const [showCashModal, setShowCashModal] = useState(false);
 const [cashDriver, setCashDriver] = useState(null);
 const [cashAmount, setCashAmount] = useState('');
+const [cashConfirm, setCashConfirm] = useState(false);
+const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [rentType, setRentType] = useState('DAILY'); // DAILY, WEEKLY, MONTHLY
 const rentTypeOptions = [
   { value: 'DAILY', label: 'Daily Rent', multiplier: 1 },
@@ -853,6 +855,25 @@ const DriverDetailsModal = () => {
   </div>
 )}
         </div>
+
+{/* ── Logout Confirm Modal ───────────────────────────────────────────── */}
+{showLogoutConfirm && (
+  <div className="absolute inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
+      <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+        <LogOut size={20} className="text-red-500" />
+      </div>
+      <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
+      <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
+      <div className="flex gap-3">
+        <button onClick={() => setShowLogoutConfirm(false)}
+          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
+        <button onClick={logout}
+          className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );
@@ -1200,6 +1221,7 @@ return () => clearInterval(interval);
     localStorage.clear();
     navigate('/login');
   };
+  const confirmLogout = () => setShowLogoutConfirm(true);
 
   const markRead = async () => {
     setUnreadCount(0);
@@ -1877,6 +1899,7 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
       e.stopPropagation();
       setCashDriver(driver);
       setCashAmount('');
+      setCashConfirm(false);
       setShowCashModal(true);
     }}
     className="p-2 rounded-lg bg-emerald-50 text-emerald-600"
@@ -3102,7 +3125,7 @@ const ProfileTab = () => {
   userType="OWNER"
   token={token()}
 />
-    <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2 border border-red-100">
+    <button onClick={confirmLogout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2 border border-red-100">
       <LogOut size={14} /> {t.logout}
     </button>
   </div>
@@ -3151,7 +3174,7 @@ const ProfileTab = () => {
               )}
             </button>
             {/* Logout */}
-            <button onClick={logout} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 transition flex items-center justify-center">
+            <button onClick={confirmLogout} className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 transition flex items-center justify-center" title="Logout">
               <LogOut size={15} className="text-red-500" />
             </button>
           </div>
@@ -3923,44 +3946,84 @@ const ProfileTab = () => {
 {showCashModal && cashDriver && (
   <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
     <div className="bg-white rounded-3xl w-full max-w-sm p-6">
-      <h3 className="text-lg font-black mb-1">Record Cash Payment</h3>
-      <p className="text-sm text-slate-500 mb-4">{cashDriver.full_name} — {cashDriver.phone_number}</p>
-      <input
-        type="number"
-        placeholder="Enter amount (₹)"
-        value={cashAmount}
-        onChange={e => setCashAmount(e.target.value)}
-        className="w-full border rounded-xl p-3 mb-4 text-sm font-mono"
-      />
-      <div className="flex gap-3">
-        <button onClick={() => setShowCashModal(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
-        <button
-          onClick={async () => {
-            if (!cashAmount || parseFloat(cashAmount) <= 0) return alert('Enter valid amount');
-            try {
-              const res = await fetch(`${API}/api/payment/owner/cash-payment`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-                body: JSON.stringify({
-                  driverPhone: cashDriver.phone_number,
-                  driverName: cashDriver.full_name,
-                  amount: parseFloat(cashAmount),
-                  ownerId: ownerId()
-                })
-              });
-              const d = await res.json();
-              if (d.success) {
-                alert(`✅ ₹${cashAmount} cash payment recorded for ${cashDriver.full_name}`);
-                setShowCashModal(false);
-                setCashAmount('');
-              } else alert(d.message || 'Failed');
-            } catch { alert('Network error'); }
-          }}
-          className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-black"
-        >
-          💵 Record Cash
-        </button>
-      </div>
+      {!cashConfirm ? (
+        <>
+          <h3 className="text-lg font-black mb-1">Record Cash Payment</h3>
+          <p className="text-sm text-slate-500 mb-4">{cashDriver.full_name} — {cashDriver.phone_number}</p>
+          <input
+            type="number"
+            placeholder="Enter amount (₹)"
+            value={cashAmount}
+            onChange={e => setCashAmount(e.target.value)}
+            className="w-full border rounded-xl p-3 mb-4 text-sm font-mono"
+          />
+          <div className="flex gap-3">
+            <button onClick={() => { setShowCashModal(false); setCashAmount(''); }} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
+            <button
+              onClick={() => {
+                if (!cashAmount || parseFloat(cashAmount) <= 0) return alert('Enter valid amount');
+                setCashConfirm(true);
+              }}
+              className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-black"
+            >
+              💵 Record Cash
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="text-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <h3 className="text-base font-black text-slate-900">Confirm Cash Recording</h3>
+            <p className="text-sm text-slate-500 mt-1">Please verify the details before saving</p>
+          </div>
+          <div className="bg-slate-50 rounded-2xl p-4 mb-4 space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Driver</span>
+              <span className="font-black text-slate-800">{cashDriver.full_name}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Phone</span>
+              <span className="font-black text-slate-800">{cashDriver.phone_number}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Amount</span>
+              <span className="font-black text-emerald-700 text-base">₹{parseFloat(cashAmount).toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setCashConfirm(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">← Edit</button>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(`${API}/api/payment/owner/cash-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                    body: JSON.stringify({
+                      driverPhone: cashDriver.phone_number,
+                      driverName: cashDriver.full_name,
+                      amount: parseFloat(cashAmount),
+                      ownerId: ownerId()
+                    })
+                  });
+                  const d = await res.json();
+                  if (d.success) {
+                    alert(`✅ ₹${cashAmount} cash payment recorded for ${cashDriver.full_name}`);
+                    setShowCashModal(false);
+                    setCashAmount('');
+                    setCashConfirm(false);
+                  } else alert(d.message || 'Failed');
+                } catch { alert('Network error'); }
+              }}
+              className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-black"
+            >
+              ✅ Yes, Record
+            </button>
+          </div>
+        </>
+      )}
     </div>
   </div>
 )}
@@ -4195,4 +4258,3 @@ const ProfileTab = () => {
     </div>
   );
 }
-   

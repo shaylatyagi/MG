@@ -384,7 +384,8 @@ async function fetchKycDrivers(statusFilter) {
             'id',               doc.id,
             'doc_type',         doc.doc_type,
             'status',           doc.status,
-            'rejection_reason', doc.rejection_reason
+            'rejection_reason', doc.rejection_reason,
+            'file_url',         doc.file_url
           ) ORDER BY doc.uploaded_at
         ) FILTER (WHERE doc.id IS NOT NULL),
         '[]'::json

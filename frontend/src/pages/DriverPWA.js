@@ -69,7 +69,10 @@ export default function DriverPWA() {
   const [payAmt, setPayAmt] = useState(0);
   const [telemetry, setTelemetry] = useState({});
   const [payments, setPayments] = useState([]);
-  const [notifs, setNotifs] = useState([]);
+  const NOTIF_KEY = `mg_notifs_${phone ? phone() : ''}`;
+  const [notifs, setNotifs] = useState(() => {
+    try { const c = localStorage.getItem('mg_notifs_cached'); return c ? JSON.parse(c) : []; } catch { return []; }
+  });
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const [totalPaid, setTotalPaid] = useState(0);
@@ -94,6 +97,7 @@ export default function DriverPWA() {
   const [sosMsg, setSosMsg] = useState('');
   const [sosSent, setSosSent] = useState(false);
   const [showOwnerChat, setShowOwnerChat] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [chatMsgs, setChatMsgs] = useState([]);
 
   const [kycState, setKycState] = useState({
@@ -154,7 +158,17 @@ export default function DriverPWA() {
       try {
         const res = await fetch(`${API}/api/payment/driver/notifications?phone=${phone()}`, { headers: { Authorization: `Bearer ${tk()}` } });
         const data = await res.json();
-        if (Array.isArray(data)) { setNotifs(data); setUnread(data.filter(n => !n.is_read).length); }
+        if (Array.isArray(data) && data.length > 0) {
+          // Merge fresh data with any cached notifications (keep newest, deduplicate by id)
+          const cached = (() => { try { const c = localStorage.getItem('mg_notifs_cached'); return c ? JSON.parse(c) : []; } catch { return []; } })();
+          const merged = [...data];
+          cached.forEach(c => { if (!merged.find(m => m.id === c.id)) merged.push(c); });
+          merged.sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0));
+          const top = merged.slice(0, 50);
+          setNotifs(top);
+          setUnread(top.filter(n => !n.is_read).length);
+          try { localStorage.setItem('mg_notifs_cached', JSON.stringify(top)); } catch {}
+        }
       } catch {}
     };
     fetchNotifications();
@@ -256,7 +270,12 @@ export default function DriverPWA() {
   }, []);
 
   const markRead = async () => {
-    setUnread(0); setNotifs(p => p.map(n => ({ ...n, is_read: true })));
+    setUnread(0);
+    setNotifs(p => {
+      const updated = p.map(n => ({ ...n, is_read: true }));
+      try { localStorage.setItem('mg_notifs_cached', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     try { await fetch(`${API}/api/payment/notifications/mark-read?userId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch {}
   };
 
@@ -344,6 +363,7 @@ export default function DriverPWA() {
     return `${d.toLocaleDateString('en-IN', {day:'2-digit', month:'short'})} ${time}`;
   };
 
+  const confirmLogout = () => setShowLogoutConfirm(true);
   const logout = async () => {
     try {
       await fetch(`${API}/api/payment/driver/activity/logout`, {
@@ -810,7 +830,7 @@ export default function DriverPWA() {
           </div>
         </div>
 
-        <button onClick={logout} className="w-full bg-white border border-slate-200 text-red-500 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 hover:border-red-200 hover:bg-red-50 transition">
+        <button onClick={confirmLogout} className="w-full bg-white border border-slate-200 text-red-500 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 hover:border-red-200 hover:bg-red-50 transition">
           <LogOut size={13}/> {t.logout}
         </button>
       </div>
@@ -937,7 +957,7 @@ export default function DriverPWA() {
               {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-indigo-600 text-white text-[8px] font-black rounded-full flex items-center justify-center">{unread > 9 ? '9+' : unread}</span>}
             </button>
             <ThemeToggle />
-            <button onClick={logout} className="p-2 rounded-lg bg-red-50 hover:bg-red-100 transition border border-red-100">
+            <button onClick={confirmLogout} className="p-2 rounded-lg bg-red-50 hover:bg-red-100 transition border border-red-100">
               <LogOut size={15} className="text-red-500"/>
             </button>
           </div>
@@ -1185,6 +1205,24 @@ export default function DriverPWA() {
           </div>
         )}
 
+      {/* Logout confirm */}
+      {showLogoutConfirm && (
+        <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+              <LogOut size={20} className="text-red-500" />
+            </div>
+            <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
+            <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
+              <button onClick={logout}
+                className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

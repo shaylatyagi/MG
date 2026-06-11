@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clearAdminToken } from '@/lib/api';
@@ -37,6 +38,7 @@ const nav = [
 export default function Sidebar() {
   const path = usePathname();
   const router = useRouter();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const logout = () => {
     clearAdminToken();
@@ -84,18 +86,5 @@ export default function Sidebar() {
       <div className="px-3 pb-5">
         <div style={{ borderTop: '1px solid #1e293b', paddingTop: 12, marginBottom: 8 }} />
         <button
-          onClick={logout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-          style={{ color: '#475569' }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#1e293b'; (e.currentTarget as HTMLElement).style.color = '#cbd5e1'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#475569'; }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-          Logout
-        </button>
-      </div>
-    </aside>
-  );
-}
+          onClick={() => setShowLogoutConfirm(true)}
+          className="w-f
