@@ -1,2 +1,3 @@
 # Exclude ONLY the root-level app/ directory (duplicate of src/app/)
-# Leading slash an
+# Leading slash anchors to project root — does NOT exclude src/app/
+/app/
