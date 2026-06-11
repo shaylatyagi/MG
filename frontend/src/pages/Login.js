@@ -52,8 +52,6 @@ export default function Login() {
   const navigate = useNavigate();
   const [step, setStep] = useState('select-role');
   const [selectedRole, setSelectedRole] = useState(null);
-  const [selectedDriver, setSelectedDriver] = useState(null);
-  const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -61,18 +59,7 @@ export default function Login() {
   const [resendTimer, setResendTimer] = useState(0);
   const [adminPhone, setAdminPhone] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
-
-  useEffect(() => { fetchDrivers(); }, []);
-
-  const fetchDrivers = async () => {
-    try {
-      const res = await fetch(`${API}/api/drivers/list`);
-      const data = await res.json();
-      setDrivers(data.drivers || []);
-    } catch (err) {
-      console.error('Error fetching drivers:', err);
-    }
-  };
+  const [driverPhone, setDriverPhone] = useState('');
 
   const roles = [
     { type: 'driver',  name: 'Driver',        icon: <Truck className="w-6 h-6" />,    redirect: '/driver/dashboard' },
@@ -132,18 +119,17 @@ export default function Login() {
   };
 
   const sendDriverOTP = async () => {
-    const phone = selectedDriver.mobile_number;
     setLoading(true); setError(''); setSuccess('');
     try {
       const res = await fetch(`${API}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phone })
+        body: JSON.stringify({ phone_number: driverPhone })
       });
       const data = await res.json();
       if (data.success) {
         setOtpValue(data.otp || '');
-        setSuccess(`OTP: ${data.otp}`);
+        setSuccess(data.otp ? `OTP: ${data.otp}` : 'OTP sent');
         setStep('driver-verify-otp');
         startResendTimer();
       } else { setError(data.message || 'Failed'); }
@@ -152,13 +138,12 @@ export default function Login() {
   };
 
   const verifyDriverOTP = async () => {
-    const phone = selectedDriver.mobile_number;
     setLoading(true); setError('');
     try {
       const res = await fetch(`${API}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phone, otp: otpValue })
+        body: JSON.stringify({ phone_number: driverPhone, otp: otpValue })
       });
       const data = await res.json();
       if (data.success) {
@@ -173,13 +158,7 @@ export default function Login() {
   const handleRoleSelect = (role) => {
     setSelectedRole(role);
     setError(''); setSuccess(''); setOtpValue('');
-    setStep(role.type === 'driver' ? 'select-driver' : 'send-otp');
-  };
-
-  const handleDriverSelect = (driver) => {
-    setSelectedDriver(driver);
-    setError(''); setSuccess(''); setOtpValue('');
-    setStep('driver-otp');
+    setStep(role.type === 'driver' ? 'driver-otp' : 'send-otp');
   };
 
   const sendAdminOTP = async () => {
@@ -220,8 +199,8 @@ export default function Login() {
 
   const handleBack = () => {
     setStep('select-role'); setSelectedRole(null);
-    setSelectedDriver(null); setError(''); setSuccess(''); setOtpValue('');
-    setAdminPhone('');
+    setError(''); setSuccess(''); setOtpValue('');
+    setAdminPhone(''); setDriverPhone('');
   };
 
   // ── Shared layout shell ──────────────────────────────────────────────
@@ -311,46 +290,10 @@ export default function Login() {
     );
   }
 
-  // ── Driver List ──────────────────────────────────────────────────────
-  if (step === 'select-driver') {
-    return (
-      <Shell showBack onBack={handleBack} title="Select Driver" subtitle="Choose your profile to continue">
-        <div style={{ maxHeight: '340px', overflowY: 'auto', margin: '0 -4px', padding: '0 4px' }}>
-          {drivers.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '14px' }}>
-              Loading drivers...
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {drivers.map((driver) => (
-                <button key={driver.id} onClick={() => handleDriverSelect(driver)} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  border: '1.5px solid #e2e8f0', borderRadius: '10px',
-                  background: '#fff', cursor: 'pointer', textAlign: 'left', width: '100%',
-                  fontFamily: 'inherit'
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#4f46e5'; e.currentTarget.style.background = '#f5f3ff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
-                >
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{driver.full_name}</p>
-                    <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0', fontFamily: 'monospace' }}>{driver.mobile_number}</p>
-                  </div>
-                  <ArrowRight size={15} style={{ color: '#94a3b8' }} />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </Shell>
-    );
-  }
-
   // ── Driver Send OTP ──────────────────────────────────────────────────
   if (step === 'driver-otp') {
     return (
-      <Shell showBack onBack={() => setStep('select-driver')} title="Login as Driver" subtitle={selectedDriver?.full_name}>
+      <Shell showBack onBack={handleBack} title="Login as Driver">
         <Alert />
         <div style={{ marginBottom: '14px' }}>
           <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
@@ -358,12 +301,19 @@ export default function Login() {
           </label>
           <div style={{ position: 'relative' }}>
             <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input type="text" value={selectedDriver?.mobile_number || ''} readOnly
-              onKeyDown={e => { if (e.key === 'Enter' && !loading) sendDriverOTP(); }}
-              style={inputStyle} />
+            <input
+              type="tel"
+              value={driverPhone}
+              onChange={e => setDriverPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              onKeyDown={e => { if (e.key === 'Enter' && !loading && driverPhone.length >= 10) sendDriverOTP(); }}
+              placeholder="10-digit mobile number"
+              autoFocus
+              style={inputStyle}
+            />
           </div>
         </div>
-        <button onClick={sendDriverOTP} disabled={loading} style={loading ? btnDisabled : btnPrimary}>
+        <button onClick={sendDriverOTP} disabled={loading || driverPhone.length < 10}
+          style={loading || driverPhone.length < 10 ? btnDisabled : btnPrimary}>
           {loading ? 'Sending…' : 'Send OTP'} <Send size={14} />
         </button>
       </Shell>
@@ -373,7 +323,7 @@ export default function Login() {
   // ── Driver Verify OTP ───────────────────────────────────────────────
   if (step === 'driver-verify-otp') {
     return (
-      <Shell showBack onBack={() => setStep('driver-otp')} title="Enter OTP" subtitle={`Sent to ${selectedDriver?.mobile_number}`}>
+      <Shell showBack onBack={() => setStep('driver-otp')} title="Enter OTP" subtitle={`Sent to ${driverPhone}`}>
         <Alert />
         <input
           type="text"
@@ -409,7 +359,7 @@ export default function Login() {
     );
   }
 
-  // ── Admin Send OTP ───────────────────────────────────────────────────
+  // ── Admin Send OTP ── (driver resend calls sendDriverOTP above) ───────────────────────────────────────────────────
   if (step === 'send-otp' && selectedRole?.type === 'admin') {
     return (
       <Shell showBack onBack={handleBack} title="Platform Admin Login">
