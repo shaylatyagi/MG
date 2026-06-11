@@ -54,6 +54,7 @@ exports.listCompanies = async (req, res, next) => {
         c.company_name,
         c.company_code,
         c.company_status,
+        c.payment_mode,
         c.city,
         c.cin,
         c.created_at,
@@ -255,6 +256,62 @@ exports.getDriverDetail = async (req, res, next) => {
         ledger: ledgerRes.rows,
       },
     });
+  } catch (err) { next(err); }
+};
+
+// POST /api/admin/drivers
+exports.createDriver = async (req, res, next) => {
+  try {
+    const { name, phone_number, owner_id, emergency_contact } = req.body;
+    if (!name || !phone_number || !owner_id)
+      throw new AppError('name, phone_number, owner_id required', 400, 'VALIDATION_ERROR');
+
+    const ownerRes = await pool.query(
+      'SELECT company_id FROM public.owners WHERE id = $1 LIMIT 1',
+      [owner_id]
+    );
+    if (!ownerRes.rows[0]) throw new AppError('Owner not found', 404, 'NOT_FOUND');
+    const { company_id } = ownerRes.rows[0];
+
+    const { rows } = await pool.query(
+      `INSERT INTO public.drivers (owner_id, company_id, name, phone_number, emergency_contact)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [owner_id, company_id, name.trim(), phone_number, emergency_contact || null]
+    );
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) { next(err); }
+};
+
+// PATCH /api/admin/drivers/:id/status
+exports.updateDriverStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const VALID = ['ACTIVE', 'INACTIVE', 'SUSPENDED'];
+    if (!VALID.includes(status))
+      throw new AppError(`status must be one of: ${VALID.join(', ')}`, 400, 'VALIDATION_ERROR');
+    const { rows } = await pool.query(
+      `UPDATE public.drivers SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!rows[0]) throw new AppError('Driver not found', 404, 'NOT_FOUND');
+    res.json({ success: true, data: rows[0] });
+  } catch (err) { next(err); }
+};
+
+// PATCH /api/admin/companies/:id/payment-mode
+exports.updateCompanyPaymentMode = async (req, res, next) => {
+  try {
+    const { payment_mode } = req.body;
+    const VALID = ['CASH_ONLY', 'ONLINE_ONLY', 'BOTH'];
+    if (!VALID.includes(payment_mode))
+      throw new AppError(`payment_mode must be one of: ${VALID.join(', ')}`, 400, 'VALIDATION_ERROR');
+    const { rows } = await pool.query(
+      `UPDATE public.client_companies SET payment_mode = $1, updated_at = NOW()
+       WHERE id = $2 RETURNING *`,
+      [payment_mode, req.params.id]
+    );
+    if (!rows[0]) throw new AppError('Company not found', 404, 'NOT_FOUND');
+    res.json({ success: true, data: rows[0] });
   } catch (err) { next(err); }
 };
 

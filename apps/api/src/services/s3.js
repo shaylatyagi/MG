@@ -20,9 +20,12 @@ function isS3Configured() {
  * @param {{ buffer: Buffer, originalname: string, mimetype: string, entityId: string, docType: string }} opts
  * @returns {{ s3_key: string, file_url: string }}
  */
-exports.uploadDocument = async ({ buffer, originalname, mimetype, entityId, docType }) => {
+exports.uploadDocument = async ({ buffer, originalname, mimetype, entityId, entityType, companyId, docType }) => {
   const ext      = path.extname(originalname) || '.bin';
-  const filename = `kyc/${entityId}/${docType}_${Date.now()}${ext}`;
+  const uuid     = require('crypto').randomUUID();
+  // Path: {company_id}/{entity_type}s/{entity_id}/{doc_type}/{uuid}.ext
+  const prefix   = companyId ? `${companyId}/${entityType || 'driver'}s/${entityId}` : `kyc/${entityId}`;
+  const filename = `${prefix}/${docType}/${uuid}${ext}`;
 
   if (!isS3Configured()) {
     const tmpDir    = path.join(process.cwd(), 'tmp', 'kyc', String(entityId));

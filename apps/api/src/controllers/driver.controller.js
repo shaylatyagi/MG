@@ -184,6 +184,20 @@ exports.createSos = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /api/driver/company-config
+exports.getCompanyConfig = async (req, res, next) => {
+  try {
+    const companyId = req.user.company_id;
+    if (!companyId) throw new AppError('No company linked to this driver', 400, 'VALIDATION_ERROR');
+    const { rows } = await pool.query(
+      'SELECT id, company_name, payment_mode FROM public.client_companies WHERE id = $1 LIMIT 1',
+      [companyId]
+    );
+    if (!rows[0]) throw new AppError('Company not found', 404, 'NOT_FOUND');
+    res.json({ success: true, data: rows[0] });
+  } catch (err) { next(err); }
+};
+
 // GET /api/driver/notifications?page=1
 exports.getNotifications = async (req, res, next) => {
   try {

@@ -13,6 +13,7 @@ router.get('/activity/ping',    requireRole('driver'),                          
 router.get('/wallet',           requireRole('driver', 'owner', 'admin'),             ctrl.getWallet);
 router.get('/ledger',           requireRole('driver', 'owner', 'admin'),             ctrl.getLedger);
 router.post('/sos',             requireRole('driver'), validate(v.createSos),        ctrl.createSos);
+router.get('/company-config',   requireRole('driver'),                               ctrl.getCompanyConfig);
 router.get('/notifications',    requireRole('driver', 'owner', 'admin'),             ctrl.getNotifications);
 
 module.exports = router;
