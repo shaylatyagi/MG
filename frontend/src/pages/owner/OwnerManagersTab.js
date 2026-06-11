@@ -31,7 +31,7 @@ export default function OwnerManagersTab({ lang }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/api/payment/owner/managers');
+      const res = await api.get('/api/manager/');
       const data = res.data?.managers ?? res.data?.data ?? res.data;
       setManagers(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -55,7 +55,7 @@ export default function OwnerManagersTab({ lang }) {
 
     setSaving(true);
     try {
-      await api.post('/api/payment/owner/managers/add', {
+      await api.post('/api/manager/', {
         full_name: form.full_name.trim(),
         mobile_number: form.mobile_number,
         permissions: form.permissions,
@@ -74,7 +74,7 @@ export default function OwnerManagersTab({ lang }) {
     if (!window.confirm('Revoke this manager\'s access?')) return;
     setRevoking(id);
     try {
-      await api.delete(`/api/owner/managers/${id}`);
+      await api.delete(`/api/manager/${id}`);
       setManagers(prev => prev.filter(m => m.id !== id));
     } catch (e) {
       alert(e.response?.data?.message || 'Failed to revoke');

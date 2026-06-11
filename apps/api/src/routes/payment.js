@@ -23,3 +23,10 @@ router.get('/history',         requireRole('driver', 'owner', 'admin'),         
 router.get('/verify-by-reference/:orderId', requireRole('driver', 'owner', 'admin'), ctrl.verifyByReference);
 
 module.exports = router;
+
+
+// ── Manager aliases (CRA calls /api/payment/owner/managers) ──────────────────
+const managerCtrl = require('../controllers/manager.controller');
+router.get('/owner/managers',        requireRole('owner', 'admin'), managerCtrl.list);
+router.post('/owner/managers/add',   requireRole('owner', 'admin'), managerCtrl.create);
+router.delete('/owner/managers/:id', requireRole('owner', 'admin'), managerCtrl.deactivate);

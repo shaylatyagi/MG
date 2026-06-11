@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../../api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://mg-qw5s.onrender.com';
+// Chat uses the global api instance (VITE_API_URL env var)
 
 export default function DriverChatTab() {
   const [messages, setMessages] = useState([]);
@@ -27,7 +27,7 @@ export default function DriverChatTab() {
     const driverId = getDriverId();
     if (!driverId) return;
     try {
-      const res = await api.get(`${API_URL}/api/chat/messages`, { params: { driver_id: driverId, limit: 60 } });
+      const res = await api.get(`/api/chat/messages`, { params: { driver_id: driverId, limit: 60 } });
       const data = res.data?.data ?? res.data;
       if (Array.isArray(data)) setMessages(data);
       setError('');
@@ -61,7 +61,7 @@ export default function DriverChatTab() {
     setInput('');
 
     try {
-      await api.post(`${API_URL}/api/chat/send`, { driver_id: driverId, message: text });
+      await api.post(`/api/chat/send`, { driver_id: driverId, message: text });
       await fetchMessages();
     } catch {
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));

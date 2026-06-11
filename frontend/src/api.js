@@ -4,7 +4,7 @@ import axios from 'axios';
 // Detect environment
 const isProduction = process.env.NODE_ENV === 'production';
 const API_URL = isProduction 
-  ? 'https://mg-qw5s.onrender.com'  // Your deployed backend
+  ? 'https://newmg.onrender.com'  // Your deployed backend
   : 'http://localhost:5000';         // Local development
 
 console.log(`🔧 API running in ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} mode`);

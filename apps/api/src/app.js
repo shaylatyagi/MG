@@ -68,6 +68,7 @@ app.use('/api/admin',      requireRole('admin'),                                
 app.use('/api/manager',    requireRole('manager','owner','admin'),            require('./routes/manager'));
 app.use('/api/kyc',        require('./routes/kyc'));
 app.use('/api/uploads',    require('./routes/uploads'));
+app.use('/api/chat',       require('./routes/chat'));
 
 // ── CENTRALISED ERROR HANDLER (must be LAST) ──────────────────
 app.use(errorHandler);
