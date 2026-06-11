@@ -12,6 +12,7 @@ export default function OwnerHandoverTab({ lang }) {
   const [vForm, setVForm] = useState({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '' });
   const [dForm, setDForm] = useState({ name: '', phone_number: '', emergency_contact: '' });
   const [aForm, setAForm] = useState({ driver_id: '', vehicle_id: '', deposit_amount: '0' });
+  const [agreementFile, setAgreementFile] = useState(null);
 
   const loadLists = useCallback(async () => {
     try {
@@ -46,9 +47,18 @@ export default function OwnerHandoverTab({ lang }) {
     e.preventDefault(); setError(''); setSuccess(''); setLoading(true);
     if (!/^\d{10}$/.test(dForm.phone_number)) { setError('Phone must be 10 digits'); setLoading(false); return; }
     try {
-      await api.post('/api/owner/drivers', { name: dForm.name.trim(), phone_number: dForm.phone_number, emergency_contact: dForm.emergency_contact || undefined });
-      setSuccess(lang === 'en' ? '✓ Driver onboarded!' : '✓ ड्राइवर ऑनबोर्ड!');
+      const res = await api.post('/api/owner/drivers', { name: dForm.name.trim(), phone_number: dForm.phone_number, emergency_contact: dForm.emergency_contact || undefined });
+      const newDriverId = res.data?.data?.id;
+      // Upload agreement if file was selected
+      if (agreementFile && newDriverId) {
+        const fd = new FormData();
+        fd.append('document', agreementFile);
+        fd.append('driverId', newDriverId);
+        await api.post('/api/uploads/agreement', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).catch(() => {});
+      }
+      setSuccess(lang === 'en' ? `✓ Driver onboarded!${agreementFile ? ' Agreement uploaded.' : ''}` : `✓ ड्राइवर ऑनबोर्ड!${agreementFile ? ' समझौता अपलोड किया।' : ''}`);
       setDForm({ name: '', phone_number: '', emergency_contact: '' });
+      setAgreementFile(null);
     } catch (e) { setError(e.response?.data?.message || 'Failed'); }
     finally { setLoading(false); }
   };
@@ -116,6 +126,12 @@ export default function OwnerHandoverTab({ lang }) {
           <input required placeholder={lang === 'en' ? 'Full Name *' : 'पूरा नाम *'} value={dForm.name} onChange={e => setDForm(f => ({ ...f, name: e.target.value }))} style={inp} />
           <input required type="tel" placeholder={lang === 'en' ? 'Mobile (10 digits) *' : 'मोबाइल (10 अंक) *'} value={dForm.phone_number} onChange={e => setDForm(f => ({ ...f, phone_number: e.target.value }))} style={inp} />
           <input type="tel" placeholder={lang === 'en' ? 'Emergency Contact (optional)' : 'आपातकालीन संपर्क'} value={dForm.emergency_contact} onChange={e => setDForm(f => ({ ...f, emergency_contact: e.target.value }))} style={inp} />
+          <div style={{ marginBottom: '12px' }}>
+            <p style={{ fontSize: '11px', color: '#6B7280', marginBottom: '6px', fontWeight: '600' }}>{lang === 'en' ? '📎 Agreement Document (optional)' : '📎 समझौता दस्तावेज़ (वैकल्पिक)'}</p>
+            <input type="file" accept="image/*,.pdf" onChange={e => setAgreementFile(e.target.files[0] || null)}
+              style={{ fontSize: '12px', color: '#6B7280', width: '100%' }} />
+            {agreementFile && <p style={{ fontSize: '11px', color: '#16A34A', marginTop: '4px', margin: '4px 0 0' }}>✓ {agreementFile.name}</p>}
+          </div>
           <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '12px' }}>{lang === 'en' ? 'Driver logs in via OTP on their phone.' : 'ड्राइवर OTP से लॉगिन करेगा।'}</p>
           <button type="submit" disabled={loading} style={btn}>{loading ? '…' : (lang === 'en' ? 'Onboard Driver' : 'ड्राइवर ऑनबोर्ड करें')}</button>
         </form>
