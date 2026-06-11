@@ -2089,7 +2089,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
   };
 
   return (
-    <div className="absolute inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 overflow-y-auto"
+    <div className="absolute inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 overflow-hidden"
       onClick={(e) => { if(e.target===e.currentTarget){ setShowVehicleDetailModal(false); setSelectedVehicleDetails(null); } }}>
       <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
         
