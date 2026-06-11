@@ -6,7 +6,7 @@ import {
   CreditCard, Eye, EyeOff, X, Send, CheckCircle, Clock,
   MessageCircle, ShieldAlert, FileText, Camera, LogOut,
   PlusCircle, ArrowDownLeft, Fingerprint, FileCheck2,
-  Landmark, ChevronLeft, ArrowUpRight
+  Landmark, ChevronLeft, ArrowUpRight, Zap, MapPin, Navigation
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Chatbot from '../components/Chatbot';
@@ -817,6 +817,92 @@ export default function DriverPWA() {
     );
   };
 
+  // ── STATIONS TAB ──────────────────────────────────────────────────────────
+  const MOCK_STATIONS = [
+    { id: 1, name: 'Dwarka Sec 10 Swap Point', type: 'Battery Swap', address: 'Sector 10 Market, Dwarka, Delhi', distance: 0.8, slots: 4, open: true },
+    { id: 2, name: 'Uttam Nagar EV Hub',       type: 'Fast Charge',  address: 'Uttam Nagar West, New Delhi',    distance: 1.4, slots: 2, open: true },
+    { id: 3, name: 'Janakpuri Swap Station',   type: 'Battery Swap', address: 'C-Block, Janakpuri, Delhi',      distance: 2.1, slots: 0, open: true },
+    { id: 4, name: 'Dwarka Mor Charge Point',  type: 'Fast Charge',  address: 'Dwarka Mor Metro, Delhi',        distance: 2.6, slots: 3, open: true },
+    { id: 5, name: 'Palam EV Station',         type: 'Battery Swap', address: 'Palam Village Road, Delhi',      distance: 3.9, slots: 1, open: false },
+    { id: 6, name: 'Najafgarh Road Swap Hub',  type: 'Battery Swap', address: 'Najafgarh Rd, Dwarka, Delhi',    distance: 4.5, slots: 6, open: true },
+  ];
+
+  const StationsTab = () => (
+    <div className="space-y-4 pb-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-black text-slate-800">Nearby Stations</h2>
+          <p className="text-[11px] text-slate-400 mt-0.5">Battery swap &amp; EV charging points</p>
+        </div>
+        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+          ⚡ Live data coming soon
+        </span>
+      </div>
+
+      {/* Filter pills */}
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {['All', 'Battery Swap', 'Fast Charge'].map(f => (
+          <button key={f} className="shrink-0 text-[11px] font-black px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 active:bg-indigo-600 active:text-white transition">
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {/* Station cards */}
+      <div className="space-y-3">
+        {MOCK_STATIONS.map(s => (
+          <div key={s.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-black text-slate-800 leading-tight">{s.name}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <MapPin size={10} className="text-slate-400 shrink-0"/>
+                  <p className="text-[10px] text-slate-400 truncate">{s.address}</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${s.open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                  {s.open ? 'Open' : 'Closed'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <Zap size={11} className={s.type === 'Battery Swap' ? 'text-amber-500' : 'text-indigo-500'}/>
+                  <span className="text-[10px] font-black text-slate-500">{s.type}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-slate-400">{s.distance} km</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Battery size={11} className={s.slots > 0 ? 'text-green-500' : 'text-red-400'}/>
+                  <span className={`text-[10px] font-black ${s.slots > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {s.slots > 0 ? `${s.slots} slots free` : 'Full'}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(s.name + ' ' + s.address)}`, '_blank')}
+                className="flex items-center gap-1 text-[11px] font-black px-3 py-1.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition">
+                <Navigation size={11}/> Go
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Partner notice */}
+      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center">
+        <Zap size={20} className="text-indigo-400 mx-auto mb-2"/>
+        <p className="text-[12px] font-black text-indigo-700">Real-time station data</p>
+        <p className="text-[10px] text-indigo-500 mt-1">Live availability &amp; battery levels will update automatically once our network partner integration is active.</p>
+      </div>
+    </div>
+  );
+
   // ── MAIN RENDER ───────────────────────────────────────────────────────────
   return (
     <div className="h-screen w-screen bg-slate-100 flex items-center justify-center overflow-hidden">
@@ -925,6 +1011,7 @@ export default function DriverPWA() {
             <>
               {tab === 'home' && <HomeTab/>}
               {tab === 'wallet' && <WalletTab/>}
+              {tab === 'stations' && <StationsTab/>}
               {tab === 'account' && <AccountTab/>}
             </>
           )}
@@ -946,9 +1033,10 @@ export default function DriverPWA() {
         {/* Bottom nav */}
         <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-200 h-16 flex justify-around items-center z-50">
           {[
-            { id: 'dashboard', tabVal: 'home', Icon: Home, label: 'Home' },
-            { id: 'wallet', tabVal: 'wallet', Icon: Wallet, label: 'Wallet' },
-            { id: 'account', tabVal: 'account', Icon: User, label: 'Account' },
+            { id: 'dashboard', tabVal: 'home',     Icon: Home,   label: 'Home' },
+            { id: 'wallet',    tabVal: 'wallet',   Icon: Wallet, label: 'Wallet' },
+            { id: 'stations',  tabVal: 'stations', Icon: Zap,    label: 'Stations' },
+            { id: 'account',   tabVal: 'account',  Icon: User,   label: 'Account' },
           ].map(({ id, tabVal, Icon, label }) => (
             <button key={id} onClick={() => { setActiveTab(id); setTab(tabVal); }}
               className={`flex flex-col items-center gap-1 transition-all px-4 ${activeTab === id ? 'text-indigo-600' : 'text-slate-400'}`}>
