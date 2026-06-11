@@ -521,6 +521,50 @@ router.patch('/companies/:id/status', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── COMPANY PAYMENT MODE ─────────────────────────────────────────────────────
+router.patch('/companies/:id/payment-mode', async (req, res) => {
+  try {
+    const { payment_mode } = req.body;
+    const VALID = ['CASH_ONLY', 'ONLINE_ONLY', 'BOTH'];
+    if (!VALID.includes(payment_mode))
+      return res.status(400).json({ error: `payment_mode must be one of: ${VALID.join(', ')}` });
+    const r = await pool.query(
+      `UPDATE public.companies SET payment_mode=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+      [payment_mode, req.params.id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'Company not found' });
+    logAudit('COMPANY_PAYMENT_MODE_CHANGED', 'company', req.params.id,
+      req.headers['x-admin-phone'] || 'admin', { payment_mode });
+    res.json({ success: true, company: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── ADMIN ADD DRIVER ─────────────────────────────────────────────────────────
+router.post('/drivers', async (req, res) => {
+  try {
+    const { full_name, mobile_number, owner_id } = req.body;
+    if (!full_name || !mobile_number || !owner_id)
+      return res.status(400).json({ error: 'full_name, mobile_number, owner_id required' });
+
+    const ownerRes = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id=$1 LIMIT 1', [owner_id]
+    );
+    if (!ownerRes.rows[0]) return res.status(404).json({ error: 'Owner not found' });
+    const { owner_code } = ownerRes.rows[0];
+
+    const driver_code = 'DRV' + Date.now().toString(36).toUpperCase();
+
+    const { rows } = await pool.query(
+      `INSERT INTO public.drivers (full_name, mobile_number, owner_code, driver_code, status)
+       VALUES ($1, $2, $3, $4, 'ACTIVE') RETURNING *`,
+      [full_name.trim(), mobile_number, owner_code, driver_code]
+    );
+    logAudit('DRIVER_CREATED', 'driver', rows[0].id,
+      req.headers['x-admin-phone'] || 'admin', { full_name, mobile_number, owner_id });
+    res.status(201).json({ success: true, driver: rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── KYC MANAGEMENT ───────────────────────────────────────────────────────────
 
 // GET /api/admin/kyc/summary — counts by status
@@ -823,65 +867,6 @@ router.get('/all-drivers', async (req, res) => {
                v.vehicle_number, v.vehicle_model, v.vehicle_type
       ORDER BY d.created_at DESC
     `);
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// --- CHAT VIEWER ---
-
-router.get('/chat/threads', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT DISTINCT ON (cm.driver_id, cm.owner_id)
-             cm.driver_id, cm.owner_id,
-             d.full_name AS driver_name, d.mobile_number AS driver_phone, d.driver_code,
-             o.full_name AS owner_name, o.mobile_number AS owner_phone,
-             c.name AS company_name,
-             cm.message AS last_message, cm.sender_type AS last_sender,
-             cm.created_at AS last_at,
-             (SELECT COUNT(*) FROM public.chat_messages
-              WHERE driver_id=cm.driver_id AND owner_id=cm.owner_id)::int AS total_messages
-      FROM public.chat_messages cm
-      JOIN public.drivers d ON d.id = cm.driver_id
-      LEFT JOIN public.owners o ON o.id = cm.owner_id
-      LEFT JOIN public.companies c ON c.id = o.company_id
-      ORDER BY cm.driver_id, cm.owner_id, cm.created_at DESC
-    `);
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-router.get('/chat/messages', async (req, res) => {
-  try {
-    const { driver_id } = req.query;
-    if (!driver_id) return res.status(400).json({ error: 'driver_id required' });
-    const result = await pool.query(
-      `SELECT cm.*, d.full_name AS driver_name, o.full_name AS owner_name
-       FROM public.chat_messages cm
-       JOIN public.drivers d ON d.id = cm.driver_id
-       LEFT JOIN public.owners o ON o.id = cm.owner_id
-       WHERE cm.driver_id = $1
-       ORDER BY cm.created_at ASC`,
-      [driver_id]
-    );
-    res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-module.exports = router;
-
-router.get('/chat/messages', async (req, res) => {
-  try {
-    const { driver_id } = req.query;
-    if (!driver_id) return res.status(400).json({ error: 'driver_id required' });
-    const result = await pool.query(`
-      SELECT cm.*, d.full_name AS driver_name, o.full_name AS owner_name
-      FROM public.chat_messages cm
-      JOIN public.drivers d ON d.id = cm.driver_id
-      LEFT JOIN public.owners o ON o.id = cm.owner_id
-      WHERE cm.driver_id = $1
-      ORDER BY cm.created_at ASC
-    `, [driver_id]);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
