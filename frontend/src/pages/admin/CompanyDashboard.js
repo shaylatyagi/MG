@@ -1114,6 +1114,7 @@ function Companies() {
   const [renaming, setRenaming] = useState(null); // { id, name }
   const [renameVal, setRenameVal] = useState('');
   const [renameSaving, setRenameSaving] = useState(false);
+  const [confirmCo, setConfirmCo] = useState(null); // confirm deactivate
 
   // Drill-down stack: each entry = { type, id, label }
   const [stack, setStack] = useState([]);
@@ -1211,7 +1212,12 @@ function Companies() {
                   <td className="px-4 py-3"><Badge status={c.status} /></td>
                   <td className="px-4 py-3 text-gray-400">{fmtDate(c.created_at)}</td>
                   <td className="px-4 py-3 flex gap-2" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => toggleStatus(c.id, c.status)}
+                    <button
+                      onClick={() =>
+                        (c.status === 'Active' || c.status === 'ACTIVE')
+                          ? setConfirmCo(c)
+                          : toggleStatus(c.id, c.status)
+                      }
                       className={`text-xs px-3 py-1 rounded-full border font-medium transition ${
                         c.status === 'Active' || c.status === 'ACTIVE'
                           ? 'border-red-300 text-red-600 hover:bg-red-50'
@@ -1229,6 +1235,30 @@ function Companies() {
             </tbody>
           </table>
           {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No companies found</p>}
+        </div>
+      )}
+
+      {/* Deactivate Confirm */}
+      {confirmCo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-sm shadow-xl text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+              <span className="text-red-600 text-xl">⚠</span>
+            </div>
+            <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-1">Deactivate Company?</h3>
+            <p className="text-sm font-semibold text-indigo-700 mb-1">{confirmCo.name}</p>
+            <p className="text-xs text-gray-500 mb-5">All owners and drivers in this company will lose access until reactivated.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmCo(null)}
+                className="flex-1 border dark:border-gray-600 text-gray-600 dark:text-gray-300 py-2 rounded-lg text-sm hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={() => { setConfirmCo(null); toggleStatus(confirmCo.id, confirmCo.status); }}
+                className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-700">
+                Yes, Deactivate
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1966,47 +1996,4 @@ function AdminPanelInner() {
           {navItems.map(item => (
             <button key={item.key} onClick={() => setTab(item.key)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                tab === item.key ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              }`}>
-              <span>{item.icon}</span> {item.label}
-            </button>
-          ))}
-        </nav>
-        <div className="p-3 border-t border-gray-700">
-          <button onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition">
-            <span>🚪</span> Logout
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white dark:bg-gray-900 border-b dark:border-gray-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-          <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200">{tabLabel}</h1>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <span className="text-xs text-gray-400 dark:text-gray-500">Super Admin · MobilityGrid</span>
-          </div>
-        </header>
-        <div className="p-6">
-          {tab === 'dashboard'    && <Dashboard />}
-          {tab === 'companies'    && <Companies />}
-          {tab === 'owners'       && <AllOwners />}
-          {tab === 'drivers'      && <AllDrivers />}
-          {tab === 'kyc'          && <KycReview />}
-          {tab === 'transactions' && <Transactions />}
-          {tab === 'chat'         && <ChatViewer />}
-          {tab === 'audit'        && <AuditLog />}
-        </div>
-      </main>
-    </div>
-  );
-}
-
-export default function AdminPanel() {
-  return (
-    <ErrorBoundary>
-      <AdminPanelInner />
-    </ErrorBoundary>
-  );
-}
+                tab === item.key ? 'bg-ind

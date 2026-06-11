@@ -9,6 +9,7 @@ const ctrl   = require('../controllers/auth.controller');
 router.post('/send-otp',         validate(v.sendOtp),         ctrl.sendOtp);
 router.post('/verify-otp',       validate(v.verifyOtp),       ctrl.verifyOtp);
 router.post('/logout',                                         ctrl.logout);
+router.post('/admin-login',      validate(v.adminLogin),      ctrl.adminLogin);
 router.post('/admin-send-otp',   validate(v.adminSendOtp),    ctrl.adminSendOtp);
 router.post('/admin-verify-otp', validate(v.adminVerifyOtp),  ctrl.adminVerifyOtp);
 

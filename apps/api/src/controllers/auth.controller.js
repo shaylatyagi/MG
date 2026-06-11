@@ -32,7 +32,6 @@ exports.sendOtp = async (req, res, next) => {
       });
     }
 
-    // Return OTP in response when DEV_BYPASS_OTP is on (demo mode)
     const resp = { success: true, message: 'OTP sent' };
     if (process.env.DEV_BYPASS_OTP === 'true') resp.otp = otp;
     res.json(resp);
@@ -63,7 +62,6 @@ exports.verifyOtp = async (req, res, next) => {
       await pool.query('DELETE FROM public.otps WHERE phone_number = $1', [phone]);
     }
 
-    // Admin phone shortcut
     if (process.env.ADMIN_PHONE && phone === process.env.ADMIN_PHONE) {
       const token = generateToken({ id: 'admin', role: 'admin', phone });
       return res.json({ success: true, token, user: { role: 'admin', phone } });
@@ -114,13 +112,29 @@ exports.logout = (_req, res) => {
   res.json({ success: true, message: 'Logged out' });
 };
 
-// POST /api/auth/admin-send-otp
+// POST /api/auth/admin-login — phone + password (primary login)
+exports.adminLogin = async (req, res, next) => {
+  try {
+    const { phone_number, password } = req.body;
+
+    if (!process.env.ADMIN_PHONE || phone_number !== process.env.ADMIN_PHONE)
+      throw new AppError('Invalid credentials', 401, 'UNAUTHORIZED');
+    if (!process.env.ADMIN_PASSWORD_HASH)
+      throw new AppError('Admin password not configured', 500, 'SERVER_ERROR');
+
+    const valid = await bcrypt.compare(password, process.env.ADMIN_PASSWORD_HASH);
+    if (!valid) throw new AppError('Invalid credentials', 401, 'UNAUTHORIZED');
+
+    const token = generateToken({ id: 'admin', role: 'admin', phone: phone_number });
+    res.json({ success: true, token, user: { role: 'admin', phone: phone_number } });
+  } catch (err) { next(err); }
+};
+
+// POST /api/auth/admin-send-otp — forgot-password OTP fallback
 exports.adminSendOtp = async (req, res, next) => {
   try {
-    const { phone_number, admin_secret } = req.body;
+    const { phone_number } = req.body;
 
-    if (!admin_secret || admin_secret !== process.env.ADMIN_SECRET_KEY)
-      throw new AppError('Invalid admin credentials', 403, 'FORBIDDEN');
     if (!process.env.ADMIN_PHONE || phone_number !== process.env.ADMIN_PHONE)
       throw new AppError('Phone not authorised for admin access', 403, 'FORBIDDEN');
 
@@ -149,13 +163,11 @@ exports.adminSendOtp = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// POST /api/auth/admin-verify-otp
+// POST /api/auth/admin-verify-otp — forgot-password OTP verify
 exports.adminVerifyOtp = async (req, res, next) => {
   try {
-    const { phone_number, otp, admin_secret } = req.body;
+    const { phone_number, otp } = req.body;
 
-    if (!admin_secret || admin_secret !== process.env.ADMIN_SECRET_KEY)
-      throw new AppError('Invalid admin credentials', 403, 'FORBIDDEN');
     if (!process.env.ADMIN_PHONE || phone_number !== process.env.ADMIN_PHONE)
       throw new AppError('Phone not authorised for admin access', 403, 'FORBIDDEN');
 

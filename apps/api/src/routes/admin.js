@@ -1,13 +1,13 @@
 // apps/api/src/routes/admin.js — per DevSpec §13.8
-// Dual-factor: JWT role=admin + x-admin-key header
+// Auth: JWT role=admin (verified by verifyToken + requireRole in each route)
 'use strict';
 
-const router                   = require('express').Router();
-const { requireAdminKey }      = require('../middleware/roleCheck');
-const { validate, admin: v }   = require('../validators');
-const ctrl                     = require('../controllers/admin.controller');
+const router                 = require('express').Router();
+const { requireRole }        = require('../middleware/roleCheck');
+const { validate, admin: v } = require('../validators');
+const ctrl                   = require('../controllers/admin.controller');
 
-router.use(requireAdminKey);
+router.use(requireRole('admin'));
 
 // Platform
 router.get('/platform-stats',                ctrl.getPlatformStats);
@@ -47,4 +47,4 @@ router.patch('/documents/:id/reject',        ctrl.rejectDocument);
 // Audit log
 router.get('/audit-logs',                    ctrl.getAuditLogs);
 
-module.exports = router;
+mo

@@ -2766,7 +2766,7 @@ const ProfileTab = () => {
       >
         <option value="BOTH">💳 Both — Cash + Online</option>
         <option value="CASH_ONLY">💵 Cash Only</option>
-        <option value="ONLINE_ONLY">📲 Online / UPI Only</option>
+        <option value="ONLINE_ONLY">📲 Online Payment</option>
       </select>
       <div className="flex items-center gap-3">
         <button
@@ -4195,3 +4195,4 @@ const ProfileTab = () => {
     </div>
   );
 }
+   

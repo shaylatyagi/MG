@@ -18,13 +18,19 @@ exports.verifyOtp = [
     .withMessage('6-digit OTP required'),
 ];
 
+exports.adminLogin = [
+  body('phone_number')
+    .matches(/^[6-9]\d{9}$/)
+    .withMessage('Valid 10-digit Indian mobile required'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required'),
+];
+
 exports.adminSendOtp = [
   body('phone_number')
     .matches(/^[6-9]\d{9}$/)
     .withMessage('Valid 10-digit Indian mobile required'),
-  body('admin_secret')
-    .notEmpty()
-    .withMessage('admin_secret is required'),
 ];
 
 exports.adminVerifyOtp = [
@@ -35,7 +41,4 @@ exports.adminVerifyOtp = [
     .isLength({ min: 6, max: 6 })
     .isNumeric()
     .withMessage('6-digit OTP required'),
-  body('admin_secret')
-    .notEmpty()
-    .withMessage('admin_secret is required'),
 ];

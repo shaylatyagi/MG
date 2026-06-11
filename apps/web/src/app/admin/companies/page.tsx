@@ -27,6 +27,9 @@ export default function CompaniesPage() {
   const [search, setSearch] = useState('');
   const [toggling, setToggling] = useState<number | null>(null);
 
+  // Confirm dialog
+  const [confirmTarget, setConfirmTarget] = useState<Company | null>(null);
+
   // Add company modal
   const [showAdd, setShowAdd] = useState(false);
   const [newCo, setNewCo] = useState({ name: '', cin: '', city: '' });
@@ -48,6 +51,7 @@ export default function CompaniesPage() {
   const toggleStatus = async (co: Company) => {
     const next = co.company_status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
     setToggling(co.id);
+    setConfirmTarget(null);
     try {
       await api.patch(`/api/admin/companies/${co.id}/status`, { status: next });
       setCompanies(cs => cs.map(c => c.id === co.id ? { ...c, company_status: next } : c));
@@ -160,7 +164,9 @@ export default function CompaniesPage() {
                         View
                       </Link>
                       <button
-                        onClick={() => toggleStatus(co)}
+                        onClick={() => co.company_status === 'ACTIVE'
+                          ? setConfirmTarget(co)
+                          : toggleStatus(co)}
                         disabled={toggling === co.id}
                         className={`text-xs font-medium px-2 py-1 rounded ${
                           co.company_status === 'ACTIVE'
@@ -179,6 +185,41 @@ export default function CompaniesPage() {
         </div>
       )}
 
+      {/* Suspend Confirm Dialog */}
+      {confirmTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <h3 className="text-base font-bold text-slate-900 text-center mb-1">Suspend Company?</h3>
+            <p className="text-sm text-slate-500 text-center mb-1">
+              <span className="font-semibold text-slate-700">{confirmTarget.company_name}</span>
+            </p>
+            <p className="text-xs text-slate-400 text-center mb-5">
+              All owners and drivers of this company will be blocked from logging in.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmTarget(null)}
+                className="flex-1 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => toggleStatus(confirmTarget)}
+                disabled={toggling === confirmTarget.id}
+                className="flex-1 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {toggling === confirmTarget.id ? 'Suspending…' : 'Yes, Suspend'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Company Modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -190,52 +231,4 @@ export default function CompaniesPage() {
                 <input
                   type="text"
                   value={newCo.name}
-                  onChange={e => setNewCo(n => ({ ...n, name: e.target.value }))}
-                  required
-                  placeholder="e.g. Ravi EV Fleet"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">CIN (optional)</label>
-                <input
-                  type="text"
-                  value={newCo.cin}
-                  onChange={e => setNewCo(n => ({ ...n, cin: e.target.value }))}
-                  placeholder="Corporate Identity Number"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
-                <input
-                  type="text"
-                  value={newCo.city}
-                  onChange={e => setNewCo(n => ({ ...n, city: e.target.value }))}
-                  placeholder="e.g. Bengaluru"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAdd(false)}
-                  className="flex-1 py-2 border border-slate-300 text-slate-700 text-sm rounded-lg hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={adding || !newCo.name}
-                  className="flex-1 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {adding ? 'Adding…' : 'Onboard Company'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                  onChange={e => setNewCo(n => ({ ...n, na

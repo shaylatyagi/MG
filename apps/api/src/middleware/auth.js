@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const PUBLIC_PATHS = [
   '/api/auth/send-otp',
   '/api/auth/verify-otp',
+  '/api/auth/admin-login',
   '/api/auth/admin-send-otp',
   '/api/auth/admin-verify-otp',
   '/api/payment/webhook',
