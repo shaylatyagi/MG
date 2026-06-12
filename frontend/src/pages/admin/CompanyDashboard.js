@@ -974,12 +974,92 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
   const [payMode, setPayMode]         = useState(company.payment_mode || 'BOTH');
   const [payModeSaving, setPayModeSaving] = useState(false);
   const [payModeMsg, setPayModeMsg]   = useState('');
+  // Payment mode requests (fix: these were previously undefined)
+  const [pmRequests, setPmRequests]   = useState([]);
+  const [pmLoading, setPmLoading]     = useState(false);
+  // Branches
+  const [branches, setBranches]         = useState([]);
+  const [branchLoading, setBranchLoading] = useState(false);
+  const [addingBranch, setAddingBranch]   = useState(false);
+  const [newBranch, setNewBranch]         = useState({ name: '', city: '', state: '' });
+  const [branchSaving, setBranchSaving]   = useState(false);
+  const [selBranch, setSelBranch]         = useState(null);
+  const [branchDrivers, setBranchDrivers] = useState([]);
+  const [branchVehicles, setBranchVehicles] = useState([]);
+  const [branchDetailLoading, setBranchDetailLoading] = useState(false);
 
   useEffect(() => {
     api(`/api/admin/companies/${company.id}/owners`)
       .then(d => { setOwners(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
+    // Load pending payment mode requests for this company
+    api(`/api/admin/payment-mode-requests?status=PENDING&company_id=${company.id}`)
+      .then(d => setPmRequests(Array.isArray(d.requests) ? d.requests : []))
+      .catch(() => {});
   }, [company.id]);
+
+  const loadBranches = useCallback(() => {
+    setBranchLoading(true);
+    api(`/api/admin/companies/${company.id}/branches`)
+      .then(d => { setBranches(Array.isArray(d.branches) ? d.branches : []); setBranchLoading(false); })
+      .catch(() => setBranchLoading(false));
+  }, [company.id]);
+
+  useEffect(() => { if (tab === 'branches') loadBranches(); }, [tab, loadBranches]);
+
+  const approvePmRequest = async (id, newMode) => {
+    setPmLoading(true);
+    try {
+      await api(`/api/admin/payment-mode-requests/${id}/approve`, { method: 'PATCH' });
+      setPmRequests(prev => prev.filter(r => r.id !== id));
+    } catch(e) { alert(e.message); } finally { setPmLoading(false); }
+  };
+
+  const rejectPmRequest = async (id) => {
+    setPmLoading(true);
+    try {
+      await api(`/api/admin/payment-mode-requests/${id}/reject`, { method: 'PATCH' });
+      setPmRequests(prev => prev.filter(r => r.id !== id));
+    } catch(e) { alert(e.message); } finally { setPmLoading(false); }
+  };
+
+  const createBranch = async (e) => {
+    e.preventDefault();
+    if (!newBranch.name.trim()) return;
+    setBranchSaving(true);
+    try {
+      await api(`/api/admin/companies/${company.id}/branches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newBranch),
+      });
+      setNewBranch({ name: '', city: '', state: '' });
+      setAddingBranch(false);
+      loadBranches();
+    } catch (err) { alert(err.message); } finally { setBranchSaving(false); }
+  };
+
+  const deleteBranch = async (branchId) => {
+    if (!window.confirm('Delete this branch? Drivers and vehicles will be unassigned.')) return;
+    try {
+      await api(`/api/admin/companies/${company.id}/branches/${branchId}`, { method: 'DELETE' });
+      loadBranches();
+      if (selBranch?.id === branchId) setSelBranch(null);
+    } catch (err) { alert(err.message); }
+  };
+
+  const viewBranch = async (branch) => {
+    setSelBranch(branch);
+    setBranchDetailLoading(true);
+    try {
+      const [dr, vr] = await Promise.all([
+        api(`/api/admin/branches/${branch.id}/drivers`),
+        api(`/api/admin/branches/${branch.id}/vehicles`),
+      ]);
+      setBranchDrivers(Array.isArray(dr.drivers) ? dr.drivers : []);
+      setBranchVehicles(Array.isArray(vr.vehicles) ? vr.vehicles : []);
+    } catch {} finally { setBranchDetailLoading(false); }
+  };
 
   const savePaymentMode = async () => {
     setPayModeSaving(true); setPayModeMsg('');
@@ -1011,7 +1091,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
     }
       onClose={onClose} onBack={onBack} breadcrumbs={breadcrumbs} wide>
       <div className="flex gap-1 border-b dark:border-gray-700 mb-4 -mt-2">
-        {[['owners','Owners'],['docs','Documents'],['settings', pmRequests.length > 0 ? 'Settings 🔴' : 'Settings']].map(([k,label]) => (
+        {[['owners','Owners'],['docs','Documents'],['branches','Branches'],['settings', pmRequests.length > 0 ? 'Settings 🔴' : 'Settings']].map(([k,label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab===k ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
             {label}
@@ -1064,6 +1144,160 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
       )}
 
       {tab === 'docs' && <CompanyDocsSection companyId={company.id} />}
+
+      {tab === 'branches' && (
+        <div>
+          {/* Branch detail drill-down */}
+          {selBranch ? (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <button onClick={() => setSelBranch(null)}
+                  className="text-sm text-indigo-600 hover:underline">← Branches</button>
+                <span className="text-gray-400">/</span>
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{selBranch.name}</span>
+              </div>
+              {branchDetailLoading ? <Spinner /> : (
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-gray-400 dark:text-gray-500 mb-2">Drivers ({branchDrivers.length})</h4>
+                    {branchDrivers.length === 0 ? (
+                      <p className="text-sm text-gray-400 dark:text-gray-500 py-3">No drivers assigned to this branch</p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Name</th>
+                            <th className="px-3 py-2 text-left">Phone</th>
+                            <th className="px-3 py-2 text-left">Vehicle</th>
+                            <th className="px-3 py-2 text-left">KYC</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {branchDrivers.map(d => (
+                            <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                              onClick={() => onSelectOwner && null /* extend if needed */}>
+                              <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-100">{d.full_name}</td>
+                              <td className="px-3 py-2 text-gray-500">{d.mobile_number}</td>
+                              <td className="px-3 py-2 text-gray-500">{d.reg_number || '—'}</td>
+                              <td className="px-3 py-2"><Badge status={d.kyc_status || 'PENDING'} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase text-gray-400 dark:text-gray-500 mb-2">Vehicles ({branchVehicles.length})</h4>
+                    {branchVehicles.length === 0 ? (
+                      <p className="text-sm text-gray-400 dark:text-gray-500 py-3">No vehicles assigned to this branch</p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Reg Number</th>
+                            <th className="px-3 py-2 text-left">Type</th>
+                            <th className="px-3 py-2 text-left">Driver</th>
+                            <th className="px-3 py-2 text-left">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {branchVehicles.map(v => (
+                            <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                              <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-100">{v.reg_number}</td>
+                              <td className="px-3 py-2 text-gray-500">{v.vehicle_type}</td>
+                              <td className="px-3 py-2 text-gray-500">{v.driver_name || '—'}</td>
+                              <td className="px-3 py-2"><Badge status={v.status || 'ACTIVE'} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Branch list */
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Geographic branches of <strong>{company.name}</strong>. Each branch has its own drivers and vehicles.
+                </p>
+                <button onClick={() => setAddingBranch(true)}
+                  className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700">
+                  + Add Branch
+                </button>
+              </div>
+
+              {addingBranch && (
+                <form onSubmit={createBranch} className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xl p-4 mb-4 space-y-3">
+                  <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">New Branch</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <input required placeholder="Branch Name (e.g. Delhi Branch)" value={newBranch.name}
+                      onChange={e => setNewBranch({ ...newBranch, name: e.target.value })}
+                      className="flex-1 min-w-[160px] border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" />
+                    <input placeholder="City" value={newBranch.city}
+                      onChange={e => setNewBranch({ ...newBranch, city: e.target.value })}
+                      className="w-28 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" />
+                    <input placeholder="State" value={newBranch.state}
+                      onChange={e => setNewBranch({ ...newBranch, state: e.target.value })}
+                      className="w-28 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={branchSaving}
+                      className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                      {branchSaving ? 'Saving…' : 'Create Branch'}
+                    </button>
+                    <button type="button" onClick={() => setAddingBranch(false)}
+                      className="px-4 py-1.5 border dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {branchLoading ? <Spinner /> : branches.length === 0 ? (
+                <div className="py-10 text-center">
+                  <p className="text-3xl mb-2">🌿</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No branches yet</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Add branches to organize drivers and vehicles by location</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {branches.map(b => (
+                    <div key={b.id}
+                      className="border dark:border-gray-700 rounded-xl p-4 hover:border-indigo-300 dark:hover:border-indigo-600 transition cursor-pointer"
+                      onClick={() => viewBranch(b)}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-800 dark:text-gray-100">{b.name}</p>
+                          {(b.city || b.state) && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              📍 {[b.city, b.state].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        <button onClick={e => { e.stopPropagation(); deleteBranch(b.id); }}
+                          className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5">✕</button>
+                      </div>
+                      <div className="flex gap-4 mt-3">
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-indigo-600">{b.driver_count || 0}</p>
+                          <p className="text-[10px] text-gray-400 uppercase">Drivers</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-violet-600">{b.vehicle_count || 0}</p>
+                          <p className="text-[10px] text-gray-400 uppercase">Vehicles</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === 'settings' && (
         <div className="space-y-6 max-w-md">

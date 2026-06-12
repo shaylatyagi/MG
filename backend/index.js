@@ -22,6 +22,12 @@ pool.query(`
 `).catch(err => console.warn('Session token migration warning:', err.message));
 
 pool.query(`
+  ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS last_lat  DOUBLE PRECISION;
+  ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS last_lng  DOUBLE PRECISION;
+  ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS last_location_at TIMESTAMPTZ;
+`).catch(err => console.warn('Driver location columns migration warning:', err.message));
+
+pool.query(`
   CREATE TABLE IF NOT EXISTS public.payment_mode_requests (
     id           SERIAL PRIMARY KEY,
     owner_id     INTEGER NOT NULL,
@@ -35,6 +41,20 @@ pool.query(`
     resolved_at  TIMESTAMPTZ
   );
 `).catch(err => console.warn('payment_mode_requests migration warning:', err.message));
+
+pool.query(`
+  CREATE TABLE IF NOT EXISTS public.branches (
+    id          SERIAL PRIMARY KEY,
+    company_id  INTEGER NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    name        VARCHAR(255) NOT NULL,
+    city        VARCHAR(100),
+    state       VARCHAR(100),
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+  );
+  ALTER TABLE public.drivers  ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES public.branches(id) ON DELETE SET NULL;
+  ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES public.branches(id) ON DELETE SET NULL;
+`).catch(err => console.warn('Branches migration warning:', err.message));
+
 const app = express();
 // CORS fixed
 app.use(cors({

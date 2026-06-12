@@ -921,4 +921,109 @@ router.patch('/payment-mode-requests/:id/reject', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+
+// ── Branch Management ──────────────────────────────────────────────────────────
+
+// Drivers in a specific branch (for branch detail view)
+router.get('/branches/:branchId/drivers', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT d.id, d.full_name, d.mobile_number, d.driver_code, d.kyc_status, d.status,
+              v.reg_number, v.vehicle_type
+       FROM public.drivers d
+       LEFT JOIN public.driver_vehicle_history dvh ON dvh.driver_id = d.id AND dvh.unassigned_at IS NULL
+       LEFT JOIN public.vehicles v ON v.id = dvh.vehicle_id
+       WHERE d.branch_id = $1
+       ORDER BY d.full_name`,
+      [req.params.branchId]
+    );
+    res.json({ success: true, drivers: r.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Vehicles in a specific branch
+router.get('/branches/:branchId/vehicles', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT v.id, v.reg_number, v.vehicle_type, v.vehicle_model, v.status,
+              d.full_name AS driver_name
+       FROM public.vehicles v
+       LEFT JOIN public.driver_vehicle_history dvh ON dvh.vehicle_id = v.id AND dvh.unassigned_at IS NULL
+       LEFT JOIN public.drivers d ON d.id = dvh.driver_id
+       WHERE v.branch_id = $1
+       ORDER BY v.reg_number`,
+      [req.params.branchId]
+    );
+    res.json({ success: true, vehicles: r.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+
+// List all branches for a company
+router.get('/companies/:companyId/branches', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const r = await pool.query(
+      `SELECT b.*,
+        (SELECT COUNT(*) FROM public.drivers d WHERE d.branch_id = b.id)::int AS driver_count,
+        (SELECT COUNT(*) FROM public.vehicles v WHERE v.branch_id = b.id)::int AS vehicle_count
+       FROM public.branches b
+       WHERE b.company_id = $1
+       ORDER BY b.name`,
+      [companyId]
+    );
+    res.json({ success: true, branches: r.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Create a branch for a company
+router.post('/companies/:companyId/branches', async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { name, city, state } = req.body;
+    if (!name) return res.status(400).json({ error: 'Branch name required' });
+    const r = await pool.query(
+      `INSERT INTO public.branches (company_id, name, city, state)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [companyId, name, city || null, state || null]
+    );
+    logAudit('BRANCH_CREATED', 'branch', r.rows[0].id,
+      req.headers['x-admin-phone'] || 'admin', { company_id: companyId, name });
+    res.json({ success: true, branch: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Delete a branch
+router.delete('/companies/:companyId/branches/:branchId', async (req, res) => {
+  try {
+    const { branchId, companyId } = req.params;
+    // Unset branch_id on drivers/vehicles before delete
+    await pool.query('UPDATE public.drivers  SET branch_id = NULL WHERE branch_id = $1', [branchId]);
+    await pool.query('UPDATE public.vehicles SET branch_id = NULL WHERE branch_id = $1', [branchId]);
+    await pool.query('DELETE FROM public.branches WHERE id = $1 AND company_id = $2', [branchId, companyId]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Assign driver to branch
+router.patch('/drivers/:driverId/branch', async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    const { branch_id } = req.body;  // null to unassign
+    await pool.query('UPDATE public.drivers SET branch_id = $1 WHERE id = $2', [branch_id || null, driverId]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Assign vehicle to branch
+router.patch('/vehicles/:vehicleId/branch', async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { branch_id } = req.body;
+    await pool.query('UPDATE public.vehicles SET branch_id = $1 WHERE id = $2', [branch_id || null, vehicleId]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;
