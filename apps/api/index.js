@@ -19,7 +19,22 @@ async function bootstrap() {
     process.exit(1);
   }
 
-  // THIRD: only now import the app
+  // THIRD: run lightweight DB migrations (idempotent — safe to re-run)
+  try {
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    await pool.query(`
+      ALTER TABLE public.owners
+        ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(20) NOT NULL DEFAULT 'BOTH'
+        CHECK (payment_mode IN ('CASH_ONLY','ONLINE_ONLY','BOTH'));
+    `);
+    await pool.end();
+    console.log(JSON.stringify({ level: 'info', event: 'migration_ok', msg: 'owners.payment_mode ensured' }));
+  } catch (e) {
+    console.warn(JSON.stringify({ level: 'warn', event: 'migration_warn', msg: e.message }));
+  }
+
+  // FOURTH: only now import the app
   const app = require('./src/app');
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () =>

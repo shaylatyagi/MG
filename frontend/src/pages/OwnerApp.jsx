@@ -1113,8 +1113,8 @@ setOwner({
     try {
       const meRes = await fetch(`${API}/api/owner/me`, { headers: H });
       const meData = await meRes.json();
-      if (meData.success && meData.owner) {
-        setOwner(prev => ({ ...prev, ...meData.owner }));
+      if (meData.success && meData.data) {
+        setOwner(prev => ({ ...prev, ...meData.data }));
       }
     } catch (e) { console.error('owner/me fetch failed:', e); }
 

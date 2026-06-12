@@ -70,10 +70,28 @@ router.get('/me', requireRole('owner', 'admin'), async (req, res, next) => {
     const r = await pool.query(
       `SELECT o.id, o.name, o.phone_number, o.email, o.status,
               o.subscription_status, o.subscription_expires_at,
+              o.payment_mode,
               cc.company_name, cc.company_code, cc.city
        FROM public.owners o
        JOIN public.client_companies cc ON cc.id = o.company_id
        WHERE o.id = $1`, [req.user.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ success: false, message: 'Owner not found' });
+    res.json({ success: true, data: r.rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ── Owner payment mode ────────────────────────────────────────────────────────
+router.put('/payment-mode', requireRole('owner', 'admin'), async (req, res, next) => {
+  try {
+    const { payment_mode } = req.body;
+    const valid = ['CASH_ONLY', 'ONLINE_ONLY', 'BOTH'];
+    if (!valid.includes(payment_mode)) {
+      return res.status(400).json({ success: false, message: `payment_mode must be one of: ${valid.join(', ')}` });
+    }
+    const r = await pool.query(
+      `UPDATE public.owners SET payment_mode = $1 WHERE id = $2 RETURNING id, payment_mode`,
+      [payment_mode, req.user.id]
     );
     if (!r.rows.length) return res.status(404).json({ success: false, message: 'Owner not found' });
     res.json({ success: true, data: r.rows[0] });
