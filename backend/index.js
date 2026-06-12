@@ -55,6 +55,15 @@ pool.query(`
   ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES public.branches(id) ON DELETE SET NULL;
 `).catch(err => console.warn('Branches migration warning:', err.message));
 
+// Backfill owner_code on any existing drivers that were added without it
+pool.query(`
+  UPDATE public.drivers d
+  SET owner_code = o.owner_code
+  FROM public.owners o
+  WHERE d.owner_id = o.id
+    AND d.owner_code IS NULL
+`).catch(err => console.warn('owner_code backfill warning:', err.message));
+
 const app = express();
 // CORS fixed
 app.use(cors({
