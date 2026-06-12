@@ -302,137 +302,107 @@ function DocumentsSection({ userType, userId }) {
 }
 
 // ── LOGIN PAGE ─────────────────────────────────────────────────────────────────
-function LoginPage({ onLogin }) {
-  const [step, setStep]         = useState('login'); // 'login' | 'otp'
-  const [phone, setPhone]       = useState('');
-  const [password, setPassword] = useState('');
-  const [otp, setOtp]           = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
-  const [showPass, setShowPass] = useState(false);
+function LoginPage() {
+  const [otp, setOtp]         = useState('');
+  const [step, setStep]       = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+  const [phone, setPhone]     = useState(ADMIN_PHONE);
+  const [secret, setSecret]   = useState(ADMIN_SECRET);
+  const otpRef                = useRef(null);
+  const autoSentRef           = useRef(false);
 
-  const login = async (e) => {
-    e.preventDefault(); setError(''); setLoading(true);
-    try {
-      const data = await api('/api/auth/admin-login', {
-        method: 'POST',
-        body: JSON.stringify({ phone_number: phone, password }),
-      });
-      setToken(data.token);
-      onLogin();
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
-  };
-
-  const sendOtp = async () => {
-    if (phone.length !== 10) { setError('Enter your phone number first'); return; }
+  const sendOtp = useCallback(async (phoneNum, secretKey) => {
     setError(''); setLoading(true);
     try {
-      await api('/api/auth/admin-send-otp', {
+      const data = await api('/api/auth/admin-send-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone_number: phone, admin_secret: ADMIN_SECRET }),
+        body: JSON.stringify({ phone_number: phoneNum, admin_secret: secretKey }),
       });
-      setStep('otp');
+      setStep(2);
+      if (data.otp) setOtp(data.otp);
+      setTimeout(() => otpRef.current?.focus(), 120);
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (ADMIN_PHONE && ADMIN_SECRET && !autoSentRef.current) {
+      autoSentRef.current = true;
+      sendOtp(ADMIN_PHONE, ADMIN_SECRET);
+    }
+  }, [sendOtp]);
 
   const verifyOtp = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
       const data = await api('/api/auth/admin-verify-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone_number: phone, otp, admin_secret: ADMIN_SECRET }),
+        body: JSON.stringify({ phone_number: phone, otp, admin_secret: secret }),
       });
       setToken(data.token);
-      onLogin();
+      window.location.href = '/admin/dashboard';
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)' }}>
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center"
-            style={{ background: '#4f46e5', boxShadow: '0 6px 20px rgba(79,70,229,0.4)' }}>
-            <span className="text-white font-black text-xl">M</span>
+          <div className="w-12 h-12 bg-indigo-600 rounded-xl mx-auto mb-4 flex items-center justify-center">
+            <span className="text-white text-xl font-bold">M</span>
           </div>
-          <h1 className="text-white text-xl font-black tracking-tight">MobilityGrid</h1>
-          <p className="text-slate-400 text-xs mt-1 tracking-widest uppercase">Platform Admin</p>
+          <h1 className="text-2xl font-bold text-gray-900">MobilityGrid</h1>
+          <p className="text-gray-500 text-sm mt-1">Platform Admin Access</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-8 shadow-xl">
-          {step === 'login' ? (
-            <form onSubmit={login} className="space-y-4">
-              <div>
-                <h2 className="text-slate-900 text-lg font-semibold">Sign in</h2>
-                <p className="text-slate-500 text-sm mt-0.5">Admin access only</p>
-              </div>
+        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
 
-              {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+        {step === 1 && loading && ADMIN_PHONE && (
+          <div className="text-center py-6 text-gray-500 text-sm">Sending OTP to admin phone…</div>
+        )}
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
-                <input type="tel" value={phone} autoFocus required
-                  onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
-                  placeholder="10-digit mobile number"
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
+        {step === 1 && !loading && !ADMIN_PHONE && (
+          <form onSubmit={(e) => { e.preventDefault(); sendOtp(phone, secret); }} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Phone</label>
+              <input type="tel" value={phone} autoFocus
+                onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
+                required placeholder="10-digit number"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Secret Key</label>
+              <input type="password" value={secret} onChange={e => setSecret(e.target.value)} required
+                placeholder="••••••••"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+            </div>
+            <button type="submit" disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
+              {loading ? 'Sending…' : 'Send OTP'}
+            </button>
+          </form>
+        )}
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                <div className="relative">
-                  <input type={showPass ? 'text' : 'password'} value={password} required
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-16" />
-                  <button type="button" onClick={() => setShowPass(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
-                    {showPass ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-              </div>
-
-              <button type="submit" disabled={loading || phone.length !== 10 || !password}
-                className="w-full py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                {loading ? 'Signing in…' : 'Sign In'}
-              </button>
-
-              <button type="button" onClick={sendOtp} disabled={loading}
-                className="w-full text-xs text-indigo-500 hover:text-indigo-700 py-1">
-                Forgot password? Sign in with OTP →
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={verifyOtp} className="space-y-4">
-              <div>
-                <h2 className="text-slate-900 text-lg font-semibold">Enter OTP</h2>
-                <p className="text-slate-500 text-sm mt-0.5">Sent to +91 {phone}</p>
-              </div>
-
-              {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
-              <input type="text" inputMode="numeric" value={otp} autoFocus required
-                onChange={e => setOtp(e.target.value.replace(/\D/g,'').slice(0,6))}
-                placeholder="000000" maxLength={6}
-                className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm text-center tracking-widest text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-
-              <button type="submit" disabled={loading || otp.length !== 6}
-                className="w-full py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                {loading ? 'Verifying…' : 'Verify & Sign In'}
-              </button>
-
-              <button type="button" onClick={() => { setStep('login'); setOtp(''); setError(''); }}
-                className="w-full text-sm text-slate-500 hover:text-slate-700">
-                ← Back to password login
-              </button>
-            </form>
-          )}
-        </div>
-
-        <p className="text-center text-slate-500 text-xs mt-6">MobilityGrid by PayYantra · Confidential</p>
+        {step === 2 && (
+          <form onSubmit={verifyOtp} className="space-y-4">
+            <p className="text-sm text-gray-600 text-center">OTP sent to <strong>+91{phone}</strong></p>
+            <input ref={otpRef} type="text" value={otp}
+              onChange={e => setOtp(e.target.value)} required
+              placeholder="6-digit OTP" maxLength={6}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center text-2xl tracking-widest" />
+            <button type="submit" disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
+              {loading ? 'Verifying…' : 'Login'}
+            </button>
+            <button type="button" onClick={() => { setStep(1); setOtp(''); autoSentRef.current = false; }}
+              className="w-full text-sm text-gray-500 hover:text-gray-700">
+              ← Resend OTP
+            </button>
+          </form>
+        )}
+        <p className="text-center text-xs text-gray-400 mt-6">MobilityGrid by PayYantra · Confidential</p>
       </div>
     </div>
   );

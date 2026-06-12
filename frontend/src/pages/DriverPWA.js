@@ -959,7 +959,7 @@ export default function DriverPWA() {
 
   // ── MAIN RENDER ───────────────────────────────────────────────────────────
   return (
-    <div style={{height:"100dvh",width:"100vw"}} className="bg-slate-100 flex items-center justify-center overflow-hidden">
+    <div className="h-screen w-screen bg-slate-100 flex items-center justify-center overflow-hidden">
       <div className="w-full max-w-[412px] bg-slate-50 h-full sm:max-h-[840px] flex flex-col relative overflow-hidden sm:rounded-[32px] sm:shadow-2xl sm:border sm:border-slate-200">
 
         {/* Status bar */}
