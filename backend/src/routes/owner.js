@@ -12,7 +12,7 @@ router.use(verifyToken);
 // Helper: get owner row (id + company_id) from JWT user id
 async function getOwner(userId) {
   const r = await pool.query(
-    'SELECT id, company_id FROM owners WHERE id = $1',
+    'SELECT id, company_id, owner_code FROM owners WHERE id = $1',
     [userId]
   );
   return r.rows[0] || null;
@@ -802,4 +802,4 @@ router.get('/driver-locations', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-module.exports = router;
+module.export

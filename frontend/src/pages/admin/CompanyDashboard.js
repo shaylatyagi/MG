@@ -2229,6 +2229,7 @@ function ChatViewer() {
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [tab, setTab]               = useState('dashboard');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
@@ -2243,7 +2244,8 @@ function AdminPanelInner() {
     { key: 'audit',        label: 'Audit Log',    icon: '📋' },
   ];
 
-  const logout = () => { clearToken(); window.location.href = '/login'; };
+  const doLogout = () => { clearToken(); window.location.href = '/login'; };
+  const logout = () => setShowLogoutConfirm(true);
   const tabLabel = navItems.find(n => n.key === tab)?.label || tab;
 
   return (
@@ -2295,6 +2297,22 @@ function AdminPanelInner() {
           {tab === 'audit'        && <AuditLog />}
         </div>
       </main>
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-xs p-6 text-center shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3 text-2xl">🚪</div>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">Logout?</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Are you sure you want to sign out?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200">Cancel</button>
+              <button onClick={doLogout}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold">Yes, Logout</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

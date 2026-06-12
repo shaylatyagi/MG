@@ -69,9 +69,7 @@ export default function DriverPWA() {
   const [payAmt, setPayAmt] = useState(0);
   const [telemetry, setTelemetry] = useState({});
   const [payments, setPayments] = useState([]);
-  const [notifs, setNotifs] = useState(() => {
-    try { const c = localStorage.getItem('mg_notifs_cached'); return c ? JSON.parse(c) : []; } catch { return []; }
-  });
+  const [notifs, setNotifs] = useState([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const [totalPaid, setTotalPaid] = useState(0);
@@ -157,16 +155,11 @@ export default function DriverPWA() {
       try {
         const res = await fetch(`${API}/api/payment/driver/notifications?phone=${phone()}`, { headers: { Authorization: `Bearer ${tk()}` } });
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          // Merge fresh data with any cached notifications (keep newest, deduplicate by id)
-          const cached = (() => { try { const c = localStorage.getItem('mg_notifs_cached'); return c ? JSON.parse(c) : []; } catch { return []; } })();
-          const merged = [...data];
-          cached.forEach(c => { if (!merged.find(m => m.id === c.id)) merged.push(c); });
-          merged.sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0));
-          const top = merged.slice(0, 50);
+        if (Array.isArray(data)) {
+          // Always use fresh server data — no local cache merging
+          const top = data.slice(0, 50);
           setNotifs(top);
           setUnread(top.filter(n => !n.is_read).length);
-          try { localStorage.setItem('mg_notifs_cached', JSON.stringify(top)); } catch {}
         }
       } catch {}
     };
@@ -244,7 +237,7 @@ export default function DriverPWA() {
 
   // GPS ping — silent, every 30s, only when assigned vehicle
   useEffect(() => {
-    if (!user || !assignedVehicle) return;
+    if (!user) return;
     const pingLocation = () => {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(

@@ -2373,23 +2373,16 @@ router.get('/owner/notifications', async (req, res) => {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
     
-    const ownerResult = await pool.query(
-      'SELECT owner_code FROM public.owners WHERE id = $1', [ownerId]
-    );
-    if (ownerResult.rows.length === 0) return res.json([]);
-    
-    const ownerCode = ownerResult.rows[0].owner_code;
-    
-    // ✅ notifResult — duplicate const result avoid, aur driver_id bhi add
+    // Owner-targeted notifications only (driver rent reminders excluded)
     const notifResult = await pool.query(
-      `SELECT n.id, n.driver_id, n.title, n.message, n.is_read, 
+      `SELECT n.id, n.driver_id, n.title, n.message, n.is_read,
               n.created_at, n.metadata, d.full_name as driver_name
        FROM public.notifications n
        LEFT JOIN public.drivers d ON d.id = n.driver_id
-       WHERE (n.user_type = 'DRIVER' AND d.owner_code = $1)
+       WHERE n.user_type = 'OWNER' AND n.user_id = $1
        ORDER BY n.created_at DESC
        LIMIT 50`,
-      [ownerCode]
+      [ownerId]
     );
     
     res.json(notifResult.rows);
@@ -3257,4 +3250,4 @@ router.get('/manager/profile', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Upgrade to premium (admin manually upgrades, or payment webhook)
+// Upgrade to premium (admin manually upgrades, or payment webhook)                                                                                                                                                                                                                                                                 
