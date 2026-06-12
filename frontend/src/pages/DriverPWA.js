@@ -1060,7 +1060,7 @@ export default function DriverPWA() {
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 pt-4 bg-slate-50 pb-40">
+        <div className="flex-1 overflow-y-auto px-4 pt-4 bg-slate-50">
           {loading ? <div className="text-center py-16 text-xs font-black text-slate-400 animate-pulse">Loading…</div> : (
             <>
               {tab === 'home' && <HomeTab/>}
@@ -1072,7 +1072,7 @@ export default function DriverPWA() {
         </div>
 
         {/* Emergency bar */}
-        <div className="absolute left-0 right-0 px-4 py-2 flex items-center justify-between" style={{ bottom: '68px', background:'#0f172a', borderTop:'1px solid #1e293b' }}>
+        <div className="shrink-0 px-4 py-2 flex items-center justify-between" style={{ background:'#0f172a', borderTop:'1px solid #1e293b' }}>
           <button onClick={() => { setShowOwnerChat(true); fetchChat(); }}
             className="flex items-center gap-1.5 text-[10px] font-black transition active:scale-[0.96]"
             style={{color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',borderRadius:8,padding:'6px 12px'}}>
@@ -1086,7 +1086,7 @@ export default function DriverPWA() {
         </div>
 
         {/* Bottom nav */}
-        <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto z-50" style={{padding:'0 12px 10px'}}>
+        <div className="shrink-0 w-full" style={{padding:'0 12px 10px'}}>
           <div style={{background:'#1e1b4b',borderRadius:24,padding:8,display:'flex',boxShadow:'0 -4px 30px rgba(79,70,229,0.25)'}}>
             {[
               { id: 'dashboard', tabVal: 'home',     Icon: Home,   label: 'Home' },
