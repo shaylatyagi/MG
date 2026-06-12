@@ -531,4 +531,17 @@ router.get('/company-config', verifyToken, async (req, res) => {
   }
 });
 
+// POST /api/driver/location — driver pings GPS every 30s
+router.post('/location', verifyToken, async (req, res) => {
+  try {
+    const { lat, lng } = req.body;
+    if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
+    await pool.query(
+      `UPDATE public.drivers SET last_lat=$1, last_lng=$2, last_location_at=NOW() WHERE id=$3`,
+      [parseFloat(lat), parseFloat(lng), req.user.id]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

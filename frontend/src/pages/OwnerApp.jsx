@@ -1689,6 +1689,15 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           </div>
         </button>
       </div>
+      <button onClick={() => setActiveTab('track')}
+        className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-2xl p-3 flex items-center gap-3 shadow-md">
+        <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-base">📍</div>
+        <div className="text-left flex-1">
+          <p className="text-xs font-black">Track Fleet Live</p>
+          <p className="text-[9px] text-indigo-200">See driver locations on map</p>
+        </div>
+        <span className="text-white/60 text-sm">→</span>
+      </button>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
@@ -3189,6 +3198,132 @@ const ProfileTab = () => {
   );
 };
 
+  // TRACK FLEET TAB
+  const TrackFleetTab = () => {
+    const [drivers, setDrivers] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+    const [lastRefresh, setLastRefresh] = React.useState(null);
+    const mapsKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+
+    const fetchLocations = async () => {
+      try {
+        const r = await fetch(`${API}/api/owner/driver-locations`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        });
+        const d = await r.json();
+        if (d.success) { setDrivers(d.drivers || []); setLastRefresh(new Date()); }
+      } catch {}
+      setLoading(false);
+    };
+
+    React.useEffect(() => {
+      fetchLocations();
+      const id = setInterval(fetchLocations, 30000);
+      return () => clearInterval(id);
+    }, []);
+
+    const timeAgo = (ts) => {
+      if (!ts) return 'Unknown';
+      const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
+      if (diff < 60) return `${diff}s ago`;
+      if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+      return `${Math.floor(diff/3600)}h ago`;
+    };
+
+    const staticMapUrl = (driversArr) => {
+      if (!mapsKey || !driversArr.length) return null;
+      const center = driversArr[0];
+      const markers = driversArr.map(d => `markers=color:red%7C${d.last_lat},${d.last_lng}`).join('&');
+      return `https://maps.googleapis.com/maps/api/staticmap?center=${center.last_lat},${center.last_lng}&zoom=13&size=400x220&${markers}&key=${mapsKey}`;
+    };
+
+    const openAllOnMaps = () => {
+      if (!drivers.length) return;
+      if (drivers.length === 1) {
+        window.open(`https://maps.google.com/?q=${drivers[0].last_lat},${drivers[0].last_lng}`, '_blank');
+      } else {
+        const url = `https://maps.google.com/maps/dir/${drivers.map(d => `${d.last_lat},${d.last_lng}`).join('/')}`;
+        window.open(url, '_blank');
+      }
+    };
+
+    return (
+      <div className="pb-4 space-y-3">
+        {/* Header row */}
+        <div className="flex items-center justify-between">
+          <button onClick={() => setActiveTab('home')} className="flex items-center gap-1 text-xs font-black text-indigo-600">
+            ← Back
+          </button>
+          <div className="text-[10px] text-slate-400 font-semibold">
+            {lastRefresh ? `Updated ${timeAgo(lastRefresh)}` : 'Loading...'}
+          </div>
+          <button onClick={fetchLocations}
+            className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
+            ↻ Refresh
+          </button>
+        </div>
+
+        {/* Map image or fallback */}
+        {loading ? (
+          <div className="bg-slate-100 rounded-2xl h-40 flex items-center justify-center text-xs text-slate-400 animate-pulse font-black">
+            Fetching driver locations...
+          </div>
+        ) : drivers.length === 0 ? (
+          <div className="bg-slate-100 rounded-2xl h-40 flex flex-col items-center justify-center gap-2">
+            <span className="text-3xl">📡</span>
+            <span className="text-xs font-black text-slate-400">No drivers online</span>
+            <span className="text-[10px] text-slate-300">Drivers send GPS every 30s when assigned a vehicle</span>
+          </div>
+        ) : staticMapUrl(drivers) ? (
+          <div className="relative rounded-2xl overflow-hidden shadow-md">
+            <img src={staticMapUrl(drivers)} alt="Driver locations" className="w-full object-cover" />
+            <button onClick={openAllOnMaps}
+              className="absolute bottom-2 right-2 bg-white text-indigo-700 text-[10px] font-black px-3 py-1.5 rounded-xl shadow flex items-center gap-1">
+              📍 Open in Maps
+            </button>
+          </div>
+        ) : (
+          <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl h-36 flex flex-col items-center justify-center gap-2 shadow-md">
+            <span className="text-2xl">🗺️</span>
+            <span className="text-white text-xs font-black">{drivers.length} driver{drivers.length > 1 ? 's' : ''} online</span>
+            <button onClick={openAllOnMaps}
+              className="bg-white text-indigo-700 text-[10px] font-black px-4 py-1.5 rounded-xl mt-1">
+              📍 View on Google Maps
+            </button>
+          </div>
+        )}
+
+        {/* Driver cards */}
+        {!loading && drivers.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider px-1">
+              Live Drivers ({drivers.length})
+            </div>
+            {drivers.map(d => (
+              <div key={d.id} className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-sm font-black text-indigo-700 shrink-0">
+                  {(d.full_name || 'D')[0].toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-black text-slate-800 truncate">{d.full_name || 'Unknown Driver'}</div>
+                  <div className="text-[10px] text-slate-400 font-semibold">{d.vehicle_type || ''} {d.reg_number ? `• ${d.reg_number}` : ''}</div>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>
+                    <span className="text-[9px] text-green-600 font-black">{timeAgo(d.last_location_at)}</span>
+                  </div>
+                </div>
+                <button onClick={() => window.open(`https://maps.google.com/?q=${d.last_lat},${d.last_lng}`, '_blank')}
+                  className="shrink-0 bg-indigo-600 text-white text-[9px] font-black px-2.5 py-1.5 rounded-xl flex items-center gap-1">
+                  📍 Map
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex items-start justify-center">
       <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, height:'100dvh'}}>
@@ -3476,6 +3611,7 @@ const ProfileTab = () => {
                 </div>
               )}
               {activeTab === 'profile' && <ProfileTab />}
+              {activeTab === 'track' && <TrackFleetTab />}
             </>
           )}
         </div>

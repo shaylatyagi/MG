@@ -241,6 +241,28 @@ export default function DriverPWA() {
   }, [user]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // GPS ping — silent, every 30s, only when assigned vehicle
+  useEffect(() => {
+    if (!user || !assignedVehicle) return;
+    const pingLocation = () => {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          fetch(`${API}/api/driver/location`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+            body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          }).catch(() => {});
+        },
+        () => {}, // silent fail if permission denied
+        { timeout: 10000, maximumAge: 60000 }
+      );
+    };
+    pingLocation();
+    const interval = setInterval(pingLocation, 30000);
+    return () => clearInterval(interval);
+  }, [user, assignedVehicle]);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('status') === 'success') {
