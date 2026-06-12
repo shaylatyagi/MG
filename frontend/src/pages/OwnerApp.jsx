@@ -4427,7 +4427,6 @@ const ProfileTab = () => {
   </div>
 )}
       </div>
-    </div>
     {/* ── Logout Confirm Modal — outside overflow:hidden, z-9999 ── */}
     {showLogoutConfirm && (
       <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
