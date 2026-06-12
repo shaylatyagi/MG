@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import api from '../../api';
+import AppShell from '../../components/AppShell';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
 
 const fmt = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -66,21 +69,21 @@ export default function DriverPayTab() {
   );
 
   return (
-    <div className="flex flex-col gap-4 p-4 pb-24">
+    <AppShell title="Pay Rent" subtitle="Quickly settle dues with secure payment flows">
+      <div className="flex flex-col gap-4 p-4 pb-24">
 
       {/* Header */}
-      <div className="rounded-2xl p-5 text-white shadow-lg"
-           style={{ background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)' }}>
-        <p className="text-xs font-semibold tracking-wide mb-1" style={{ opacity: 0.8 }}>PAY RENT</p>
+      <div className="hero-card hero-card--pay">
+        <p className="hero-card__label">PAY RENT</p>
         <p className="text-3xl font-black mb-1">{fmt(outstanding)}</p>
-        <p className="text-xs" style={{ opacity: 0.75 }}>
+        <p className="hero-card__footnote">
           {outstanding > 0 ? 'Outstanding balance' : 'All paid for today ✓'}
         </p>
 
         {wallet?.vehicle && (
-          <div className="mt-3 pt-3 border-t border-white/20 flex justify-between text-xs">
-            <span style={{ opacity: 0.8 }}>Vehicle: <strong>{wallet.vehicle.reg_number}</strong></span>
-            <span style={{ opacity: 0.8 }}>Daily: <strong>{fmt(rentDue)}</strong></span>
+          <div className="mt-3 pt-3 border-t border-white/20 flex justify-between text-xs opacity-75">
+            <span>Vehicle: <strong>{wallet.vehicle.reg_number}</strong></span>
+            <span>Daily: <strong>{fmt(rentDue)}</strong></span>
           </div>
         )}
       </div>
@@ -91,19 +94,14 @@ export default function DriverPayTab() {
 
         {/* Quick amount chips */}
         {outstanding > 0 && (
-          <div className="flex gap-2 mb-3 flex-wrap">
+          <div className="chip-group">
             {[outstanding, outstanding / 2, 100, 200, 500]
               .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i)
               .slice(0, 4)
               .map((v) => (
                 <button key={v}
                   onClick={() => setAmount(String(v))}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
-                  style={{
-                    backgroundColor: parseFloat(amount) === v ? '#4f46e5' : 'white',
-                    color:           parseFloat(amount) === v ? 'white'    : '#4f46e5',
-                    borderColor:     '#4f46e5',
-                  }}>
+                  className={`chip ${parseFloat(amount) === v ? 'chip--active' : ''}`}>
                   {fmt(v)}
                 </button>
               ))}
@@ -128,37 +126,32 @@ export default function DriverPayTab() {
       </div>
 
       {/* Wallet info */}
-      <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 flex justify-between">
-        <div className="text-center">
-          <p className="text-[10px] text-amber-600 mb-0.5">Wallet Balance</p>
-          <p className="text-sm font-black text-amber-800">{fmt(wallet?.wallet_balance)}</p>
+      <div className="pay-summary">
+        <div className="pay-summary__item">
+          <p className="pay-summary__label">Wallet Balance</p>
+          <p className="pay-summary__value">{fmt(wallet?.wallet_balance)}</p>
         </div>
-        <div className="text-center">
-          <p className="text-[10px] text-amber-600 mb-0.5">Paid Today</p>
-          <p className="text-sm font-black text-amber-800">{fmt(paidToday)}</p>
+        <div className="pay-summary__item">
+          <p className="pay-summary__label">Paid Today</p>
+          <p className="pay-summary__value">{fmt(paidToday)}</p>
         </div>
-        <div className="text-center">
-          <p className="text-[10px] text-amber-600 mb-0.5">Outstanding</p>
-          <p className="text-sm font-black" style={{ color: outstanding > 0 ? '#DC2626' : '#16A34A' }}>
+        <div className="pay-summary__item">
+          <p className="pay-summary__label">Outstanding</p>
+          <p className={`pay-summary__value ${outstanding > 0 ? 'pay-summary__value--negative' : 'pay-summary__value--positive'}`}>
             {fmt(outstanding)}
           </p>
         </div>
       </div>
 
       {/* Pay button */}
-      <button
+      <Button
         onClick={initiatePayment}
         disabled={paying || !amount || parseFloat(amount) <= 0}
-        className="w-full py-4 rounded-2xl font-black text-base text-white shadow-md transition-opacity"
-        style={{
-          backgroundColor: '#16A34A',
-          opacity: (paying || !amount || parseFloat(amount) <= 0) ? 0.6 : 1,
-          cursor:  (paying || !amount || parseFloat(amount) <= 0) ? 'not-allowed' : 'pointer',
-        }}>
-        {paying
-          ? '⏳ Opening Payment…'
-          : `Pay ${amount ? fmt(parseFloat(amount)) : '₹0.00'} via UPI / Card`}
-      </button>
+        className="w-full"
+        variant="primary"
+      >
+        {paying ? '⏳ Opening Payment…' : `Pay ${amount ? fmt(parseFloat(amount)) : '₹0.00'} via UPI / Card`}
+      </Button>
 
       <div className="flex items-center justify-center gap-2 opacity-50">
         <span className="text-xs text-gray-500">Secured by</span>
@@ -166,6 +159,7 @@ export default function DriverPayTab() {
         <span className="text-xs text-gray-500">🔒</span>
       </div>
 
-    </div>
+      </div>
+    </AppShell>
   );
 }

@@ -53,13 +53,13 @@ const useBasePath = () => {
   return parts.length >= 1 ? `/${parts[0]}` : '';
 };
 
-const navStyle = {
-  position: 'fixed', bottom: 0, left: 0, right: 0,
-  background: '#fff', borderTop: '1px solid #f1f5f9',
-  display: 'flex', zIndex: 50,
-  boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
-  height: 58, alignItems: 'stretch'
-};
+const getNavClass = (active) => active
+  ? 'bottom-nav__item bottom-nav__item--active'
+  : 'bottom-nav__item';
+
+const getButtonClass = (active) => active
+  ? 'bottom-nav__button bottom-nav__button--active'
+  : 'bottom-nav__button';
 
 export default function BottomNav({ tabs, active, onChange }) {
   const routerMode = !onChange;
@@ -72,25 +72,19 @@ export default function BottomNav({ tabs, active, onChange }) {
 
   if (routerMode) {
     return (
-      <nav style={navStyle}>
+      <nav className="bottom-nav">
         {tabs.map((tab) => {
           const on = isActive(tab);
           return (
             <NavLink
               key={tab}
               to={`${base}/${tab}`}
-              style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 2, textDecoration: 'none', position: 'relative', paddingTop: 2
-              }}
+              className={getNavClass(on)}
+              aria-current={on ? 'page' : undefined}
             >
-              {on && (
-                <span style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 24, height: 2, background: '#4f46e5', borderRadius: '0 0 4px 4px' }} />
-              )}
+              {on && <span className="bottom-nav__indicator" />}
               {(ICONS[tab] || ICONS.wallet)(on)}
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', color: on ? '#4f46e5' : '#94a3b8', textTransform: 'capitalize' }}>
-                {LABELS[tab] || tab}
-              </span>
+              <span className="bottom-nav__label">{LABELS[tab] || tab}</span>
             </NavLink>
           );
         })}
@@ -99,22 +93,19 @@ export default function BottomNav({ tabs, active, onChange }) {
   }
 
   return (
-    <nav style={navStyle}>
+    <nav className="bottom-nav">
       {tabs.map((tab) => {
         const on = isActive(tab);
         return (
-          <button key={tab} onClick={() => onChange(tab)} style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: 2, background: 'none', border: 'none',
-            cursor: 'pointer', position: 'relative', paddingTop: 2
-          }}>
-            {on && (
-              <span style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 24, height: 2, background: '#4f46e5', borderRadius: '0 0 4px 4px' }} />
-            )}
+          <button
+            key={tab}
+            type="button"
+            onClick={() => onChange(tab)}
+            className={getButtonClass(on)}
+          >
+            {on && <span className="bottom-nav__indicator" />}
             {(ICONS[tab] || ICONS.wallet)(on)}
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', color: on ? '#4f46e5' : '#94a3b8', textTransform: 'capitalize' }}>
-              {LABELS[tab] || tab}
-            </span>
+            <span className="bottom-nav__label">{LABELS[tab] || tab}</span>
           </button>
         );
       })}

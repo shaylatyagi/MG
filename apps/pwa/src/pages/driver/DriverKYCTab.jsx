@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../api';
+import AppShell from '../../components/AppShell';
 
 const DOC_TYPES = [
   { key: 'aadhaar_front', label: 'Aadhaar Card (Front)', icon: '🪪', required: true },
@@ -85,157 +86,132 @@ export default function DriverKYCTab() {
   );
 
   return (
-    <div className="flex flex-col gap-4 p-4 pb-24">
+    <AppShell title="KYC Documents" subtitle="Upload once, keep status visible and actionable">
+      <div className="page-section p-4 pb-24">
 
-      {/* Status banner */}
-      <div className="rounded-2xl p-4"
-           style={{
-             background: allApproved
-               ? 'linear-gradient(135deg, #16A34A, #15803D)'
-               : 'linear-gradient(135deg, #4f46e5, #5C3A1E)',
-             color: 'white',
-           }}>
-        <p className="text-xs font-semibold tracking-wide mb-1" style={{ opacity: 0.8 }}>KYC STATUS</p>
-        <p className="text-xl font-black mb-1">
-          {allApproved ? '✅ Fully Verified' : `${uploadedCount}/${required.length} Uploaded`}
-        </p>
-        <p className="text-xs" style={{ opacity: 0.75 }}>
-          {allApproved
-            ? 'All required documents approved'
-            : 'Upload all required documents to complete verification'}
-        </p>
+        <div className={`kyc-status-card ${allApproved ? 'kyc-status-card--approved' : 'kyc-status-card--pending'}`}>
+          <p className="kyc-status-card__label">KYC STATUS</p>
+          <p className="kyc-status-card__headline">
+            {allApproved ? '✅ Fully Verified' : `${uploadedCount}/${required.length} Uploaded`}
+          </p>
+          <p className="text-xs" style={{ opacity: 0.75 }}>
+            {allApproved
+              ? 'All required documents approved'
+              : 'Upload all required documents to complete verification'}
+          </p>
 
-        {/* Progress bar */}
-        {!allApproved && (
-          <div className="mt-3 h-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}>
-            <div className="h-1.5 rounded-full bg-white transition-all"
-                 style={{ width: `${(uploadedCount / required.length) * 100}%` }} />
-          </div>
-        )}
-      </div>
+          {!allApproved && (
+            <div className="kyc-progress-bar">
+              <div className="kyc-progress-fill" style={{ width: `${(uploadedCount / required.length) * 100}%` }} />
+            </div>
+          )}
+        </div>
 
-      {/* Doc cards */}
-      {DOC_TYPES.map((doc) => {
-        const existing   = docs[doc.key];
-        const upState    = uploads[doc.key];
-        const statusMeta = existing ? (STATUS_STYLE[existing.status] || STATUS_STYLE.pending) : null;
-        const isUploading = upState?.stage === 'uploading';
-        const isLocked    = existing?.status === 'approved';
+        {DOC_TYPES.map((doc) => {
+          const existing   = docs[doc.key];
+          const upState    = uploads[doc.key];
+          const statusMeta = existing ? (STATUS_STYLE[existing.status] || STATUS_STYLE.pending) : null;
+          const isUploading = upState?.stage === 'uploading';
+          const isLocked    = existing?.status === 'approved';
 
-        return (
-          <div key={doc.key} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-            {/* Hidden file input */}
-            <input
-              ref={(el) => { fileRefs.current[doc.key] = el; }}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              className="hidden"
-              onChange={(e) => handleFile(doc.key, e.target.files[0])}
-            />
+          return (
+            <div key={doc.key} className="doc-card">
+              <input
+                ref={(el) => { fileRefs.current[doc.key] = el; }}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                className="hidden"
+                onChange={(e) => handleFile(doc.key, e.target.files[0])}
+              />
 
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{doc.icon}</span>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">{doc.label}</p>
-                  {!doc.required && (
-                    <p className="text-[10px] text-gray-400">Optional</p>
-                  )}
+              <div className="doc-card__head">
+                <div className="doc-card__title">
+                  <span>{doc.icon}</span>
+                  <div>
+                    <p className="doc-card__label">{doc.label}</p>
+                    {!doc.required && (
+                      <p className="doc-card__subtitle">Optional</p>
+                    )}
+                  </div>
                 </div>
+
+                {statusMeta && (
+                  <span className={`doc-card__pill doc-card__pill--${existing.status}`}>
+                    {statusMeta.label}
+                  </span>
+                )}
+                {!existing && (
+                  <span className="doc-card__pill doc-card__pill--empty">
+                    Not uploaded
+                  </span>
+                )}
               </div>
 
-              {statusMeta && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: statusMeta.bg, color: statusMeta.color }}>
-                  {statusMeta.label}
-                </span>
+              {existing?.status === 'rejected' && existing.rejection_reason && (
+                <div className="doc-card__rejection bg-red-50 text-red-600 text-xs p-2 rounded-lg">
+                  ❌ Rejected: {existing.rejection_reason}
+                </div>
               )}
-              {!existing && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: '#F3F4F6', color: '#9CA3AF' }}>
-                  Not uploaded
-                </span>
+
+              {upState?.stage === 'done' && (
+                <div className="doc-card__rejection bg-green-50 text-green-600 text-xs p-2 rounded-lg">
+                  ✓ {upState.msg}
+                </div>
+              )}
+              {upState?.stage === 'error' && (
+                <div className="doc-card__rejection bg-red-50 text-red-600 text-xs p-2 rounded-lg">
+                  ⚠ {upState.msg}
+                </div>
+              )}
+
+              {!isLocked && (
+                <>
+                  {existing?.status === 'rejected' && (
+                    <div className="doc-card__rejection mb-2 bg-orange-50 border border-orange-200 rounded-xl p-2 text-center">
+                      <p className="text-xs font-bold text-orange-600 mb-1">⚠️ Re-upload required</p>
+                      <p className="text-[10px] text-orange-500">Fix the issue above and upload a new photo</p>
+                    </div>
+                  )}
+                  <div className="doc-card__actions">
+                    <button
+                      type="button"
+                      onClick={() => triggerUpload(doc.key, true)}
+                      disabled={isUploading}
+                      className="doc-card__action-btn"
+                    >
+                      {isUploading ? '⏳ Uploading…' : existing?.status === 'rejected' ? '📷 Re-take Photo' : '📷 Take Photo'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => triggerUpload(doc.key, false)}
+                      disabled={isUploading}
+                      className="doc-card__action-btn"
+                    >
+                      {isUploading ? '⏳' : existing?.status === 'rejected' ? '📁 Re-upload File' : '📁 Upload File'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {isLocked && (
+                <p className="text-xs text-green-600 font-semibold text-center py-1">
+                  ✅ Document approved — no changes needed
+                </p>
               )}
             </div>
+          );
+        })}
 
-            {/* Rejection reason */}
-            {existing?.status === 'rejected' && existing.rejection_reason && (
-              <div className="mb-2 bg-red-50 text-red-600 text-xs p-2 rounded-lg">
-                ❌ Rejected: {existing.rejection_reason}
-              </div>
-            )}
+        <div className="doc-note">
+          <p className="text-xs text-blue-700 font-semibold mb-1">📋 What happens next?</p>
+          <p>
+            Your documents will be reviewed by your fleet owner within 24 hours.
+            You'll see the status update here automatically.
+            Make sure photos are clear and all text is readable.
+          </p>
+        </div>
 
-            {/* Upload feedback */}
-            {upState?.stage === 'done' && (
-              <div className="mb-2 bg-green-50 text-green-600 text-xs p-2 rounded-lg">
-                ✓ {upState.msg}
-              </div>
-            )}
-            {upState?.stage === 'error' && (
-              <div className="mb-2 bg-red-50 text-red-600 text-xs p-2 rounded-lg">
-                ⚠ {upState.msg}
-              </div>
-            )}
-
-            {/* Upload buttons — KYC-08: re-upload on rejection */}
-            {!isLocked && (
-              <>
-                {existing?.status === 'rejected' && (
-                  <div className="mb-2 bg-orange-50 border border-orange-200 rounded-xl p-2 text-center">
-                    <p className="text-xs font-bold text-orange-600 mb-1">⚠️ Re-upload required</p>
-                    <p className="text-[10px] text-orange-500">Fix the issue above and upload a new photo</p>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => triggerUpload(doc.key, true)}
-                    disabled={isUploading}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors"
-                    style={{
-                      borderColor: existing?.status === 'rejected' ? '#F97316' : '#4f46e5',
-                      color:       existing?.status === 'rejected' ? '#F97316' : '#4f46e5',
-                      backgroundColor: isUploading ? '#F5F5F5' : 'white',
-                      opacity: isUploading ? 0.7 : 1,
-                      cursor: isUploading ? 'not-allowed' : 'pointer',
-                    }}>
-                    {isUploading ? '⏳ Uploading…' : existing?.status === 'rejected' ? '📷 Re-take Photo' : '📷 Take Photo'}
-                  </button>
-                  <button
-                    onClick={() => triggerUpload(doc.key, false)}
-                    disabled={isUploading}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors"
-                    style={{
-                      borderColor: existing?.status === 'rejected' ? '#F97316' : '#4f46e5',
-                      color:       existing?.status === 'rejected' ? '#F97316' : '#4f46e5',
-                      backgroundColor: isUploading ? '#F5F5F5' : 'white',
-                      opacity: isUploading ? 0.7 : 1,
-                      cursor: isUploading ? 'not-allowed' : 'pointer',
-                    }}>
-                    {isUploading ? '⏳' : existing?.status === 'rejected' ? '📁 Re-upload File' : '📁 Upload File'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {isLocked && (
-              <p className="text-xs text-green-600 font-semibold text-center py-1">
-                ✅ Document approved — no changes needed
-              </p>
-            )}
-          </div>
-        );
-      })}
-
-      {/* Info note */}
-      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3">
-        <p className="text-xs text-blue-700 font-semibold mb-1">📋 What happens next?</p>
-        <p className="text-xs text-blue-600 leading-relaxed">
-          Your documents will be reviewed by your fleet owner within 24 hours.
-          You'll see the status update here automatically.
-          Make sure photos are clear and all text is readable.
-        </p>
       </div>
-
-    </div>
+    </AppShell>
   );
 }

@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api';
+import AppShell from '../../components/AppShell';
+import Card from '../../components/Card';
+import Button from '../../components/Button';
 
 const fmt = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -55,8 +58,7 @@ export default function DriverWalletTab() {
     <div className="p-4 text-center">
       <p className="text-red-500 text-sm mb-3">{error}</p>
       <button onClick={load}
-        className="px-4 py-2 text-white rounded-xl text-sm font-semibold"
-        style={{ backgroundColor: '#4f46e5' }}>
+        className="action-button rounded-xl px-4 py-2 text-sm font-semibold">
         Retry
       </button>
     </div>
@@ -68,7 +70,8 @@ export default function DriverWalletTab() {
   const outstanding = Math.max(0, rentDue - (paid_today || 0));
 
   return (
-    <div className="flex flex-col gap-4 p-4 pb-24">
+    <AppShell title="Wallet Overview" subtitle="Everything you need to track payments, vehicle and KYC">
+      <div className="page-section p-4 pb-24">
 
       {/* Payment return banner */}
       {payStatus === 'success' && (
@@ -88,40 +91,38 @@ export default function DriverWalletTab() {
       )}
 
       {/* Balance card */}
-      <div className="rounded-2xl p-5 text-white shadow-lg"
-           style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #5C3A1E 100%)' }}>
-        <p className="text-xs font-semibold tracking-wide mb-1" style={{ opacity: 0.75 }}>WALLET BALANCE</p>
-        <p className="text-4xl font-black mb-4">{fmt(wallet_balance)}</p>
+      <Card className="hero-card hero-card--wallet">
+        <p className="hero-card__label">WALLET BALANCE</p>
+        <p className="hero-card__amount">{fmt(wallet_balance)}</p>
 
-        <div className="flex gap-2">
-          <div className="flex-1 rounded-xl p-3" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
-            <p className="text-[10px] mb-0.5" style={{ opacity: 0.75 }}>Today's Rent</p>
-            <p className="text-sm font-bold">{fmt(rentDue)}</p>
+        <div className="metric-grid">
+          <div className="metric-card">
+            <p className="metric-card__label">Today's Rent</p>
+            <p className="metric-card__value">{fmt(rentDue)}</p>
           </div>
-          <div className="flex-1 rounded-xl p-3" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
-            <p className="text-[10px] mb-0.5" style={{ opacity: 0.75 }}>Paid Today</p>
-            <p className="text-sm font-bold" style={{ color: isPaid ? '#86EFAC' : '#FCA5A5' }}>
+          <div className="metric-card">
+            <p className="metric-card__label">Paid Today</p>
+            <p className={`metric-card__value ${isPaid ? 'entry-amount--positive' : 'entry-amount--negative'}`}>
               {fmt(paid_today)}
             </p>
           </div>
           {outstanding > 0 && (
-            <div className="flex-1 rounded-xl p-3" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
-              <p className="text-[10px] mb-0.5" style={{ opacity: 0.75 }}>Due</p>
-              <p className="text-sm font-bold" style={{ color: '#FCA5A5' }}>{fmt(outstanding)}</p>
+            <div className="metric-card">
+              <p className="metric-card__label">Due</p>
+              <p className="metric-card__value entry-amount--negative">{fmt(outstanding)}</p>
             </div>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* KYC nudge */}
       {kyc_status !== 'APPROVED' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between"
-             onClick={() => navigate('/driver/kyc')} style={{ cursor: 'pointer' }}>
-          <div className="flex items-center gap-2">
+        <div className="wallet-banner wallet-banner--clickable" onClick={() => navigate('/driver/kyc')}>
+          <div className="wallet-banner__body">
             <span>⚠️</span>
             <div>
               <p className="text-sm font-semibold text-amber-800">KYC {kyc_status}</p>
-              <p className="text-xs text-amber-600">Tap to upload your documents</p>
+              <p className="wallet-banner__note">Tap to upload your documents</p>
             </div>
           </div>
           <span className="text-amber-600 font-bold text-lg">›</span>
@@ -130,25 +131,23 @@ export default function DriverWalletTab() {
 
       {/* Vehicle */}
       {vehicle ? (
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-bold text-gray-800">Your Vehicle</p>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: '#DCFCE7', color: '#16A34A' }}>
-              ASSIGNED
-            </span>
+        <div className="vehicle-card">
+          <div className="vehicle-card__head">
+            <div>
+              <p className="text-sm font-bold text-gray-800">Your Vehicle</p>
+              <span className="status-pill status-pill--approved">ASSIGNED</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                 style={{ backgroundColor: '#FDF3E8' }}>🚗</div>
-            <div>
-              <p className="text-base font-black text-gray-900">{vehicle.reg_number}</p>
-              <p className="text-xs text-gray-500">
+            <div className="vehicle-card__icon">🚗</div>
+            <div className="vehicle-card__info">
+              <p className="vehicle-card__title">{vehicle.reg_number}</p>
+              <p className="vehicle-card__meta">
                 {vehicle.type}{vehicle.model ? ` • ${vehicle.model}` : ''}
               </p>
             </div>
-            <div className="ml-auto text-right">
-              <p className="text-sm font-bold" style={{ color: '#4f46e5' }}>{fmt(vehicle.rent_amount)}</p>
+            <div className="vehicle-card__price">
+              <p className="text-sm font-bold text-brand">{fmt(vehicle.rent_amount)}</p>
               <p className="text-[10px] text-gray-400">/{vehicle.rent_type?.toLowerCase()}</p>
             </div>
           </div>
@@ -163,8 +162,7 @@ export default function DriverWalletTab() {
       {/* Pay CTA */}
       {outstanding > 0 && (
         <button onClick={() => navigate('/driver/pay')}
-          className="w-full py-4 rounded-2xl font-black text-base text-white shadow-md"
-          style={{ backgroundColor: '#16A34A' }}>
+          className="action-button action-button--full rounded-2xl py-4 font-black text-base shadow-md">
           Pay {fmt(outstanding)} Now
         </button>
       )}
@@ -181,19 +179,18 @@ export default function DriverWalletTab() {
           return (
             <div key={entry.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-                     style={{ backgroundColor: isPos ? '#DCFCE7' : '#FEE2E2', color: isPos ? '#16A34A' : '#DC2626' }}>
+                <div className={`entry-icon ${isPos ? 'entry-icon--positive' : 'entry-icon--negative'}`}>
                   {isPos ? '↑' : '↓'}
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-800">{meta.label}</p>
+                  <p className="entry-label">{meta.label}</p>
                   {entry.description && (
-                    <p className="text-[10px] text-gray-400 truncate max-w-40">{entry.description}</p>
+                    <p className="entry-note">{entry.description}</p>
                   )}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-sm font-bold" style={{ color: meta.color }}>
+                <p className={`entry-amount ${isPos ? 'entry-amount--positive' : 'entry-amount--negative'}`}>
                   {isPos ? '+' : ''}{fmt(entry.amount)}
                 </p>
                 <p className="text-[10px] text-gray-400">
@@ -205,6 +202,7 @@ export default function DriverWalletTab() {
         })}
       </div>
 
-    </div>
+      </div>
+    </AppShell>
   );
 }

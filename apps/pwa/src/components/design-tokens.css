@@ -1,0 +1,55 @@
+/* Central design tokens shared across the PWA
+   Sourced from legacy frontend variables and the new theme.
+*/
+:root {
+  /* Brand palette */
+  --indigo:     #4f46e5;
+  --indigo-d:   #4338ca;
+  --indigo-l:   #6366f1;
+  --gold:       #c4965a;
+  --gold-l:     #d9ae74;
+
+  /* Semantic tokens */
+  --bg-dark: #0f172a;
+  --bg-dark-2: #131b33;
+  --bg-surface: rgba(15,23,42,0.85);
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --surface-muted: #f1f5f9;
+
+  --brand: var(--indigo);
+  --brand-dark: var(--indigo-d);
+  --brand-soft: var(--indigo-l);
+  --brand-alt: var(--gold);
+
+  --text-on-dark: #ffffff;
+  --text: #0f172a;
+  --text-muted: #64748b;
+
+  --border: #e2e8f0;
+
+  /* Elevation */
+  --shadow-soft: 0 12px 40px rgba(15, 23, 42, 0.12);
+  --shadow-rich: 0 24px 64px rgba(15, 23, 42, 0.18);
+
+  /* Radii */
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+
+  /* Spacing scale (useful classes will reference these) */
+  --space-xs: 6px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+}
+
+/* Utility aliases for legacy class mapping */
+:root {
+  --bg: var(--surface-soft);
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
