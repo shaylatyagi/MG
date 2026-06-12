@@ -709,19 +709,107 @@ export default function DriverPWA() {
 
   // ── ACCOUNT TAB ───────────────────────────────────────────────────────────
   const AccountTab = () => {
-    const handleFileUpload = async (docType, file) => {
+    const [uploadPreview, setUploadPreview] = useState(null); // { docType, file, dataUrl }
+    const [uploading, setUploading]         = useState(false);
+    const [uploadDone, setUploadDone]       = useState('');
+
+    const selectForPreview = (docType, file) => {
       if (!file) return;
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => setUploadPreview({ docType, file, dataUrl: e.target.result });
+        reader.readAsDataURL(file);
+      } else {
+        setUploadPreview({ docType, file, dataUrl: null });
+      }
+    };
+
+    const confirmUpload = async () => {
+      if (!uploadPreview || uploading) return;
+      setUploading(true);
+      const { docType, file } = uploadPreview;
       const formData = new FormData();
-      formData.append('document', file); formData.append('type', docType); formData.append('phone', phone());
+      formData.append('document', file);
+      formData.append('type', docType);
+      formData.append('phone', phone());
       try {
-        const res = await fetch(`${API}/api/kyc/upload-document`, { method: 'POST', headers: { Authorization: `Bearer ${tk()}` }, body: formData });
+        const res = await fetch(`${API}/api/kyc/upload-document`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tk()}` },
+          body: formData
+        });
         const data = await res.json();
-        alert(data.success ? `✅ ${docType} uploaded` : 'Upload failed');
-      } catch { alert('Upload failed'); }
+        setUploadPreview(null);
+        if (data.success) {
+          setUploadDone(`✅ ${docType} submitted for admin review!`);
+          setTimeout(() => setUploadDone(''), 4000);
+        } else {
+          alert('Upload failed: ' + (data.message || ''));
+        }
+      } catch { alert('Upload failed — network error'); }
+      finally { setUploading(false); }
     };
 
     return (
       <div className="space-y-3 pb-4">
+
+      {/* ── Document Upload Preview Sheet ── */}
+      {uploadPreview && (
+        <div className="fixed inset-0 bg-black/70 z-[9999] flex items-end justify-center">
+          <div className="bg-white rounded-t-3xl w-full max-w-sm overflow-hidden shadow-2xl">
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-slate-300 rounded-full"/>
+            </div>
+            {/* Header */}
+            <div className="px-5 pb-3 pt-2 border-b border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Preview</p>
+              <p className="text-base font-black text-slate-800">{uploadPreview.docType.replace(/_/g,' ')}</p>
+              <p className="text-xs text-slate-500 truncate mt-0.5">{uploadPreview.file.name}</p>
+              <p className="text-[10px] text-slate-400">{(uploadPreview.file.size / 1024).toFixed(0)} KB</p>
+            </div>
+            {/* Preview */}
+            <div className="p-4">
+              {uploadPreview.dataUrl ? (
+                <img
+                  src={uploadPreview.dataUrl}
+                  alt="document preview"
+                  className="w-full max-h-64 object-contain rounded-2xl border border-slate-200 bg-slate-50"
+                />
+              ) : (
+                <div className="w-full h-36 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col items-center justify-center gap-2">
+                  <span className="text-4xl">📄</span>
+                  <span className="text-xs font-black text-slate-500">PDF Document</span>
+                </div>
+              )}
+              <p className="text-[10px] text-slate-400 text-center mt-2">
+                ✅ Upload ho jaega aur admin review karega
+              </p>
+            </div>
+            {/* Actions */}
+            <div className="px-4 pb-8 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setUploadPreview(null)}
+                className="py-3.5 bg-slate-100 text-slate-700 font-black rounded-2xl text-sm hover:bg-slate-200 transition">
+                Cancel
+              </button>
+              <button
+                onClick={confirmUpload}
+                disabled={uploading}
+                className="py-3.5 bg-indigo-600 text-white font-black rounded-2xl text-sm hover:bg-indigo-700 disabled:opacity-60 transition flex items-center justify-center gap-2">
+                {uploading ? <><span className="animate-spin">⏳</span> Uploading…</> : '✅ Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload success toast */}
+      {uploadDone && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 text-sm font-black text-emerald-700 text-center">
+          {uploadDone}
+        </div>
+      )}
         {/* Profile card — fixed layout */}
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="bg-indigo-600 px-5 pt-6 pb-5">
@@ -795,7 +883,7 @@ export default function DriverPWA() {
             )}
             <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed mt-2">
               <Camera size={11}/> Upload Aadhaar
-              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => handleFileUpload('AADHAAR', e.target.files[0])}/>
+              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => selectForPreview('AADHAAR', e.target.files[0])}/>
             </label>
           </div>
 
@@ -815,7 +903,7 @@ export default function DriverPWA() {
             {kycState.pan.verifiedName && <p className="text-[10px] text-indigo-600 font-black mb-2">✓ {kycState.pan.verifiedName}</p>}
             <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
               <Camera size={11}/> Upload PAN
-              <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload('PAN', e.target.files[0])}/>
+              <input type="file" accept="image/*" className="hidden" onChange={e => selectForPreview('PAN', e.target.files[0])}/>
             </label>
           </div>
 
@@ -837,7 +925,7 @@ export default function DriverPWA() {
               className="w-full border border-slate-200 rounded-xl p-2.5 text-sm mb-2 bg-slate-50 focus:outline-none focus:border-indigo-500"/>
             <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
               <Camera size={11}/> Upload License
-              <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload('DL', e.target.files[0])}/>
+              <input type="file" accept="image/*" className="hidden" onChange={e => selectForPreview('DL', e.target.files[0])}/>
             </label>
           </div>
 
@@ -859,7 +947,7 @@ export default function DriverPWA() {
             </div>
             <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
               <Camera size={11}/> Upload Cheque
-              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => handleFileUpload('BANK', e.target.files[0])}/>
+              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => selectForPreview('BANK', e.target.files[0])}/>
             </label>
           </div>
         </div>

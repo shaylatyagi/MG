@@ -1,10 +1,26 @@
-const express = require('express');
-const multer  = require('multer');
-const router  = express.Router();
-const pool    = require('../config/db');
+const express    = require('express');
+const multer     = require('multer');
+const router     = express.Router();
+const pool       = require('../config/db');
 const { logAudit } = require('../utils/audit');
+const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-// multer — memory storage for admin uploads (S3 not wired yet)
+const s3 = new S3Client({
+  region: process.env.AWS_REGION || 'ap-south-1',
+  credentials: {
+    accessKeyId:     process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+const BUCKET = process.env.AWS_S3_BUCKET || 'mobilitygrid-docs';
+
+async function adminPresignedUrl(key) {
+  if (!key) return null;
+  return getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 });
+}
+
+// multer — memory storage for admin uploads
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -778,7 +794,7 @@ router.get('/companies/:companyId/docs', async (req, res) => {
       `SELECT ud.id, ud.user_id, ud.user_type, ud.doc_type,
               ud.original_name, ud.file_size, ud.mime_type,
               ud.status, ud.review_notes, ud.uploaded_at,
-              COALESCE(o.full_name, d.full_name) AS user_name
+              COALESCE(o.full_name, d.name) AS user_name
        FROM public.user_documents ud
        LEFT JOIN public.owners  o ON o.id  = ud.user_id AND ud.user_type = 'OWNER'
        LEFT JOIN public.drivers d ON d.id  = ud.user_id AND ud.user_type = 'DRIVER'
@@ -843,6 +859,22 @@ router.patch('/user-docs/:docId/status', async (req, res) => {
 
     logAudit(`DOC_${status}`, 'document', docId, 'admin', { reason });
     res.json({ success: true, doc: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET presigned view URL for a document
+router.get('/user-docs/:docId/view', async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const result = await pool.query(
+      'SELECT s3_key, original_name, mime_type FROM public.user_documents WHERE id=$1',
+      [docId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    const { s3_key, original_name, mime_type } = result.rows[0];
+    if (!s3_key) return res.status(404).json({ error: 'No file stored for this document' });
+    const view_url = await adminPresignedUrl(s3_key);
+    res.json({ success: true, view_url, original_name, mime_type });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1045,6 +1077,59 @@ router.patch('/vehicles/:vehicleId/branch', async (req, res) => {
     const { vehicleId } = req.params;
     const { branch_id } = req.body;
     await pool.query('UPDATE public.vehicles SET branch_id = $1 WHERE id = $2', [branch_id || null, vehicleId]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── DOCUMENT APPROVAL WORKFLOW ───────────────────────────────────────────────
+
+// GET /api/admin/document-approvals — list all PENDING documents
+router.get('/document-approvals', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        ud.*,
+        COALESCE(d.name, o.full_name)                 AS user_name,
+        COALESCE(d.mobile_number, o.mobile_number)    AS user_phone,
+        c.company_name
+      FROM public.user_documents ud
+      LEFT JOIN public.drivers d  ON d.id  = ud.user_id AND ud.user_type = 'DRIVER'
+      LEFT JOIN public.owners  o  ON o.id  = ud.user_id AND ud.user_type = 'OWNER'
+      LEFT JOIN public.companies c ON c.id = COALESCE(d.company_id, o.company_id)
+      WHERE ud.status = 'PENDING'
+      ORDER BY ud.uploaded_at DESC
+    `);
+    const docs = await Promise.all(result.rows.map(async doc => ({
+      ...doc,
+      view_url: await adminPresignedUrl(doc.s3_key).catch(() => null),
+    })));
+    res.json({ success: true, docs, count: docs.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/admin/document-approvals/:id/approve
+router.put('/document-approvals/:id/approve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query(
+      "UPDATE public.user_documents SET status='APPROVED', reviewed_at=NOW() WHERE id=$1",
+      [id]
+    );
+    await logAudit('ADMIN', 'DOCUMENT_APPROVED', { doc_id: id });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/admin/document-approvals/:id/reject
+router.put('/document-approvals/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    await pool.query(
+      "UPDATE public.user_documents SET status='REJECTED', rejection_reason=$2, reviewed_at=NOW() WHERE id=$1",
+      [id, reason || null]
+    );
+    await logAudit('ADMIN', 'DOCUMENT_REJECTED', { doc_id: id, reason });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

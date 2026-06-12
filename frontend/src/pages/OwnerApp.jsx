@@ -515,12 +515,33 @@ const fetchAvailableVehicles = async (driverId) => {
 const DriverDetailsModal = () => {
   // ✅ Hooks PEHLE — early return se pehle
   const [driverHistory, setDriverHistory] = useState(null);
+  const [agreementViewUrl, setAgreementViewUrl]       = useState('');
+  const [fetchingAgreement, setFetchingAgreement]     = useState(false);
+  const [agreementPreviewUrl, setAgreementPreviewUrl] = useState(null);
+  const [uploadingAgreement, setUploadingAgreement]   = useState(false);
+
   useEffect(() => {
     if (!selectedDriverDetails?.id) return;
     fetch(`${API}/api/payment/owner/driver-history/${selectedDriverDetails.id}`, {
       headers: { Authorization: `Bearer ${token()}` }
     }).then(r => r.json()).then(setDriverHistory).catch(() => {});
   }, [selectedDriverDetails?.id]);
+
+  const viewAgreement = async () => {
+    if (agreementViewUrl) { window.open(agreementViewUrl, '_blank'); return; }
+    setFetchingAgreement(true);
+    try {
+      const r = await fetch(
+        `${API}/api/uploads/my-docs?user_id=${selectedDriverDetails.id}&user_type=DRIVER`,
+        { headers: { Authorization: `Bearer ${token()}` } }
+      );
+      const data = await r.json();
+      const agDoc = data.docs?.find(d => d.doc_type === 'AGREEMENT');
+      if (agDoc?.view_url) { setAgreementViewUrl(agDoc.view_url); window.open(agDoc.view_url, '_blank'); }
+      else alert('Document not found or expired. Try re-uploading.');
+    } catch { alert('Could not fetch document URL'); }
+    finally { setFetchingAgreement(false); }
+  };
 
   if (!selectedDriverDetails) return null;
   const driver = selectedDriverDetails;
@@ -726,45 +747,101 @@ const DriverDetailsModal = () => {
             <p className="text-[10px] text-slate-400">Replace with new file below</p>
           </div>
         </div>
+        <button
+          onClick={viewAgreement}
+          disabled={fetchingAgreement}
+          className="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 disabled:opacity-50"
+        >
+          {fetchingAgreement ? '…' : '👁 View'}
+        </button>
       </div>
     ) : (
       <p className="text-sm text-amber-600 font-black mb-2">⚠️ No agreement uploaded yet</p>
     )}
     <div className="mt-3 space-y-2">
-      <input
-        type="file"
-        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-        onChange={e => setAgreementFile(e.target.files[0])}
-        className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-      />
-      {agreementFile && (
-        <button
-          onClick={async () => {
-            const fd = new FormData();
-            fd.append('document', agreementFile);
-            fd.append('driverId', driver.id);
-            try {
-              const r = await fetch(`${API}/api/uploads/agreement`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token()}` },
-                body: fd
-              });
-              const data = await r.json();
-              if (data.success) {
-                alert('✅ Agreement uploaded!');
-                setAgreementFile(null);
-                fetchAllData();
-              } else {
-                alert(data.message || 'Upload failed');
-              }
-            } catch {
-              alert('Upload failed — network error');
+      <label className="flex items-center justify-center gap-2 w-full py-2.5 bg-slate-50 rounded-xl text-xs font-black text-slate-500 cursor-pointer hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 border-dashed transition">
+        📎 Choose File
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+          className="hidden"
+          onChange={e => {
+            const f = e.target.files[0];
+            if (!f) return;
+            setAgreementFile(f);
+            if (f.type.startsWith('image/')) {
+              const reader = new FileReader();
+              reader.onload = ev => setAgreementPreviewUrl(ev.target.result);
+              reader.readAsDataURL(f);
+            } else {
+              setAgreementPreviewUrl(null);
             }
           }}
-          className="w-full bg-indigo-600 text-white text-xs font-black py-2.5 rounded-xl hover:bg-indigo-700 transition"
-        >
-          📤 Upload: {agreementFile.name.length > 25 ? agreementFile.name.slice(0,25)+'…' : agreementFile.name}
-        </button>
+        />
+      </label>
+      {agreementFile && (
+        <div className="rounded-2xl overflow-hidden border border-indigo-200 bg-white shadow-sm">
+          {/* Preview area */}
+          {agreementPreviewUrl ? (
+            <img
+              src={agreementPreviewUrl}
+              alt="agreement preview"
+              className="w-full max-h-52 object-contain bg-slate-50 border-b border-indigo-100"
+            />
+          ) : (
+            <div className="bg-indigo-50 px-4 py-5 flex items-center gap-3 border-b border-indigo-100">
+              <span className="text-3xl">📄</span>
+              <div>
+                <p className="text-xs font-black text-slate-800 truncate max-w-[200px]">{agreementFile.name}</p>
+                <p className="text-[10px] text-slate-400">{(agreementFile.size/1024).toFixed(0)} KB · PDF</p>
+              </div>
+            </div>
+          )}
+          {/* File info row */}
+          <div className="px-3 py-2 flex items-center justify-between bg-indigo-50/50">
+            <p className="text-[10px] text-slate-500 truncate max-w-[180px]">{agreementFile.name}</p>
+            <button
+              onClick={() => { setAgreementFile(null); setAgreementPreviewUrl(null); }}
+              className="text-[10px] text-red-400 font-black hover:text-red-600"
+            >✕ Remove</button>
+          </div>
+          {/* Confirm upload button */}
+          <button
+            onClick={async () => {
+              setUploadingAgreement(true);
+              const fd = new FormData();
+              fd.append('document', agreementFile);
+              fd.append('driverId', driver.id);
+              try {
+                const r = await fetch(`${API}/api/uploads/agreement`, {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${token()}` },
+                  body: fd
+                });
+                const data = await r.json();
+                if (data.success) {
+                  setAgreementFile(null);
+                  setAgreementPreviewUrl(null);
+                  setAgreementViewUrl(data.view_url || '');
+                  setSelectedDriverDetails(prev => ({ ...prev, agreement_uploaded: true }));
+                  fetchAllData();
+                } else {
+                  alert(data.message || 'Upload failed');
+                }
+              } catch {
+                alert('Upload failed — network error');
+              } finally {
+                setUploadingAgreement(false);
+              }
+            }}
+            disabled={uploadingAgreement}
+            className="w-full bg-indigo-600 text-white text-xs font-black py-3 hover:bg-indigo-700 disabled:opacity-60 transition flex items-center justify-center gap-2"
+          >
+            {uploadingAgreement
+              ? <><span className="animate-spin">⏳</span> Uploading…</>
+              : '✅ Confirm & Submit for Approval'}
+          </button>
+        </div>
       )}
     </div>
   </div>

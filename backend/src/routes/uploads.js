@@ -72,7 +72,7 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
          s3_key        = EXCLUDED.s3_key,
          file_size     = EXCLUDED.file_size,
          mime_type     = EXCLUDED.mime_type,
-         status        = 'UPLOADED',
+         status        = 'PENDING',
          uploaded_at   = NOW()`,
       [uId, uType, doc_type, file.originalname, s3Key, file.size, file.mimetype]
     );
@@ -158,10 +158,10 @@ router.post('/agreement', verifyToken, upload.single('document'), async (req, re
     await pool.query(
       `INSERT INTO public.user_documents
          (user_id, user_type, doc_type, original_name, s3_key, file_size, mime_type, status)
-       VALUES ($1,'DRIVER','AGREEMENT',$2,$3,$4,$5,'UPLOADED')
+       VALUES ($1,'DRIVER','AGREEMENT',$2,$3,$4,$5,'PENDING')
        ON CONFLICT (user_id, user_type, doc_type)
        DO UPDATE SET original_name=EXCLUDED.original_name, s3_key=EXCLUDED.s3_key,
-         file_size=EXCLUDED.file_size, status='UPLOADED', uploaded_at=NOW()`,
+         file_size=EXCLUDED.file_size, status='PENDING', uploaded_at=NOW()`,
       [driverId, f.originalname, s3Key, f.size, f.mimetype]
     );
 

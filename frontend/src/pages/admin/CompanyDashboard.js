@@ -277,7 +277,18 @@ function DocumentsSection({ userType, userId }) {
                 <td className="px-3 py-2"><Badge status={d.status} /></td>
                 <td className="px-3 py-2 text-gray-400 dark:text-gray-500">{timeSince(d.uploaded_at)}</td>
                 <td className="px-3 py-2">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const r = await api(`/api/admin/user-docs/${d.id}/view`);
+                          if (r.view_url) window.open(r.view_url, '_blank');
+                          else alert('No file stored for this document');
+                        } catch { alert('Could not load document URL'); }
+                      }}
+                      className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full font-medium hover:bg-indigo-100">
+                      👁 View
+                    </button>
                     {d.status !== 'APPROVED' && (
                       <button onClick={() => updateStatus(d.id, 'APPROVED')}
                         className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium hover:bg-green-200">
@@ -980,14 +991,25 @@ function CompanyDocsSection({ companyId }) {
                   <td className="px-3 py-2"><Badge status={d.status} /></td>
                   <td className="px-3 py-2 text-gray-400 dark:text-gray-500 text-xs">{timeSince(d.uploaded_at)}</td>
                   <td className="px-3 py-2">
-                    {d.status === 'UPLOADED' && (
-                      <div className="flex gap-1">
+                    <div className="flex gap-1 flex-wrap">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const r = await api(`/api/admin/user-docs/${d.id}/view`);
+                            if (r.view_url) window.open(r.view_url, '_blank');
+                            else alert('No file stored for this document');
+                          } catch { alert('Could not load document URL'); }
+                        }}
+                        className="text-xs text-indigo-600 hover:underline">👁 View</button>
+                      {d.status !== 'APPROVED' && (
                         <button onClick={() => updateStatus(d.id, 'APPROVED')}
-                          className="text-xs text-green-600 hover:underline">✓ Approve</button>
+                          className="text-xs text-green-600 hover:underline ml-1">✓ Approve</button>
+                      )}
+                      {d.status !== 'REJECTED' && (
                         <button onClick={() => updateStatus(d.id, 'REJECTED')}
                           className="text-xs text-red-500 hover:underline ml-1">✗ Reject</button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -2265,6 +2287,153 @@ function ChatViewer() {
   );
 }
 
+// ── DOCUMENT APPROVALS ────────────────────────────────────────────────────────
+function DocApprovals() {
+  const [docs, setDocs]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [rejectId, setRejectId] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const load = () => {
+    setLoading(true);
+    api('/api/admin/document-approvals')
+      .then(d => { setDocs(d.docs || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const approve = async (id) => {
+    await api(`/api/admin/document-approvals/${id}/approve`, { method: 'PUT' }).catch(() => {});
+    load();
+  };
+
+  const reject = async () => {
+    if (!rejectId) return;
+    await api(`/api/admin/document-approvals/${rejectId}/reject`, {
+      method: 'PUT',
+      body: JSON.stringify({ reason: rejectReason }),
+    }).catch(() => {});
+    setRejectId(null);
+    setRejectReason('');
+    load();
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Reject reason modal */}
+      {rejectId && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 className="font-bold text-gray-900 dark:text-white mb-1">Reject Document</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Optional: provide reason for rejection.</p>
+            <textarea
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              placeholder="e.g. Image blurry, wrong document type…"
+              className="w-full border dark:border-gray-600 rounded-xl p-3 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-red-400 bg-white dark:bg-gray-800 dark:text-gray-200"
+            />
+            <div className="flex gap-3 mt-4">
+              <button onClick={() => { setRejectId(null); setRejectReason(''); }}
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                Cancel
+              </button>
+              <button onClick={reject}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition">
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">Document Approvals</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Review and approve documents uploaded by drivers and owners.
+          </p>
+        </div>
+        <button onClick={load} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1.5 bg-indigo-50 rounded-lg">
+          ↻ Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <Spinner />
+      ) : docs.length === 0 ? (
+        <div className="text-center py-16 text-gray-400 dark:text-gray-500">
+          <div className="text-5xl mb-3">✅</div>
+          <p className="font-medium">No pending documents</p>
+          <p className="text-sm mt-1">All uploads have been reviewed.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {docs.map(d => (
+            <div key={d.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition">
+              {/* Document preview */}
+              <div
+                className="h-40 bg-gray-50 dark:bg-gray-700 flex items-center justify-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition relative group"
+                onClick={() => d.view_url && window.open(d.view_url, '_blank')}
+              >
+                {d.mime_type?.startsWith('image/') && d.view_url ? (
+                  <img src={d.view_url} alt={d.original_name} className="h-full w-full object-contain" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+                    <span className="text-4xl">📄</span>
+                    <span className="text-xs font-medium">Click to View PDF</span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 text-white bg-black/50 rounded-full px-3 py-1 text-xs font-medium transition">
+                    👁 Open
+                  </span>
+                </div>
+              </div>
+
+              {/* Meta */}
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div>
+                    <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm">
+                      {d.doc_type?.replace(/_/g, ' ')}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {d.user_name || '—'} · {d.user_type}
+                    </p>
+                    {d.company_name && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{d.company_name}</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5 rounded-full font-medium shrink-0">
+                    PENDING
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 truncate">{d.original_name}</p>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">{fileSize(d.file_size)} · {timeSince(d.uploaded_at)}</p>
+
+                {/* Action buttons */}
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => approve(d.id)}
+                    className="flex-1 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 transition">
+                    ✓ Approve
+                  </button>
+                  <button
+                    onClick={() => setRejectId(d.id)}
+                    className="flex-1 py-2 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-xl text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition border border-red-200 dark:border-red-800">
+                    ✕ Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── MAIN ADMIN PANEL ──────────────────────────────────────────────────────────
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
@@ -2274,14 +2443,15 @@ function AdminPanelInner() {
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
   const navItems = [
-    { key: 'dashboard',    label: 'Dashboard',   icon: '📊' },
-    { key: 'companies',    label: 'Companies',    icon: '🏢' },
-    { key: 'owners',       label: 'Owners',       icon: '👤' },
-    { key: 'drivers',      label: 'All Drivers',  icon: '🚗' },
-    { key: 'kyc',          label: 'KYC Review',   icon: '🪪' },
-    { key: 'transactions', label: 'Transactions', icon: '💳' },
-    { key: 'chat',         label: 'Chat',         icon: '💬' },
-    { key: 'audit',        label: 'Audit Log',    icon: '📋' },
+    { key: 'dashboard',    label: 'Dashboard',     icon: '📊' },
+    { key: 'companies',    label: 'Companies',      icon: '🏢' },
+    { key: 'owners',       label: 'Owners',         icon: '👤' },
+    { key: 'drivers',      label: 'All Drivers',    icon: '🚗' },
+    { key: 'kyc',          label: 'KYC Review',     icon: '🪪' },
+    { key: 'docs',         label: 'Doc Approvals',  icon: '📄' },
+    { key: 'transactions', label: 'Transactions',   icon: '💳' },
+    { key: 'chat',         label: 'Chat',           icon: '💬' },
+    { key: 'audit',        label: 'Audit Log',      icon: '📋' },
   ];
 
   const doLogout = () => { clearToken(); window.location.href = '/login'; };
@@ -2332,6 +2502,7 @@ function AdminPanelInner() {
           {tab === 'owners'       && <AllOwners />}
           {tab === 'drivers'      && <AllDrivers />}
           {tab === 'kyc'          && <KycReview />}
+          {tab === 'docs'         && <DocApprovals />}
           {tab === 'transactions' && <Transactions />}
           {tab === 'chat'         && <ChatViewer />}
           {tab === 'audit'        && <AuditLog />}
