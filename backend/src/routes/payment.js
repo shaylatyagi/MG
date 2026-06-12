@@ -3250,4 +3250,4 @@ router.get('/manager/profile', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Upgrade to premium (admin manually upgrades, or payment webhook)                                                                                                                                                                                                                                                                 
+// Upgrade to premium (admin manually upgrades, or payment webhook)

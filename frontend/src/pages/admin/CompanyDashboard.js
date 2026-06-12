@@ -1280,7 +1280,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                         <button onClick={e => { e.stopPropagation(); deleteBranch(b.id); }}
                           className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5">✕</button>
                       </div>
-                      <div className="flex gap-4 mt-3">
+                      <div className="flex flex-wrap gap-4 mt-3">
                         <div className="text-center">
                           <p className="text-lg font-bold text-indigo-600">{b.driver_count || 0}</p>
                           <p className="text-[10px] text-gray-400 uppercase">Drivers</p>
@@ -1288,6 +1288,14 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                         <div className="text-center">
                           <p className="text-lg font-bold text-violet-600">{b.vehicle_count || 0}</p>
                           <p className="text-[10px] text-gray-400 uppercase">Vehicles</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-emerald-600">{fmt(b.collection_today || 0)}</p>
+                          <p className="text-[10px] text-gray-400 uppercase">Today</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-blue-600">{fmt(b.collection_month || 0)}</p>
+                          <p className="text-[10px] text-gray-400 uppercase">This Month</p>
                         </div>
                       </div>
                     </div>
