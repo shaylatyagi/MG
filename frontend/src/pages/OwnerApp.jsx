@@ -856,24 +856,6 @@ const DriverDetailsModal = () => {
 )}
         </div>
 
-{/* ── Logout Confirm Modal ───────────────────────────────────────────── */}
-{showLogoutConfirm && (
-  <div className="absolute inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
-    <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
-      <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
-        <LogOut size={20} className="text-red-500" />
-      </div>
-      <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
-      <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
-      <div className="flex gap-3">
-        <button onClick={() => setShowLogoutConfirm(false)}
-          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
-        <button onClick={logout}
-          className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
-      </div>
-    </div>
-  </div>
-)}
       </div>
     </div>
   );
@@ -1871,12 +1853,10 @@ const DriversTab = () => {
 const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicle_id));
               
               return (
-                <div key={i} className={`p-4 transition ${hasVehicle ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                <div key={i} className="p-4 transition cursor-pointer hover:bg-slate-50"
                   onClick={() => {
-                    if (hasVehicle) {
-                      setSelectedDriverDetails(driver);
-                      setShowDriverDetailsModal(true);
-                    }
+                    setSelectedDriverDetails(driver);
+                    setShowDriverDetailsModal(true);
                   }}
                 >
                   <div className="flex items-center justify-between mb-2">
@@ -4446,25 +4426,26 @@ const ProfileTab = () => {
     </div>
   </div>
 )}
-{/* ── Logout Confirm Modal ─────────────────────────────────────── */}
-{showLogoutConfirm && (
-  <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
-    <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
-      <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
-        <LogOut size={20} className="text-red-500" />
-      </div>
-      <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
-      <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
-      <div className="flex gap-3">
-        <button onClick={() => setShowLogoutConfirm(false)}
-          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
-        <button onClick={logout}
-          className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
       </div>
     </div>
+    {/* ── Logout Confirm Modal — outside overflow:hidden, z-9999 ── */}
+    {showLogoutConfirm && (
+      <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+            <LogOut size={20} className="text-red-500" />
+          </div>
+          <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
+          <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
+          <div className="flex gap-3">
+            <button onClick={() => setShowLogoutConfirm(false)}
+              className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
+            <button onClick={logout}
+              className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>
-)}
-      </div>
-    </div>
   );
 }
