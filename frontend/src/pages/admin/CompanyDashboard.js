@@ -303,9 +303,10 @@ function DocumentsSection({ userType, userId }) {
 
 // ── LOGIN PAGE ─────────────────────────────────────────────────────────────────
 function LoginPage({ onLogin }) {
-  const [step, setStep]       = useState('login');
+  const [step, setStep]       = useState('login'); // 'login' | 'forgot' | 'otp'
   const [phone, setPhone]     = useState('');
   const [password, setPassword] = useState('');
+  const [forgotPhone, setForgotPhone] = useState('');
   const [otp, setOtp]         = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
@@ -327,11 +328,10 @@ function LoginPage({ onLogin }) {
   const sendOtp = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      const data = await api('/api/auth/admin-send-otp', {
+      await api('/api/auth/admin-send-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone_number: phone, admin_secret: '' }),
+        body: JSON.stringify({ phone_number: forgotPhone, admin_secret: '' }),
       });
-      if (data.otp) setOtp(data.otp);
       setStep('otp');
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
@@ -342,7 +342,7 @@ function LoginPage({ onLogin }) {
     try {
       const data = await api('/api/auth/admin-verify-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone_number: phone, otp, admin_secret: '' }),
+        body: JSON.stringify({ phone_number: forgotPhone, otp, admin_secret: '' }),
       });
       setToken(data.token);
       onLogin();
@@ -369,7 +369,7 @@ function LoginPage({ onLogin }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
               <input type="tel" value={phone} autoFocus
                 onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
-                required placeholder="10-digit mobile number"
+                required placeholder="10-digit number"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
             </div>
             <div>
@@ -377,9 +377,9 @@ function LoginPage({ onLogin }) {
               <div className="relative">
                 <input type={showPass ? 'text' : 'password'} value={password}
                   onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm pr-10" />
-                <button type="button" onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 text-xs">
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm pr-12" />
+                <button type="button" onClick={() => setShowPass(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">
                   {showPass ? 'Hide' : 'Show'}
                 </button>
               </div>
@@ -388,51 +388,58 @@ function LoginPage({ onLogin }) {
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
-            <div className="text-center">
-              <button type="button" onClick={() => { setStep('forgot'); setError(''); }}
-                className="text-sm text-indigo-600 hover:text-indigo-800">
-                Forgot password? Sign in with OTP →
-              </button>
-            </div>
+            <button type="button" onClick={() => { setStep('forgot'); setError(''); }}
+              className="w-full text-sm text-gray-500 hover:text-gray-700">
+              Forgot password? Use OTP
+            </button>
           </form>
         )}
 
         {step === 'forgot' && (
           <form onSubmit={sendOtp} className="space-y-4">
-            <p className="text-sm text-gray-600 text-center">Enter admin phone to receive OTP</p>
-            <input type="tel" value={phone} autoFocus
-              onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
-              required placeholder="10-digit mobile number"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Phone</label>
+              <input type="tel" value={forgotPhone} autoFocus
+                onChange={e => setForgotPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
+                required placeholder="10-digit number"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+            </div>
             <button type="submit" disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
               {loading ? 'Sending…' : 'Send OTP'}
             </button>
             <button type="button" onClick={() => { setStep('login'); setError(''); }}
-              className="w-full text-sm text-gray-500 hover:text-gray-700">← Back to password login</button>
+              className="w-full text-sm text-gray-500 hover:text-gray-700">
+              ← Back to login
+            </button>
           </form>
         )}
 
         {step === 'otp' && (
           <form onSubmit={verifyOtp} className="space-y-4">
-            <p className="text-sm text-gray-600 text-center">OTP sent to <strong>+91{phone}</strong></p>
-            <input type="text" value={otp} autoFocus onChange={e => setOtp(e.target.value)}
-              required placeholder="6-digit OTP" maxLength={6}
+            <p className="text-sm text-gray-600 text-center">OTP sent to <strong>+91{forgotPhone}</strong></p>
+            <input type="text" value={otp}
+              onChange={e => setOtp(e.target.value)} required autoFocus
+              placeholder="6-digit OTP" maxLength={6}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center text-2xl tracking-widest" />
             <button type="submit" disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
               {loading ? 'Verifying…' : 'Login'}
             </button>
             <button type="button" onClick={() => { setStep('forgot'); setOtp(''); }}
-              className="w-full text-sm text-gray-500 hover:text-gray-700">← Resend OTP</button>
+              className="w-full text-sm text-gray-500 hover:text-gray-700">
+              ← Resend OTP
+            </button>
           </form>
         )}
+
+        <p className="text-center text-xs text-gray-400 mt-6">MobilityGrid by PayYantra · Confidential</p>
       </div>
     </div>
   );
 }
 
-function Dashboard() {
+// ── DASHBOARD ───────────────────────────────────────────────────────────────────────────────
   const [stats, setStats]     = useState(null);
   const [kyc, setKyc]         = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2336,4 +2343,22 @@ function AdminPanelInner() {
             <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">Logout?</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Are you sure you want to sign out?</p>
             <div className="flex gap-3">
-   
+              <button onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200">Cancel</button>
+              <button onClick={doLogout}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold">Yes, Logout</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AdminPanel() {
+  return (
+    <ErrorBoundary>
+      <AdminPanelInner />
+    </ErrorBoundary>
+  );
+}

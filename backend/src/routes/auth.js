@@ -247,4 +247,18 @@ router.post('/admin-verify-otp', async (req, res) => {
   }
 });
 
+// POST /api/auth/admin-login  — Body: { phone_number, password }
+router.post('/admin-login', async (req, res) => {
+  const { phone_number, password } = req.body;
+  if (!phone_number || !password)
+    return res.status(400).json({ success: false, message: 'phone_number and password required' });
+  const expectedPw = process.env.ADMIN_PASSWORD;
+  if (!expectedPw)
+    return res.status(500).json({ success: false, message: 'Server misconfiguration: ADMIN_PASSWORD not set' });
+  if (password !== expectedPw)
+    return res.status(401).json({ success: false, message: 'Invalid credentials' });
+  const token = jwt.sign({ id: 'admin', role: 'admin', phone: phone_number }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  res.json({ success: true, token, user: { role: 'admin', phone: phone_number } });
+});
+
 module.exports = router;
