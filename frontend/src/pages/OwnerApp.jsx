@@ -2726,27 +2726,7 @@ const PaymentsTab = () => {
 
 // PROFILE TAB - Complete
 const ProfileTab = () => {
-  const [payMode, setPayMode] = useState(owner?.payment_mode || 'BOTH');
-  const [payModeSaving, setPayModeSaving] = useState(false);
-  const [payModeMsg, setPayModeMsg] = useState('');
 
-  const savePayMode = async () => {
-    setPayModeSaving(true); setPayModeMsg('');
-    try {
-      const res = await fetch(`${API}/api/owner/payment-mode`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify({ payment_mode: payMode })
-      });
-      const d = await res.json();
-      if (d.success) {
-        setPayModeMsg('✅ Saved');
-        setOwner(prev => ({ ...prev, payment_mode: payMode }));
-      } else setPayModeMsg(d.error || 'Failed');
-    } catch { setPayModeMsg('Network error'); }
-    setPayModeSaving(false);
-    setTimeout(() => setPayModeMsg(''), 3000);
-  };
 
   return (
   <div className="space-y-4 pb-4">
@@ -2799,26 +2779,13 @@ const ProfileTab = () => {
         <CreditCard size={16} className="text-indigo-600"/>
         <p className="text-sm font-black text-slate-800">Payment Mode</p>
       </div>
-      <p className="text-[10px] text-slate-400">Apni company ke liye payment mode set karo. Admin bhi change kar sakta hai.</p>
-      <select
-        value={payMode}
-        onChange={e => setPayMode(e.target.value)}
-        className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white focus:outline-none focus:border-indigo-500"
-      >
-        <option value="BOTH">💳 Both — Cash + Online</option>
-        <option value="CASH_ONLY">💵 Cash Only</option>
-        <option value="ONLINE_ONLY">📲 Online Payment</option>
-      </select>
-      <div className="flex items-center gap-3">
-        <button
-          onClick={savePayMode}
-          disabled={payModeSaving}
-          className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50"
-        >
-          {payModeSaving ? 'Saving...' : 'Save'}
-        </button>
-        {payModeMsg && <span className="text-xs font-black text-emerald-600">{payModeMsg}</span>}
+      <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
+        <span className="text-sm font-black text-slate-700">
+          {owner?.payment_mode === 'CASH_ONLY' ? '💵 Cash Only' : owner?.payment_mode === 'ONLINE_ONLY' ? '📲 Online Only' : '💳 Cash + Online'}
+        </span>
+        <span className="text-[10px] text-slate-400 bg-slate-200 px-2 py-1 rounded-full">Admin managed</span>
       </div>
+      <p className="text-[10px] text-slate-400">Payment mode is controlled by your admin. Contact admin to request a change.</p>
     </div>
 
     {/* ─── Manager Role (Premium) ─── */}
@@ -4267,6 +4234,24 @@ const ProfileTab = () => {
               className="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-black">✓ Done</button>
           </div>
         )}
+      </div>
+    </div>
+  </div>
+)}
+{/* ── Logout Confirm Modal ─────────────────────────────────────── */}
+{showLogoutConfirm && (
+  <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
+      <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+        <LogOut size={20} className="text-red-500" />
+      </div>
+      <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
+      <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
+      <div className="flex gap-3">
+        <button onClick={() => setShowLogoutConfirm(false)}
+          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
+        <button onClick={logout}
+          className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
       </div>
     </div>
   </div>
