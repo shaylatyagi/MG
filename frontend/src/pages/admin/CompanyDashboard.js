@@ -303,13 +303,13 @@ function DocumentsSection({ userType, userId }) {
 
 // ── LOGIN PAGE ─────────────────────────────────────────────────────────────────
 function LoginPage({ onLogin }) {
-  const [step, setStep]       = useState('login'); // 'login' | 'forgot' | 'otp'
-  const [phone, setPhone]     = useState('');
+  const [step, setStep]         = useState('login'); // 'login' | 'forgot' | 'otp'
+  const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
   const [forgotPhone, setForgotPhone] = useState('');
-  const [otp, setOtp]         = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [otp, setOtp]           = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
   const [showPass, setShowPass] = useState(false);
 
   const login = async (e) => {
@@ -439,7 +439,9 @@ function LoginPage({ onLogin }) {
   );
 }
 
-// ── DASHBOARD ───────────────────────────────────────────────────────────────────────────────
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function Dashboard() {
   const [stats, setStats]     = useState(null);
   const [kyc, setKyc]         = useState(null);
   const [loading, setLoading] = useState(true);
