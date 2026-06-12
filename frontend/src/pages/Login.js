@@ -496,4 +496,13 @@ export default function Login() {
       </button>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
         <button onClick={sendOwnerOTP} disabled={resendTimer > 0} style={{
-          fontSize
+          fontSize: '13px', color: resendTimer > 0 ? '#94a3b8' : '#4f46e5',
+          background: 'none', border: 'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
+          fontWeight: 600, fontFamily: 'inherit'
+        }}>
+          {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+        </button>
+      </div>
+    </Shell>
+  );
+}
