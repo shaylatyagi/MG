@@ -1,16 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
 
-const MAPS_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
 
 const NEARBY_TILES = [
-  { icon: '⚡', label: 'EV Charging',    query: 'electric+vehicle+charging+station', color: '#6d28d9', bg: '#f5f3ff' },
-  { icon: '⛽', label: 'Petrol Pump',    query: 'petrol+pump+near+me',                color: '#b45309', bg: '#fef3c7' },
-  { icon: '🏥', label: 'Hospital',       query: 'hospital+near+me',                   color: '#dc2626', bg: '#fef2f2' },
-  { icon: '🔧', label: 'Repair Shop',    query: 'vehicle+repair+shop+near+me',        color: '#0369a1', bg: '#f0f9ff' },
-  { icon: '🚔', label: 'Police Station', query: 'police+station+near+me',             color: '#0f172a', bg: '#f8fafc' },
-  { icon: '🛒', label: 'Grocery Store',  query: 'grocery+store+near+me',              color: '#16a34a', bg: '#f0fdf4' },
+  { icon: '⚡', label: 'EV Charging',    query: 'electric+vehicle+charging+station', overpassTag: 'amenity=charging_station', color: '#6d28d9', bg: '#f5f3ff' },
+  { icon: '⛽', label: 'Petrol Pump',    query: 'petrol+pump+near+me',               overpassTag: 'amenity=fuel',             color: '#b45309', bg: '#fef3c7' },
+  { icon: '🏥', label: 'Hospital',       query: 'hospital+near+me',                  overpassTag: 'amenity=hospital',         color: '#dc2626', bg: '#fef2f2' },
+  { icon: '🔧', label: 'Repair Shop',    query: 'vehicle+repair+shop+near+me',       overpassTag: 'shop=car_repair',          color: '#0369a1', bg: '#f0f9ff' },
+  { icon: '🚔', label: 'Police Station', query: 'police+station+near+me',            overpassTag: 'amenity=police',           color: '#0f172a', bg: '#f8fafc' },
+  { icon: '🛒', label: 'Grocery Store',  query: 'grocery+store+near+me',             overpassTag: 'shop=supermarket',         color: '#16a34a', bg: '#f0fdf4' },
 ];
 
 const faqs = [
@@ -36,6 +35,63 @@ export default function HelpSOS() {
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError]   = useState('');
   const [mapTile, setMapTile]           = useState(null);    // currently selected tile for embed
+
+  const nearbyMapRef  = useRef(null);  // Leaflet container DOM node
+  const nearbyLeafRef = useRef(null);  // Leaflet map instance
+
+  useEffect(() => {
+    if (!mapTile || !nearbyLoc || !nearbyMapRef.current) return;
+    const initNearbyMap = () => {
+      const L = window.L;
+      if (!L || !nearbyMapRef.current) return;
+      if (nearbyLeafRef.current) { nearbyLeafRef.current.remove(); nearbyLeafRef.current = null; }
+      const map = L.map(nearbyMapRef.current, { zoomControl: true, attributionControl: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      map.setView([nearbyLoc.lat, nearbyLoc.lng], 14);
+      const youIcon = L.divIcon({
+        className: '',
+        html: '<div style="width:16px;height:16px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(59,130,246,0.7)"></div>',
+        iconSize: [16, 16], iconAnchor: [8, 8],
+      });
+      L.marker([nearbyLoc.lat, nearbyLoc.lng], { icon: youIcon })
+        .bindPopup('<b>You are here</b>').addTo(map);
+      nearbyLeafRef.current = map;
+      const [oKey, oVal] = mapTile.overpassTag.split('=');
+      const q = `[out:json][timeout:20];(node["${oKey}"="${oVal}"](around:3000,${nearbyLoc.lat},${nearbyLoc.lng});way["${oKey}"="${oVal}"](around:3000,${nearbyLoc.lat},${nearbyLoc.lng}););out center;`;
+      fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!nearbyLeafRef.current) return;
+          const places = (data.elements || []).slice(0, 15);
+          const placeIcon = L.divIcon({ className: '', html: `<div style="font-size:20px;line-height:1">${mapTile.icon}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+          const latlngs = [[nearbyLoc.lat, nearbyLoc.lng]];
+          places.forEach(el => {
+            const plat = el.type === 'way' ? el.center?.lat : el.lat;
+            const plng = el.type === 'way' ? el.center?.lon : el.lon;
+            if (!plat || !plng) return;
+            L.marker([plat, plng], { icon: placeIcon })
+              .bindPopup(`<b>${el.tags?.name || mapTile.label}</b>`).addTo(nearbyLeafRef.current);
+            latlngs.push([plat, plng]);
+          });
+          if (latlngs.length > 1) nearbyLeafRef.current.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30] });
+        })
+        .catch(() => {});
+    };
+    if (!document.getElementById('lf-css')) {
+      const link = document.createElement('link'); link.id = 'lf-css';
+      link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if (window.L) { initNearbyMap(); }
+    else if (!document.getElementById('lf-js')) {
+      const s = document.createElement('script'); s.id = 'lf-js';
+      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      s.onload = initNearbyMap; document.head.appendChild(s);
+    } else {
+      const poll = setInterval(() => { if (window.L) { clearInterval(poll); initNearbyMap(); } }, 100);
+    }
+    return () => { if (nearbyLeafRef.current) { nearbyLeafRef.current.remove(); nearbyLeafRef.current = null; } };
+  }, [mapTile, nearbyLoc]);
 
   const locateMe = useCallback(() => {
     setNearbyLoading(true); setNearbyError(''); setMapTile(null);
@@ -190,52 +246,23 @@ export default function HelpSOS() {
                           <p style={{ fontSize: '11px', fontWeight: '600', color: tile.color, margin: 0 }}>{tile.label}</p>
                           <p style={{ fontSize: '10px', color: '#9CA3AF', margin: '2px 0 0' }}>Open Maps ↗</p>
                         </a>
-                        {/* Show embed button — only if API key present */}
-                        {MAPS_KEY && (
-                          <button onClick={() => setMapTile(isActive ? null : tile)}
-                            style={{ width: '100%', padding: '5px', fontSize: '10px', fontWeight: '600', color: tile.color, backgroundColor: tile.bg, border: 'none', borderTop: '1px solid #f0f0f0', cursor: 'pointer' }}>
-                            {isActive ? 'Hide map ▲' : 'Show map ▼'}
-                          </button>
-                        )}
+                        <button onClick={() => setMapTile(isActive ? null : tile)}
+                          style={{ width: '100%', padding: '5px', fontSize: '10px', fontWeight: '600', color: tile.color, backgroundColor: tile.bg, border: 'none', borderTop: '1px solid #f0f0f0', cursor: 'pointer' }}>
+                          {isActive ? 'Hide map ▲' : 'Show map ▼'}
+                        </button>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Embedded map — shown when tile selected and API key is present */}
-                {MAPS_KEY && mapTile && (
+                {mapTile && (
                   <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
                     <div style={{ padding: '8px 12px', backgroundColor: mapTile.bg, display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span>{mapTile.icon}</span>
                       <span style={{ fontSize: '13px', fontWeight: '600', color: mapTile.color }}>{mapTile.label} near you</span>
+                      <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: 'auto' }}>OpenStreetMap</span>
                     </div>
-                    <iframe
-                      title="nearby-map"
-                      width="100%"
-                      height="300"
-                      frameBorder="0"
-                      style={{ display: 'block' }}
-                      src={`https://www.google.com/maps/embed/v1/search?key=${MAPS_KEY}&q=${mapTile.query}&center=${nearbyLoc.lat},${nearbyLoc.lng}&zoom=14`}
-                      allowFullScreen
-                    />
-                  </div>
-                )}
-
-                {/* Fallback embed (no key) — basic map of current location */}
-                {!MAPS_KEY && (
-                  <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-                    <p style={{ padding: '8px 12px', fontSize: '12px', color: '#9CA3AF', margin: 0, backgroundColor: '#f9fafb' }}>
-                      📌 Your current location
-                    </p>
-                    <iframe
-                      title="current-location-map"
-                      width="100%"
-                      height="260"
-                      frameBorder="0"
-                      style={{ display: 'block' }}
-                      src={`https://maps.google.com/maps?q=${nearbyLoc.lat},${nearbyLoc.lng}&z=15&output=embed`}
-                      allowFullScreen
-                    />
+                    <div ref={nearbyMapRef} style={{ width: '100%', height: '300px' }} />
                   </div>
                 )}
               </>
