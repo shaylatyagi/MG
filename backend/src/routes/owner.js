@@ -732,21 +732,54 @@ router.post('/sos/:id/resolve', async (req, res) => {
     res.status(500).json({ success: false, message: err.message }); }
 });
 
-// PATCH /api/owner/payment-mode
-router.patch('/payment-mode', async (req, res) => {
+// POST /api/owner/payment-mode/request — submit change request
+router.post('/payment-mode/request', async (req, res) => {
   try {
     const VALID = ['CASH_ONLY', 'ONLINE_ONLY', 'BOTH'];
-    const { payment_mode } = req.body;
-    if (!VALID.includes(payment_mode))
-      return res.status(400).json({ error: 'payment_mode must be CASH_ONLY, ONLINE_ONLY, or BOTH' });
+    const { requested_mode } = req.body;
+    if (!VALID.includes(requested_mode))
+      return res.status(400).json({ error: 'requested_mode must be CASH_ONLY, ONLINE_ONLY, or BOTH' });
     const owner = await getOwner(req.user.id);
     if (!owner || !owner.company_id)
       return res.status(404).json({ error: 'No company linked to this owner' });
+    // Cancel any existing pending request first
     await pool.query(
-      'UPDATE public.companies SET payment_mode=$1 WHERE id=$2',
-      [payment_mode, owner.company_id]
+      `UPDATE public.payment_mode_requests SET status='REJECTED', resolved_at=NOW()
+       WHERE owner_id=$1 AND status='PENDING'`, [req.user.id]
     );
-    res.json({ success: true, payment_mode });
+    // Get company info
+    const co = await pool.query('SELECT name, payment_mode FROM public.companies WHERE id=$1', [owner.company_id]);
+    const company = co.rows[0] || {};
+    const r = await pool.query(
+      `INSERT INTO public.payment_mode_requests
+         (owner_id, company_id, owner_name, company_name, current_mode, requested_mode)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [req.user.id, owner.company_id, owner.full_name, company.name,
+       company.payment_mode || 'BOTH', requested_mode]
+    );
+    res.json({ success: true, request: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/owner/payment-mode/request — get current pending request
+router.get('/payment-mode/request', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT * FROM public.payment_mode_requests
+       WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 1`, [req.user.id]
+    );
+    res.json({ success: true, request: r.rows[0] || null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/owner/payment-mode/request — cancel pending request
+router.delete('/payment-mode/request', async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE public.payment_mode_requests SET status='REJECTED', resolved_at=NOW()
+       WHERE owner_id=$1 AND status='PENDING'`, [req.user.id]
+    );
+    res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

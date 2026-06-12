@@ -2726,7 +2726,46 @@ const PaymentsTab = () => {
 
 // PROFILE TAB - Complete
 const ProfileTab = () => {
+  const [reqMode, setReqMode] = useState(owner?.payment_mode || 'BOTH');
+  const [pendingReq, setPendingReq] = useState(null);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [reqMsg, setReqMsg] = useState('');
 
+  useEffect(() => {
+    fetch(`${API}/api/owner/payment-mode/request`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json()).then(d => { if (d.success) setPendingReq(d.request); }).catch(() => {});
+  }, []);
+
+  const submitRequest = async () => {
+    if (reqMode === (owner?.payment_mode || 'BOTH')) {
+      setReqMsg('Already set to this mode'); setTimeout(() => setReqMsg(''), 2500); return;
+    }
+    setReqLoading(true); setReqMsg('');
+    try {
+      const res = await fetch(`${API}/api/owner/payment-mode/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ requested_mode: reqMode })
+      });
+      const d = await res.json();
+      if (d.success) { setPendingReq(d.request); }
+      else setReqMsg(d.error || 'Failed');
+    } catch { setReqMsg('Network error'); }
+    setReqLoading(false);
+  };
+
+  const cancelRequest = async () => {
+    setReqLoading(true);
+    try {
+      await fetch(`${API}/api/owner/payment-mode/request`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token()}` }
+      });
+      setPendingReq(null);
+    } catch {}
+    setReqLoading(false);
+  };
+
+  const modeLabel = m => m === 'CASH_ONLY' ? '💵 Cash Only' : m === 'ONLINE_ONLY' ? '📲 Online Only' : '💳 Cash + Online';
 
   return (
   <div className="space-y-4 pb-4">
@@ -2779,13 +2818,46 @@ const ProfileTab = () => {
         <CreditCard size={16} className="text-indigo-600"/>
         <p className="text-sm font-black text-slate-800">Payment Mode</p>
       </div>
-      <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
-        <span className="text-sm font-black text-slate-700">
-          {owner?.payment_mode === 'CASH_ONLY' ? '💵 Cash Only' : owner?.payment_mode === 'ONLINE_ONLY' ? '📲 Online Only' : '💳 Cash + Online'}
-        </span>
-        <span className="text-[10px] text-slate-400 bg-slate-200 px-2 py-1 rounded-full">Admin managed</span>
+      {/* Current mode */}
+      <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3 mb-1">
+        <span className="text-xs text-slate-500">Current</span>
+        <span className="text-sm font-black text-slate-800">{modeLabel(owner?.payment_mode || 'BOTH')}</span>
       </div>
-      <p className="text-[10px] text-slate-400">Payment mode is controlled by your admin. Contact admin to request a change.</p>
+
+      {pendingReq && pendingReq.status === 'PENDING' ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-black text-amber-700">⏳ Pending admin approval</p>
+            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black">PENDING</span>
+          </div>
+          <p className="text-[11px] text-amber-600">Requested: <strong>{modeLabel(pendingReq.requested_mode)}</strong></p>
+          <button onClick={cancelRequest} disabled={reqLoading}
+            className="w-full py-2 bg-white border border-amber-300 text-amber-700 rounded-xl text-xs font-black disabled:opacity-50">
+            {reqLoading ? 'Cancelling…' : 'Cancel Request'}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <select value={reqMode} onChange={e => setReqMode(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white focus:outline-none focus:border-indigo-400">
+            <option value="BOTH">💳 Cash + Online</option>
+            <option value="CASH_ONLY">💵 Cash Only</option>
+            <option value="ONLINE_ONLY">📲 Online Only</option>
+          </select>
+          <button onClick={submitRequest} disabled={reqLoading || reqMode === (owner?.payment_mode || 'BOTH')}
+            className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-40">
+            {reqLoading ? 'Sending…' : 'Request Change'}
+          </button>
+          {reqMsg && <p className="text-[10px] text-red-500 text-center">{reqMsg}</p>}
+          {pendingReq?.status === 'APPROVED' && (
+            <p className="text-[10px] text-emerald-600 text-center font-black">✅ Last request approved</p>
+          )}
+          {pendingReq?.status === 'REJECTED' && (
+            <p className="text-[10px] text-slate-400 text-center">Last request was declined by admin</p>
+          )}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-400">Admin will review and approve your request.</p>
     </div>
 
     {/* ─── Manager Role (Premium) ─── */}

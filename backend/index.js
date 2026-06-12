@@ -20,6 +20,21 @@ pool.query(`
   ALTER TABLE public.owners  ADD COLUMN IF NOT EXISTS session_token VARCHAR(64);
   ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS session_token VARCHAR(64);
 `).catch(err => console.warn('Session token migration warning:', err.message));
+
+pool.query(`
+  CREATE TABLE IF NOT EXISTS public.payment_mode_requests (
+    id           SERIAL PRIMARY KEY,
+    owner_id     INTEGER NOT NULL,
+    company_id   INTEGER NOT NULL,
+    owner_name   VARCHAR(255),
+    company_name VARCHAR(255),
+    current_mode VARCHAR(20),
+    requested_mode VARCHAR(20) NOT NULL CHECK (requested_mode IN ('CASH_ONLY','ONLINE_ONLY','BOTH')),
+    status       VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','APPROVED','REJECTED')),
+    created_at   TIMESTAMPTZ DEFAULT NOW(),
+    resolved_at  TIMESTAMPTZ
+  );
+`).catch(err => console.warn('payment_mode_requests migration warning:', err.message));
 const app = express();
 // CORS fixed
 app.use(cors({

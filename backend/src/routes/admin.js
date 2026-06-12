@@ -871,4 +871,54 @@ router.get('/all-drivers', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Payment Mode Requests ────────────────────────────────────────────────────
+router.get('/payment-mode-requests', async (req, res) => {
+  try {
+    const { status = 'PENDING', company_id } = req.query;
+    let q = `SELECT * FROM public.payment_mode_requests WHERE 1=1`;
+    const params = [];
+    if (status !== 'ALL') { params.push(status); q += ` AND status=$${params.length}`; }
+    if (company_id)        { params.push(parseInt(company_id)); q += ` AND company_id=$${params.length}`; }
+    q += ' ORDER BY created_at DESC';
+    const r = await pool.query(q, params);
+    res.json({ success: true, requests: r.rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.patch('/payment-mode-requests/:id/approve', async (req, res) => {
+  try {
+    const reqRow = await pool.query(
+      'SELECT * FROM public.payment_mode_requests WHERE id=$1', [req.params.id]
+    );
+    if (!reqRow.rows[0]) return res.status(404).json({ error: 'Request not found' });
+    const pmReq = reqRow.rows[0];
+    if (pmReq.status !== 'PENDING')
+      return res.status(400).json({ error: 'Request is no longer pending' });
+    // Update company payment mode
+    await pool.query(
+      'UPDATE public.companies SET payment_mode=$1 WHERE id=$2',
+      [pmReq.requested_mode, pmReq.company_id]
+    );
+    // Mark request approved
+    await pool.query(
+      `UPDATE public.payment_mode_requests SET status='APPROVED', resolved_at=NOW() WHERE id=$1`,
+      [req.params.id]
+    );
+    logAudit('PAYMENT_MODE_REQUEST_APPROVED', 'payment_mode_request', req.params.id,
+      req.headers['x-admin-phone'] || 'admin', { new_mode: pmReq.requested_mode });
+    res.json({ success: true, new_mode: pmReq.requested_mode });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.patch('/payment-mode-requests/:id/reject', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE public.payment_mode_requests SET status='REJECTED', resolved_at=NOW()
+       WHERE id=$1 AND status='PENDING' RETURNING *`, [req.params.id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'Request not found or already resolved' });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

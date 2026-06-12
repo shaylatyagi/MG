@@ -1011,7 +1011,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
     }
       onClose={onClose} onBack={onBack} breadcrumbs={breadcrumbs} wide>
       <div className="flex gap-1 border-b dark:border-gray-700 mb-4 -mt-2">
-        {[['owners','Owners'],['docs','Documents'],['settings','Settings']].map(([k,label]) => (
+        {[['owners','Owners'],['docs','Documents'],['settings', pmRequests.length > 0 ? 'Settings 🔴' : 'Settings']].map(([k,label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab===k ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
             {label}
@@ -1067,6 +1067,38 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
 
       {tab === 'settings' && (
         <div className="space-y-6 max-w-md">
+
+          {pmRequests.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-semibold text-amber-800">
+                🔔 Payment Mode Change Request{pmRequests.length > 1 ? 's' : ''}
+              </p>
+              {pmRequests.map(req => (
+                <div key={req.id} className="bg-white rounded-lg p-3 border border-amber-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-700">{req.owner_name}</p>
+                    <span className="text-[10px] text-gray-400">{new Date(req.created_at).toLocaleDateString('en-IN')}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    <span className="font-medium">{req.current_mode || 'BOTH'}</span>
+                    {' → '}
+                    <span className="font-bold text-indigo-700">{req.requested_mode}</span>
+                  </p>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => approvePmRequest(req.id, req.requested_mode)} disabled={pmLoading}
+                      className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg font-semibold disabled:opacity-50">
+                      ✓ Approve
+                    </button>
+                    <button onClick={() => rejectPmRequest(req.id)} disabled={pmLoading}
+                      className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs rounded-lg font-semibold border border-red-200 disabled:opacity-50">
+                      ✗ Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Payment Mode</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
