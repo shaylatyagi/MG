@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../../api';
 
 const fmt = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN')}`;
@@ -12,6 +12,45 @@ const fmtTime = (ts) => {
 const I = '#4f46e5'; // indigo-600
 const IG = 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)';
 const GOLD = '#c4965a';
+
+
+function SosLeafletMap({ lat, lng }) {
+  const containerRef = useRef(null);
+  const mapRef       = useRef(null);
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const init = () => {
+      const L = window.L;
+      if (!L || !containerRef.current) return;
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+      const map = L.map(containerRef.current, { zoomControl: false, attributionControl: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      map.setView([lat, lng], 15);
+      const icon = L.divIcon({
+        className: '',
+        html: '<div style="width:18px;height:18px;background:#dc2626;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(220,38,38,0.7)"></div>',
+        iconSize: [18, 18], iconAnchor: [9, 9],
+      });
+      L.marker([lat, lng], { icon }).bindPopup('SOS Location').addTo(map);
+      mapRef.current = map;
+    };
+    if (!document.getElementById('lf-css')) {
+      const link = document.createElement('link'); link.id = 'lf-css';
+      link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    if (window.L) { init(); }
+    else if (!document.getElementById('lf-js')) {
+      const s = document.createElement('script'); s.id = 'lf-js';
+      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      s.onload = init; document.head.appendChild(s);
+    } else {
+      const poll = setInterval(() => { if (window.L) { clearInterval(poll); init(); } }, 100);
+    }
+    return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
+  }, [lat, lng]);
+  return <div ref={containerRef} style={{ width: '100%', height: '220px' }} />;
+}
 
 export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
   const [stats, setStats] = useState({
@@ -183,15 +222,7 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
               {/* Expandable map */}
               {expandedSos === s.id && s.lat && s.lng && (
                 <div style={{ borderTop: '1px solid #fecaca' }}>
-                  <iframe
-                    title={`sos-map-${s.id}`}
-                    width="100%"
-                    height="220"
-                    frameBorder="0"
-                    style={{ display: 'block' }}
-                    src={`https://maps.google.com/maps?q=${s.lat},${s.lng}&z=15&output=embed`}
-                    allowFullScreen
-                  />
+                  <SosLeafletMap lat={parseFloat(s.lat)} lng={parseFloat(s.lng)} />
                   <div style={{ padding: '8px 12px', background: '#fef9f9', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                     <a href={`https://maps.google.com/?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer"
                       style={{ fontSize: '11px', fontWeight: 700, color: '#4f46e5', textDecoration: 'none', padding: '5px 10px', background: '#eef2ff', borderRadius: '6px' }}>

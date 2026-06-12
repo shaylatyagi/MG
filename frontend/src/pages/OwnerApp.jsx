@@ -3183,7 +3183,8 @@ const ProfileTab = () => {
     const [drivers, setDrivers] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [lastRefresh, setLastRefresh] = React.useState(null);
-    const mapsKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+    const mapContainerRef = React.useRef(null);
+    const leafletMapRef = React.useRef(null);
 
     const fetchLocations = async () => {
       try {
@@ -3202,29 +3203,62 @@ const ProfileTab = () => {
       return () => clearInterval(id);
     }, []);
 
+    // Load Leaflet + OSM map whenever drivers list changes
+    React.useEffect(() => {
+      if (!drivers.length || !mapContainerRef.current) return;
+
+      const initMap = () => {
+        const L = window.L;
+        if (!L || !mapContainerRef.current) return;
+        // Destroy old map instance before creating new one
+        if (leafletMapRef.current) { leafletMapRef.current.remove(); leafletMapRef.current = null; }
+        const map = L.map(mapContainerRef.current, { zoomControl: true, attributionControl: false });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        const icon = L.divIcon({
+          className: '',
+          html: '<div style="width:14px;height:14px;background:#6366f1;border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(99,102,241,0.6)"></div>',
+          iconSize: [14, 14], iconAnchor: [7, 7]
+        });
+        drivers.forEach(d => {
+          L.marker([d.last_lat, d.last_lng], { icon })
+            .bindPopup(`<b style="font-size:12px">${d.full_name || 'Driver'}</b><br><span style="font-size:11px;color:#64748b">${d.reg_number || ''}</span>`)
+            .addTo(map);
+        });
+        if (drivers.length === 1) {
+          map.setView([drivers[0].last_lat, drivers[0].last_lng], 14);
+        } else {
+          map.fitBounds(L.latLngBounds(drivers.map(d => [d.last_lat, d.last_lng])), { padding: [24, 24] });
+        }
+        leafletMapRef.current = map;
+      };
+
+      // Inject Leaflet CSS once
+      if (!document.getElementById('lf-css')) {
+        const lnk = document.createElement('link');
+        lnk.id = 'lf-css'; lnk.rel = 'stylesheet';
+        lnk.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(lnk);
+      }
+      // Load Leaflet JS if not already loaded
+      if (window.L) { initMap(); }
+      else if (!document.getElementById('lf-js')) {
+        const s = document.createElement('script');
+        s.id = 'lf-js'; s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        s.onload = initMap;
+        document.head.appendChild(s);
+      } else {
+        // Script tag exists but not loaded yet — wait
+        const check = setInterval(() => { if (window.L) { clearInterval(check); initMap(); } }, 100);
+      }
+      return () => { if (leafletMapRef.current) { leafletMapRef.current.remove(); leafletMapRef.current = null; } };
+    }, [drivers]);
+
     const timeAgo = (ts) => {
       if (!ts) return 'Unknown';
       const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
       if (diff < 60) return `${diff}s ago`;
       if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
       return `${Math.floor(diff/3600)}h ago`;
-    };
-
-    const staticMapUrl = (driversArr) => {
-      if (!mapsKey || !driversArr.length) return null;
-      const center = driversArr[0];
-      const markers = driversArr.map(d => `markers=color:red%7C${d.last_lat},${d.last_lng}`).join('&');
-      return `https://maps.googleapis.com/maps/api/staticmap?center=${center.last_lat},${center.last_lng}&zoom=13&size=400x220&${markers}&key=${mapsKey}`;
-    };
-
-    const openAllOnMaps = () => {
-      if (!drivers.length) return;
-      if (drivers.length === 1) {
-        window.open(`https://maps.google.com/?q=${drivers[0].last_lat},${drivers[0].last_lng}`, '_blank');
-      } else {
-        const url = `https://maps.google.com/maps/dir/${drivers.map(d => `${d.last_lat},${d.last_lng}`).join('/')}`;
-        window.open(url, '_blank');
-      }
     };
 
     return (
@@ -3243,33 +3277,20 @@ const ProfileTab = () => {
           </button>
         </div>
 
-        {/* Map image or fallback */}
+        {/* Map */}
         {loading ? (
-          <div className="bg-slate-100 rounded-2xl h-40 flex items-center justify-center text-xs text-slate-400 animate-pulse font-black">
+          <div className="bg-slate-100 rounded-2xl h-52 flex items-center justify-center text-xs text-slate-400 animate-pulse font-black">
             Fetching driver locations...
           </div>
         ) : drivers.length === 0 ? (
           <div className="bg-slate-100 rounded-2xl h-40 flex flex-col items-center justify-center gap-2">
             <span className="text-3xl">📡</span>
             <span className="text-xs font-black text-slate-400">No drivers online</span>
-            <span className="text-[10px] text-slate-300">Drivers send GPS every 30s when assigned a vehicle</span>
-          </div>
-        ) : staticMapUrl(drivers) ? (
-          <div className="relative rounded-2xl overflow-hidden shadow-md">
-            <img src={staticMapUrl(drivers)} alt="Driver locations" className="w-full object-cover" />
-            <button onClick={openAllOnMaps}
-              className="absolute bottom-2 right-2 bg-white text-indigo-700 text-[10px] font-black px-3 py-1.5 rounded-xl shadow flex items-center gap-1">
-              📍 Open in Maps
-            </button>
+            <span className="text-[10px] text-slate-300">Drivers send location every 30s</span>
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl h-36 flex flex-col items-center justify-center gap-2 shadow-md">
-            <span className="text-2xl">🗺️</span>
-            <span className="text-white text-xs font-black">{drivers.length} driver{drivers.length > 1 ? 's' : ''} online</span>
-            <button onClick={openAllOnMaps}
-              className="bg-white text-indigo-700 text-[10px] font-black px-4 py-1.5 rounded-xl mt-1">
-              📍 View on Google Maps
-            </button>
+          <div className="relative rounded-2xl overflow-hidden shadow-md border border-slate-200" style={{height:'220px'}}>
+            <div ref={mapContainerRef} style={{width:'100%',height:'100%'}} />
           </div>
         )}
 
