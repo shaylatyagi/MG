@@ -1563,25 +1563,36 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   };
   return subtitles[activeTab] || '';
 };
-  const StatCard = ({ title, value, icon: Icon, color, trend, isMoney = false }) => (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 hover:border-indigo-100 transition">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
-          <p className="text-xl font-black text-slate-800 mt-1">{isMoney ? `₹${value.toLocaleString('en-IN')}` : value}</p>
-          {trend && (
-            <div className="flex items-center gap-1 mt-1">
-              <ArrowDownRight size={10} className="text-slate-400" />
-              <span className="text-[9px] text-slate-400">pending</span>
-            </div>
-          )}
-        </div>
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon size={16} className="text-white" />
+  const StatCard = ({ title, value, icon: Icon, color, trend, isMoney = false }) => {
+    const gradMap = {
+      'bg-indigo-600': 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
+      'bg-indigo-500': 'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)',
+      'bg-slate-700':  'linear-gradient(135deg,#059669 0%,#0d9488 100%)',
+      'bg-slate-500':  'linear-gradient(135deg,#b45309 0%,#d97706 100%)',
+    };
+    const grad = gradMap[color] || 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)';
+    return (
+      <div style={{background:grad,borderRadius:16,padding:16}}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p style={{fontSize:9,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)',marginBottom:6}}>{title}</p>
+            <p style={{fontSize:isMoney?18:22,fontWeight:900,color:'white',fontFamily:isMoney?'monospace':'inherit',letterSpacing:isMoney?'-0.02em':'normal',lineHeight:1}}>
+              {isMoney ? <><span style={{fontSize:12,opacity:.7}}>₹</span>{(value||0).toLocaleString('en-IN')}</> : (value||0)}
+            </p>
+            {trend && (
+              <div style={{display:'flex',alignItems:'center',gap:4,marginTop:6}}>
+                <ArrowDownRight size={10} color="rgba(255,255,255,0.5)"/>
+                <span style={{fontSize:9,color:'rgba(255,255,255,0.5)',fontWeight:700}}>pending</span>
+              </div>
+            )}
+          </div>
+          <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <Icon size={16} color="white"/>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // HOME TAB
   const HomeTab = () => (
@@ -1861,9 +1872,16 @@ const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicl
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-black text-lg">
-                        {driver.full_name?.charAt(0) || driver.name?.charAt(0)}
-                      </div>
+                      {(() => {
+                        const ch = ((driver.full_name || driver.name || '?').charAt(0)).toUpperCase();
+                        const avColors = ['#4f46e5','#7c3aed','#0891b2','#059669','#b45309','#be185d','#0f766e'];
+                        const avBg = avColors[ch.charCodeAt(0) % avColors.length];
+                        return (
+                          <div style={{width:44,height:44,borderRadius:12,background:avBg,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:900,fontSize:17,flexShrink:0,letterSpacing:'-0.01em'}}>
+                            {ch}
+                          </div>
+                        );
+                      })()}
                       <div>
                         <p className="font-black text-slate-800">{driver.full_name || driver.name}</p>
                         <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
@@ -3399,7 +3417,7 @@ const ProfileTab = () => {
         )}
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-20">
+        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28">
           {loading ? (
             <div className="text-center py-16 text-xs font-black text-slate-400 animate-pulse">Loading...</div>
           ) : (
@@ -3424,30 +3442,28 @@ const ProfileTab = () => {
         </div>
 
         {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto bg-white border-t border-slate-100 flex justify-around items-center z-50" style={{height:58, boxShadow:'0 -4px 20px rgba(0,0,0,0.06)'}}>
-          {[
-            { id: 'home',     Icon: Home,       label: t.navHome },
-            { id: 'drivers',  Icon: Users,      label: t.navDrivers },
-            { id: 'vehicles', Icon: Truck,      label: t.navFleet },
-            { id: 'payments', Icon: Wallet,     label: t.navPayments },
-            { id: 'profile',  Icon: User,       label: t.navProfile },
-          ].map(({ id, Icon, label }) => (
-            <button
-              key={id}
-              onClick={() => {
-                setActiveTab(id);
-                setSearchQuery('');
-                setVehicleSearch('');
-              }}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 2, position: 'relative' }}
-            >
-              {activeTab === id && (
-                <span style={{ position:'absolute', top:0, left:'50%', transform:'translateX(-50%)', width:24, height:2, background:'#4f46e5', borderRadius:'0 0 4px 4px' }} />
-              )}
-              <Icon size={19} style={{ color: activeTab === id ? '#4f46e5' : '#94a3b8' }} />
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.04em', color: activeTab === id ? '#4f46e5' : '#94a3b8' }}>{label}</span>
-            </button>
-          ))}
+        <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto z-50" style={{padding:'0 12px 10px'}}>
+          <div style={{background:'#1e1b4b',borderRadius:24,padding:8,display:'flex',boxShadow:'0 -4px 30px rgba(79,70,229,0.25)'}}>
+            {[
+              { id: 'home',     Icon: Home,       label: t.navHome },
+              { id: 'drivers',  Icon: Users,      label: t.navDrivers },
+              { id: 'vehicles', Icon: Truck,      label: t.navFleet },
+              { id: 'payments', Icon: Wallet,     label: t.navPayments },
+              { id: 'profile',  Icon: User,       label: t.navProfile },
+            ].map(({ id, Icon, label }) => {
+              const active = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => { setActiveTab(id); setSearchQuery(''); setVehicleSearch(''); }}
+                  style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'8px 4px',borderRadius:16,border:'none',cursor:'pointer',background:active?'rgba(99,102,241,0.25)':'transparent',color:active?'#a5b4fc':'rgba(255,255,255,0.3)',transition:'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'}}>
+                  <Icon size={active?20:18}/>
+                  <span style={{fontSize:9,fontWeight:900,letterSpacing:'0.04em'}}>{label}</span>
+                  {active && <div style={{width:4,height:4,borderRadius:'50%',background:'#6366f1'}}/>}
+                </button>
+              );
+            })}
+          </div>
         </div>
         {showChatbot && (
           <Chatbot 
@@ -3996,6 +4012,7 @@ const ProfileTab = () => {
           <div className="flex gap-3">
             <button onClick={() => setCashConfirm(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">← Edit</button>
             <button
+              onTouchStart={()=>{try{navigator.vibrate&&navigator.vibrate([50,30,100])}catch{}}}
               onClick={async () => {
                 try {
                   const res = await fetch(`${API}/api/payment/owner/cash-payment`, {
@@ -4017,7 +4034,7 @@ const ProfileTab = () => {
                   } else alert(d.message || 'Failed');
                 } catch { alert('Network error'); }
               }}
-              className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-black"
+              className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-black active:scale-[0.96] transition-transform"
             >
               ✅ Yes, Record
             </button>
