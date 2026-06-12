@@ -179,6 +179,122 @@ button {
   font-weight: 600;
 }
 
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  padding: 32px;
+  border-radius: 28px;
+  background: rgba(255,255,255,0.94);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.14);
+}
+
+.login-mark {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.login-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+}
+
+.login-subtitle {
+  margin: 8px auto 0;
+  color: rgba(15, 23, 42, 0.68);
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.login-heading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 10px;
+}
+
+.login-copy {
+  margin: 0 0 22px;
+  color: rgba(100, 116, 139, 1);
+  line-height: 1.6;
+}
+
+.login-alert {
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.login-alert--error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.login-alert--success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.login-form-group {
+  margin-bottom: 16px;
+}
+
+.login-otp-input {
+  font-size: 1.35rem;
+  text-align: center;
+  letter-spacing: 0.4em;
+  font-family: monospace;
+}
+
+.login-button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-grid-overlay {
+  position: fixed;
+  inset: 0;
+  opacity: 0.03;
+  background-image: linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.text-muted {
+  opacity: 0.75;
+}
+
+.kyc-progress-fill {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), rgba(79, 70, 229, 0.32));
+  width: var(--progress, 0%);
+}
+
 .form-note {
   color: rgba(15, 23, 42, 0.65);
   font-size: 0.88rem;

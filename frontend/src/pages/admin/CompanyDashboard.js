@@ -302,46 +302,50 @@ function DocumentsSection({ userType, userId }) {
 }
 
 // ── LOGIN PAGE ─────────────────────────────────────────────────────────────────
-function LoginPage() {
+function LoginPage({ onLogin }) {
+  const [step, setStep]       = useState('login');
+  const [phone, setPhone]     = useState('');
+  const [password, setPassword] = useState('');
   const [otp, setOtp]         = useState('');
-  const [step, setStep]       = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
-  const [phone, setPhone]     = useState(ADMIN_PHONE);
-  const [secret, setSecret]   = useState(ADMIN_SECRET);
-  const otpRef                = useRef(null);
-  const autoSentRef           = useRef(false);
+  const [showPass, setShowPass] = useState(false);
 
-  const sendOtp = useCallback(async (phoneNum, secretKey) => {
-    setError(''); setLoading(true);
+  const login = async (e) => {
+    e.preventDefault(); setError(''); setLoading(true);
+    try {
+      const data = await api('/api/auth/admin-login', {
+        method: 'POST',
+        body: JSON.stringify({ phone_number: phone, password }),
+      });
+      setToken(data.token);
+      onLogin();
+    } catch (err) { setError(err.message || 'Invalid credentials'); }
+    finally { setLoading(false); }
+  };
+
+  const sendOtp = async (e) => {
+    e.preventDefault(); setError(''); setLoading(true);
     try {
       const data = await api('/api/auth/admin-send-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone_number: phoneNum, admin_secret: secretKey }),
+        body: JSON.stringify({ phone_number: phone, admin_secret: '' }),
       });
-      setStep(2);
       if (data.otp) setOtp(data.otp);
-      setTimeout(() => otpRef.current?.focus(), 120);
+      setStep('otp');
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => {
-    if (ADMIN_PHONE && ADMIN_SECRET && !autoSentRef.current) {
-      autoSentRef.current = true;
-      sendOtp(ADMIN_PHONE, ADMIN_SECRET);
-    }
-  }, [sendOtp]);
+  };
 
   const verifyOtp = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
       const data = await api('/api/auth/admin-verify-otp', {
         method: 'POST',
-        body: JSON.stringify({ phone_number: phone, otp, admin_secret: secret }),
+        body: JSON.stringify({ phone_number: phone, otp, admin_secret: '' }),
       });
       setToken(data.token);
-      window.location.href = '/admin/dashboard';
+      onLogin();
     } catch (err) { setError(err.message); }
     finally { setLoading(false); }
   };
@@ -359,56 +363,75 @@ function LoginPage() {
 
         {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
 
-        {step === 1 && loading && ADMIN_PHONE && (
-          <div className="text-center py-6 text-gray-500 text-sm">Sending OTP to admin phone…</div>
-        )}
-
-        {step === 1 && !loading && !ADMIN_PHONE && (
-          <form onSubmit={(e) => { e.preventDefault(); sendOtp(phone, secret); }} className="space-y-4">
+        {step === 'login' && (
+          <form onSubmit={login} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Phone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
               <input type="tel" value={phone} autoFocus
                 onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
-                required placeholder="10-digit number"
+                required placeholder="10-digit mobile number"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Secret Key</label>
-              <input type="password" value={secret} onChange={e => setSecret(e.target.value)} required
-                placeholder="••••••••"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <div className="relative">
+                <input type={showPass ? 'text' : 'password'} value={password}
+                  onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm pr-10" />
+                <button type="button" onClick={() => setShowPass(v => !v)}
+                  className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 text-xs">
+                  {showPass ? 'Hide' : 'Show'}
+                </button>
+              </div>
             </div>
+            <button type="submit" disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
+              {loading ? 'Signing in…' : 'Sign In'}
+            </button>
+            <div className="text-center">
+              <button type="button" onClick={() => { setStep('forgot'); setError(''); }}
+                className="text-sm text-indigo-600 hover:text-indigo-800">
+                Forgot password? Sign in with OTP →
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step === 'forgot' && (
+          <form onSubmit={sendOtp} className="space-y-4">
+            <p className="text-sm text-gray-600 text-center">Enter admin phone to receive OTP</p>
+            <input type="tel" value={phone} autoFocus
+              onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
+              required placeholder="10-digit mobile number"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
             <button type="submit" disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
               {loading ? 'Sending…' : 'Send OTP'}
             </button>
+            <button type="button" onClick={() => { setStep('login'); setError(''); }}
+              className="w-full text-sm text-gray-500 hover:text-gray-700">← Back to password login</button>
           </form>
         )}
 
-        {step === 2 && (
+        {step === 'otp' && (
           <form onSubmit={verifyOtp} className="space-y-4">
             <p className="text-sm text-gray-600 text-center">OTP sent to <strong>+91{phone}</strong></p>
-            <input ref={otpRef} type="text" value={otp}
-              onChange={e => setOtp(e.target.value)} required
-              placeholder="6-digit OTP" maxLength={6}
+            <input type="text" value={otp} autoFocus onChange={e => setOtp(e.target.value)}
+              required placeholder="6-digit OTP" maxLength={6}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center text-2xl tracking-widest" />
             <button type="submit" disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
               {loading ? 'Verifying…' : 'Login'}
             </button>
-            <button type="button" onClick={() => { setStep(1); setOtp(''); autoSentRef.current = false; }}
-              className="w-full text-sm text-gray-500 hover:text-gray-700">
-              ← Resend OTP
-            </button>
+            <button type="button" onClick={() => { setStep('forgot'); setOtp(''); }}
+              className="w-full text-sm text-gray-500 hover:text-gray-700">← Resend OTP</button>
           </form>
         )}
-        <p className="text-center text-xs text-gray-400 mt-6">MobilityGrid by PayYantra · Confidential</p>
       </div>
     </div>
   );
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard() {
   const [stats, setStats]     = useState(null);
   const [kyc, setKyc]         = useState(null);
@@ -2313,22 +2336,4 @@ function AdminPanelInner() {
             <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">Logout?</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Are you sure you want to sign out?</p>
             <div className="flex gap-3">
-              <button onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200">Cancel</button>
-              <button onClick={doLogout}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold">Yes, Logout</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function AdminPanel() {
-  return (
-    <ErrorBoundary>
-      <AdminPanelInner />
-    </ErrorBoundary>
-  );
-}
+   
