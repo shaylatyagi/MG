@@ -967,7 +967,30 @@ router.get('/companies/:companyId/branches', async (req, res) => {
     const r = await pool.query(
       `SELECT b.*,
         (SELECT COUNT(*) FROM public.drivers d WHERE d.branch_id = b.id)::int AS driver_count,
-        (SELECT COUNT(*) FROM public.vehicles v WHERE v.branch_id = b.id)::int AS vehicle_count
+        (SELECT COUNT(*) FROM public.vehicles v WHERE v.branch_id = b.id)::int AS vehicle_count,
+        COALESCE((
+          SELECT SUM(mo.order_amount)
+          FROM public.ms_orders mo
+          JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+          WHERE d.branch_id = b.id
+            AND mo.transaction_status = 'SUCCESS'
+            AND DATE(mo.order_initiation_date) = CURRENT_DATE
+        ), 0)::numeric AS collection_today,
+        COALESCE((
+          SELECT SUM(mo.order_amount)
+          FROM public.ms_orders mo
+          JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+          WHERE d.branch_id = b.id
+            AND mo.transaction_status = 'SUCCESS'
+            AND DATE_TRUNC('month', mo.order_initiation_date) = DATE_TRUNC('month', NOW())
+        ), 0)::numeric AS collection_month,
+        COALESCE((
+          SELECT SUM(mo.order_amount)
+          FROM public.ms_orders mo
+          JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+          WHERE d.branch_id = b.id
+            AND mo.transaction_status = 'SUCCESS'
+        ), 0)::numeric AS collection_total
        FROM public.branches b
        WHERE b.company_id = $1
        ORDER BY b.name`,
