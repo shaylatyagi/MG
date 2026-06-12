@@ -71,10 +71,10 @@ app.get('/api/drivers/list', async (req, res) => {
   try {
     console.log('🎯 Direct /api/drivers/list called');
     const result = await pool.query(
-      `SELECT id, full_name, mobile_number, driver_code 
+      `SELECT id, name AS full_name, mobile_number, driver_code 
        FROM public.drivers 
        WHERE status = 'ACTIVE'
-       ORDER BY full_name`
+       ORDER BY name`
     );
     console.log(`✅ Found ${result.rows.length} drivers`);
     res.json({ drivers: result.rows, success: true });

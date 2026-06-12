@@ -789,8 +789,8 @@ router.get('/driver-locations', async (req, res) => {
     const owner = await getOwner(req.user.id);
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
     const r = await pool.query(
-      `SELECT d.id, d.full_name, d.last_lat, d.last_lng, d.last_location_at,
-              v.reg_number, v.vehicle_type
+      `SELECT d.id, d.name AS full_name, d.last_lat, d.last_lng, d.last_location_at,
+              v.reg_number, v.type AS vehicle_type
        FROM public.drivers d
        LEFT JOIN public.driver_vehicle_history dvh ON dvh.driver_id = d.id AND dvh.unassigned_at IS NULL
        LEFT JOIN public.vehicles v ON v.id = dvh.vehicle_id
