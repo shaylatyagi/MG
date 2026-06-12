@@ -284,67 +284,94 @@ router.post('/verify-bank', async (req, res) => {
 
 
 
-// ── Document upload (mirrors /api/driver/kyc/upload) ───────────────
+// ── Document upload — unified S3 + user_documents flow ────────────
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+
+const kycS3 = new S3Client({
+  region: process.env.AWS_REGION || 'ap-south-1',
+  credentials: {
+    accessKeyId:     process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+const KYC_BUCKET = process.env.AWS_S3_BUCKET || 'mobilitygrid-docs';
 
 const kycDocUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits:  { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ok = /jpeg|jpg|png|webp|pdf/.test(file.mimetype);
     cb(ok ? null : new Error('Only JPEG, PNG, WebP, PDF allowed'), ok);
   },
 });
 
-const VALID_DOC_TYPES = ['aadhaar_front','aadhaar_back','pan','driving_licence','bank_account','license','photo'];
-
 // POST /api/kyc/upload-document — called by DriverPWA KYC tab
-router.post('/upload-document', kycDocUpload.single('file'), async (req, res) => {
+// Field: 'document' (matches DriverPWA FormData.append('document', file))
+// Body:  type | doc_type  (DriverPWA sends type='AADHAAR'|'PAN'|'DL'|'BANK')
+router.post('/upload-document', kycDocUpload.single('document'), async (req, res) => {
   try {
-    const { doc_type, driver_id, phone } = req.body;
     const file = req.file;
-    if (!file) return res.status(400).json({ success: false, message: 'File required' });
+    if (!file) return res.status(400).json({ success: false, message: 'File required (field: document)' });
 
-    // Resolve driver ID from JWT if available, else from body param
-    let driverId = driver_id;
+    // Resolve driver ID from JWT → body driver_id → phone lookup
+    let driverId = req.body.driver_id ? parseInt(req.body.driver_id) : null;
     if (!driverId && req.headers.authorization) {
       try {
-        const jwt = require('jsonwebtoken');
+        const jwt     = require('jsonwebtoken');
         const decoded = jwt.verify(
           req.headers.authorization.replace('Bearer ', ''),
           process.env.JWT_SECRET || 'your_jwt_secret_key_here'
         );
-        driverId = decoded.id || decoded.driver_id;
+        driverId = decoded.id || decoded.driver_id || null;
       } catch (_) {}
     }
-    if (!driverId && phone) {
-      const r = await pool.query('SELECT id FROM public.drivers WHERE mobile_number = $1', [phone]);
+    if (!driverId && req.body.phone) {
+      const r = await pool.query(
+        'SELECT id FROM public.drivers WHERE mobile_number = $1', [req.body.phone]
+      );
       if (r.rows.length) driverId = r.rows[0].id;
     }
     if (!driverId) return res.status(400).json({ success: false, message: 'Could not identify driver' });
 
-    const docType = doc_type || 'license';
-    const ext     = (file.originalname.split('.').pop() || 'bin').toLowerCase();
-    const s3Key   = `drivers/${driverId}/${docType}/${uuidv4()}.${ext}`;
+    // Normalize doc type — DriverPWA sends AADHAAR / PAN / DL / BANK
+    const rawType = ((req.body.type || req.body.doc_type || 'DOCUMENT')).toUpperCase();
 
+    // Upload buffer to S3
+    const ext   = (file.originalname.split('.').pop() || 'bin').toLowerCase();
+    const s3Key = `drivers/${driverId}/${rawType.toLowerCase()}_${Date.now()}.${ext}`;
+
+    await kycS3.send(new PutObjectCommand({
+      Bucket:      KYC_BUCKET,
+      Key:         s3Key,
+      Body:        file.buffer,
+      ContentType: file.mimetype,
+    }));
+
+    // Upsert into public.user_documents (same table as uploads.js)
     await pool.query(
-      `INSERT INTO public.documents (entity_type, entity_id, doc_type, s3_key, status, uploaded_at)
-       VALUES ('driver', $1, $2, $3, 'pending', NOW())
-       ON CONFLICT (entity_type, entity_id, doc_type)
-       DO UPDATE SET s3_key = EXCLUDED.s3_key, status = 'pending',
-                     rejection_reason = NULL, reviewed_at = NULL,
-                     uploaded_at = NOW()`,
-      [driverId, docType, s3Key]
+      `INSERT INTO public.user_documents
+         (user_id, user_type, doc_type, original_name, s3_key, file_size, mime_type, status)
+       VALUES ($1,'DRIVER',$2,$3,$4,$5,$6,'PENDING')
+       ON CONFLICT (user_id, user_type, doc_type)
+       DO UPDATE SET
+         original_name = EXCLUDED.original_name,
+         s3_key        = EXCLUDED.s3_key,
+         file_size     = EXCLUDED.file_size,
+         mime_type     = EXCLUDED.mime_type,
+         status        = 'PENDING',
+         uploaded_at   = NOW()`,
+      [driverId, rawType, file.originalname, s3Key, file.size, file.mimetype]
     );
 
+    // Mark kyc_status as PARTIAL if still at initial PENDING
     await pool.query(
-      `UPDATE public.drivers SET kyc_status = 'PARTIAL', updated_at = NOW()
-       WHERE id = $1 AND kyc_status = 'PENDING'`,
+      `UPDATE public.drivers SET kyc_status='PARTIAL', updated_at=NOW()
+       WHERE id=$1 AND kyc_status='PENDING'`,
       [driverId]
-    );
+    ).catch(() => {});
 
-    res.json({ success: true, doc_type: docType, s3_key: s3Key, status: 'pending' });
+    res.json({ success: true, doc_type: rawType, s3_key: s3Key, status: 'PENDING' });
   } catch (err) {
     console.error('KYC upload-document error:', err);
     res.status(500).json({ success: false, message: err.message });

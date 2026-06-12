@@ -95,8 +95,9 @@ export default function DocumentSection({ userId, userType, token }) {
     } catch {}
   };
 
+  const isApproved   = (s) => s === 'APPROVED' || s === 'VERIFIED';
   const uploadedDocs = docTypes.filter(d => docs[d.key] || localPreviews[d.key]).length;
-  const verifiedDocs = docTypes.filter(d => docs[d.key]?.status === 'VERIFIED').length;
+  const verifiedDocs = docTypes.filter(d => isApproved(docs[d.key]?.status)).length;
 
   return (
     <div className="space-y-3">
@@ -133,9 +134,9 @@ export default function DocumentSection({ userId, userType, token }) {
 
         return (
           <div key={key} className={`bg-white border rounded-xl overflow-hidden ${
-            doc?.status === 'VERIFIED' ? 'border-emerald-200' :
-            doc?.status === 'REJECTED' ? 'border-red-200'    :
-            hasContent                  ? 'border-amber-200'  : 'border-slate-200'
+            isApproved(doc?.status)     ? 'border-emerald-200' :
+            doc?.status === 'REJECTED'  ? 'border-red-200'     :
+            hasContent                  ? 'border-amber-200'   : 'border-slate-200'
           }`}>
 
             {/* ── TOP ROW ── */}
@@ -143,9 +144,9 @@ export default function DocumentSection({ userId, userType, token }) {
               {/* Left: icon + label */}
               <div className="flex items-center gap-2.5">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg ${
-                  doc?.status === 'VERIFIED' ? 'bg-emerald-50' :
+                  isApproved(doc?.status)    ? 'bg-emerald-50' :
                   doc?.status === 'REJECTED' ? 'bg-red-50'     :
-                  hasContent                  ? 'bg-amber-50'   : 'bg-slate-100'
+                  hasContent                 ? 'bg-amber-50'   : 'bg-slate-100'
                 }`}>
                   {/* Show thumbnail in icon if image preview exists */}
                   {preview && preview !== 'pdf' && !doc
@@ -170,12 +171,12 @@ export default function DocumentSection({ userId, userType, token }) {
                   // ── UPLOADED TO SERVER ──
                   <>
                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
-                      doc.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-700' :
-                      doc.status === 'REJECTED' ? 'bg-red-100 text-red-700'        :
+                      isApproved(doc.status)     ? 'bg-emerald-100 text-emerald-700' :
+                      doc.status === 'REJECTED'  ? 'bg-red-100 text-red-700'         :
                                                    'bg-amber-100 text-amber-700'
                     }`}>
-                      {doc.status === 'VERIFIED' ? '✅ Verified' :
-                       doc.status === 'REJECTED' ? '❌ Rejected' : '⏳ Pending'}
+                      {isApproved(doc.status)    ? '✅ Approved'  :
+                       doc.status === 'REJECTED' ? '❌ Rejected'  : '⏳ Pending'}
                     </span>
                     <button onClick={() => setViewDoc(doc)}
                       className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-xs">
@@ -242,9 +243,9 @@ export default function DocumentSection({ userId, userType, token }) {
             )}
 
             {/* Rejected reason */}
-            {doc?.status === 'REJECTED' && doc?.reject_reason && (
+            {doc?.status === 'REJECTED' && (doc?.rejection_reason || doc?.reject_reason) && (
               <div className="px-3 pb-2 text-[10px] text-red-500 font-black">
-                ❌ {doc.reject_reason}
+                ❌ {doc.rejection_reason || doc.reject_reason}
               </div>
             )}
           </div>

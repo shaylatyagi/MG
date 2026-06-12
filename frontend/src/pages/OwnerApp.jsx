@@ -519,12 +519,20 @@ const DriverDetailsModal = () => {
   const [fetchingAgreement, setFetchingAgreement]     = useState(false);
   const [agreementPreviewUrl, setAgreementPreviewUrl] = useState(null);
   const [uploadingAgreement, setUploadingAgreement]   = useState(false);
+  const [agreementDoc, setAgreementDoc]               = useState(null); // full doc record
 
   useEffect(() => {
     if (!selectedDriverDetails?.id) return;
     fetch(`${API}/api/payment/owner/driver-history/${selectedDriverDetails.id}`, {
       headers: { Authorization: `Bearer ${token()}` }
     }).then(r => r.json()).then(setDriverHistory).catch(() => {});
+    // Fetch agreement doc status
+    fetch(`${API}/api/uploads/my-docs?user_id=${selectedDriverDetails.id}&user_type=DRIVER`, {
+      headers: { Authorization: `Bearer ${token()}` }
+    }).then(r => r.json()).then(data => {
+      const ag = data.docs?.find(d => d.doc_type === 'AGREEMENT');
+      if (ag) setAgreementDoc(ag);
+    }).catch(() => {});
   }, [selectedDriverDetails?.id]);
 
   const viewAgreement = async () => {
@@ -739,18 +747,28 @@ const DriverDetailsModal = () => {
   </h3>
   <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
     {driver.agreement_uploaded ? (
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-emerald-600 text-lg">✅</span>
-          <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-lg shrink-0">
+            {agreementDoc?.status === 'APPROVED' ? '✅' :
+             agreementDoc?.status === 'REJECTED'  ? '❌' : '⏳'}
+          </span>
+          <div className="min-w-0">
             <p className="text-sm font-black text-slate-800">Agreement uploaded</p>
-            <p className="text-[10px] text-slate-400">Replace with new file below</p>
+            <p className={`text-[10px] font-black ${
+              agreementDoc?.status === 'APPROVED' ? 'text-emerald-600' :
+              agreementDoc?.status === 'REJECTED'  ? 'text-red-500'     : 'text-amber-600'
+            }`}>
+              {agreementDoc?.status === 'APPROVED' ? '✅ Approved by admin' :
+               agreementDoc?.status === 'REJECTED'  ? `❌ Rejected${agreementDoc.rejection_reason ? ': ' + agreementDoc.rejection_reason : ' — please re-upload'}` :
+                                                      '⏳ Pending admin review'}
+            </p>
           </div>
         </div>
         <button
           onClick={viewAgreement}
           disabled={fetchingAgreement}
-          className="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 disabled:opacity-50"
+          className="text-xs font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 disabled:opacity-50 shrink-0"
         >
           {fetchingAgreement ? '…' : '👁 View'}
         </button>

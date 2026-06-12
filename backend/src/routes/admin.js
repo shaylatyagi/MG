@@ -3,6 +3,7 @@ const multer     = require('multer');
 const router     = express.Router();
 const pool       = require('../config/db');
 const { logAudit } = require('../utils/audit');
+const fcm          = require('../services/fcm');
 const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -1111,11 +1112,22 @@ router.get('/document-approvals', async (req, res) => {
 router.put('/document-approvals/:id/approve', async (req, res) => {
   try {
     const { id } = req.params;
+    const docRes = await pool.query(
+      'SELECT user_id, user_type, doc_type FROM public.user_documents WHERE id=$1', [id]
+    );
     await pool.query(
-      "UPDATE public.user_documents SET status='APPROVED', reviewed_at=NOW() WHERE id=$1",
-      [id]
+      "UPDATE public.user_documents SET status='APPROVED', reviewed_at=NOW() WHERE id=$1", [id]
     );
     await logAudit('ADMIN', 'DOCUMENT_APPROVED', { doc_id: id });
+    // FCM push
+    if (docRes.rows[0]) {
+      const { user_id, user_type, doc_type } = docRes.rows[0];
+      fcm.sendToUser(pool, user_id, user_type.toLowerCase(),
+        '✅ Document Approved',
+        `Your ${doc_type.replace(/_/g,' ')} has been approved by admin.`,
+        { type: 'DOC_APPROVED', doc_type }
+      ).catch(() => {});
+    }
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1125,11 +1137,26 @@ router.put('/document-approvals/:id/reject', async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body || {};
+    const docRes = await pool.query(
+      'SELECT user_id, user_type, doc_type FROM public.user_documents WHERE id=$1', [id]
+    );
     await pool.query(
       "UPDATE public.user_documents SET status='REJECTED', rejection_reason=$2, reviewed_at=NOW() WHERE id=$1",
       [id, reason || null]
     );
     await logAudit('ADMIN', 'DOCUMENT_REJECTED', { doc_id: id, reason });
+    // FCM push
+    if (docRes.rows[0]) {
+      const { user_id, user_type, doc_type } = docRes.rows[0];
+      const body = reason
+        ? `Your ${doc_type.replace(/_/g,' ')} was rejected: ${reason}`
+        : `Your ${doc_type.replace(/_/g,' ')} was rejected. Please re-upload.`;
+      fcm.sendToUser(pool, user_id, user_type.toLowerCase(),
+        '❌ Document Rejected',
+        body,
+        { type: 'DOC_REJECTED', doc_type, reason: reason || '' }
+      ).catch(() => {});
+    }
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

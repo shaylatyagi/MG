@@ -201,7 +201,7 @@ router.get('/drivers', async (req, res) => {
 
     const result = await pool.query(
       `SELECT d.id, d.name, d.phone_number, d.status, d.kyc_status,
-              d.wallet_balance, d.created_at,
+              d.wallet_balance, d.created_at, d.agreement_uploaded,
               v.id         AS vehicle_id,
               v.reg_number AS vehicle_reg,
               v.daily_rent,
