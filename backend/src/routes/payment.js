@@ -1457,16 +1457,17 @@ router.get('/owner/plan', async (req, res) => {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
     const result = await pool.query(
-      `SELECT subscription_status, subscription_expires_at FROM public.owners WHERE id = $1`,
+      `SELECT subscription_end_date FROM public.owners WHERE id = $1`,
       [parseInt(ownerId)]
     );
     if (!result.rows.length) return res.status(404).json({ message: 'Owner not found' });
     const row = result.rows[0];
+    const isPremium = row.subscription_end_date && new Date(row.subscription_end_date) > new Date();
     res.json({
-      plan: row.subscription_status === 'ACTIVE' ? 'PREMIUM' : 'FREE',
-      is_premium: row.subscription_status === 'ACTIVE',
-      subscription_status: row.subscription_status,
-      expires_at: row.subscription_expires_at || null,
+      plan: isPremium ? 'PREMIUM' : 'FREE',
+      is_premium: isPremium,
+      subscription_status: isPremium ? 'ACTIVE' : 'INACTIVE',
+      expires_at: row.subscription_end_date || null,
     });
   } catch (err) {
     console.error('owner/plan error:', err);
@@ -2385,13 +2386,10 @@ router.get('/owner/notifications', async (req, res) => {
               n.created_at, n.metadata, d.full_name as driver_name
        FROM public.notifications n
        LEFT JOIN public.drivers d ON d.id = n.driver_id
-       WHERE (
-         (n.user_type = 'DRIVER' AND d.owner_code = $1)
-         OR (n.user_type = 'OWNER' AND n.user_id = $2)
-       )
+       WHERE (n.user_type = 'DRIVER' AND d.owner_code = $1)
        ORDER BY n.created_at DESC
        LIMIT 50`,
-      [ownerCode, parseInt(ownerId)]
+      [ownerCode]
     );
     
     res.json(notifResult.rows);
@@ -3259,4 +3257,4 @@ router.get('/manager/profile', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Upgrade to premium (admin manually upgrades, or payment webhook)                                                                                                                                                                                                               
+// Upgrade to premium (admin manually upgrades, or payment webhook)

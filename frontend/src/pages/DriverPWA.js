@@ -69,7 +69,6 @@ export default function DriverPWA() {
   const [payAmt, setPayAmt] = useState(0);
   const [telemetry, setTelemetry] = useState({});
   const [payments, setPayments] = useState([]);
-  const NOTIF_KEY = `mg_notifs_${phone ? phone() : ''}`;
   const [notifs, setNotifs] = useState(() => {
     try { const c = localStorage.getItem('mg_notifs_cached'); return c ? JSON.parse(c) : []; } catch { return []; }
   });
