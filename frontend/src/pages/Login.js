@@ -105,14 +105,18 @@ export default function Login() {
       });
       const data = await res.json();
       if (data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
         const role = data.user?.role;
-        if (role === 'MANAGER') navigate('/manager/dashboard');
-        else if (selectedRole.type === 'admin') {
-          localStorage.setItem('mg_admin_token', data.token);
-          window.location.href = '/admin/dashboard';
-        } else navigate(selectedRole.redirect);
+        if (role === 'DRIVER') {
+          setError('This number is not registered as an owner. Please use the driver login.');
+        } else {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          if (role === 'MANAGER') navigate('/manager/dashboard');
+          else if (selectedRole.type === 'admin') {
+            localStorage.setItem('mg_admin_token', data.token);
+            window.location.href = '/admin/dashboard';
+          } else navigate(selectedRole.redirect);
+        }
       } else { setError(data.message || 'OTP galat hai'); }
     } catch { setError('Network error.'); }
     setLoading(false);
@@ -147,9 +151,13 @@ export default function Login() {
       });
       const data = await res.json();
       if (data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/driver/dashboard');
+        if (data.user?.role !== 'DRIVER') {
+          setError('This number is not registered as a driver. Please use the correct login.');
+        } else {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          navigate('/driver/dashboard');
+        }
       } else { setError(data.message || 'OTP galat hai'); }
     } catch { setError('Network error.'); }
     setLoading(false);
@@ -488,13 +496,4 @@ export default function Login() {
       </button>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
         <button onClick={sendOwnerOTP} disabled={resendTimer > 0} style={{
-          fontSize: '13px', color: resendTimer > 0 ? '#94a3b8' : '#4f46e5',
-          background: 'none', border: 'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
-          fontWeight: 600, fontFamily: 'inherit'
-        }}>
-          {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-        </button>
-      </div>
-    </Shell>
-  );
-}
+          fontSize
