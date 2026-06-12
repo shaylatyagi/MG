@@ -253,10 +253,10 @@ router.post('/drivers', async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO drivers (owner_id, company_id, name, phone_number, emergency_contact,
-                            wallet_balance, status, kyc_status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5, 0,'ACTIVE','PENDING',NOW(),NOW()) RETURNING *`,
+                            owner_code, wallet_balance, status, kyc_status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5, $6, 0,'ACTIVE','PENDING',NOW(),NOW()) RETURNING *`,
       [owner.id, owner.company_id, name.trim(), phone_number,
-       emergency_contact || null]
+       emergency_contact || null, owner.owner_code]
     );
 
     res.status(201).json({ success: true, data: result.rows[0] });
@@ -478,9 +478,9 @@ router.post('/drivers/bulk-import', csvUpload.single('file'), async (req, res) =
       try {
         await pool.query(
           `INSERT INTO drivers (owner_id, company_id, name, phone_number, emergency_contact,
-                                wallet_balance, status, kyc_status, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5, 0,'ACTIVE','PENDING',NOW(),NOW())`,
-          [owner.id, owner.company_id, name, phone, ec]
+                                owner_code, wallet_balance, status, kyc_status, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5, $6, 0,'ACTIVE','PENDING',NOW(),NOW())`,
+          [owner.id, owner.company_id, name, phone, ec, owner.owner_code]
         );
         results.created++;
       } catch (e) {
