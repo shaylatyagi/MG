@@ -137,7 +137,7 @@ router.post('/companies', async (req, res) => {
     if (!name) return res.status(400).json({ error: 'Name required' });
     // Insert first, then update code with the id
     const r = await pool.query(
-      `INSERT INTO public.companies(name,cin,city) VALUES($1,$2,$3) RETURNING *`,
+      `INSERT INTO public.companies(name,cin,city,status) VALUES($1,$2,$3,'ACTIVE') RETURNING *`,
       [name, cin||null, city||null]
     );
     const co = r.rows[0];
@@ -524,7 +524,7 @@ router.patch('/owners/:id/phone', async (req, res) => {
 router.patch('/companies/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
-    if (!['Active', 'Inactive'].includes(status)) {
+    if (!['ACTIVE', 'INACTIVE'].includes(status)) {
       return res.status(400).json({ error: 'status must be Active or Inactive' });
     }
     const r = await pool.query(
@@ -893,7 +893,8 @@ router.get('/all-drivers', async (req, res) => {
       FROM public.drivers d
       LEFT JOIN public.owners o ON o.owner_code = d.owner_code
       LEFT JOIN public.companies c ON c.id = o.company_id
-      LEFT JOIN public.vehicles v ON v.driver_id = d.id AND v.status = 'ACTIVE'
+      LEFT JOIN public.vehicles v ON v.driver_id = d.id 
+  AND v.status IN ('ACTIVE', 'ASSIGNED')
       LEFT JOIN public.ms_orders mo ON mo.payer_mobile = d.mobile_number AND mo.transaction_status='SUCCESS'
       GROUP BY d.id, d.full_name, d.mobile_number, d.driver_code, d.kyc_status, d.status, d.created_at,
                o.full_name, o.mobile_number, o.owner_code, c.name,
