@@ -1415,8 +1415,8 @@ router.get('/owner/drivers/list', async (req, res) => {
     }
 
     const whereClause = ownerCode
-      ? `WHERE d.status = 'ACTIVE' AND d.owner_code = $3`
-      : `WHERE d.status = 'ACTIVE'`;
+  ? `WHERE UPPER(d.status) = 'ACTIVE' AND d.owner_code = $3`
+  : `WHERE UPPER(d.status) = 'ACTIVE'`;
     const params = ownerCode ? [limit, offset, ownerCode] : [limit, offset];
 
     const countParams = ownerCode ? [ownerCode] : [];
@@ -2379,7 +2379,13 @@ router.get('/owner/notifications', async (req, res) => {
               n.created_at, n.metadata, d.full_name as driver_name
        FROM public.notifications n
        LEFT JOIN public.drivers d ON d.id = n.driver_id
-       WHERE n.user_type = 'OWNER' AND n.user_id = $1
+       WHERE n.user_type = 'OWNER' 
+AND n.driver_id IN (
+  SELECT id FROM public.drivers 
+  WHERE owner_code = (
+    SELECT owner_code FROM public.owners WHERE id = $1
+  )
+)
        ORDER BY n.created_at DESC
        LIMIT 50`,
       [ownerId]
