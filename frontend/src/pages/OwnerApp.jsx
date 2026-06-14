@@ -4506,4 +4506,76 @@ const ProfileTab = () => {
                             </td>
                             <td className="px-1 py-1">
                               <input value={v.chassis_number||''} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],chassis_number:e.target.value.toUpperCase()};return u;})}}
-                                className="w-28 border border-slate-200 rounded px-1.5 py-1 text-xs up
+                                className="w-28 border border-slate-200 rounded px-1.5 py-1 text-xs uppercase font-mono focus:outline-none"/>
+                            </td>
+                            <td className="px-2 py-1.5">
+                              {v._errors.length===0
+                                ? <span className="text-emerald-600 font-black text-[10px]">✅</span>
+                                : <span className="text-red-600 font-black text-[9px]">{v._errors[0]}</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setBulkVehicles(prev=>prev.filter(v=>v._errors.length===0))}
+                    className="px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl text-xs font-black border border-amber-200">🗑 Remove Errors</button>
+                  <button onClick={importBulkVehicles}
+                    disabled={bulkLoading || bulkVehicles.filter(v=>v._errors.length===0).length===0}
+                    className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black disabled:opacity-50">
+                    {bulkLoading ? '⏳ Importing...' : `Import ${bulkVehicles.filter(v=>v._errors.length===0).length} Vehicles →`}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <div className="space-y-4 py-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center">
+              <p className="text-5xl font-black text-emerald-600">{bulkResult.imported}</p>
+              <p className="text-base font-black text-emerald-600 mt-2">
+                {bulkTab==='drivers'?'Drivers':'Vehicles'} Imported! ✅
+              </p>
+            </div>
+            {bulkResult.failed > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-xs font-black text-red-700 mb-2">❌ {bulkResult.failed} Failed:</p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {bulkResult.failures?.map((f, i) => (
+                    <p key={i} className="text-[10px] text-red-500">{f.name||f.num} — {f.reason}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button onClick={() => { setShowBulkModal(false); setBulkDrivers([]); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); setBulkTab('drivers'); }}
+              className="w-full py-3 bg-slate-800 text-white rounded-xl text-sm font-black">✓ Done</button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+      </div>
+    {/* ── Logout Confirm Modal — outside overflow:hidden, z-9999 ── */}
+    {showLogoutConfirm && (
+      <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+            <LogOut size={20} className="text-red-500" />
+          </div>
+          <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
+          <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
+          <div className="flex gap-3">
+            <button onClick={() => setShowLogoutConfirm(false)}
+              className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
+            <button onClick={logout}
+              className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+  );
+}
