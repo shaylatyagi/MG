@@ -151,7 +151,8 @@
       "icons": [
         {
           "src": "icon-driver-192.png",
-          "sizes": "192x192"
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ],
       "auth": false,
@@ -166,5 +167,16 @@
       "src": "icon-driver-192.png",
       "sizes": "192x192"
     }
-  }
+  },
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "scope_extensions": [
+    {
+      "origin": "https://mobilitygrid.in"
+    },
+    {
+      "origin": "https://www.mobilitygrid.in"
+    }
+  ]
 }
