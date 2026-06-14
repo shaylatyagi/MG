@@ -692,11 +692,13 @@ router.post('/forgot-pin', async (req, res) => {
         message: 'DEV: OTP is ' + otp });
     }
 
-    // Send via email — free (nodemailer + Gmail SMTP)
+    // Send via email — free (nodemailer + Brevo SMTP)
     var nodemailer = require('nodemailer');
     var transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD }
+      host: 'smtp-relay.brevo.com',
+      port: 587,
+      secure: false,
+      auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
     });
     await transporter.sendMail({
       from: '"MobilityGrid" <' + process.env.GMAIL_USER + '>',
