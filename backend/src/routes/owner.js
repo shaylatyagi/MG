@@ -127,7 +127,7 @@ router.get('/vehicles', async (req, res) => {
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
 
     const result = await pool.query(
-      `SELECT v.id, v.reg_number, v.type, v.status, v.daily_rent, v.rent_type,
+      `SELECT v.id, v.vehicle_number, v.vehicle_type, v.status, v.daily_rent, v.rent_type,
               v.created_at,
               d.id   AS driver_id,
               d.name AS driver_name,
@@ -158,15 +158,15 @@ router.post('/vehicles', async (req, res) => {
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
 
     const existing = await pool.query(
-      'SELECT id FROM vehicles WHERE reg_number = $1', [reg_number]
+      'SELECT id FROM vehicles WHERE vehicle_number = $1', [reg_number]
     );
     if (existing.rows.length)
       return res.status(409).json({ success: false, message: 'Vehicle already registered' });
 
     const result = await pool.query(
-      `INSERT INTO vehicles (owner_id, company_id, reg_number, type, model, rent_type, daily_rent, status, created_at, updated_at)
+      `INSERT INTO vehicles (owner_id, vehicle_number, vehicle_type, vehicle_model, rent_type, daily_rent, status, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'AVAILABLE',NOW(),NOW()) RETURNING *`,
-      [owner.id, owner.company_id, reg_number, type, model || null,
+      [owner.id, reg_number, type, model || null,
        rent_type, parseFloat(daily_rent) || 0]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
@@ -203,7 +203,7 @@ router.get('/drivers', async (req, res) => {
       `SELECT d.id, d.name, d.phone_number, d.status, d.kyc_status,
               d.wallet_balance, d.created_at, d.agreement_uploaded,
               v.id         AS vehicle_id,
-              v.reg_number AS vehicle_reg,
+              v.vehicle_number AS vehicle_reg,
               v.daily_rent,
               COALESCE(
                 (SELECT SUM(o.amount) FROM ms_orders o
@@ -292,7 +292,7 @@ router.post('/assign', async (req, res) => {
     // Ownership checks
     const [driverRow, vehicleRow] = await Promise.all([
       client.query('SELECT id, name, assigned_vehicle_id FROM drivers WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL', [driver_id, owner.id]),
-      client.query('SELECT id, reg_number, daily_rent, status FROM vehicles WHERE id = $1 AND owner_id = $2', [vehicle_id, owner.id]),
+      client.query('SELECT id, vehicle_number, daily_rent, status FROM vehicles WHERE id = $1 AND owner_id = $2', [vehicle_id, owner.id]),
     ]);
     if (!driverRow.rows.length)  return res.status(404).json({ success: false, message: 'Driver not found' });
     if (!vehicleRow.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });
@@ -342,7 +342,7 @@ router.post('/assign', async (req, res) => {
 
     res.json({
       success: true,
-      message: `${vehicle.reg_number} assigned to ${driver.name}`,
+      message: `${vehicle.vehicle_number} assigned to ${driver.name}`,
       data: { driver_id: driver.id, vehicle_id: vehicle.id, rent_amount: effectiveRent },
     });
   } catch (err) {
@@ -615,7 +615,7 @@ router.get('/drivers/:id/profile', async (req, res) => {
 
     const [driverRow, paymentsRow, historyRow] = await Promise.all([
       pool.query(
-        `SELECT d.*, v.reg_number AS vehicle_reg, v.type AS vehicle_type,
+        `SELECT d.*, v.vehicle_number AS vehicle_reg, v.vehicle_type,
                 v.daily_rent AS vehicle_daily_rent
          FROM drivers d
          LEFT JOIN vehicles v ON v.id = d.assigned_vehicle_id
@@ -632,7 +632,7 @@ router.get('/drivers/:id/profile', async (req, res) => {
       pool.query(
         `SELECT dvh.id, dvh.assigned_at, dvh.unassigned_at,
                 dvh.rent_type, dvh.rent_amount, dvh.deposit_amount,
-                v.reg_number, v.type AS vehicle_type,
+                v.vehicle_number, v.vehicle_type,
                 EXTRACT(EPOCH FROM (COALESCE(dvh.unassigned_at, NOW()) - dvh.assigned_at))/3600 AS hours_active
          FROM driver_vehicle_history dvh
          LEFT JOIN vehicles v ON v.id = dvh.vehicle_id
@@ -810,10 +810,9 @@ router.get('/driver-locations', async (req, res) => {
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
     const r = await pool.query(
       `SELECT d.id, d.full_name, d.last_lat, d.last_lng, d.last_location_at,
-              v.reg_number, v.type AS vehicle_type
+              v.vehicle_number, v.vehicle_type
        FROM public.drivers d
-       LEFT JOIN public.driver_vehicle_history dvh ON dvh.driver_id = d.id AND dvh.unassigned_at IS NULL
-       LEFT JOIN public.vehicles v ON v.id = dvh.vehicle_id
+       LEFT JOIN public.vehicles v ON v.driver_id = d.id
        WHERE d.owner_code = $1 AND d.last_lat IS NOT NULL
        ORDER BY d.last_location_at DESC`,
       [owner.owner_code]

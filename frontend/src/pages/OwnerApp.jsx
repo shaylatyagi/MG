@@ -3305,16 +3305,25 @@ const ProfileTab = () => {
     const [drivers, setDrivers] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [lastRefresh, setLastRefresh] = React.useState(null);
+    const [apiError, setApiError] = React.useState(null);
     const mapsKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     const fetchLocations = async () => {
+      setApiError(null);
       try {
         const r = await fetch(`${API}/api/owner/driver-locations`, {
           headers: { Authorization: `Bearer ${token()}` }
         });
         const d = await r.json();
-        if (d.success) { setDrivers(d.drivers || []); setLastRefresh(new Date()); }
-      } catch {}
+        if (d.success) {
+          setDrivers(d.drivers || []);
+          setLastRefresh(new Date());
+        } else {
+          setApiError(d.error || d.message || `Server error ${r.status}`);
+        }
+      } catch (err) {
+        setApiError(err.message || 'Network error');
+      }
       setLoading(false);
     };
 
@@ -3369,6 +3378,13 @@ const ProfileTab = () => {
         {loading ? (
           <div className="bg-slate-100 rounded-2xl h-40 flex items-center justify-center text-xs text-slate-400 animate-pulse font-black">
             Fetching driver locations...
+          </div>
+        ) : apiError ? (
+          <div className="bg-red-50 border border-red-200 rounded-2xl h-40 flex flex-col items-center justify-center gap-2 px-4">
+            <span className="text-2xl">⚠️</span>
+            <span className="text-xs font-black text-red-600">API Error</span>
+            <span className="text-[10px] text-red-400 text-center">{apiError}</span>
+            <button onClick={fetchLocations} className="text-[10px] font-black text-white bg-red-500 px-3 py-1 rounded-lg mt-1">Retry</button>
           </div>
         ) : drivers.length === 0 ? (
           <div className="bg-slate-100 rounded-2xl h-40 flex flex-col items-center justify-center gap-2">
