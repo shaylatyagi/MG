@@ -58,6 +58,8 @@ export default function Login() {
   const [otpValue, setOtpValue] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const [adminPhone, setAdminPhone] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPass, setShowAdminPass] = useState(false);
   const [ownerPhone, setOwnerPhone] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
 
@@ -169,38 +171,19 @@ export default function Login() {
     setStep(role.type === 'driver' ? 'driver-otp' : 'send-otp');
   };
 
-  const sendAdminOTP = async () => {
-    setLoading(true); setError(''); setSuccess('');
+  const loginAdmin = async () => {
+    setLoading(true); setError('');
     try {
-      const res = await fetch(`${API}/api/auth/admin-send-otp`, {
+      const res = await fetch(`${API}/api/auth/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: adminPhone, admin_secret: ADMIN_SECRET })
+        body: JSON.stringify({ phone_number: adminPhone, password: adminPassword })
       });
       const data = await res.json();
       if (data.success) {
-        setOtpValue(data.otp || '');
-        setSuccess(data.otp ? `OTP: ${data.otp}` : 'OTP sent');
-        setStep('verify-otp');
-        startResendTimer();
-      } else { setError(data.message || 'Failed to send OTP'); }
-    } catch { setError('Network error.'); }
-    setLoading(false);
-  };
-
-  const verifyAdminOTP = async () => {
-    setLoading(true); setError('');
-    try {
-      const res = await fetch(`${API}/api/auth/admin-verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: adminPhone, otp: otpValue, admin_secret: ADMIN_SECRET })
-      });
-      const data = await res.json();
-      if (data.success && data.token) {
         localStorage.setItem('mg_admin_token', data.token);
-        window.location.href = '/admin/dashboard';
-      } else { setError(data.message || 'Verification failed'); }
+        navigate('/admin');
+      } else { setError(data.message || 'Invalid credentials'); }
     } catch { setError('Network error.'); }
     setLoading(false);
   };
@@ -367,12 +350,13 @@ export default function Login() {
     );
   }
 
-  // ── Admin Send OTP ── (driver resend calls sendDriverOTP above) ───────────────────────────────────────────────────
+  // ── Admin Login — phone + password only, no OTP ─────────────────────────────
   if (step === 'send-otp' && selectedRole?.type === 'admin') {
+    const ready = adminPhone.length === 10 && adminPassword.length > 0;
     return (
       <Shell showBack onBack={handleBack} title="Platform Admin Login">
         <Alert />
-        <div style={{ marginBottom: '18px' }}>
+        <div style={{ marginBottom: '14px' }}>
           <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
             Admin Phone Number
           </label>
@@ -382,19 +366,39 @@ export default function Login() {
               type="tel"
               value={adminPhone}
               onChange={e => setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-              onKeyDown={e => { if (e.key === 'Enter' && !loading && adminPhone.length >= 10) sendAdminOTP(); }}
+              onKeyDown={e => { if (e.key === 'Enter' && ready && !loading) loginAdmin(); }}
               placeholder="10-digit mobile number"
               autoFocus
               style={inputStyle}
             />
           </div>
         </div>
+        <div style={{ marginBottom: '18px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+            Password
+          </label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showAdminPass ? 'text' : 'password'}
+              value={adminPassword}
+              onChange={e => setAdminPassword(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && ready && !loading) loginAdmin(); }}
+              placeholder="••••••••"
+              style={{ ...inputStyle, paddingRight: '52px' }}
+            />
+            <button type="button" onClick={() => setShowAdminPass(p => !p)}
+              style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>
+              {showAdminPass ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </div>
         <button
-          onClick={sendAdminOTP}
-          disabled={loading || adminPhone.length < 10}
-          style={loading || adminPhone.length < 10 ? btnDisabled : btnPrimary}
+          onClick={loginAdmin}
+          disabled={loading || !ready}
+          style={loading || !ready ? btnDisabled : btnPrimary}
         >
-          {loading ? 'Sending…' : 'Send OTP'} <Send size={14} />
+          {loading ? 'Signing in…' : 'Sign In'} <ArrowRight size={14} />
         </button>
       </Shell>
     );
@@ -431,44 +435,6 @@ export default function Login() {
   }
 
   // ── Admin Verify OTP ─────────────────────────────────────────────────
-  if (step === 'verify-otp' && selectedRole?.type === 'admin') {
-    return (
-      <Shell showBack onBack={() => setStep('send-otp')} title="Enter OTP" subtitle={`Sent to ${adminPhone}`}>
-        <Alert />
-        <input
-          type="text"
-          value={otpValue}
-          onChange={e => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          onKeyDown={e => { if (e.key === 'Enter' && !loading && otpValue.length >= 6) verifyAdminOTP(); }}
-          placeholder="• • • • • •"
-          maxLength={6}
-          autoFocus
-          style={{
-            width: '100%', padding: '16px',
-            border: '1.5px solid #e2e8f0', borderRadius: '12px',
-            fontSize: '28px', textAlign: 'center', letterSpacing: '0.4em',
-            fontFamily: 'monospace', color: '#0f172a',
-            background: '#f8fafc', outline: 'none',
-            marginBottom: '14px', boxSizing: 'border-box'
-          }}
-        />
-        <button onClick={verifyAdminOTP} disabled={loading || otpValue.length < 6}
-          style={loading || otpValue.length < 6 ? btnDisabled : btnPrimary}>
-          {loading ? 'Verifying…' : 'Verify & Login'} <ArrowRight size={14} />
-        </button>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
-          <button onClick={sendAdminOTP} disabled={resendTimer > 0} style={{
-            fontSize: '13px', color: resendTimer > 0 ? '#94a3b8' : '#4f46e5',
-            background: 'none', border: 'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
-            fontWeight: 600, fontFamily: 'inherit'
-          }}>
-            {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
-          </button>
-        </div>
-      </Shell>
-    );
-  }
-
   // ── Owner/Manager Verify OTP ─────────────────────────────────────────
   return (
     <Shell showBack onBack={() => setStep('send-otp')} title="Enter OTP" subtitle={`Sent to ${ownerPhone}`}>
