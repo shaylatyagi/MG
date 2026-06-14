@@ -1,7 +1,8 @@
 {
+  "id": "/login?role=owner",
   "short_name": "MG Owner",
   "name": "MobilityGrid - Fleet Owner",
-  "description": "Manage your EV fleet, drivers, and earnings",
+  "description": "Manage your EV fleet, drivers, and earnings with MobilityGrid",
   "icons": [
     { "src": "favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" },
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
@@ -13,5 +14,16 @@
   "theme_color": "#4f46e5",
   "background_color": "#ffffff",
   "scope": "/",
-  "categories": ["business", "productivity"]
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "screenshots": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "MobilityGrid Fleet Owner Dashboard"
+    }
+  ]
 }

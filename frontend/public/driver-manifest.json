@@ -1,4 +1,5 @@
 {
+  "id": "/login?role=driver",
   "short_name": "MG Driver",
   "name": "MobilityGrid - Driver App",
   "description": "Track trips, earnings, and manage your EV vehicle",
@@ -13,5 +14,16 @@
   "theme_color": "#16a34a",
   "background_color": "#ffffff",
   "scope": "/",
-  "categories": ["business", "productivity"]
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "screenshots": [
+    {
+      "src": "icon-driver-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "MobilityGrid Driver Dashboard"
+    }
+  ]
 }
