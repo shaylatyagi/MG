@@ -1266,7 +1266,7 @@ router.post('/reset-pin', async (req, res) => {
     var table = role === 'DRIVER' ? 'drivers' : 'owners';
     var pin   = String(Math.floor(100000 + Math.random() * 900000));
     var upd   = await pool.query(
-      'UPDATE public.' + table + ' SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true WHERE mobile_number=$2 RETURNING full_name, mobile_number',
+      'UPDATE public.' + table + ' SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true, pin_otp_used=false WHERE mobile_number=$2 RETURNING full_name, mobile_number',
       [await bcrypt.hash(pin, 10), phone]
     );
     if (!upd.rows[0]) return res.status(404).json({ success: false, message: 'No ' + role.toLowerCase() + ' found with that number' });

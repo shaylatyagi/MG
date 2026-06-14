@@ -254,9 +254,15 @@ export default function Login() {
       var data = await res.json();
       if (data.success) {
         setOtpValue(data.otp || '');
-        setSuccess(data.otp ? 'OTP: ' + data.otp : 'OTP sent to WhatsApp');
+        var via = data.via === 'dev' ? 'DEV OTP: ' + data.otp
+                : data.masked_email ? 'OTP sent to ' + data.masked_email
+                : 'OTP sent';
+        setSuccess(via);
         setStep('reset-pin');
         startResendTimer();
+      } else if (data.contact_admin) {
+        setStep('contact-admin');
+        setError(data.message || 'Please contact admin.');
       } else { setError(data.message || 'Failed'); }
     } catch { setError('Network error'); }
     setLoading(false);
@@ -531,6 +537,33 @@ export default function Login() {
           {loading ? 'Saving…' : 'Set PIN & Continue'} {!loading && <ArrowRight size={14} />}
         </button>
         {showEnrollSheet && <EnrollSheet />}
+      </Shell>
+    );
+  }
+
+  // ── Contact Admin screen ─────────────────────────────────────────────────
+  if (step === 'contact-admin') {
+    return (
+      <Shell showBack onBack={function() { setStep('pin-login'); setError(''); setSuccess(''); }}
+        title="Contact Admin" subtitle="PIN reset via OTP not available">
+        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+          <p style={{ color: '#0f172a', fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>
+            Self-service reset unavailable
+          </p>
+          <p style={{ color: '#64748b', fontSize: '13px', lineHeight: '1.6', marginBottom: '24px' }}>
+            {error || 'Please contact the MobilityGrid admin to reset your PIN.'}
+          </p>
+          <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '16px', marginBottom: '20px', textAlign: 'left' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: '#0369a1', marginBottom: '4px' }}>📞 Admin Contact</p>
+            <p style={{ fontSize: '13px', color: '#0f172a', margin: 0 }}>Call or WhatsApp your fleet owner</p>
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', margin: '4px 0 0' }}>or email <strong>support@mobilitygrid.in</strong></p>
+          </div>
+          <button onClick={function() { setStep('pin-login'); setError(''); setSuccess(''); }}
+            style={btnPrimary}>
+            Back to Login
+          </button>
+        </div>
       </Shell>
     );
   }

@@ -641,7 +641,9 @@ router.post('/set-pin', verifyToken, async (req, res) => {
 });
 
 // POST /api/auth/forgot-pin  — Body: { phone_number, role }
-// Sends OTP via existing send-otp flow so user can reset PIN
+// Rules:
+//   - Owners with email: send OTP to email (free). One-time only — after that contact admin.
+//   - Drivers / Owners without email: contact admin (no OTP ever).
 router.post('/forgot-pin', async (req, res) => {
   var phone = (req.body.phone_number || '').trim();
   var role  = (req.body.role || '').toUpperCase();
@@ -650,10 +652,31 @@ router.post('/forgot-pin', async (req, res) => {
 
   try {
     var table = role === 'DRIVER' ? 'drivers' : 'owners';
-    var userRes = await pool.query('SELECT id FROM public.' + table + ' WHERE mobile_number=$1 LIMIT 1', [phone]);
-    if (!userRes.rows[0]) return res.status(404).json({ success: false, message: 'No account found' });
+    var userRes = await pool.query(
+      'SELECT id, email, pin_otp_used FROM public.' + table + ' WHERE mobile_number=$1 LIMIT 1', [phone]
+    );
+    var user = userRes.rows[0];
+    if (!user) return res.status(404).json({ success: false, message: 'No account found' });
 
-    // Reuse existing OTP send logic
+    // Drivers: no self-service OTP — contact admin
+    if (role === 'DRIVER') {
+      return res.json({ success: false, contact_admin: true,
+        message: 'Drivers cannot reset PIN via OTP. Please contact your fleet owner or admin.' });
+    }
+
+    // Owner already used their one-time OTP
+    if (user.pin_otp_used) {
+      return res.json({ success: false, contact_admin: true,
+        message: 'You have already used your one-time PIN reset. Please contact the MobilityGrid admin.' });
+    }
+
+    // Owner has no email on file
+    if (!user.email) {
+      return res.json({ success: false, contact_admin: true,
+        message: 'No email on file. Please contact the MobilityGrid admin to reset your PIN.' });
+    }
+
+    // Generate & store OTP
     var otp = Math.floor(100000 + Math.random() * 900000).toString();
     var otpHash = await bcrypt.hash(otp, 10);
     await pool.query(
@@ -661,19 +684,32 @@ router.post('/forgot-pin', async (req, res) => {
       [phone, otpHash]
     );
 
-    // Send via Twilio (or dev bypass)
     var devBypass = process.env.DEV_BYPASS_OTP === 'true';
-    if (!devBypass) {
-      var client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      await client.messages.create({
-        from: 'whatsapp:' + process.env.TWILIO_WHATSAPP_FROM,
-        to:   'whatsapp:+91' + phone,
-        body: 'Your MobilityGrid PIN reset OTP is: ' + otp + '. Valid for 10 minutes.'
-      });
-      res.json({ success: true, message: 'OTP sent via WhatsApp' });
-    } else {
-      res.json({ success: true, message: 'OTP sent', otp: otp });
+    if (devBypass) {
+      var parts0 = user.email.split('@');
+      var masked0 = parts0[0].slice(0,2) + '***@' + parts0[1];
+      return res.json({ success: true, via: 'dev', otp: otp, masked_email: masked0,
+        message: 'DEV: OTP is ' + otp });
     }
+
+    // Send via email — free (nodemailer + Gmail SMTP)
+    var nodemailer = require('nodemailer');
+    var transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD }
+    });
+    await transporter.sendMail({
+      from: '"MobilityGrid" <' + process.env.GMAIL_USER + '>',
+      to:   user.email,
+      subject: 'MobilityGrid — PIN Reset OTP',
+      text: 'Your PIN reset OTP is: ' + otp + '\n\nValid for 10 minutes.\n\nIf you did not request this, ignore this email or contact support@mobilitygrid.in',
+      html: '<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid</h2><p>Your PIN reset OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">' + otp + '</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes. If you did not request this, ignore this email.</p></div>'
+    });
+
+    var parts = user.email.split('@');
+    var masked = parts[0].slice(0,2) + '***@' + parts[1];
+    res.json({ success: true, via: 'email', masked_email: masked,
+      message: 'OTP sent to your registered email: ' + masked });
   } catch (err) {
     console.error('forgot-pin error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -710,6 +746,9 @@ router.post('/reset-pin', async (req, res) => {
       [pinHash, phone]
     );
     if (!upd.rows[0]) return res.status(404).json({ success: false, message: 'Account not found' });
+
+    // Mark OTP as used — no more self-service resets
+    await pool.query('UPDATE public.' + table + ' SET pin_otp_used=true WHERE mobile_number=$1', [phone]);
 
     res.json({ success: true, message: 'PIN reset successfully. You can now login.' });
   } catch (err) {
