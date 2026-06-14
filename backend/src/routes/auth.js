@@ -45,21 +45,34 @@ const sendSMS = async (phone, otp) => {
 };
 
 // ── POST /api/auth/send-otp ───────────────────────────────────────────────────
+// Security: `role` param (DRIVER | OWNER | MANAGER) scopes the lookup.
+// A driver's phone cannot trigger an OTP on the owner portal and vice versa.
 router.post('/send-otp', async (req, res) => {
   const phone_number = (req.body.phone || req.body.phone_number || '').trim();
+  const role = (req.body.role || '').toUpperCase(); // DRIVER | OWNER | MANAGER
   if (!phone_number) return res.status(400).json({ success: false, message: 'Phone required' });
   const lockMsg = checkLock(phone_number);
   if (lockMsg) return res.status(429).json({ success: false, message: lockMsg });
   try {
-    const userRes = await pool.query(
-      `SELECT id, full_name FROM public.drivers WHERE mobile_number = $1
-       UNION SELECT id, full_name FROM public.owners WHERE mobile_number = $1
-       UNION SELECT id, full_name FROM public.managers WHERE mobile_number = $1 AND status = 'ACTIVE'
-       LIMIT 1`,
-      [phone_number]
-    );
+    let userRes;
+    if (role === 'DRIVER') {
+      userRes = await pool.query('SELECT id FROM public.drivers WHERE mobile_number = $1 LIMIT 1', [phone_number]);
+    } else if (role === 'OWNER') {
+      userRes = await pool.query('SELECT id FROM public.owners WHERE mobile_number = $1 LIMIT 1', [phone_number]);
+    } else if (role === 'MANAGER') {
+      userRes = await pool.query("SELECT id FROM public.managers WHERE mobile_number = $1 AND status='ACTIVE' LIMIT 1", [phone_number]);
+    } else {
+      // Fallback (no role sent) — search all, but never expose OTP in response
+      userRes = await pool.query(
+        `SELECT id FROM public.drivers WHERE mobile_number = $1
+         UNION SELECT id FROM public.owners WHERE mobile_number = $1
+         UNION SELECT id FROM public.managers WHERE mobile_number = $1 AND status='ACTIVE'
+         LIMIT 1`,
+        [phone_number]
+      );
+    }
     if (!userRes.rows[0])
-      return res.status(404).json({ success: false, message: 'Phone registered nahi hai' });
+      return res.status(404).json({ success: false, message: 'Phone number not found for this role' });
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpHash = await bcrypt.hash(otp, 10);
     await pool.query('DELETE FROM otps WHERE phone_number = $1', [phone_number]);
@@ -67,7 +80,6 @@ router.post('/send-otp', async (req, res) => {
       "INSERT INTO otps (phone_number, otp, expires_at) VALUES ($1, $2, NOW() + INTERVAL '10 minutes')",
       [phone_number, otpHash]
     );
-    // Never return OTP in production
     if (process.env.NODE_ENV !== 'production') console.log('DEV OTP:', phone_number, otp);
     const resp = { success: true, message: 'OTP sent' };
     if (process.env.NODE_ENV !== 'production' || process.env.DEV_BYPASS_OTP === 'true') resp.otp = otp;
@@ -78,9 +90,12 @@ router.post('/send-otp', async (req, res) => {
 });
 
 // ── POST /api/auth/verify-otp ─────────────────────────────────────────────────
+// Security: after OTP is verified, confirm the resolved user's role matches
+// the `role` param sent by the frontend. Prevents cross-portal login.
 router.post('/verify-otp', async (req, res) => {
   const phone_number = (req.body.phone || req.body.phone_number || '').trim();
   const otp = (req.body.otp || '').trim();
+  const expectedRole = (req.body.role || '').toUpperCase(); // DRIVER | OWNER | MANAGER
   if (!phone_number || !otp)
     return res.status(400).json({ success: false, message: 'Phone and OTP required' });
   const lockMsg = checkLock(phone_number);
@@ -142,6 +157,10 @@ router.post('/verify-otp', async (req, res) => {
     }
     const user = driverRes.rows[0] || ownerRes.rows[0];
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    // Role gate — if frontend sent a role, the resolved user must match it
+    if (expectedRole && user.role !== expectedRole) {
+      return res.status(403).json({ success: false, message: 'This phone number is not registered for this portal' });
+    }
     // Single-device login: generate new session token, invalidate old sessions
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const table = user.role === 'DRIVER' ? 'drivers' : 'owners';

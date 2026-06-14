@@ -83,12 +83,12 @@ export default function Login() {
       const res = await fetch(`${API}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phone })
+        body: JSON.stringify({ phone_number: phone, role: 'OWNER' })
       });
       const data = await res.json();
       if (data.success) {
         setOtpValue(data.otp || '');
-        setSuccess(`OTP: ${data.otp}`);
+        setSuccess(data.otp ? `OTP: ${data.otp}` : 'OTP sent');
         setStep('verify-otp');
         startResendTimer();
       } else { setError(data.message || 'Failed'); }
@@ -103,23 +103,23 @@ export default function Login() {
       const res = await fetch(`${API}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phone, otp: otpValue })
+        body: JSON.stringify({ phone_number: phone, otp: otpValue, role: 'OWNER' })
       });
       const data = await res.json();
       if (data.success) {
         const role = data.user?.role;
-        if (role === 'DRIVER') {
-          setError('This number is not registered as an owner. Please use the driver login.');
-        } else {
+        if (role === 'MANAGER') {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
-          if (role === 'MANAGER') navigate('/manager/dashboard');
-          else if (selectedRole.type === 'admin') {
-            localStorage.setItem('mg_admin_token', data.token);
-            window.location.href = '/admin/dashboard';
-          } else navigate(selectedRole.redirect);
+          navigate('/manager/dashboard');
+        } else if (role === 'OWNER') {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          navigate(selectedRole.redirect);
+        } else {
+          setError('This number is not registered as an owner.');
         }
-      } else { setError(data.message || 'OTP galat hai'); }
+      } else { setError(data.message || 'OTP invalid'); }
     } catch { setError('Network error.'); }
     setLoading(false);
   };
@@ -130,7 +130,7 @@ export default function Login() {
       const res = await fetch(`${API}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: driverPhone })
+        body: JSON.stringify({ phone_number: driverPhone, role: 'DRIVER' })
       });
       const data = await res.json();
       if (data.success) {
@@ -149,18 +149,18 @@ export default function Login() {
       const res = await fetch(`${API}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: driverPhone, otp: otpValue })
+        body: JSON.stringify({ phone_number: driverPhone, otp: otpValue, role: 'DRIVER' })
       });
       const data = await res.json();
       if (data.success) {
         if (data.user?.role !== 'DRIVER') {
-          setError('This number is not registered as a driver. Please use the correct login.');
+          setError('This number is not registered as a driver.');
         } else {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
           navigate('/driver/dashboard');
         }
-      } else { setError(data.message || 'OTP galat hai'); }
+      } else { setError(data.message || 'OTP invalid'); }
     } catch { setError('Network error.'); }
     setLoading(false);
   };

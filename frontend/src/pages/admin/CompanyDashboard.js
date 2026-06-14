@@ -2471,6 +2471,25 @@ function useAdminNotifications() {
   return { notifications, unread, markAllRead };
 }
 
+// ── Admin nav icons (inline SVG, no external dep) ────────────────────────────
+const NavIcon = ({ d, size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    {Array.isArray(d) ? d.map((path, i) => <path key={i} d={path} />) : <path d={d} />}
+  </svg>
+);
+
+const NAV_ICONS = {
+  dashboard:    ['M3 3h7v7H3z', 'M14 3h7v7h-7z', 'M14 14h7v7h-7z', 'M3 14h7v7H3z'],
+  companies:    ['M3 21V7l9-4 9 4v14', 'M9 21v-6h6v6'],
+  owners:       ['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', 'M23 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75', 'M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8'],
+  drivers:      ['M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5', 'M14 17a3 3 0 1 0 6 0 3 3 0 0 0-6 0', 'M5 17a3 3 0 1 0 6 0 3 3 0 0 0-6 0'],
+  kyc:          ['M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z', 'M16 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4', 'M8 12h.01'],
+  docs:         ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', 'M14 2v6h6', 'M9 15l2 2 4-4'],
+  transactions: ['M8 3H5a2 2 0 0 0-2 2v3', 'M21 8V5a2 2 0 0 0-2-2h-3', 'M3 16v3a2 2 0 0 0 2 2h3', 'M16 21h3a2 2 0 0 0 2-2v-3', 'M7 12h10', 'M12 7l5 5-5 5'],
+  chat:         ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
+  audit:        ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
+};
+
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [tab, setTab]               = useState('dashboard');
@@ -2481,15 +2500,15 @@ function AdminPanelInner() {
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
   const navItems = [
-    { key: 'dashboard',    label: 'Dashboard',     icon: '📊' },
-    { key: 'companies',    label: 'Companies',      icon: '🏢' },
-    { key: 'owners',       label: 'Owners',         icon: '👤' },
-    { key: 'drivers',      label: 'All Drivers',    icon: '🚗' },
-    { key: 'kyc',          label: 'KYC Review',     icon: '🪪' },
-    { key: 'docs',         label: 'Doc Approvals',  icon: '📄' },
-    { key: 'transactions', label: 'Transactions',   icon: '💳' },
-    { key: 'chat',         label: 'Chat',           icon: '💬' },
-    { key: 'audit',        label: 'Audit Log',      icon: '📋' },
+    { key: 'dashboard',    label: 'Dashboard',     icon: 'dashboard' },
+    { key: 'companies',    label: 'Companies',      icon: 'companies' },
+    { key: 'owners',       label: 'Owners',         icon: 'owners' },
+    { key: 'drivers',      label: 'All Drivers',    icon: 'drivers' },
+    { key: 'kyc',          label: 'KYC Review',     icon: 'kyc' },
+    { key: 'docs',         label: 'Doc Approvals',  icon: 'docs' },
+    { key: 'transactions', label: 'Transactions',   icon: 'transactions' },
+    { key: 'chat',         label: 'Chat',           icon: 'chat' },
+    { key: 'audit',        label: 'Audit Log',      icon: 'audit' },
   ];
 
   const doLogout = () => { clearToken(); window.location.href = '/login'; };
@@ -2497,75 +2516,169 @@ function AdminPanelInner() {
   const tabLabel = navItems.find(n => n.key === tab)?.label || tab;
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-950 font-sans">
-      <aside className="w-56 bg-gray-900 flex flex-col shrink-0">
-        <div className="p-5 border-b border-gray-700">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>
+    <div style={{ display:'flex', height:'100vh', background:'#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      <aside style={{
+        width: 224, background: '#0d1117', display: 'flex', flexDirection: 'column',
+        flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)'
+      }}>
+        {/* Logo */}
+        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(99,102,241,0.35)', flexShrink: 0
+            }}>
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>M</span>
+            </div>
             <div>
-              <p className="text-white text-sm font-semibold">MobilityGrid</p>
-              <p className="text-gray-400 text-xs">Super Admin</p>
+              <p style={{ color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', margin: 0 }}>MobilityGrid</p>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 500, margin: 0, marginTop: 1 }}>Super Admin Console</p>
             </div>
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(item => (
-            <button key={item.key} onClick={() => setTab(item.key)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                tab === item.key ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              }`}>
-              <span>{item.icon}</span> {item.label}
-            </button>
-          ))}
+
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+          {navItems.map(item => {
+            const active = tab === item.key;
+            return (
+              <button key={item.key} onClick={() => setTab(item.key)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                marginBottom: 2, textAlign: 'left', fontSize: 13, fontWeight: active ? 600 : 500,
+                background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
+                color: active ? '#818cf8' : 'rgba(255,255,255,0.45)',
+                borderLeft: active ? '2px solid #6366f1' : '2px solid transparent',
+                transition: 'all 0.15s',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}}
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}}
+              >
+                <span style={{ opacity: active ? 1 : 0.6, flexShrink: 0 }}>
+                  <NavIcon d={NAV_ICONS[item.icon]} size={15} />
+                </span>
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
-        <div className="p-3 border-t border-gray-700">
-          <button onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition">
-            <span>🚪</span> Logout
+
+        {/* Bottom — logout */}
+        <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <button onClick={logout} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: 13,
+            fontWeight: 500, textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.15s'
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#f87171'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
+          >
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign Out
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white dark:bg-gray-900 border-b dark:border-gray-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-          <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200">{tabLabel}</h1>
-          <div className="flex items-center gap-3">
+      {/* ── Main ────────────────────────────────────────────────────────── */}
+      <main style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Header */}
+        <header style={{
+          background: '#fff', borderBottom: '1px solid #e5e7eb',
+          padding: '0 24px', height: 56, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10,
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: '#9ca3af', fontSize: 12, fontWeight: 500 }}>Admin</span>
+            <span style={{ color: '#d1d5db', fontSize: 12 }}>›</span>
+            <span style={{ color: '#111827', fontSize: 14, fontWeight: 600 }}>{tabLabel}</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ThemeToggle />
-            {/* ── Notification Bell ── */}
-            <div className="relative">
+
+            {/* Bell */}
+            <div style={{ position: 'relative' }}>
               <button onClick={() => { setShowNotifs(v => !v); if (!showNotifs && unread > 0) markAllRead(); }}
-                className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
-                <span className="text-xl">🔔</span>
+                style={{
+                  width: 36, height: 36, borderRadius: 8, border: '1px solid #e5e7eb',
+                  background: showNotifs ? '#f3f4f6' : '#fff', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#6b7280', position: 'relative', transition: 'all 0.15s'
+                }}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
                 {unread > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                  <span style={{
+                    position: 'absolute', top: -4, right: -4,
+                    minWidth: 16, height: 16, background: '#ef4444',
+                    color: '#fff', fontSize: 9, fontWeight: 700,
+                    borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px'
+                  }}>
                     {unread > 99 ? '99+' : unread}
                   </span>
                 )}
               </button>
+
               {showNotifs && (
-                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border dark:border-gray-700 z-50 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
-                    <span className="text-sm font-semibold text-gray-800 dark:text-white">Notifications</span>
-                    <button onClick={markAllRead} className="text-xs text-indigo-500 hover:underline">Mark all read</button>
+                <div style={{
+                  position: 'absolute', right: 0, top: 44, width: 320,
+                  background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                  border: '1px solid #e5e7eb', zIndex: 50, overflow: 'hidden'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>Notifications</span>
+                    <button onClick={markAllRead} style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Mark all read</button>
                   </div>
-                  <div className="max-h-80 overflow-y-auto divide-y dark:divide-gray-700">
+                  <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-6">No notifications</p>
+                      <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
                     ) : notifications.map(n => (
-                      <div key={n.id} className={`px-4 py-3 ${!n.is_read ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
-                        <p className="text-sm font-medium text-gray-800 dark:text-white">{n.title}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{n.message}</p>
-                        <p className="text-[10px] text-gray-400 mt-1">{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                      <div key={n.id} style={{
+                        padding: '12px 16px', borderBottom: '1px solid #f9fafb',
+                        background: !n.is_read ? '#fafaff' : '#fff'
+                      }}>
+                        {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginRight: 6, verticalAlign: 'middle' }} />}
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{n.title}</p>
+                        <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
+                        <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
             </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500">Super Admin · MobilityGrid</span>
+
+            {/* Avatar chip */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '4px 12px 4px 4px', borderRadius: 20,
+              border: '1px solid #e5e7eb', background: '#fff', cursor: 'default'
+            }}>
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%',
+                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SA</span>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Super Admin</span>
+            </div>
           </div>
         </header>
-        <div className="p-6">
+
+        {/* Content */}
+        <div style={{ padding: 24, flex: 1 }}>
           {tab === 'dashboard'    && <Dashboard />}
           {tab === 'companies'    && <Companies />}
           {tab === 'owners'       && <AllOwners />}
@@ -2579,16 +2692,24 @@ function AdminPanelInner() {
       </main>
 
       {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-xs p-6 text-center shadow-2xl">
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3 text-2xl">🚪</div>
-            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">Logout?</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Are you sure you want to sign out?</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200">Cancel</button>
-              <button onClick={doLogout}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold">Yes, Logout</button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 320, padding: 24, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '0 0 4px' }}>Sign out?</h3>
+            <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 20px' }}>You'll need to sign in again to access the console.</p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowLogoutConfirm(false)} style={{
+                flex: 1, padding: '10px', background: '#f3f4f6', borderRadius: 10,
+                border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151'
+              }}>Cancel</button>
+              <button onClick={doLogout} style={{
+                flex: 1, padding: '10px', background: '#ef4444', borderRadius: 10,
+                border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff'
+              }}>Sign Out</button>
             </div>
           </div>
         </div>
