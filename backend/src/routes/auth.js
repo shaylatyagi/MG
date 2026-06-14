@@ -289,12 +289,8 @@ router.post('/admin-login', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PASSKEY / BIOMETRIC AUTH (WebAuthn)
 // ═══════════════════════════════════════════════════════════════════════════════
-const {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
-  generateAuthenticationOptions,
-  verifyAuthenticationResponse,
-} = require('@simplewebauthn/server');
+// Lazy-require so startup never crashes if package has an issue
+function swa() { return require('@simplewebauthn/server'); }
 
 const IS_PROD   = process.env.NODE_ENV === 'production';
 const RP_ID     = IS_PROD ? 'mobilitygrid.in' : 'localhost';
@@ -322,7 +318,7 @@ router.post('/passkey/register-options', verifyToken, async (req, res) => {
       return { id: Buffer.from(r.credential_id, 'base64url'), type: 'public-key' };
     });
 
-    const options = await generateRegistrationOptions({
+    const options = await swa().generateRegistrationOptions({
       rpName:   RP_NAME,
       rpID:     RP_ID,
       userID:   Buffer.from(userId.toString()),
@@ -371,7 +367,7 @@ router.post('/passkey/register-verify', verifyToken, async (req, res) => {
 
     const expectedChallenge = challengeRes.rows[0].challenge;
 
-    const verification = await verifyRegistrationResponse({
+    const verification = await swa().verifyRegistrationResponse({
       response:            req.body,
       expectedChallenge:   expectedChallenge,
       expectedOrigin:      ORIGIN,
@@ -442,7 +438,7 @@ router.post('/passkey/auth-options', async (req, res) => {
       return { id: Buffer.from(r.credential_id, 'base64url'), type: 'public-key' };
     });
 
-    var options = await generateAuthenticationOptions({
+    var options = await swa().generateAuthenticationOptions({
       rpID:               RP_ID,
       allowCredentials:   allowCredentials,
       userVerification:   'preferred',
@@ -489,7 +485,7 @@ router.post('/passkey/auth-verify', async (req, res) => {
 
     var storedCred = credRes.rows[0];
 
-    var verification = await verifyAuthenticationResponse({
+    var verification = await swa().verifyAuthenticationResponse({
       response:          assertion,
       expectedChallenge: expectedChallenge,
       expectedOrigin:    ORIGIN,

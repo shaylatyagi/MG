@@ -95,6 +95,9 @@ export default function DriverPWA() {
   const [sosSent, setSosSent] = useState(false);
   const [showOwnerChat, setShowOwnerChat] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  // Passkey one-time nudge
+  const [showPasskeyNudge, setShowPasskeyNudge] = useState(false);
+  const [enrollingPasskey, setEnrollingPasskey] = useState(false);
   const [chatMsgs, setChatMsgs] = useState([]);
 
   const [kycState, setKycState] = useState({
@@ -378,6 +381,53 @@ export default function DriverPWA() {
   };
 
   const confirmLogout = () => setShowLogoutConfirm(true);
+  // Passkey nudge: show once if driver has no passkey and hasn't been asked in 7 days
+  useEffect(() => {
+    const dismissed = localStorage.getItem('mg_passkey_nudge_dismissed');
+    if (dismissed && Date.now() < parseInt(dismissed)) return;
+    const u = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!u.mobile_number) return;
+    setTimeout(async () => {
+      try {
+        const res = await fetch(API + '/api/auth/passkey/auth-options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone_number: u.mobile_number, role: 'DRIVER' }),
+        });
+        const data = await res.json();
+        if (!data.hasPasskey) setShowPasskeyNudge(true);
+      } catch { /* silent */ }
+    }, 4000);
+  }, []);
+
+  const enrollDriverPasskey = async () => {
+    setEnrollingPasskey(true);
+    try {
+      const tk = localStorage.getItem('token');
+      const optRes = await fetch(API + '/api/auth/passkey/register-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk },
+      });
+      const optData = await optRes.json();
+      if (!optData.success) throw new Error(optData.message);
+      const { startRegistration } = await import('@simplewebauthn/browser');
+      const regResponse = await startRegistration(optData.options);
+      await fetch(API + '/api/auth/passkey/register-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk },
+        body: JSON.stringify(regResponse),
+      });
+    } catch (e) { console.warn('Driver passkey enroll:', e.message); }
+    setEnrollingPasskey(false);
+    setShowPasskeyNudge(false);
+    localStorage.setItem('mg_passkey_nudge_dismissed', (Date.now() + 30 * 24 * 3600 * 1000).toString());
+  };
+
+  const dismissPasskeyNudge = () => {
+    setShowPasskeyNudge(false);
+    localStorage.setItem('mg_passkey_nudge_dismissed', (Date.now() + 7 * 24 * 3600 * 1000).toString());
+  };
+
   const logout = async () => {
     try {
       await fetch(`${API}/api/payment/driver/activity/logout`, {
@@ -1410,6 +1460,55 @@ export default function DriverPWA() {
           </div>
         )}
 
+      {/* Passkey nudge sheet */}
+      {showPasskeyNudge && (
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          zIndex: 299, padding: '0 16px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '20px 20px 0 0',
+            padding: '28px 20px 40px', width: '100%',
+            fontFamily: "'Inter', -apple-system, sans-serif",
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+              <div style={{ fontSize: '42px', marginBottom: '8px' }}>🔐</div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: '0 0 5px' }}>Enable Biometric Login</h2>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+                Next time log in with fingerprint or Face ID — no OTP needed.
+              </p>
+            </div>
+            <button
+              onClick={enrollDriverPasskey}
+              disabled={enrollingPasskey}
+              style={{
+                width: '100%', padding: '13px',
+                background: enrollingPasskey ? '#c7d2fe' : '#4f46e5',
+                color: '#fff', border: 'none', borderRadius: '12px',
+                fontSize: '14px', fontWeight: 700,
+                cursor: enrollingPasskey ? 'not-allowed' : 'pointer',
+                marginBottom: '10px', fontFamily: 'inherit',
+              }}
+            >
+              {enrollingPasskey ? 'Setting up…' : 'Enable Biometrics'}
+            </button>
+            <button
+              onClick={dismissPasskeyNudge}
+              disabled={enrollingPasskey}
+              style={{
+                width: '100%', padding: '12px',
+                background: 'transparent', color: '#64748b',
+                border: '1.5px solid #e2e8f0', borderRadius: '12px',
+                fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
       {/* Logout confirm */}
       {showLogoutConfirm && (
         <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
