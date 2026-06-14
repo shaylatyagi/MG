@@ -661,7 +661,7 @@ router.post('/forgot-pin', async (req, res) => {
     var otp = Math.floor(100000 + Math.random() * 900000).toString();
     var otpHash = await bcrypt.hash(otp, 10);
     await pool.query(
-      'INSERT INTO otps (phone_number, otp, expires_at) VALUES ($1,$2,NOW()+INTERVAL'10 minutes') ON CONFLICT (phone_number) DO UPDATE SET otp=$2, expires_at=NOW()+INTERVAL'10 minutes'',
+      "INSERT INTO otps (phone_number, otp, expires_at) VALUES ($1,$2,NOW()+INTERVAL '10 minutes') ON CONFLICT (phone_number) DO UPDATE SET otp=$2, expires_at=NOW()+INTERVAL '10 minutes'",
       [phone, otpHash]
     );
 
