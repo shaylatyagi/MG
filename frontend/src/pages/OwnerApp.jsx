@@ -1641,30 +1641,31 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   return subtitles[activeTab] || '';
 };
   const StatCard = ({ title, value, icon: Icon, color, trend, isMoney = false }) => {
-    const gradMap = {
-      'bg-indigo-600': 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
-      'bg-indigo-500': 'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)',
-      'bg-slate-700':  'linear-gradient(135deg,#059669 0%,#0d9488 100%)',
-      'bg-slate-500':  'linear-gradient(135deg,#b45309 0%,#d97706 100%)',
+    // Accent color map: border + icon bg + icon color
+    const accentMap = {
+      'bg-indigo-600': { border: '#6366f1', iconBg: '#eef2ff', iconColor: '#4f46e5' },
+      'bg-indigo-500': { border: '#818cf8', iconBg: '#f0f9ff', iconColor: '#6366f1' },
+      'bg-slate-700':  { border: '#10b981', iconBg: '#ecfdf5', iconColor: '#059669' },
+      'bg-slate-500':  { border: '#f59e0b', iconBg: '#fffbeb', iconColor: '#d97706' },
     };
-    const grad = gradMap[color] || 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)';
+    const acc = accentMap[color] || accentMap['bg-indigo-600'];
     return (
-      <div style={{background:grad,borderRadius:16,padding:16}}>
+      <div style={{background:'white',borderRadius:16,padding:'14px 14px',borderLeft:`3px solid ${acc.border}`,boxShadow:'0 1px 4px rgba(0,0,0,0.05)',border:`1px solid #f1f5f9`,borderLeftWidth:3,borderLeftColor:acc.border}}>
         <div className="flex items-center justify-between">
           <div>
-            <p style={{fontSize:9,fontWeight:900,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.6)',marginBottom:6}}>{title}</p>
-            <p style={{fontSize:isMoney?18:22,fontWeight:900,color:'white',fontFamily:isMoney?'monospace':'inherit',letterSpacing:isMoney?'-0.02em':'normal',lineHeight:1}}>
-              {isMoney ? <><span style={{fontSize:12,opacity:.7}}>₹</span>{(value||0).toLocaleString('en-IN')}</> : (value||0)}
+            <p style={{fontSize:10,fontWeight:600,color:'#94a3b8',marginBottom:6,letterSpacing:'0.01em'}}>{title}</p>
+            <p style={{fontSize:isMoney?17:22,fontWeight:800,color:'#1e293b',fontFamily:isMoney?'monospace':'inherit',letterSpacing:isMoney?'-0.02em':'-0.01em',lineHeight:1}}>
+              {isMoney ? <><span style={{fontSize:12,color:'#64748b',marginRight:1}}>₹</span>{(value||0).toLocaleString('en-IN')}</> : (value||0)}
             </p>
             {trend && (
-              <div style={{display:'flex',alignItems:'center',gap:4,marginTop:6}}>
-                <ArrowDownRight size={10} color="rgba(255,255,255,0.5)"/>
-                <span style={{fontSize:9,color:'rgba(255,255,255,0.5)',fontWeight:700}}>pending</span>
+              <div style={{display:'flex',alignItems:'center',gap:3,marginTop:5}}>
+                <ArrowDownRight size={9} color="#f59e0b"/>
+                <span style={{fontSize:9,color:'#f59e0b',fontWeight:600}}>needs attention</span>
               </div>
             )}
           </div>
-          <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <Icon size={16} color="white"/>
+          <div style={{width:34,height:34,borderRadius:10,background:acc.iconBg,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <Icon size={15} color={acc.iconColor}/>
           </div>
         </div>
       </div>
@@ -1672,12 +1673,31 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   };
 
   // HOME TAB
-  const HomeTab = () => (
+  const HomeTab = () => {
+    const hr = new Date().getHours();
+    const greeting = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+    const firstName = (owner?.full_name || '').split(' ')[0] || 'there';
+    const todayStr = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
+    return (
     <div className="space-y-4 pb-4">
+
+    {/* Greeting */}
+    <div className="flex items-center justify-between pt-1">
+      <div>
+        <p className="text-[11px] text-slate-400 font-medium">{todayStr}</p>
+        <p className="text-lg font-bold text-slate-800 mt-0.5">{greeting}, {firstName} 👋</p>
+      </div>
+      {owner?.company_name && (
+        <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-100">
+          {owner.company_name}
+        </span>
+      )}
+    </div>
+
     {/* Yield Ledger — YAHAN ADD KARO */}
     <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{t.ledger}</span>
+        <span className="text-xs font-semibold text-slate-600">{t.ledger}</span>
         <select value={horizon} onChange={e=>setHorizon(e.target.value)}
           className="bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-[10px] font-black text-slate-600 outline-none">
           <option value="today">Today</option>
@@ -1717,7 +1737,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
       </div>
       {/* 30-day Collection Trend */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-        <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-3">30-Day Collection Trend</p>
+        <p className="text-xs font-semibold text-slate-600 mb-3">30-Day Collection Trend</p>
         {trendData.length > 0 ? (
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={trendData} barSize={6} margin={{ top: 0, right: 0, left: -28, bottom: 0 }}>
@@ -1746,57 +1766,67 @@ const removeRule = (i) => setIncentiveRules(prev => ({
       {/* Quick Nav */}
       <div className="grid grid-cols-2 gap-2">
         <button onClick={() => setActiveTab('drivers')}
-          className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2 hover:border-indigo-200 hover:bg-indigo-50/30 transition">
-          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
-            <UserPlus size={14} className="text-indigo-600"/>
+          className="bg-white border border-slate-100 shadow-sm rounded-2xl p-3 flex items-center gap-2.5 active:bg-slate-50 transition">
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+            <Users size={14} className="text-indigo-600"/>
           </div>
-          <div className="text-left">
-            <p className="text-xs font-black text-slate-800">Drivers</p>
-            <p className="text-[9px] text-slate-400">{stats.totalDrivers} active</p>
+          <div className="text-left flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-800">Drivers</p>
+            <p className="text-[10px] text-slate-400">{stats.totalDrivers} active</p>
           </div>
+          <span className="text-slate-300 text-sm">›</span>
         </button>
         <button onClick={() => setActiveTab('vehicles')}
-          className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center gap-2 hover:border-indigo-200 hover:bg-indigo-50/30 transition">
-          <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
-            <Truck size={14} className="text-indigo-600"/>
+          className="bg-white border border-slate-100 shadow-sm rounded-2xl p-3 flex items-center gap-2.5 active:bg-slate-50 transition">
+          <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+            <Truck size={14} className="text-violet-600"/>
           </div>
-          <div className="text-left">
-            <p className="text-xs font-black text-slate-800">Fleet</p>
-            <p className="text-[9px] text-slate-400">{stats.totalVehicles} vehicles</p>
+          <div className="text-left flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-800">Fleet</p>
+            <p className="text-[10px] text-slate-400">{stats.totalVehicles} vehicles</p>
           </div>
+          <span className="text-slate-300 text-sm">›</span>
         </button>
       </div>
       <button onClick={() => setActiveTab('track')}
-        className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-2xl p-3 flex items-center gap-3 shadow-md">
-        <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-base">📍</div>
+        className="w-full bg-white border border-slate-100 shadow-sm rounded-2xl p-3 flex items-center gap-3 active:bg-slate-50 transition">
+        <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-base">📍</div>
         <div className="text-left flex-1">
-          <p className="text-xs font-black">Track Fleet Live</p>
-          <p className="text-[9px] text-indigo-200">See driver locations on map</p>
+          <p className="text-sm font-semibold text-slate-800">Track Fleet Live</p>
+          <p className="text-[10px] text-slate-400">See driver locations on map</p>
         </div>
-        <span className="text-white/60 text-sm">→</span>
+        <span className="text-slate-300 text-base font-light">›</span>
       </button>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t.recentDrivers}</h3>
-          <button onClick={() => setActiveTab('drivers')} className="text-[10px] text-indigo-600 font-black">{t.viewAll}</button>
+        <div className="px-4 py-3 border-b border-slate-50 flex justify-between items-center">
+          <p className="text-xs font-semibold text-slate-600">{t.recentDrivers}</p>
+          <button onClick={() => setActiveTab('drivers')} className="text-[11px] text-indigo-500 font-medium flex items-center gap-0.5">
+            {t.viewAll} <span className="text-slate-400">›</span>
+          </button>
         </div>
-        <div className="divide-y">
+        <div className="divide-y divide-slate-50">
           {drivers.slice(0, 5).map((driver, i) => {
             const dVehicle = vehicles.find(v => Number(v.driver_id) === Number(driver.id));
+            const ch = (driver.full_name || driver.name || 'D').charAt(0).toUpperCase();
+            const avColors = ['#4f46e5','#7c3aed','#0891b2','#059669','#b45309','#be185d'];
+            const avBg = avColors[ch.charCodeAt(0) % avColors.length];
             return (
-              <div key={i} className="px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black text-sm border border-indigo-100">
-                    {driver.full_name?.charAt(0) || 'D'}
+              <div key={i} className="px-4 py-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div style={{width:36,height:36,borderRadius:12,background:avBg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:700,fontSize:14}}>
+                    {ch}
                   </div>
                   <div>
-                    <p className="text-sm font-black text-slate-800">{driver.full_name || driver.name}</p>
-                    <p className="text-[9px] text-slate-400 font-mono">{dVehicle?.vehicle_number || 'Unassigned'}</p>
+                    <p className="text-sm font-semibold text-slate-800">{driver.full_name || driver.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${dVehicle ? 'bg-emerald-500' : 'bg-amber-400'}`}/>
+                      <p className="text-[10px] text-slate-400">{dVehicle ? dVehicle.vehicle_number : 'Unassigned'}</p>
+                    </div>
                   </div>
                 </div>
                 <button onClick={() => openChatWithDriver(driver)}
-                  className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 hover:border-indigo-200 hover:text-indigo-600 transition">
+                  className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition">
                   <MessageCircle size={13} />
                 </button>
               </div>
@@ -1810,7 +1840,8 @@ const removeRule = (i) => setIncentiveRules(prev => ({
         </div>
       </div>
     </div>
-  );
+    );
+  };
   const handleUnassign = async (vehicleId) => {
   if (!window.confirm('Remove this driver from the vehicle?')) return;
   try {

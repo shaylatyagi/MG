@@ -528,20 +528,28 @@ export default function DriverPWA() {
         </button>
       )}
       {fleetOwner ? (
-        <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Fleet Owner</p>
-            <p className="text-sm font-black text-slate-800">{fleetOwner}</p>
-            {fleetCompany ? <p className="text-[9px] text-slate-500">{fleetCompany}</p> : null}
+        <div className="bg-white border border-slate-100 rounded-2xl px-4 py-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600 text-base font-bold shrink-0">
+              {fleetOwner.charAt(0)}
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-400 font-medium mb-0.5">Fleet Owner</p>
+              <p className="text-sm font-semibold text-slate-800">{fleetOwner}</p>
+              {fleetCompany ? <p className="text-[10px] text-slate-400 mt-0.5">{fleetCompany}</p> : null}
+            </div>
           </div>
-          <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">OWNER</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"/>
+            <span className="text-[10px] text-slate-400 font-medium">Active</span>
+          </div>
         </div>
       ) : null}
 
       {/* Recent transactions */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.recent}</h3>
+          <h3 className="text-xs font-semibold text-slate-500">{t.recent}</h3>
           <button onClick={() => { setHistoryFrom('transaction'); setTab('wallet'); setActiveTab('wallet'); }}
             className="text-[10px] text-indigo-600 font-black flex items-center gap-1">{t.viewAll} <ArrowUpRight size={10}/></button>
         </div>
