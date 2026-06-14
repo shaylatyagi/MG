@@ -968,90 +968,155 @@ export default function DriverPWA() {
   };
 
   // ── STATIONS TAB ──────────────────────────────────────────────────────────
-  const MOCK_STATIONS = [
-    { id: 1, name: 'Dwarka Sec 10 Swap Point', type: 'Battery Swap', address: 'Sector 10 Market, Dwarka, Delhi', distance: 0.8, slots: 4, open: true },
-    { id: 2, name: 'Uttam Nagar EV Hub',       type: 'Fast Charge',  address: 'Uttam Nagar West, New Delhi',    distance: 1.4, slots: 2, open: true },
-    { id: 3, name: 'Janakpuri Swap Station',   type: 'Battery Swap', address: 'C-Block, Janakpuri, Delhi',      distance: 2.1, slots: 0, open: true },
-    { id: 4, name: 'Dwarka Mor Charge Point',  type: 'Fast Charge',  address: 'Dwarka Mor Metro, Delhi',        distance: 2.6, slots: 3, open: true },
-    { id: 5, name: 'Palam EV Station',         type: 'Battery Swap', address: 'Palam Village Road, Delhi',      distance: 3.9, slots: 1, open: false },
-    { id: 6, name: 'Najafgarh Road Swap Hub',  type: 'Battery Swap', address: 'Najafgarh Rd, Dwarka, Delhi',    distance: 4.5, slots: 6, open: true },
+  // Stations with real coordinates — sorted by GPS distance from driver
+  const ALL_STATIONS = [
+    { id: 1, name: 'Dwarka Sec 10 Swap Point', type: 'Battery Swap', address: 'Sector 10 Market, Dwarka, Delhi',   lat: 28.5734, lng: 77.0539, slots: 4, open: true },
+    { id: 2, name: 'Uttam Nagar EV Hub',       type: 'Fast Charge',  address: 'Uttam Nagar West, New Delhi',       lat: 28.6219, lng: 77.0494, slots: 2, open: true },
+    { id: 3, name: 'Janakpuri Swap Station',   type: 'Battery Swap', address: 'C-Block, Janakpuri, Delhi',         lat: 28.6282, lng: 77.0830, slots: 0, open: true },
+    { id: 4, name: 'Dwarka Mor Charge Point',  type: 'Fast Charge',  address: 'Dwarka Mor Metro, Delhi',           lat: 28.6131, lng: 77.0430, slots: 3, open: true },
+    { id: 5, name: 'Palam EV Station',         type: 'Battery Swap', address: 'Palam Village Road, Delhi',         lat: 28.5968, lng: 77.0744, slots: 1, open: false },
+    { id: 6, name: 'Najafgarh Road Swap Hub',  type: 'Battery Swap', address: 'Najafgarh Rd, Dwarka, Delhi',       lat: 28.5890, lng: 77.0214, slots: 6, open: true },
+    { id: 7, name: 'Connaught Place EV Point', type: 'Fast Charge',  address: 'Connaught Place, New Delhi',        lat: 28.6315, lng: 77.2167, slots: 5, open: true },
+    { id: 8, name: 'Lajpat Nagar Swap Hub',   type: 'Battery Swap', address: 'Lajpat Nagar Market, Delhi',        lat: 28.5677, lng: 77.2432, slots: 2, open: true },
+    { id: 9, name: 'Noida Sec 18 Charge',     type: 'Fast Charge',  address: 'Sector 18, Noida, UP',              lat: 28.5706, lng: 77.3216, slots: 4, open: true },
+    { id:10, name: 'Gurugram Cyber Hub EV',   type: 'Fast Charge',  address: 'DLF Cyber Hub, Gurugram',           lat: 28.4950, lng: 77.0888, slots: 3, open: true },
   ];
 
-  const StationsTab = () => (
-    <div className="space-y-4 pb-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-black text-slate-800">Nearby Stations</h2>
-          <p className="text-[11px] text-slate-400 mt-0.5">Battery swap &amp; EV charging points</p>
+  const haversineKm = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
+  const StationsTab = () => {
+    const [driverPos, setDriverPos] = React.useState(null);
+    const [gpsError, setGpsError]   = React.useState(false);
+    const [filter, setFilter]        = React.useState('All');
+
+    React.useEffect(() => {
+      if (!navigator.geolocation) { setGpsError(true); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => setDriverPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        ()  => setGpsError(true),
+        { timeout: 8000, maximumAge: 60000 }
+      );
+    }, []);
+
+    const stations = React.useMemo(() => {
+      let list = ALL_STATIONS.map(s => ({
+        ...s,
+        distance: driverPos ? haversineKm(driverPos.lat, driverPos.lng, s.lat, s.lng) : null,
+      }));
+      if (filter !== 'All') list = list.filter(s => s.type === filter);
+      if (driverPos) list.sort((a, b) => a.distance - b.distance);
+      return list;
+    }, [driverPos, filter]);
+
+    const openDirections = (s) => {
+      // Always open turn-by-turn directions to the station's exact coordinates
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`, '_blank');
+    };
+
+    return (
+      <div className="space-y-4 pb-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-black text-slate-800">Nearby Stations</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {driverPos ? 'Sorted by distance from you' : 'Battery swap & EV charging points'}
+            </p>
+          </div>
+          {gpsError ? (
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-red-100 text-red-600 border border-red-200">
+              📍 GPS off
+            </span>
+          ) : !driverPos ? (
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200 animate-pulse">
+              Locating…
+            </span>
+          ) : (
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-green-100 text-green-700 border border-green-200">
+              📍 Near you
+            </span>
+          )}
         </div>
-        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-          ⚡ Live data coming soon
-        </span>
-      </div>
 
-      {/* Filter pills */}
-      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {['All', 'Battery Swap', 'Fast Charge'].map(f => (
-          <button key={f} className="shrink-0 text-[11px] font-black px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 active:bg-indigo-600 active:text-white transition">
-            {f}
-          </button>
-        ))}
-      </div>
+        {/* Filter pills */}
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {['All', 'Battery Swap', 'Fast Charge'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`shrink-0 text-[11px] font-black px-3 py-1.5 rounded-full border transition ${
+                filter === f
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white border-slate-200 text-slate-600'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
 
-      {/* Station cards */}
-      <div className="space-y-3">
-        {MOCK_STATIONS.map(s => (
-          <div key={s.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-black text-slate-800 leading-tight">{s.name}</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <MapPin size={10} className="text-slate-400 shrink-0"/>
-                  <p className="text-[10px] text-slate-400 truncate">{s.address}</p>
+        {/* Station cards */}
+        <div className="space-y-3">
+          {stations.map(s => (
+            <div key={s.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-black text-slate-800 leading-tight">{s.name}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <MapPin size={10} className="text-slate-400 shrink-0"/>
+                    <p className="text-[10px] text-slate-400 truncate">{s.address}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${s.open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                  {s.open ? 'Open' : 'Closed'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                  <Zap size={11} className={s.type === 'Battery Swap' ? 'text-amber-500' : 'text-indigo-500'}/>
-                  <span className="text-[10px] font-black text-slate-500">{s.type}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-slate-400">{s.distance} km</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Battery size={11} className={s.slots > 0 ? 'text-green-500' : 'text-red-400'}/>
-                  <span className={`text-[10px] font-black ${s.slots > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {s.slots > 0 ? `${s.slots} slots free` : 'Full'}
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${s.open ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                    {s.open ? 'Open' : 'Closed'}
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(s.name + ' ' + s.address)}`, '_blank')}
-                className="flex items-center gap-1 text-[11px] font-black px-3 py-1.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition">
-                <Navigation size={11}/> Go
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
 
-      {/* Partner notice */}
-      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center">
-        <Zap size={20} className="text-indigo-400 mx-auto mb-2"/>
-        <p className="text-[12px] font-black text-indigo-700">Real-time station data</p>
-        <p className="text-[10px] text-indigo-500 mt-1">Live availability &amp; battery levels will update automatically once our network partner integration is active.</p>
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <Zap size={11} className={s.type === 'Battery Swap' ? 'text-amber-500' : 'text-indigo-500'}/>
+                    <span className="text-[10px] font-black text-slate-500">{s.type}</span>
+                  </div>
+                  {s.distance !== null && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-black text-indigo-600">{s.distance.toFixed(1)} km</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <Battery size={11} className={s.slots > 0 ? 'text-green-500' : 'text-red-400'}/>
+                    <span className={`text-[10px] font-black ${s.slots > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {s.slots > 0 ? `${s.slots} slots` : 'Full'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => openDirections(s)}
+                  className="flex items-center gap-1 text-[11px] font-black px-3 py-1.5 bg-indigo-600 text-white rounded-xl active:bg-indigo-700 transition">
+                  <Navigation size={11}/> Go
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Partner notice */}
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center">
+          <Zap size={20} className="text-indigo-400 mx-auto mb-2"/>
+          <p className="text-[12px] font-black text-indigo-700">Real-time station data</p>
+          <p className="text-[10px] text-indigo-500 mt-1">Live availability & battery levels will update automatically once our network partner integration is active.</p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── MAIN RENDER ───────────────────────────────────────────────────────────
   return (
@@ -1306,69 +1371,4 @@ export default function DriverPWA() {
           </div>
         )}
 
-        {/* Owner Chat */}
-        {showOwnerChat && (
-          <div className="absolute inset-0 z-[100] flex flex-col bg-slate-50">
-            <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
-              <button onClick={() => setShowOwnerChat(false)} className="text-slate-400 hover:text-slate-600 transition">
-                <ChevronLeft size={20}/>
-              </button>
-              <div>
-                <h3 className="font-black text-slate-800 text-sm">{fleetOwner || 'Fleet Owner'}</h3>
-                <p className="text-[9px] text-slate-400">{fleetCompany || 'MobilityGrid'}</p>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {chatMsgs.length === 0 ? (
-                <div className="text-center text-slate-400 text-xs py-12">
-                  <MessageCircle size={28} className="mx-auto mb-2 opacity-20"/>
-                  <p>No messages yet</p>
-                </div>
-              ) : chatMsgs.map((msg, i) => (
-                <div key={i} className={`flex ${msg.sender_type === 'DRIVER' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] px-3 py-2.5 rounded-2xl text-sm ${
-                    msg.sender_type === 'DRIVER'
-                      ? 'bg-indigo-600 text-white rounded-br-sm'
-                      : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
-                  }`}>
-                    <p className="text-sm">{msg.message}</p>
-                    <p className={`text-[9px] mt-1 ${msg.sender_type === 'DRIVER' ? 'text-indigo-200' : 'text-slate-400'}`}>
-                      {formatChatTime(msg.created_at)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-3 bg-white border-t border-slate-200 flex gap-2">
-              <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
-                placeholder="Message..." className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500"/>
-              <button onClick={sendChatMessage} className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl transition">
-                <Send size={15}/>
-              </button>
-            </div>
-          </div>
-        )}
-
-      {/* Logout confirm */}
-      {showLogoutConfirm && (
-        <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
-              <LogOut size={20} className="text-red-500" />
-            </div>
-            <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
-            <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
-              <button onClick={logout}
-                className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
-            </div>
-          </div>
-        </div>
-      )}
-      </div>
-    </div>
-  );
-}
+        {/
