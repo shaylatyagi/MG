@@ -1509,6 +1509,42 @@ export default function DriverPWA() {
           </div>
         </div>
       )}
+      {/* Notification Permission Nudge */}
+      {showNotifNudge && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9998,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '20px 20px 0 0', padding: '24px 20px 32px',
+            width: '100%', maxWidth: '480px', margin: '0 auto',
+            boxShadow: '0 -8px 32px rgba(0,0,0,0.15)',
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <div style={{ fontSize: '40px', marginBottom: '8px' }}>🔔</div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>Enable Notifications</h2>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+                Get instant alerts for payment updates, owner messages, and important fleet notifications.
+              </p>
+            </div>
+            <button onClick={requestNotifPermission} style={{
+              width: '100%', padding: '13px', borderRadius: '12px',
+              background: '#16a34a', color: '#fff', border: 'none',
+              fontSize: '14px', fontWeight: 700, cursor: 'pointer', marginBottom: '10px',
+              fontFamily: 'inherit',
+            }}>
+              Allow Notifications
+            </button>
+            <button onClick={dismissNotifNudge} style={{
+              width: '100%', padding: '11px', borderRadius: '12px',
+              background: 'transparent', color: '#94a3b8', border: 'none',
+              fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
       {/* Logout confirm */}
       {showLogoutConfirm && (
         <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">

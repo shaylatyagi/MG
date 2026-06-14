@@ -351,6 +351,7 @@ const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 // Passkey one-time nudge
 const [showPasskeyNudge, setShowPasskeyNudge]   = useState(false);
 const [enrollingPasskey, setEnrollingPasskey]   = useState(false);
+const [showNotifNudge, setShowNotifNudge]       = useState(false);
   const [rentType, setRentType] = useState('DAILY'); // DAILY, WEEKLY, MONTHLY
 const rentTypeOptions = [
   { value: 'DAILY', label: 'Daily Rent', multiplier: 1 },
@@ -1315,6 +1316,35 @@ return () => clearInterval(interval);
       } catch { /* silent */ }
     }, 3000);
   }, []);
+
+  // Notification permission nudge — show once if not granted
+  useEffect(() => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') return;
+    const dismissed = localStorage.getItem('mg_notif_nudge_dismissed');
+    if (dismissed && Date.now() < parseInt(dismissed)) return;
+    setTimeout(() => setShowNotifNudge(true), 6000); // 6s after mount
+  }, []);
+
+  const requestNotifPermission = async () => {
+    setShowNotifNudge(false);
+    localStorage.setItem('mg_notif_nudge_dismissed', (Date.now() + 30 * 24 * 3600 * 1000).toString());
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        // Register FCM token if available
+        try {
+          const { initFCM } = await import('../utils/fcm');
+          await initFCM();
+        } catch { /* silent */ }
+      }
+    } catch (e) { console.warn('Notif permission:', e); }
+  };
+
+  const dismissNotifNudge = () => {
+    setShowNotifNudge(false);
+    localStorage.setItem('mg_notif_nudge_dismissed', (Date.now() + 7 * 24 * 3600 * 1000).toString());
+  };
 
   const enrollOwnerPasskey = async () => {
     setEnrollingPasskey(true);
@@ -4750,6 +4780,43 @@ const ProfileTab = () => {
         </div>
       </div>
     )}
+    {/* ── Notification Permission Nudge ── */}
+    {showNotifNudge && (
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9998,
+        background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end',
+      }}>
+        <div style={{
+          background: '#fff', borderRadius: '20px 20px 0 0', padding: '24px 20px 32px',
+          width: '100%', maxWidth: '480px', margin: '0 auto',
+          boxShadow: '0 -8px 32px rgba(0,0,0,0.15)',
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <div style={{ fontSize: '40px', marginBottom: '8px' }}>🔔</div>
+            <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>Enable Notifications</h2>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+              Get instant alerts for SOS emergencies, payments, and driver updates — even when the app is closed.
+            </p>
+          </div>
+          <button onClick={requestNotifPermission} style={{
+            width: '100%', padding: '14px', borderRadius: '12px',
+            background: '#4f46e5', color: '#fff', border: 'none',
+            fontSize: '15px', fontWeight: 700, cursor: 'pointer', marginBottom: '10px',
+            fontFamily: 'inherit',
+          }}>
+            Allow Notifications
+          </button>
+          <button onClick={dismissNotifNudge} style={{
+            width: '100%', padding: '12px', borderRadius: '12px',
+            background: 'transparent', color: '#94a3b8', border: 'none',
+            fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            Not now
+          </button>
+        </div>
+      </div>
+    )}
+
     {/* ── Logout Confirm Modal — outside overflow:hidden, z-9999 ── */}
     {showLogoutConfirm && (
       <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
