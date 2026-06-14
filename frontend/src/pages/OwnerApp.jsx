@@ -3304,13 +3304,22 @@ const ProfileTab = () => {
   const TrackFleetTab = () => {
     const [drivers, setDrivers] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
-    const [lastRefresh, setLastRefresh] = React.useState(null);
     const [apiError, setApiError] = React.useState(null);
-    const [mapDriver, setMapDriver] = React.useState(null); // driver shown in in-app map modal
+    const [selectedDriver, setSelectedDriver] = React.useState(null);
+    const mapRef = React.useRef(null);
+    const mapInstanceRef = React.useRef(null);
+    const markersRef = React.useRef([]);
     const mapsKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
-    const fetchLocations = async () => {
-      setApiError(null);
+    const timeAgo = (ts) => {
+      if (!ts) return 'Unknown';
+      const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
+      if (diff < 60) return diff + 's ago';
+      if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+      return Math.floor(diff/3600) + 'h ago';
+    };
+
+    const fetchLocations = React.useCallback(async () => {
       try {
         const r = await fetch(`${API}/api/owner/driver-locations`, {
           headers: { Authorization: `Bearer ${token()}` }
@@ -3318,167 +3327,192 @@ const ProfileTab = () => {
         const d = await r.json();
         if (d.success) {
           setDrivers(d.drivers || []);
-          setLastRefresh(new Date());
+          setApiError(null);
         } else {
-          setApiError(d.error || d.message || `Server error ${r.status}`);
+          setApiError(d.error || 'Failed to load');
         }
       } catch (err) {
-        setApiError(err.message || 'Network error');
+        setApiError(err.message);
       }
       setLoading(false);
-    };
+    }, []);
 
+    // Place/update markers whenever drivers change
+    const placeMarkers = React.useCallback((map, driversArr) => {
+      // Clear old markers
+      markersRef.current.forEach(m => m.setMap(null));
+      markersRef.current = [];
+
+      driversArr.forEach(d => {
+        // Custom SVG pin — circular avatar with driver initial (Snapchat-style)
+        const initial = (d.full_name || 'D')[0].toUpperCase();
+        const svg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="52" height="62" viewBox="0 0 52 62">
+            <circle cx="26" cy="26" r="24" fill="#4f46e5" stroke="white" stroke-width="3"/>
+            <text x="26" y="32" text-anchor="middle" fill="white" font-size="18" font-weight="900" font-family="Arial">${initial}</text>
+            <polygon points="20,48 26,62 32,48" fill="#4f46e5"/>
+          </svg>`;
+        const marker = new window.google.maps.Marker({
+          position: { lat: parseFloat(d.last_lat), lng: parseFloat(d.last_lng) },
+          map,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+            scaledSize: new window.google.maps.Size(52, 62),
+            anchor: new window.google.maps.Point(26, 62),
+          },
+          title: d.full_name,
+        });
+        marker.addListener('click', () => setSelectedDriver(d));
+        markersRef.current.push(marker);
+      });
+
+      // Fit map to show all drivers
+      if (driversArr.length > 1) {
+        const bounds = new window.google.maps.LatLngBounds();
+        driversArr.forEach(d => bounds.extend({ lat: parseFloat(d.last_lat), lng: parseFloat(d.last_lng) }));
+        map.fitBounds(bounds, { top: 80, bottom: 120, left: 40, right: 40 });
+      } else if (driversArr.length === 1) {
+        map.setCenter({ lat: parseFloat(driversArr[0].last_lat), lng: parseFloat(driversArr[0].last_lng) });
+        map.setZoom(15);
+      }
+    }, []);
+
+    const initMap = React.useCallback(() => {
+      if (!mapRef.current || mapInstanceRef.current) return;
+      const defaultCenter = drivers.length
+        ? { lat: parseFloat(drivers[0].last_lat), lng: parseFloat(drivers[0].last_lng) }
+        : { lat: 28.6139, lng: 77.2090 }; // Delhi default
+      const map = new window.google.maps.Map(mapRef.current, {
+        center: defaultCenter,
+        zoom: 14,
+        disableDefaultUI: true,
+        gestureHandling: 'greedy',
+        styles: [
+          { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
+        ],
+      });
+      mapInstanceRef.current = map;
+      if (drivers.length) placeMarkers(map, drivers);
+    }, [drivers, placeMarkers]);
+
+    // Load Google Maps JS API once
+    React.useEffect(() => {
+      if (!mapsKey) return;
+      const loadMap = () => {
+        if (mapInstanceRef.current) {
+          placeMarkers(mapInstanceRef.current, drivers);
+          return;
+        }
+        initMap();
+      };
+      if (window.google && window.google.maps) {
+        loadMap();
+      } else if (!document.getElementById('gmap-script')) {
+        const script = document.createElement('script');
+        script.id = 'gmap-script';
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}`;
+        script.async = true;
+        script.onload = loadMap;
+        document.head.appendChild(script);
+      } else {
+        // Script loading — wait
+        const check = setInterval(() => {
+          if (window.google && window.google.maps) { clearInterval(check); loadMap(); }
+        }, 200);
+      }
+    }, [drivers, mapsKey, initMap, placeMarkers]);
+
+    // Fetch on mount + every 30s
     React.useEffect(() => {
       fetchLocations();
       const id = setInterval(fetchLocations, 30000);
       return () => clearInterval(id);
-    }, []);
-
-    const timeAgo = (ts) => {
-      if (!ts) return 'Unknown';
-      const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
-      if (diff < 60) return `${diff}s ago`;
-      if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-      return `${Math.floor(diff/3600)}h ago`;
-    };
-
-    const staticMapUrl = (driversArr) => {
-      if (!mapsKey || !driversArr.length) return null;
-      const center = driversArr[0];
-      const markers = driversArr.map(d => `markers=color:red%7C${d.last_lat},${d.last_lng}`).join('&');
-      return `https://maps.googleapis.com/maps/api/staticmap?center=${center.last_lat},${center.last_lng}&zoom=13&size=400x220&${markers}&key=${mapsKey}`;
-    };
-
-    // Embed URL for in-app interactive map (uses Maps Embed API)
-    const embedUrl = (d) => mapsKey
-      ? `https://www.google.com/maps/embed/v1/view?key=${mapsKey}&center=${d.last_lat},${d.last_lng}&zoom=16&maptype=roadmap`
-      : null;
+    }, [fetchLocations]);
 
     return (
-      <>
-      {/* ── In-app map modal ── */}
-      {mapDriver && (
-        <div className="absolute inset-0 z-[500] flex flex-col bg-slate-900">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-slate-800 shrink-0">
-            <button onClick={() => setMapDriver(null)}
-              className="text-white font-black text-sm flex items-center gap-2">
-              ← Back
-            </button>
-            <div className="text-center">
-              <div className="text-white text-xs font-black">{mapDriver.full_name}</div>
-              <div className="text-slate-400 text-[9px]">Last seen {timeAgo(mapDriver.last_location_at)}</div>
-            </div>
-            <a href={`https://www.google.com/maps/dir/?api=1&destination=${mapDriver.last_lat},${mapDriver.last_lng}`}
-               target="_blank" rel="noreferrer"
-               className="text-indigo-300 text-[10px] font-black">
-              Directions ↗
-            </a>
-          </div>
-          {/* Map iframe */}
-          {embedUrl(mapDriver) ? (
-            <iframe
-              title="driver-location"
-              src={embedUrl(mapDriver)}
-              className="flex-1 w-full border-0"
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4">
-              <span className="text-5xl">📍</span>
-              <span className="text-white font-black text-sm">{mapDriver.full_name}</span>
-              <span className="text-slate-400 text-xs">{mapDriver.last_lat}, {mapDriver.last_lng}</span>
-              <a href={`https://www.google.com/maps/dir/?api=1&destination=${mapDriver.last_lat},${mapDriver.last_lng}`}
-                 target="_blank" rel="noreferrer"
-                 className="bg-indigo-600 text-white font-black px-6 py-3 rounded-2xl text-sm mt-2">
-                Open in Google Maps
-              </a>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="pb-4 space-y-3">
-        {/* Header row */}
-        <div className="flex items-center justify-between">
-          <button onClick={() => setActiveTab('home')} className="flex items-center gap-1 text-xs font-black text-indigo-600">
+      <div className="absolute inset-0 z-50 bg-slate-900 flex flex-col">
+        {/* Top overlay bar */}
+        <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-3 pb-2 bg-gradient-to-b from-black/50 to-transparent">
+          <button onClick={() => setActiveTab('home')}
+            className="bg-white/90 backdrop-blur text-slate-800 font-black text-xs px-3 py-1.5 rounded-full shadow flex items-center gap-1">
             ← Back
           </button>
-          <div className="text-[10px] text-slate-400 font-semibold">
-            {lastRefresh ? `Updated ${timeAgo(lastRefresh)}` : 'Loading...'}
+          <div className="bg-white/90 backdrop-blur rounded-full px-3 py-1.5 shadow">
+            <span className="text-xs font-black text-slate-800">
+              {loading ? 'Loading…' : apiError ? '⚠️ Error' : `${drivers.length} driver${drivers.length !== 1 ? 's' : ''} live`}
+            </span>
           </div>
           <button onClick={fetchLocations}
-            className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
-            ↻ Refresh
+            className="bg-white/90 backdrop-blur text-indigo-600 font-black text-xs px-3 py-1.5 rounded-full shadow">
+            ↻
           </button>
         </div>
 
-        {/* Overview static map */}
-        {loading ? (
-          <div className="bg-slate-100 rounded-2xl h-40 flex items-center justify-center text-xs text-slate-400 animate-pulse font-black">
-            Fetching driver locations...
+        {/* Map container */}
+        {apiError ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
+            <span className="text-4xl">⚠️</span>
+            <span className="text-white font-black">{apiError}</span>
+            <button onClick={fetchLocations} className="bg-indigo-600 text-white font-black px-6 py-2 rounded-xl">Retry</button>
           </div>
-        ) : apiError ? (
-          <div className="bg-red-50 border border-red-200 rounded-2xl h-40 flex flex-col items-center justify-center gap-2 px-4">
-            <span className="text-2xl">⚠️</span>
-            <span className="text-xs font-black text-red-600">API Error</span>
-            <span className="text-[10px] text-red-400 text-center">{apiError}</span>
-            <button onClick={fetchLocations} className="text-[10px] font-black text-white bg-red-500 px-3 py-1 rounded-lg mt-1">Retry</button>
-          </div>
-        ) : drivers.length === 0 ? (
-          <div className="bg-slate-100 rounded-2xl h-40 flex flex-col items-center justify-center gap-2">
-            <span className="text-3xl">📡</span>
-            <span className="text-xs font-black text-slate-400">No drivers online</span>
-            <span className="text-[10px] text-slate-300">Drivers send GPS every 30s when assigned a vehicle</span>
-          </div>
-        ) : staticMapUrl(drivers) ? (
-          <div className="relative rounded-2xl overflow-hidden shadow-md cursor-pointer"
-               onClick={() => setMapDriver(drivers[0])}>
-            <img src={staticMapUrl(drivers)} alt="Driver locations" className="w-full object-cover" />
-            <div className="absolute inset-0 bg-black/10 flex items-end justify-end p-2">
-              <span className="bg-white text-indigo-700 text-[10px] font-black px-3 py-1.5 rounded-xl shadow">
-                Tap to view live map
-              </span>
-            </div>
+        ) : !mapsKey ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
+            <span className="text-4xl">🗺️</span>
+            <span className="text-white font-black text-sm">{drivers.length} driver{drivers.length !== 1 ? 's' : ''} online</span>
+            {drivers.map(d => (
+              <button key={d.id} onClick={() => setSelectedDriver(d)}
+                className="bg-white/10 text-white text-xs font-black px-4 py-2 rounded-xl w-full max-w-xs">
+                {(d.full_name||'Driver')[0]} {d.full_name} — {timeAgo(d.last_location_at)}
+              </button>
+            ))}
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl h-36 flex flex-col items-center justify-center gap-2 shadow-md">
-            <span className="text-2xl">🗺️</span>
-            <span className="text-white text-xs font-black">{drivers.length} driver{drivers.length > 1 ? 's' : ''} online</span>
-          </div>
+          <div ref={mapRef} className="flex-1 w-full" />
         )}
 
-        {/* Driver cards */}
-        {!loading && drivers.length > 0 && (
-          <div className="space-y-2">
-            <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider px-1">
-              Live Drivers ({drivers.length})
-            </div>
-            {drivers.map(d => (
-              <div key={d.id} className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-sm font-black text-indigo-700 shrink-0">
-                  {(d.full_name || 'D')[0].toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-black text-slate-800 truncate">{d.full_name || 'Unknown Driver'}</div>
-                  <div className="text-[10px] text-slate-400 font-semibold">{d.vehicle_type || ''} {d.vehicle_number ? `• ${d.vehicle_number}` : ''}</div>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>
-                    <span className="text-[9px] text-green-600 font-black">{timeAgo(d.last_location_at)}</span>
-                  </div>
-                </div>
-                <button onClick={() => setMapDriver(d)}
-                  className="shrink-0 bg-indigo-600 text-white text-[9px] font-black px-2.5 py-1.5 rounded-xl flex items-center gap-1">
-                  📍 Map
-                </button>
+        {/* Bottom driver info sheet — slides up on pin tap */}
+        {selectedDriver && (
+          <div className="absolute bottom-0 left-0 right-0 z-20 bg-white rounded-t-3xl p-5 shadow-2xl"
+               onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"/>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-2xl font-black text-white shadow-md">
+                {(selectedDriver.full_name||'D')[0].toUpperCase()}
               </div>
-            ))}
+              <div className="flex-1">
+                <div className="text-base font-black text-slate-800">{selectedDriver.full_name}</div>
+                <div className="text-xs text-slate-400 font-semibold mt-0.5">
+                  {selectedDriver.vehicle_type || 'Vehicle'}{selectedDriver.vehicle_number ? ' · ' + selectedDriver.vehicle_number : ''}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"/>
+                  <span className="text-[11px] text-green-600 font-black">Active · {timeAgo(selectedDriver.last_location_at)}</span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedDriver(null)}
+                className="text-slate-400 text-xl font-black leading-none">×</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedDriver.last_lat},${selectedDriver.last_lng}`}
+                 target="_blank" rel="noreferrer"
+                 className="flex items-center justify-center gap-2 bg-indigo-600 text-white font-black py-3 rounded-2xl text-sm">
+                🧭 Directions
+              </a>
+              <button
+                onClick={() => {
+                  setSelectedDriver(null);
+                  const d = selectedDriver;
+                  const driver = drivers.find(dr => dr.id === d.id);
+                  if (driver) openChatWithDriver(driver);
+                }}
+                className="flex items-center justify-center gap-2 bg-slate-100 text-slate-700 font-black py-3 rounded-2xl text-sm">
+                💬 Message
+              </button>
+            </div>
           </div>
         )}
       </div>
-      </>
     );
   };
 
