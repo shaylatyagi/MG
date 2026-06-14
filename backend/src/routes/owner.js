@@ -259,6 +259,16 @@ router.post('/drivers', async (req, res) => {
        emergency_contact || null]
     );
 
+    // Notify admin of new driver onboarding — fire-and-forget
+    pool.query(
+      `INSERT INTO public.notifications (user_type, title, message, created_at)
+       VALUES ('ADMIN', $1, $2, NOW())`,
+      [
+        '🚗 New Driver Onboarded',
+        `Owner ${owner.full_name} added driver ${name.trim()} (${phone_number}) — KYC pending`,
+      ]
+    ).catch(() => {});
+
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error('owner/drivers POST:', err);
@@ -757,6 +767,16 @@ router.post('/payment-mode/request', async (req, res) => {
       [req.user.id, owner.company_id, owner.full_name, company.name,
        company.payment_mode || 'BOTH', requested_mode]
     );
+    // Notify admin of payment-mode change request — fire-and-forget
+    pool.query(
+      `INSERT INTO public.notifications (user_type, title, message, created_at)
+       VALUES ('ADMIN', $1, $2, NOW())`,
+      [
+        '💳 Payment Mode Change Request',
+        `Owner ${owner.full_name} requested mode change → ${requested_mode}`,
+      ]
+    ).catch(() => {});
+
     res.json({ success: true, request: r.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

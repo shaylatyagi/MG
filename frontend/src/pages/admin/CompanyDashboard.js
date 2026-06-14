@@ -2435,10 +2435,38 @@ function DocApprovals() {
 }
 
 // ── MAIN ADMIN PANEL ──────────────────────────────────────────────────────────
+function useAdminNotifications() {
+  const [notifications, setNotifications] = useState([]);
+  const [unread, setUnread] = useState(0);
+
+  const fetchNotifs = () => {
+    api('/api/admin/notifications')
+      .then(r => r.json())
+      .then(d => { if (d.success) { setNotifications(d.notifications || []); setUnread(d.unread || 0); } })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchNotifs();
+    const id = setInterval(fetchNotifs, 30000); // poll every 30s
+    return () => clearInterval(id);
+  }, []);
+
+  const markAllRead = () => {
+    api('/api/admin/notifications/read-all', { method: 'PUT' })
+      .then(() => { setUnread(0); setNotifications(n => n.map(x => ({ ...x, is_read: true }))); })
+      .catch(() => {});
+  };
+
+  return { notifications, unread, markAllRead };
+}
+
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [tab, setTab]               = useState('dashboard');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const { notifications, unread, markAllRead } = useAdminNotifications();
 
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
@@ -2491,8 +2519,39 @@ function AdminPanelInner() {
       <main className="flex-1 overflow-auto">
         <header className="bg-white dark:bg-gray-900 border-b dark:border-gray-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
           <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200">{tabLabel}</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <ThemeToggle />
+            {/* ── Notification Bell ── */}
+            <div className="relative">
+              <button onClick={() => { setShowNotifs(v => !v); if (!showNotifs && unread > 0) markAllRead(); }}
+                className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                <span className="text-xl">🔔</span>
+                {unread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
+              </button>
+              {showNotifs && (
+                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border dark:border-gray-700 z-50 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
+                    <span className="text-sm font-semibold text-gray-800 dark:text-white">Notifications</span>
+                    <button onClick={markAllRead} className="text-xs text-indigo-500 hover:underline">Mark all read</button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y dark:divide-gray-700">
+                    {notifications.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-6">No notifications</p>
+                    ) : notifications.map(n => (
+                      <div key={n.id} className={`px-4 py-3 ${!n.is_read ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
+                        <p className="text-sm font-medium text-gray-800 dark:text-white">{n.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{n.message}</p>
+                        <p className="text-[10px] text-gray-400 mt-1">{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <span className="text-xs text-gray-400 dark:text-gray-500">Super Admin · MobilityGrid</span>
           </div>
         </header>

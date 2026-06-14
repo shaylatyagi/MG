@@ -77,6 +77,16 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
       [uId, uType, doc_type, file.originalname, s3Key, file.size, file.mimetype]
     );
 
+    // Notify admin — fire-and-forget
+    pool.query(
+      `INSERT INTO public.notifications (user_type, title, message, created_at)
+       VALUES ('ADMIN', $1, $2, NOW())`,
+      [
+        `📄 New Document: ${doc_type}`,
+        `${uType} ID ${uId} uploaded ${doc_type} — awaiting review`,
+      ]
+    ).catch(() => {});
+
     const view_url = await presignedUrl(s3Key);
     res.json({ success: true, s3Key, view_url });
   } catch (err) {
@@ -168,6 +178,16 @@ router.post('/agreement', verifyToken, upload.single('document'), async (req, re
     await pool.query(
       `UPDATE public.drivers SET agreement_uploaded=true, updated_at=NOW() WHERE id=$1`,
       [driverId]
+    ).catch(() => {});
+
+    // Notify admin — fire-and-forget
+    pool.query(
+      `INSERT INTO public.notifications (user_type, title, message, created_at)
+       VALUES ('ADMIN', $1, $2, NOW())`,
+      [
+        '📄 New Agreement Uploaded',
+        `Driver ID ${driverId} uploaded an agreement — awaiting review`,
+      ]
     ).catch(() => {});
 
     const view_url = await presignedUrl(s3Key);

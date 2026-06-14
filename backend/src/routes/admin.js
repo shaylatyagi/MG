@@ -1083,6 +1083,32 @@ router.patch('/vehicles/:vehicleId/branch', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── ADMIN NOTIFICATIONS ──────────────────────────────────────────────────────
+
+// GET /api/admin/notifications — latest 50 admin notifications
+router.get('/notifications', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, message, is_read, created_at
+       FROM public.notifications
+       WHERE user_type = 'ADMIN'
+       ORDER BY created_at DESC LIMIT 50`
+    );
+    const unread = result.rows.filter(n => !n.is_read).length;
+    res.json({ success: true, notifications: result.rows, unread });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/admin/notifications/read-all — mark all admin notifications read
+router.put('/notifications/read-all', async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE public.notifications SET is_read = true WHERE user_type = 'ADMIN'`
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── DOCUMENT APPROVAL WORKFLOW ───────────────────────────────────────────────
 
 // GET /api/admin/document-approvals — list all PENDING documents

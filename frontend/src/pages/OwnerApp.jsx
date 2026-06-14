@@ -1924,105 +1924,102 @@ const DriversTab = () => {
         )}
       </div>
       
-      <div className="flex gap-2">
-  <button onClick={() => setShowAddDriver(true)}
-    className="flex-1 bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
-    <UserPlus size={16}/> {t.addNewDriver}
-  </button>
-  <button onClick={() => { setShowBulkModal(true); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
-    className="py-3 px-4 bg-emerald-600 text-white rounded-xl text-sm font-black">
-    📊 Bulk
-  </button>
-</div>
-      
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="divide-y">
-          {localFilteredDrivers.length === 0 ? (
-            <div className="p-8 text-center text-slate-400">
-              {localSearch ? 'No drivers match your search' : 'No drivers added yet'}
+      {/* Action Row */}
+      <div className="flex items-center gap-2">
+        <button onClick={() => setShowAddDriver(true)}
+          className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 shadow-sm">
+          <UserPlus size={15}/> {t.addNewDriver}
+        </button>
+        <button onClick={() => { setShowBulkModal(true); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
+          className="py-2.5 px-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-medium flex items-center gap-1.5 shadow-sm">
+          <span className="text-sm">📥</span> Import CSV
+        </button>
+      </div>
+
+      {/* Driver Cards */}
+      <div className="space-y-2.5">
+        {localFilteredDrivers.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center border border-slate-100 shadow-sm">
+            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <UserPlus size={20} className="text-slate-300" />
             </div>
-          ) : (
-            localFilteredDrivers.map((driver, i) => {
-              // Check if driver has assigned vehicle
-              const hasVehicle = driver.vehicle_id != null;
-const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicle_id));
-              
-              return (
-                <div key={i} className="p-4 transition cursor-pointer hover:bg-slate-50"
-                  onClick={() => {
-                    setSelectedDriverDetails(driver);
-                    setShowDriverDetailsModal(true);
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      {(() => {
-                        const ch = ((driver.full_name || driver.name || '?').charAt(0)).toUpperCase();
-                        const avColors = ['#4f46e5','#7c3aed','#0891b2','#059669','#b45309','#be185d','#0f766e'];
-                        const avBg = avColors[ch.charCodeAt(0) % avColors.length];
-                        return (
-                          <div style={{width:44,height:44,borderRadius:12,background:avBg,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:900,fontSize:17,flexShrink:0,letterSpacing:'-0.01em'}}>
-                            {ch}
-                          </div>
-                        );
-                      })()}
-                      <div>
-                        <p className="font-black text-slate-800">{driver.full_name || driver.name}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">{driver.phone_number || driver.phone}</p>
-                        <p className="text-[9px] text-slate-400">
-                          Vehicle: {assignedVehicle?.vehicle_number || 'Not Assigned'}
-                        </p>
-                      </div>
-                    </div>
+            <p className="text-sm text-slate-500 font-medium">{localSearch ? 'No drivers match your search' : 'No drivers added yet'}</p>
+            <p className="text-xs text-slate-400 mt-1">Tap "Add New Driver" to get started</p>
+          </div>
+        ) : (
+          localFilteredDrivers.map((driver, i) => {
+            const hasVehicle = driver.vehicle_id != null;
+            const assignedVehicle = vehicles.find(v => Number(v.id) === Number(driver.vehicle_id));
+            const ch = ((driver.full_name || driver.name || '?').charAt(0)).toUpperCase();
+            const avColors = ['#4f46e5','#7c3aed','#0891b2','#059669','#b45309','#be185d','#0f766e'];
+            const avBg = avColors[ch.charCodeAt(0) % avColors.length];
+
+            return (
+              <div key={i}
+                className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm cursor-pointer active:scale-[0.99] transition-transform"
+                onClick={() => { setSelectedDriverDetails(driver); setShowDriverDetailsModal(true); }}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Avatar */}
+                  <div style={{width:42,height:42,borderRadius:14,background:avBg,flexShrink:0}}
+                    className="flex items-center justify-center text-white font-bold text-base">
+                    {ch}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-black px-2 py-1 rounded-full ${
-                        hasVehicle ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                      <p className="font-semibold text-slate-800 text-sm truncate">{driver.full_name || driver.name}</p>
+                      {/* Status dot-pill */}
+                      <span className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${
+                        hasVehicle ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
                       }`}>
-                        {hasVehicle ? t.assigned : t.unassigned}
+                        <span className={`w-1.5 h-1.5 rounded-full ${hasVehicle ? 'bg-emerald-500' : 'bg-amber-400'}`}/>
+                        {hasVehicle ? 'Assigned' : 'Unassigned'}
                       </span>
-                      {!hasVehicle && (
-                        <button 
-                          onClick={() => {
-                            setSelectedDriverForAssignInTab(driver);
-                            fetchAvailableVehiclesForDriverTab(driver.id);
-                            setDriverRentType('DAILY');
-                            setDriverRentAmount('');
-                            setShowDriverAssignModal(true);
-                          }}
-                          className="p-2 rounded-lg bg-indigo-50 text-indigo-600"
-                          title="Assign Vehicle"
-                        >
-                          <Truck size={14} />
-                        </button>
-                      )}
-                      {hasVehicle && (
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      setCashDriver(driver);
-      setCashAmount('');
-      setCashConfirm(false);
-      setShowCashModal(true);
-    }}
-    className="p-2 rounded-lg bg-emerald-50 text-emerald-600"
-    title="Record Cash Payment"
-  >
-    <span className="text-xs font-black">₹</span>
-  </button>
-)}
-                      <button 
-                        onClick={() => openChatWithDriver(driver)}
-                        className="p-2 rounded-lg bg-indigo-50 text-indigo-600"
-                      >
-                        <MessageCircle size={16} />
-                      </button>
                     </div>
+                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">{driver.phone_number || driver.phone}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {assignedVehicle?.vehicle_number ? `🚗 ${assignedVehicle.vehicle_number}` : '— no vehicle'}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                    {!hasVehicle && (
+                      <button
+                        onClick={() => {
+                          setSelectedDriverForAssignInTab(driver);
+                          fetchAvailableVehiclesForDriverTab(driver.id);
+                          setDriverRentType('DAILY');
+                          setDriverRentAmount('');
+                          setShowDriverAssignModal(true);
+                        }}
+                        className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500"
+                        title="Assign Vehicle"
+                      >
+                        <Truck size={13} />
+                      </button>
+                    )}
+                    {hasVehicle && (
+                      <button
+                        onClick={() => { setCashDriver(driver); setCashAmount(''); setCashConfirm(false); setShowCashModal(true); }}
+                        className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 text-xs font-bold"
+                        title="Record Cash Payment"
+                      >₹</button>
+                    )}
+                    <button
+                      onClick={() => openChatWithDriver(driver)}
+                      className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500"
+                    >
+                      <MessageCircle size={13} />
+                    </button>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
+              </div>
+            );
+          })
+        )}
       </div>
 {showDriverAssignModal && selectedDriverForAssignInTab && (
   <div 
@@ -2543,86 +2540,85 @@ const VehiclesTab = () => {
         </button>
       )}
     </div>
-    <div className="flex gap-2">
-  <button onClick={openAddVehicleModal}
-    className="flex-1 bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
-    <Plus size={16} /> Add Vehicle
-  </button>
-  <button onClick={() => { setShowBulkModal(true); setBulkTab('vehicles'); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); }}
-    className="py-3 px-4 bg-emerald-600 text-white rounded-xl text-sm font-black">
-    📊 Bulk
-  </button>
-</div>
-    
-    <div className="space-y-3">
-      
-      {sorted.map((vehicle, i) => (
-        <div 
-          key={i} 
-          onClick={() => {
-            setSelectedVehicleDetails(vehicle);
-            fetchUnassignedDriversList();
-            setShowVehicleDetailModal(true);
-          }}
-          className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition"
-        >
-          <div className="flex items-center justify-between mb-2">
+    {/* Action Row */}
+    <div className="flex items-center gap-2">
+      <button onClick={openAddVehicleModal}
+        className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 shadow-sm">
+        <Plus size={15}/> Add Vehicle
+      </button>
+      <button onClick={() => { setShowBulkModal(true); setBulkTab('vehicles'); setBulkVehicles([]); setBulkResult(null); setBulkFile(null); }}
+        className="py-2.5 px-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-medium flex items-center gap-1.5 shadow-sm">
+        <span className="text-sm">📥</span> Import CSV
+      </button>
+    </div>
+
+    <div className="space-y-2.5">
+      {sorted.map((vehicle, i) => {
+        const vi = getVehicleIcon(vehicle);
+        const hasDriver = !!vehicle.driver_id;
+        const opStatus = vehicle.operational_status;
+        const opBadge = opStatus && opStatus !== 'ACTIVE'
+          ? opStatus === 'MAINTENANCE' ? { label: 'Maintenance', color: 'bg-amber-50 text-amber-600' }
+          : opStatus === 'ACCIDENT'    ? { label: 'Accident',    color: 'bg-red-50 text-red-600' }
+          : opStatus === 'RECOVERY'    ? { label: 'Recovery',    color: 'bg-orange-50 text-orange-600' }
+          : { label: 'Inactive', color: 'bg-slate-100 text-slate-500' }
+          : null;
+        return (
+          <div key={i}
+            onClick={() => { setSelectedVehicleDetails(vehicle); fetchUnassignedDriversList(); setShowVehicleDetailModal(true); }}
+            className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm cursor-pointer active:scale-[0.99] transition-transform"
+          >
+            {/* Top row: icon + reg/model + rent */}
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl ${getVehicleIcon(vehicle).bg} flex items-center justify-center text-lg`}>
-  {getVehicleIcon(vehicle).icon}
-</div>
-              <div>
-                <p className="font-black text-slate-800">{vehicle.vehicle_number}</p>
-                <p className="text-[10px] text-slate-400">{vehicle.vehicle_model}</p>
+              <div className={`w-10 h-10 rounded-2xl ${vi.bg} flex items-center justify-center text-xl shrink-0`}>
+                {vi.icon}
               </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-slate-800 text-sm">{vehicle.vehicle_number}</p>
+                  {opBadge && (
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${opBadge.color}`}>
+                      {opBadge.label}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">{vehicle.vehicle_model}</p>
+              </div>
+              <span className="text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-xl shrink-0">
+                ₹{vehicle.daily_rent}/day
+              </span>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-700">
-              ₹{vehicle.daily_rent}/day
-            </span>
-          </div>
-          {/* Operational Status Badge */}
-{vehicle.operational_status && vehicle.operational_status !== 'ACTIVE' && (
-  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
-    vehicle.operational_status === 'MAINTENANCE' ? 'bg-amber-100 text-amber-700' :
-    vehicle.operational_status === 'ACCIDENT'    ? 'bg-red-100 text-red-700' :
-    vehicle.operational_status === 'RECOVERY'    ? 'bg-orange-100 text-orange-700' :
-    'bg-slate-100 text-slate-500'
-  }`}>
-    {vehicle.operational_status === 'MAINTENANCE' ? '🔧 Maintenance' :
-     vehicle.operational_status === 'ACCIDENT'    ? '🚨 Accident' :
-     vehicle.operational_status === 'RECOVERY'    ? '💰 Recovery' : '⏸ Inactive'}
-  </span>
-)}
-          
-          {/* Assigned Driver Info */}
-          <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-            <div>
-              <p className="text-[10px] text-slate-400">{t.assignedDriver}</p>
-              <p className="text-xs font-black text-slate-800">
-                {vehicle.driver_name || t.notAssigned}
-              </p>
-              {vehicle.driver_phone && (
-                <p className="text-[9px] text-slate-400 font-mono">{vehicle.driver_phone}</p>
-              )}
+
+            {/* Bottom row: assigned driver */}
+            <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-50">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${hasDriver ? 'bg-emerald-50' : 'bg-slate-50'}`}>
+                  <UserPlus size={11} className={hasDriver ? 'text-emerald-500' : 'text-slate-300'} />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-700">{vehicle.driver_name || 'No driver'}</p>
+                  {vehicle.driver_phone && <p className="text-[10px] text-slate-400 font-mono">{vehicle.driver_phone}</p>}
+                </div>
+              </div>
+              <span className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                hasDriver ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${hasDriver ? 'bg-emerald-500' : 'bg-amber-400'}`}/>
+                {hasDriver ? 'Assigned' : 'Available'}
+              </span>
             </div>
-            {/* FIXED: Check driver_id instead of status */}
-            <span className={`text-[9px] font-black px-2 py-1 rounded-full ${
-              vehicle.driver_id 
-                ? 'bg-green-100 text-green-700' 
-                : 'bg-amber-100 text-amber-700'
-            }`}>
-              {vehicle.driver_id ? t.assigned : t.available}
-            </span>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {vehicles.length === 0 && (
-  <div className="bg-white rounded-2xl p-8 text-center text-slate-400">
-    <Truck size={32} className="mx-auto mb-2 opacity-50" />
-    <p className="text-sm">No vehicles yet</p>
-    <p className="text-xs mt-1">Use buttons above to add vehicles</p>
-  </div>
-)}
+        <div className="bg-white rounded-2xl p-8 text-center border border-slate-100 shadow-sm">
+          <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <Truck size={20} className="text-slate-300" />
+          </div>
+          <p className="text-sm text-slate-500 font-medium">No vehicles yet</p>
+          <p className="text-xs text-slate-400 mt-1">Add your first vehicle to get started</p>
+        </div>
+      )}
     </div>
   </div>
 );}

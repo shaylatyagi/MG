@@ -314,9 +314,10 @@ router.post('/upload-document', kycDocUpload.single('document'), async (req, res
     const file = req.file;
     if (!file) return res.status(400).json({ success: false, message: 'File required (field: document)' });
 
-    // Resolve driver ID from JWT → body driver_id → phone lookup
-    let driverId = req.body.driver_id ? parseInt(req.body.driver_id) : null;
-    if (!driverId && req.headers.authorization) {
+    // Resolve driver ID — JWT is authoritative; body driver_id only fallback when no JWT
+    // Prevents a logged-in driver from uploading docs on behalf of a different driver_id
+    let driverId = null;
+    if (req.headers.authorization) {
       try {
         const jwt     = require('jsonwebtoken');
         const decoded = jwt.verify(
@@ -326,6 +327,7 @@ router.post('/upload-document', kycDocUpload.single('document'), async (req, res
         driverId = decoded.id || decoded.driver_id || null;
       } catch (_) {}
     }
+    if (!driverId && req.body.driver_id) driverId = parseInt(req.body.driver_id); // fallback only
     if (!driverId && req.body.phone) {
       const r = await pool.query(
         'SELECT id FROM public.drivers WHERE mobile_number = $1', [req.body.phone]
@@ -369,6 +371,16 @@ router.post('/upload-document', kycDocUpload.single('document'), async (req, res
       `UPDATE public.drivers SET kyc_status='PARTIAL', updated_at=NOW()
        WHERE id=$1 AND kyc_status='PENDING'`,
       [driverId]
+    ).catch(() => {});
+
+    // Notify admin — fire-and-forget
+    pool.query(
+      `INSERT INTO public.notifications (user_type, title, message, created_at)
+       VALUES ('ADMIN', $1, $2, NOW())`,
+      [
+        `📄 New KYC Document: ${rawType}`,
+        `Driver ID ${driverId} uploaded ${rawType} — awaiting review`,
+      ]
     ).catch(() => {});
 
     res.json({ success: true, doc_type: rawType, s3_key: s3Key, status: 'PENDING' });

@@ -254,6 +254,8 @@ router.post('/earnings', verifyToken, async (req, res) => {
     const { amount, note, earning_date } = req.body;
     if (!amount || isNaN(amount) || Number(amount) <= 0)
       return res.status(400).json({ error: 'Valid amount required' });
+    if (Number(amount) > 50000)
+      return res.status(400).json({ error: 'Maximum ₹50,000 per entry allowed' });
     await pool.query(`
       CREATE TABLE IF NOT EXISTS public.driver_earnings (
         id SERIAL PRIMARY KEY,
@@ -305,6 +307,23 @@ router.post('/sos', verifyToken, async (req, res) => {
     }
 
     const { id: driverId, owner_id: ownerId, name: driverName } = driverRow;
+
+    // ── Rate limit: 1 SOS per 5 minutes per driver ────────────────────────────
+    const lastSos = await pool.query(
+      'SELECT created_at FROM sos_alerts WHERE driver_id=$1 ORDER BY created_at DESC LIMIT 1',
+      [driverId]
+    );
+    if (lastSos.rows[0]) {
+      const msSince = Date.now() - new Date(lastSos.rows[0].created_at).getTime();
+      const waitSec = Math.ceil((5 * 60 * 1000 - msSince) / 1000);
+      if (msSince < 5 * 60 * 1000) {
+        return res.status(429).json({
+          success: false,
+          message: `Please wait ${waitSec}s before sending another SOS`,
+          retry_after_seconds: waitSec,
+        });
+      }
+    }
 
     // Insert SOS alert
     const alert = await pool.query(
