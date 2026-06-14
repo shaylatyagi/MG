@@ -1195,7 +1195,7 @@ router.put('/document-approvals/:id/reject', async (req, res) => {
 // POST /api/admin/generate-pins
 // Generates random 6-digit PINs for all owners/drivers that don't have one yet.
 // Returns the plain-text PINs (only time they're visible) for admin to export.
-router.post('/generate-pins', verifyAdmin, async (req, res) => {
+router.post('/generate-pins', async (req, res) => {
   var bcrypt = require('bcryptjs');
   try {
     // Fetch all owners without a PIN
@@ -1238,7 +1238,7 @@ router.post('/generate-pins', verifyAdmin, async (req, res) => {
 
 // POST /api/admin/reset-pin  — Body: { user_id, role }
 // Resets a single user's PIN and returns the new plain-text PIN.
-router.post('/reset-pin', verifyAdmin, async (req, res) => {
+router.post('/reset-pin', async (req, res) => {
   var bcrypt = require('bcryptjs');
   var userId = parseInt(req.body.user_id);
   var role   = (req.body.role || '').toUpperCase();
@@ -1269,7 +1269,7 @@ router.post('/reset-pin', verifyAdmin, async (req, res) => {
 
 // GET /api/admin/pin-status
 // Returns counts of owners/drivers with and without PINs set.
-router.get('/pin-status', verifyAdmin, async (req, res) => {
+router.get('/pin-status', async (req, res) => {
   try {
     var r = await pool.query(
       "SELECT " +
