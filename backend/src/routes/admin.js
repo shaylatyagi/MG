@@ -1193,38 +1193,57 @@ router.put('/document-approvals/:id/reject', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // POST /api/admin/generate-pins
-// Generates random 6-digit PINs for all owners/drivers that don't have one yet.
-// Returns the plain-text PINs (only time they're visible) for admin to export.
+// Body (all optional): { company_id, owner_id }
+// Scope: if owner_id given → only that owner's drivers (+ owner if no PIN)
+//        if company_id given → all owners+drivers in that company without a PIN
+//        if neither → all users platform-wide without a PIN
 router.post('/generate-pins', async (req, res) => {
-  var bcrypt = require('bcrypt');
+  var bcrypt    = require('bcrypt');
+  var companyId = req.body.company_id ? parseInt(req.body.company_id) : null;
+  var ownerId   = req.body.owner_id   ? parseInt(req.body.owner_id)   : null;
   try {
-    // Fetch all owners without a PIN
-    var ownersRes = await pool.query(
-      "SELECT id, full_name, mobile_number, owner_code FROM public.owners WHERE pin_hash IS NULL AND status != 'INACTIVE' ORDER BY id"
+    var ownerWhere  = "pin_hash IS NULL AND status != 'INACTIVE'";
+    var driverWhere = "pin_hash IS NULL AND status != 'INACTIVE'";
+    var ownerParams  = [];
+    var driverParams = [];
+
+    if (ownerId) {
+      // Only this owner + their drivers
+      ownerWhere  += ' AND id=$1';
+      ownerParams  = [ownerId];
+      driverWhere += ' AND owner_code = (SELECT owner_code FROM public.owners WHERE id=$1)';
+      driverParams = [ownerId];
+    } else if (companyId) {
+      // All owners in this company + all their drivers
+      ownerWhere  += ' AND company_id=$1';
+      ownerParams  = [companyId];
+      driverWhere += ' AND owner_code IN (SELECT owner_code FROM public.owners WHERE company_id=$1)';
+      driverParams = [companyId];
+    }
+
+    var ownersRes  = await pool.query(
+      'SELECT id, full_name, mobile_number, owner_code FROM public.owners WHERE ' + ownerWhere + ' ORDER BY id',
+      ownerParams
     );
-    // Fetch all drivers without a PIN
     var driversRes = await pool.query(
-      "SELECT id, full_name, mobile_number, driver_code FROM public.drivers WHERE pin_hash IS NULL AND status != 'INACTIVE' ORDER BY id"
+      'SELECT id, full_name, mobile_number, driver_code FROM public.drivers WHERE ' + driverWhere + ' ORDER BY id',
+      driverParams
     );
 
     var generated = [];
-
     for (var o of ownersRes.rows) {
       var pin = String(Math.floor(100000 + Math.random() * 900000));
-      var hash = await bcrypt.hash(pin, 10);
       await pool.query(
         'UPDATE public.owners SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true WHERE id=$2',
-        [hash, o.id]
+        [await bcrypt.hash(pin, 10), o.id]
       );
       generated.push({ role: 'OWNER', name: o.full_name, phone: o.mobile_number, code: o.owner_code, pin: pin });
     }
-
     for (var d of driversRes.rows) {
       var pin = String(Math.floor(100000 + Math.random() * 900000));
-      var hash = await bcrypt.hash(pin, 10);
       await pool.query(
         'UPDATE public.drivers SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true WHERE id=$2',
-        [hash, d.id]
+        [await bcrypt.hash(pin, 10), d.id]
       );
       generated.push({ role: 'DRIVER', name: d.full_name, phone: d.mobile_number, code: d.driver_code, pin: pin });
     }
@@ -1236,35 +1255,48 @@ router.post('/generate-pins', async (req, res) => {
   }
 });
 
-// POST /api/admin/reset-pin  — Body: { user_id, role }
-// Resets a single user's PIN and returns the new plain-text PIN.
+// POST /api/admin/reset-pin  — Body: { phone_number, role }
+// Finds user by phone, resets PIN, returns new plain-text PIN.
 router.post('/reset-pin', async (req, res) => {
   var bcrypt = require('bcrypt');
-  var userId = parseInt(req.body.user_id);
+  var phone  = (req.body.phone_number || '').trim();
   var role   = (req.body.role || '').toUpperCase();
-  if (!userId || !role) return res.status(400).json({ success: false, message: 'user_id and role required' });
-
+  if (!phone || !role) return res.status(400).json({ success: false, message: 'phone_number and role required' });
   try {
-    var table   = role === 'DRIVER' ? 'drivers' : 'owners';
-    var nameCol = 'full_name';
-    var pin     = String(Math.floor(100000 + Math.random() * 900000));
-    var hash    = await bcrypt.hash(pin, 10);
-    var upd = await pool.query(
-      'UPDATE public.' + table + ' SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true WHERE id=$2 RETURNING ' + nameCol + ', mobile_number',
-      [hash, userId]
+    var table = role === 'DRIVER' ? 'drivers' : 'owners';
+    var pin   = String(Math.floor(100000 + Math.random() * 900000));
+    var upd   = await pool.query(
+      'UPDATE public.' + table + ' SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true WHERE mobile_number=$2 RETURNING full_name, mobile_number',
+      [await bcrypt.hash(pin, 10), phone]
     );
-    if (!upd.rows[0]) return res.status(404).json({ success: false, message: 'User not found' });
-
-    res.json({
-      success: true,
-      pin: pin,
-      name: upd.rows[0][nameCol],
-      phone: upd.rows[0].mobile_number,
-    });
+    if (!upd.rows[0]) return res.status(404).json({ success: false, message: 'No ' + role.toLowerCase() + ' found with that number' });
+    res.json({ success: true, pin: pin, name: upd.rows[0].full_name, phone: upd.rows[0].mobile_number });
   } catch (err) {
     console.error('admin reset-pin error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
+});
+
+// GET /api/admin/companies-list — lightweight list for PIN scope dropdown
+router.get('/companies-list', async (req, res) => {
+  try {
+    var r = await pool.query("SELECT id, name FROM public.companies WHERE status='ACTIVE' ORDER BY name");
+    res.json({ success: true, companies: r.rows });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// GET /api/admin/owners-list?company_id=X — owners for a company (for PIN scope)
+router.get('/owners-list', async (req, res) => {
+  try {
+    var where = "status != 'INACTIVE'";
+    var params = [];
+    if (req.query.company_id) { where += ' AND company_id=$1'; params = [req.query.company_id]; }
+    var r = await pool.query(
+      'SELECT id, full_name, mobile_number, owner_code FROM public.owners WHERE ' + where + ' ORDER BY full_name',
+      params
+    );
+    res.json({ success: true, owners: r.rows });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // GET /api/admin/pin-status

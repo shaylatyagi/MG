@@ -2492,35 +2492,50 @@ const NAV_ICONS = {
 };
 
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PIN MANAGEMENT SECTION
 // ═══════════════════════════════════════════════════════════════════════════════
 function PinManagementSection() {
-  const [status, setStatus] = React.useState(null);
-  const [generating, setGenerating] = React.useState(false);
-  const [pins, setPins] = React.useState([]);       // plain-text list from last generate
-  const [resetTarget, setResetTarget] = React.useState(null); // { user_id, role, name }
-  const [resetting, setResetting] = React.useState(false);
-  const [resetResult, setResetResult] = React.useState(null); // { pin, name, phone }
-  const [msg, setMsg] = React.useState('');
+  const [status, setStatus]             = React.useState(null);
+  const [companies, setCompanies]       = React.useState([]);
+  const [owners, setOwners]             = React.useState([]);
+  const [scopeCompany, setScopeCompany] = React.useState('');
+  const [scopeOwner, setScopeOwner]     = React.useState('');
+  const [generating, setGenerating]     = React.useState(false);
+  const [pins, setPins]                 = React.useState([]);
+  const [msg, setMsg]                   = React.useState('');
+  const [resetPhone, setResetPhone]     = React.useState('');
+  const [resetRole, setResetRole]       = React.useState('OWNER');
+  const [resetting, setResetting]       = React.useState(false);
+  const [resetResult, setResetResult]   = React.useState(null);
 
-  React.useEffect(function() { loadStatus(); }, []);
+  React.useEffect(function() {
+    loadStatus();
+    api('/api/admin/companies-list').then(function(d) { if (d.success) setCompanies(d.companies); }).catch(function(){});
+  }, []);
+
+  React.useEffect(function() {
+    if (!scopeCompany) { setOwners([]); setScopeOwner(''); return; }
+    api('/api/admin/owners-list?company_id=' + scopeCompany)
+      .then(function(d) { if (d.success) setOwners(d.owners); }).catch(function(){});
+    setScopeOwner('');
+  }, [scopeCompany]);
 
   function loadStatus() {
-    api('/api/admin/pin-status')
-      .then(function(d) { if (d.success) setStatus(d); })
-      .catch(function() {});
+    api('/api/admin/pin-status').then(function(d) { if (d.success) setStatus(d); }).catch(function(){});
   }
 
   async function generatePins() {
     setGenerating(true); setMsg(''); setPins([]);
     try {
-      var d = await api('/api/admin/generate-pins', { method: 'POST' });
+      var body = {};
+      if (scopeOwner)        body.owner_id   = parseInt(scopeOwner);
+      else if (scopeCompany) body.company_id  = parseInt(scopeCompany);
+      var d = await api('/api/admin/generate-pins', { method: 'POST', body: JSON.stringify(body) });
       if (d.success) {
         setPins(d.pins);
-        setMsg(d.count === 0
-          ? 'All users already have PINs.'
-          : d.count + ' PINs generated. Download the list below.');
+        setMsg(d.count === 0 ? 'All users in this scope already have PINs.' : d.count + ' PINs generated. Download the list below.');
         loadStatus();
       } else { setMsg(d.message || 'Failed'); }
     } catch { setMsg('Network error'); }
@@ -2529,63 +2544,88 @@ function PinManagementSection() {
 
   function downloadCSV() {
     var header = 'Role,Name,Phone,Code,PIN';
-    var rows = pins.map(function(p) {
-      return [p.role, p.name, p.phone, p.code || '', p.pin].join(',');
-    });
-    var csv = [header].concat(rows).join('\n');
+    var rows = pins.map(function(p) { return [p.role, '"' + p.name + '"', p.phone, p.code || '', p.pin].join(','); });
+    var csv  = [header].concat(rows).join('\n');
     var blob = new Blob([csv], { type: 'text/csv' });
     var url  = URL.createObjectURL(blob);
     var a    = document.createElement('a');
-    a.href = url; a.download = 'mg_initial_pins.csv'; a.click();
+    var scope = scopeOwner ? ('owner_' + scopeOwner) : scopeCompany ? ('co_' + scopeCompany) : 'all';
+    a.href = url; a.download = 'mg_pins_' + scope + '.csv'; a.click();
     URL.revokeObjectURL(url);
   }
 
-  async function resetPin(userId, role) {
+  async function doResetPin() {
+    if (resetPhone.length < 10) return;
     setResetting(true); setResetResult(null);
     try {
-      var d = await api('/api/admin/reset-pin', { method: 'POST', body: JSON.stringify({ user_id: userId, role: role }) });
+      var d = await api('/api/admin/reset-pin', { method: 'POST', body: JSON.stringify({ phone_number: resetPhone, role: resetRole }) });
       if (d.success) setResetResult(d);
       else setMsg('Reset failed: ' + (d.message || ''));
     } catch { setMsg('Network error'); }
     setResetting(false);
-    setResetTarget(null);
   }
+
+  var scopeLabel = scopeOwner
+    ? 'Owner: ' + ((owners.find(function(o) { return String(o.id) === scopeOwner; }) || {}).full_name || scopeOwner)
+    : scopeCompany
+      ? 'Company: ' + ((companies.find(function(co) { return String(co.id) === scopeCompany; }) || {}).name || scopeCompany)
+      : 'All companies (platform-wide)';
 
   return (
     <div className="p-4 md:p-6 space-y-5">
       <div>
         <h2 className="text-xl font-black text-slate-900">PIN Management</h2>
-        <p className="text-sm text-slate-500 mt-1">Generate and distribute initial PINs to owners and drivers. They set their own PIN on first login.</p>
+        <p className="text-sm text-slate-500 mt-1">Generate initial PINs per company or owner — each CSV is scoped so no owner sees another's drivers.</p>
       </div>
 
-      {/* Status cards */}
       {status && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Owners with PIN',    val: status.owners_with_pin,    color: 'emerald' },
-            { label: 'Owners without PIN', val: status.owners_without_pin, color: 'amber'   },
-            { label: 'Drivers with PIN',   val: status.drivers_with_pin,   color: 'emerald' },
-            { label: 'Drivers without PIN',val: status.drivers_without_pin,color: 'amber'   },
-          ].map(function(c) {
+            { label: 'Owners with PIN',     val: status.owners_with_pin,     color: 'emerald' },
+            { label: 'Owners without PIN',  val: status.owners_without_pin,  color: 'amber'   },
+            { label: 'Drivers with PIN',    val: status.drivers_with_pin,    color: 'emerald' },
+            { label: 'Drivers without PIN', val: status.drivers_without_pin, color: 'amber'   },
+          ].map(function(card) {
             return (
-              <div key={c.label} className={'bg-' + c.color + '-50 border border-' + c.color + '-200 rounded-2xl p-4 text-center'}>
-                <p className={'text-2xl font-black text-' + c.color + '-700'}>{c.val}</p>
-                <p className={'text-xs font-semibold text-' + c.color + '-600 mt-1'}>{c.label}</p>
+              <div key={card.label} className={'bg-' + card.color + '-50 border border-' + card.color + '-200 rounded-2xl p-4 text-center'}>
+                <p className={'text-2xl font-black text-' + card.color + '-700'}>{card.val}</p>
+                <p className={'text-xs font-semibold text-' + card.color + '-600 mt-1'}>{card.label}</p>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Generate button */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
         <div>
           <h3 className="font-black text-slate-800">Generate Initial PINs</h3>
-          <p className="text-xs text-slate-500 mt-1">Creates a random 6-digit PIN for every owner and driver that doesn't have one yet. Download the list and share with them.</p>
+          <p className="text-xs text-slate-500 mt-1">Pick a scope, generate, download CSV, share ONLY with that owner. Leave blank for platform-wide.</p>
+        </div>
+        <div className="flex gap-3 flex-wrap items-end">
+          <div>
+            <label className="text-xs font-black text-slate-600 block mb-1">Company</label>
+            <select value={scopeCompany} onChange={function(e) { setScopeCompany(e.target.value); }}
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 min-w-[160px]">
+              <option value="">All companies</option>
+              {companies.map(function(co) { return <option key={co.id} value={String(co.id)}>{co.name}</option>; })}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-black text-slate-600 block mb-1">Owner (optional)</label>
+            <select value={scopeOwner} onChange={function(e) { setScopeOwner(e.target.value); }}
+              disabled={!scopeCompany}
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 min-w-[180px] disabled:opacity-40">
+              <option value="">All owners in company</option>
+              {owners.map(function(o) { return <option key={o.id} value={String(o.id)}>{o.full_name} · {o.mobile_number}</option>; })}
+            </select>
+          </div>
+        </div>
+        <div className="text-xs text-indigo-700 font-semibold bg-indigo-50 rounded-xl px-3 py-2">
+          📋 Scope: {scopeLabel}
         </div>
         <button onClick={generatePins} disabled={generating}
           className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
-          {generating ? '⏳ Generating…' : '🔑 Generate PINs for new users'}
+          {generating ? '⏳ Generating…' : '🔑 Generate PINs for this scope'}
         </button>
         {msg && (
           <div className={'text-sm font-semibold px-4 py-3 rounded-xl ' + (pins.length > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')}>
@@ -2601,63 +2641,49 @@ function PinManagementSection() {
             <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50 sticky top-0">
-                  <tr>
-                    {['Role','Name','Phone','Code','PIN'].map(function(h) {
-                      return <th key={h} className="px-3 py-2 text-left font-black text-slate-600">{h}</th>;
-                    })}
-                  </tr>
+                  <tr>{['Role','Name','Phone','Code','PIN'].map(function(h){return <th key={h} className="px-3 py-2 text-left font-black text-slate-600">{h}</th>;})}</tr>
                 </thead>
                 <tbody>
                   {pins.map(function(p, i) {
                     return (
                       <tr key={i} className="border-t border-slate-100">
-                        <td className="px-3 py-2">
-                          <span className={'px-2 py-0.5 rounded-full text-[10px] font-black ' + (p.role === 'OWNER' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700')}>
-                            {p.role}
-                          </span>
-                        </td>
+                        <td className="px-3 py-2"><span className={'px-2 py-0.5 rounded-full text-[10px] font-black ' + (p.role==='OWNER' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700')}>{p.role}</span></td>
                         <td className="px-3 py-2 font-medium text-slate-800">{p.name}</td>
                         <td className="px-3 py-2 font-mono text-slate-600">{p.phone}</td>
                         <td className="px-3 py-2 text-slate-500">{p.code}</td>
-                        <td className="px-3 py-2">
-                          <span className="font-mono font-black text-indigo-700 text-sm tracking-widest">{p.pin}</span>
-                        </td>
+                        <td className="px-3 py-2 font-mono font-black text-indigo-700 tracking-widest">{p.pin}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-slate-400">⚠️ Save this file now — PINs cannot be retrieved after you close this page.</p>
+            <p className="text-[11px] text-slate-400">⚠️ Save this file now — PINs cannot be retrieved after you leave this page.</p>
           </div>
         )}
       </div>
 
-      {/* Reset individual PIN */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
         <div>
           <h3 className="font-black text-slate-800">Reset a User's PIN</h3>
-          <p className="text-xs text-slate-500 mt-1">Enter a user ID and role to generate a new PIN for them. Give them the new PIN — they'll be asked to change it on next login.</p>
+          <p className="text-xs text-slate-500 mt-1">Enter phone number — no need to look up IDs. User will be forced to change PIN on next login.</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <input
-            type="number"
-            placeholder="User ID"
-            className="border border-slate-200 rounded-xl px-3 py-2 text-sm w-28 focus:outline-none focus:border-indigo-400"
-            value={resetTarget ? resetTarget.user_id : ''}
-            onChange={function(e) { setResetTarget(function(t) { return Object.assign({}, t, { user_id: e.target.value }); }); }}
-          />
-          <select
-            className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
-            value={resetTarget ? resetTarget.role : 'OWNER'}
-            onChange={function(e) { setResetTarget(function(t) { return Object.assign({}, t, { role: e.target.value }); }); }}
-          >
-            <option value="OWNER">Owner</option>
-            <option value="DRIVER">Driver</option>
-          </select>
-          <button
-            onClick={function() { if (resetTarget && resetTarget.user_id) resetPin(resetTarget.user_id, resetTarget.role || 'OWNER'); }}
-            disabled={resetting || !resetTarget || !resetTarget.user_id}
+        <div className="flex gap-2 flex-wrap items-end">
+          <div>
+            <label className="text-xs font-black text-slate-600 block mb-1">Phone Number</label>
+            <input type="tel" placeholder="10-digit number" maxLength={10} value={resetPhone}
+              onChange={function(e) { setResetPhone(e.target.value.replace(/\D/g,'').slice(0,10)); setResetResult(null); }}
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm w-44 focus:outline-none focus:border-indigo-400" />
+          </div>
+          <div>
+            <label className="text-xs font-black text-slate-600 block mb-1">Role</label>
+            <select value={resetRole} onChange={function(e) { setResetRole(e.target.value); setResetResult(null); }}
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400">
+              <option value="OWNER">Owner</option>
+              <option value="DRIVER">Driver</option>
+            </select>
+          </div>
+          <button onClick={doResetPin} disabled={resetting || resetPhone.length < 10}
             className="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-black disabled:opacity-50">
             {resetting ? 'Resetting…' : '🔄 Reset PIN'}
           </button>
@@ -2665,14 +2691,16 @@ function PinManagementSection() {
         {resetResult && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
             <p className="text-sm font-black text-emerald-700">✅ PIN reset for {resetResult.name} ({resetResult.phone})</p>
-            <p className="text-sm mt-1">New PIN: <span className="font-mono font-black text-indigo-700 tracking-widest text-lg">{resetResult.pin}</span></p>
-            <p className="text-[11px] text-slate-400 mt-2">Share this PIN with the user — it won't be shown again.</p>
+            <p className="text-sm mt-2">New PIN: <span className="font-mono font-black text-indigo-700 tracking-widest text-lg">{resetResult.pin}</span></p>
+            <p className="text-[11px] text-slate-400 mt-2">Share this with the user — it won't be shown again.</p>
           </div>
         )}
       </div>
     </div>
   );
 }
+
+
 
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
