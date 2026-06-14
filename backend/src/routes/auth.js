@@ -286,4 +286,440 @@ router.post('/admin-login', async (req, res) => {
   res.json({ success: true, token, user: { role: 'admin', phone: phone_number } });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PASSKEY / BIOMETRIC AUTH (WebAuthn)
+// ═══════════════════════════════════════════════════════════════════════════════
+const {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} = require('@simplewebauthn/server');
+
+const IS_PROD   = process.env.NODE_ENV === 'production';
+const RP_ID     = IS_PROD ? 'mobilitygrid.in' : 'localhost';
+const RP_NAME   = 'MobilityGrid';
+const ORIGIN    = IS_PROD ? 'https://www.mobilitygrid.in' : 'http://localhost:3000';
+
+// POST /api/auth/passkey/register-options
+// Called after OTP login. Returns WebAuthn registration options. Requires valid JWT.
+router.post('/passkey/register-options', verifyToken, async (req, res) => {
+  try {
+    const { id: userId, role } = req.user;
+    const table = role === 'DRIVER' ? 'drivers' : 'owners';
+    const userRes = await pool.query(
+      'SELECT id, full_name, mobile_number FROM public.' + table + ' WHERE id=$1', [userId]
+    );
+    const user = userRes.rows[0];
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Exclude already-registered credentials
+    const existing = await pool.query(
+      'SELECT credential_id FROM public.passkeys WHERE user_id=$1 AND user_type=$2',
+      [userId, role]
+    );
+    const excludeCredentials = existing.rows.map(function(r) {
+      return { id: Buffer.from(r.credential_id, 'base64url'), type: 'public-key' };
+    });
+
+    const options = await generateRegistrationOptions({
+      rpName:   RP_NAME,
+      rpID:     RP_ID,
+      userID:   Buffer.from(userId.toString()),
+      userName: user.mobile_number,
+      userDisplayName: user.full_name,
+      excludeCredentials: excludeCredentials,
+      authenticatorSelection: {
+        residentKey:      'preferred',
+        userVerification: 'preferred',
+      },
+      supportedAlgorithmIDs: [-7, -257],
+    });
+
+    // Store challenge temporarily
+    await pool.query('DELETE FROM public.webauthn_challenges WHERE identifier=$1', [user.mobile_number]);
+    await pool.query(
+      'INSERT INTO public.webauthn_challenges (identifier, user_type, challenge) VALUES ($1,$2,$3)',
+      [user.mobile_number, role, options.challenge]
+    );
+
+    res.json({ success: true, options: options });
+  } catch (err) {
+    console.error('passkey register-options error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/passkey/register-verify
+// Verifies the credential from the device and stores it.
+router.post('/passkey/register-verify', verifyToken, async (req, res) => {
+  try {
+    const { id: userId, role } = req.user;
+    const table = role === 'DRIVER' ? 'drivers' : 'owners';
+    const userRes = await pool.query(
+      'SELECT mobile_number FROM public.' + table + ' WHERE id=$1', [userId]
+    );
+    const user = userRes.rows[0];
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const challengeRes = await pool.query(
+      'SELECT challenge FROM public.webauthn_challenges WHERE identifier=$1 AND expires_at > NOW() LIMIT 1',
+      [user.mobile_number]
+    );
+    if (!challengeRes.rows[0])
+      return res.status(400).json({ success: false, message: 'Challenge expired. Try again.' });
+
+    const expectedChallenge = challengeRes.rows[0].challenge;
+
+    const verification = await verifyRegistrationResponse({
+      response:            req.body,
+      expectedChallenge:   expectedChallenge,
+      expectedOrigin:      ORIGIN,
+      expectedRPID:        RP_ID,
+      requireUserVerification: false,
+    });
+
+    if (!verification.verified)
+      return res.status(400).json({ success: false, message: 'Verification failed' });
+
+    const info = verification.registrationInfo;
+    const credentialPublicKey = info.credentialPublicKey;
+    const credentialID        = info.credentialID;
+    const counter             = info.counter;
+    const credentialDeviceType = info.credentialDeviceType;
+    const credentialBackedUp   = info.credentialBackedUp;
+
+    await pool.query(
+      'INSERT INTO public.passkeys (user_id, user_type, credential_id, public_key, counter, device_type, backed_up)' +
+      ' VALUES ($1,$2,$3,$4,$5,$6,$7)' +
+      ' ON CONFLICT (credential_id) DO UPDATE SET counter=$5, last_used_at=NOW()',
+      [
+        userId, role,
+        Buffer.from(credentialID).toString('base64url'),
+        Buffer.from(credentialPublicKey),
+        counter,
+        credentialDeviceType,
+        credentialBackedUp,
+      ]
+    );
+
+    await pool.query('DELETE FROM public.webauthn_challenges WHERE identifier=$1', [user.mobile_number]);
+
+    res.json({ success: true, message: 'Passkey registered' });
+  } catch (err) {
+    console.error('passkey register-verify error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/passkey/auth-options
+// Takes phone + role, returns WebAuthn auth challenge if passkey exists.
+router.post('/passkey/auth-options', async (req, res) => {
+  try {
+    var phone = (req.body.phone_number || '').trim();
+    var role  = (req.body.role || '').toUpperCase();
+    if (!phone) return res.status(400).json({ success: false, message: 'phone_number required' });
+
+    var userRes;
+    if (role === 'DRIVER')
+      userRes = await pool.query('SELECT id FROM public.drivers WHERE mobile_number=$1 LIMIT 1', [phone]);
+    else
+      userRes = await pool.query('SELECT id FROM public.owners WHERE mobile_number=$1 LIMIT 1', [phone]);
+
+    if (!userRes || !userRes.rows[0])
+      return res.status(404).json({ success: false, message: 'No account found' });
+
+    var userId = userRes.rows[0].id;
+    var credsRes = await pool.query(
+      'SELECT credential_id FROM public.passkeys WHERE user_id=$1 AND user_type=$2',
+      [userId, role]
+    );
+
+    if (!credsRes.rows.length)
+      return res.status(404).json({ success: false, hasPasskey: false, message: 'No passkey registered' });
+
+    var allowCredentials = credsRes.rows.map(function(r) {
+      return { id: Buffer.from(r.credential_id, 'base64url'), type: 'public-key' };
+    });
+
+    var options = await generateAuthenticationOptions({
+      rpID:               RP_ID,
+      allowCredentials:   allowCredentials,
+      userVerification:   'preferred',
+    });
+
+    await pool.query('DELETE FROM public.webauthn_challenges WHERE identifier=$1', [phone]);
+    await pool.query(
+      'INSERT INTO public.webauthn_challenges (identifier, user_type, challenge) VALUES ($1,$2,$3)',
+      [phone, role, options.challenge]
+    );
+
+    res.json({ success: true, hasPasskey: true, options: options });
+  } catch (err) {
+    console.error('passkey auth-options error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/passkey/auth-verify
+// Verifies biometric assertion, returns JWT same as OTP verify.
+router.post('/passkey/auth-verify', async (req, res) => {
+  try {
+    var phone     = (req.body.phone_number || '').trim();
+    var role      = (req.body.role || '').toUpperCase();
+    var assertion = req.body.assertion;
+    if (!phone || !assertion)
+      return res.status(400).json({ success: false, message: 'phone_number and assertion required' });
+
+    var challengeRes = await pool.query(
+      'SELECT challenge FROM public.webauthn_challenges WHERE identifier=$1 AND expires_at > NOW() LIMIT 1',
+      [phone]
+    );
+    if (!challengeRes.rows[0])
+      return res.status(400).json({ success: false, message: 'Challenge expired. Try again.' });
+    var expectedChallenge = challengeRes.rows[0].challenge;
+
+    var rawId  = assertion.rawId || assertion.id;
+    var credId = Buffer.from(rawId, 'base64url').toString('base64url');
+    var credRes = await pool.query(
+      'SELECT * FROM public.passkeys WHERE credential_id=$1 LIMIT 1', [credId]
+    );
+    if (!credRes.rows[0])
+      return res.status(404).json({ success: false, message: 'Passkey not found' });
+
+    var storedCred = credRes.rows[0];
+
+    var verification = await verifyAuthenticationResponse({
+      response:          assertion,
+      expectedChallenge: expectedChallenge,
+      expectedOrigin:    ORIGIN,
+      expectedRPID:      RP_ID,
+      authenticator: {
+        credentialPublicKey: storedCred.public_key,
+        credentialID:        Buffer.from(storedCred.credential_id, 'base64url'),
+        counter:             parseInt(storedCred.counter),
+      },
+      requireUserVerification: false,
+    });
+
+    if (!verification.verified)
+      return res.status(400).json({ success: false, message: 'Biometric verification failed' });
+
+    await pool.query(
+      'UPDATE public.passkeys SET counter=$1, last_used_at=NOW() WHERE id=$2',
+      [verification.authenticationInfo.newCounter, storedCred.id]
+    );
+    await pool.query('DELETE FROM public.webauthn_challenges WHERE identifier=$1', [phone]);
+
+    var userRes2, table2;
+    if (role === 'DRIVER') {
+      table2   = 'drivers';
+      userRes2 = await pool.query(
+        "SELECT *, 'DRIVER' as role FROM public.drivers WHERE id=$1 LIMIT 1", [storedCred.user_id]
+      );
+    } else {
+      table2   = 'owners';
+      userRes2 = await pool.query(
+        "SELECT *, 'OWNER' as role FROM public.owners WHERE id=$1 LIMIT 1", [storedCred.user_id]
+      );
+    }
+    var user = userRes2.rows[0];
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (user.status === 'INACTIVE')
+      return res.status(403).json({ success: false, message: 'Account deactivated' });
+
+    var crypto       = require('crypto');
+    var sessionToken = crypto.randomBytes(32).toString('hex');
+    await pool.query('UPDATE public.' + table2 + ' SET session_token=$1 WHERE id=$2', [sessionToken, user.id]);
+
+    var token = generateToken({
+      id: user.id, phone_number: user.mobile_number,
+      role: user.role, owner_id: user.owner_id || null,
+      session_token: sessionToken
+    });
+
+    res.json({
+      success: true, token: token,
+      user: {
+        id: user.id, full_name: user.full_name,
+        mobile_number: user.mobile_number, role: user.role,
+        owner_id: user.owner_id || null,
+        owner_code: user.owner_code || null,
+        driver_code: user.driver_code || null,
+      }
+    });
+  } catch (err) {
+    console.error('passkey auth-verify error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PIN AUTH
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// POST /api/auth/login-pin  — Body: { phone_number, pin, role }
+// Primary login flow. Returns JWT same shape as verify-otp.
+router.post('/login-pin', async (req, res) => {
+  var phone = (req.body.phone_number || '').trim();
+  var pin   = (req.body.pin || '').trim();
+  var role  = (req.body.role || '').toUpperCase();
+  if (!phone || !pin || !role)
+    return res.status(400).json({ success: false, message: 'phone_number, pin and role required' });
+
+  try {
+    var userRes;
+    if (role === 'DRIVER')
+      userRes = await pool.query("SELECT *, 'DRIVER' as role FROM public.drivers WHERE mobile_number=$1 LIMIT 1", [phone]);
+    else
+      userRes = await pool.query("SELECT *, 'OWNER' as role FROM public.owners WHERE mobile_number=$1 LIMIT 1", [phone]);
+
+    var user = userRes.rows[0];
+    if (!user) return res.status(404).json({ success: false, message: 'No account found for this number' });
+    if (user.status === 'INACTIVE') return res.status(403).json({ success: false, message: 'Account deactivated. Contact admin.' });
+    if (!user.pin_hash) return res.status(400).json({ success: false, message: 'PIN not set yet. Contact admin.' });
+
+    var valid = await bcrypt.compare(pin, user.pin_hash);
+    if (!valid) return res.status(401).json({ success: false, message: 'Incorrect PIN' });
+
+    var table = role === 'DRIVER' ? 'drivers' : 'owners';
+    var sessionToken = require('crypto').randomBytes(32).toString('hex');
+    await pool.query('UPDATE public.' + table + ' SET session_token=$1 WHERE id=$2', [sessionToken, user.id]);
+
+    var token = generateToken({
+      id: user.id, phone_number: user.mobile_number,
+      role: user.role, owner_id: user.owner_id || null,
+      session_token: sessionToken
+    });
+
+    res.json({
+      success: true, token: token,
+      pin_must_change: !!user.pin_must_change,
+      user: {
+        id: user.id, full_name: user.full_name,
+        mobile_number: user.mobile_number, role: user.role,
+        owner_id: user.owner_id || null,
+        owner_code: user.owner_code || null,
+        driver_code: user.driver_code || null,
+      }
+    });
+  } catch (err) {
+    console.error('login-pin error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/set-pin  — Requires JWT. Body: { current_pin (optional for first set), new_pin }
+router.post('/set-pin', verifyToken, async (req, res) => {
+  var currentPin = (req.body.current_pin || '').trim();
+  var newPin     = (req.body.new_pin || '').trim();
+  if (!newPin || newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin))
+    return res.status(400).json({ success: false, message: 'PIN must be 4-6 digits' });
+
+  try {
+    var userId = req.user.id;
+    var role   = req.user.role;
+    var table  = role === 'DRIVER' ? 'drivers' : 'owners';
+
+    var userRes = await pool.query('SELECT pin_hash, pin_must_change FROM public.' + table + ' WHERE id=$1', [userId]);
+    var user = userRes.rows[0];
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // If they already have a PIN, verify current before changing
+    if (user.pin_hash && !user.pin_must_change) {
+      if (!currentPin) return res.status(400).json({ success: false, message: 'current_pin required' });
+      var valid = await bcrypt.compare(currentPin, user.pin_hash);
+      if (!valid) return res.status(401).json({ success: false, message: 'Current PIN is incorrect' });
+    }
+
+    var hash = await bcrypt.hash(newPin, 10);
+    await pool.query(
+      'UPDATE public.' + table + ' SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=false WHERE id=$2',
+      [hash, userId]
+    );
+    res.json({ success: true, message: 'PIN updated' });
+  } catch (err) {
+    console.error('set-pin error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/forgot-pin  — Body: { phone_number, role }
+// Sends OTP via existing send-otp flow so user can reset PIN
+router.post('/forgot-pin', async (req, res) => {
+  var phone = (req.body.phone_number || '').trim();
+  var role  = (req.body.role || '').toUpperCase();
+  if (!phone || !role)
+    return res.status(400).json({ success: false, message: 'phone_number and role required' });
+
+  try {
+    var table = role === 'DRIVER' ? 'drivers' : 'owners';
+    var userRes = await pool.query('SELECT id FROM public.' + table + ' WHERE mobile_number=$1 LIMIT 1', [phone]);
+    if (!userRes.rows[0]) return res.status(404).json({ success: false, message: 'No account found' });
+
+    // Reuse existing OTP send logic
+    var otp = Math.floor(100000 + Math.random() * 900000).toString();
+    var otpHash = await bcrypt.hash(otp, 10);
+    await pool.query(
+      'INSERT INTO otps (phone_number, otp, expires_at) VALUES ($1,$2,NOW()+INTERVAL'10 minutes') ON CONFLICT (phone_number) DO UPDATE SET otp=$2, expires_at=NOW()+INTERVAL'10 minutes'',
+      [phone, otpHash]
+    );
+
+    // Send via Twilio (or dev bypass)
+    var devBypass = process.env.DEV_BYPASS_OTP === 'true';
+    if (!devBypass) {
+      var client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+      await client.messages.create({
+        from: 'whatsapp:' + process.env.TWILIO_WHATSAPP_FROM,
+        to:   'whatsapp:+91' + phone,
+        body: 'Your MobilityGrid PIN reset OTP is: ' + otp + '. Valid for 10 minutes.'
+      });
+      res.json({ success: true, message: 'OTP sent via WhatsApp' });
+    } else {
+      res.json({ success: true, message: 'OTP sent', otp: otp });
+    }
+  } catch (err) {
+    console.error('forgot-pin error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/reset-pin  — Body: { phone_number, role, otp, new_pin }
+router.post('/reset-pin', async (req, res) => {
+  var phone  = (req.body.phone_number || '').trim();
+  var role   = (req.body.role || '').toUpperCase();
+  var otp    = (req.body.otp || '').trim();
+  var newPin = (req.body.new_pin || '').trim();
+  if (!phone || !role || !otp || !newPin)
+    return res.status(400).json({ success: false, message: 'phone_number, role, otp and new_pin required' });
+  if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin))
+    return res.status(400).json({ success: false, message: 'PIN must be 4-6 digits' });
+
+  try {
+    // Verify OTP
+    var isDevBypass = process.env.DEV_BYPASS_OTP === 'true' && otp === '000000';
+    if (!isDevBypass) {
+      var otpRes = await pool.query(
+        'SELECT * FROM otps WHERE phone_number=$1 AND expires_at > NOW() LIMIT 1', [phone]
+      );
+      var validHash = otpRes.rows[0] && await bcrypt.compare(otp, otpRes.rows[0].otp);
+      if (!validHash) return res.status(400).json({ success: false, message: 'OTP invalid or expired' });
+      await pool.query('DELETE FROM otps WHERE phone_number=$1', [phone]);
+    }
+
+    var table  = role === 'DRIVER' ? 'drivers' : 'owners';
+    var pinHash = await bcrypt.hash(newPin, 10);
+    var upd = await pool.query(
+      'UPDATE public.' + table + ' SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=false WHERE mobile_number=$2 RETURNING id',
+      [pinHash, phone]
+    );
+    if (!upd.rows[0]) return res.status(404).json({ success: false, message: 'Account not found' });
+
+    res.json({ success: true, message: 'PIN reset successfully. You can now login.' });
+  } catch (err) {
+    console.error('reset-pin error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

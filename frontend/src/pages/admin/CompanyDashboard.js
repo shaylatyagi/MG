@@ -2488,7 +2488,191 @@ const NAV_ICONS = {
   transactions: ['M8 3H5a2 2 0 0 0-2 2v3', 'M21 8V5a2 2 0 0 0-2-2h-3', 'M3 16v3a2 2 0 0 0 2 2h3', 'M16 21h3a2 2 0 0 0 2-2v-3', 'M7 12h10', 'M12 7l5 5-5 5'],
   chat:         ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
   audit:        ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
+  pins:         ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'M12 8v4', 'M12 16h.01'],
 };
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PIN MANAGEMENT SECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+function PinManagementSection() {
+  const [status, setStatus] = React.useState(null);
+  const [generating, setGenerating] = React.useState(false);
+  const [pins, setPins] = React.useState([]);       // plain-text list from last generate
+  const [resetTarget, setResetTarget] = React.useState(null); // { user_id, role, name }
+  const [resetting, setResetting] = React.useState(false);
+  const [resetResult, setResetResult] = React.useState(null); // { pin, name, phone }
+  const [msg, setMsg] = React.useState('');
+
+  React.useEffect(function() { loadStatus(); }, []);
+
+  function loadStatus() {
+    api('/api/admin/pin-status')
+      .then(function(d) { if (d.success) setStatus(d); })
+      .catch(function() {});
+  }
+
+  async function generatePins() {
+    setGenerating(true); setMsg(''); setPins([]);
+    try {
+      var d = await api('/api/admin/generate-pins', { method: 'POST' });
+      if (d.success) {
+        setPins(d.pins);
+        setMsg(d.count === 0
+          ? 'All users already have PINs.'
+          : d.count + ' PINs generated. Download the list below.');
+        loadStatus();
+      } else { setMsg(d.message || 'Failed'); }
+    } catch { setMsg('Network error'); }
+    setGenerating(false);
+  }
+
+  function downloadCSV() {
+    var header = 'Role,Name,Phone,Code,PIN';
+    var rows = pins.map(function(p) {
+      return [p.role, p.name, p.phone, p.code || '', p.pin].join(',');
+    });
+    var csv = [header].concat(rows).join('\n');
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.download = 'mg_initial_pins.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function resetPin(userId, role) {
+    setResetting(true); setResetResult(null);
+    try {
+      var d = await api('/api/admin/reset-pin', { method: 'POST', body: JSON.stringify({ user_id: userId, role: role }) });
+      if (d.success) setResetResult(d);
+      else setMsg('Reset failed: ' + (d.message || ''));
+    } catch { setMsg('Network error'); }
+    setResetting(false);
+    setResetTarget(null);
+  }
+
+  return (
+    <div className="p-4 md:p-6 space-y-5">
+      <div>
+        <h2 className="text-xl font-black text-slate-900">PIN Management</h2>
+        <p className="text-sm text-slate-500 mt-1">Generate and distribute initial PINs to owners and drivers. They set their own PIN on first login.</p>
+      </div>
+
+      {/* Status cards */}
+      {status && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Owners with PIN',    val: status.owners_with_pin,    color: 'emerald' },
+            { label: 'Owners without PIN', val: status.owners_without_pin, color: 'amber'   },
+            { label: 'Drivers with PIN',   val: status.drivers_with_pin,   color: 'emerald' },
+            { label: 'Drivers without PIN',val: status.drivers_without_pin,color: 'amber'   },
+          ].map(function(c) {
+            return (
+              <div key={c.label} className={'bg-' + c.color + '-50 border border-' + c.color + '-200 rounded-2xl p-4 text-center'}>
+                <p className={'text-2xl font-black text-' + c.color + '-700'}>{c.val}</p>
+                <p className={'text-xs font-semibold text-' + c.color + '-600 mt-1'}>{c.label}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Generate button */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+        <div>
+          <h3 className="font-black text-slate-800">Generate Initial PINs</h3>
+          <p className="text-xs text-slate-500 mt-1">Creates a random 6-digit PIN for every owner and driver that doesn't have one yet. Download the list and share with them.</p>
+        </div>
+        <button onClick={generatePins} disabled={generating}
+          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
+          {generating ? '⏳ Generating…' : '🔑 Generate PINs for new users'}
+        </button>
+        {msg && (
+          <div className={'text-sm font-semibold px-4 py-3 rounded-xl ' + (pins.length > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')}>
+            {msg}
+          </div>
+        )}
+        {pins.length > 0 && (
+          <div className="space-y-3">
+            <button onClick={downloadCSV}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-black">
+              ⬇️ Download PIN List (CSV)
+            </button>
+            <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 sticky top-0">
+                  <tr>
+                    {['Role','Name','Phone','Code','PIN'].map(function(h) {
+                      return <th key={h} className="px-3 py-2 text-left font-black text-slate-600">{h}</th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pins.map(function(p, i) {
+                    return (
+                      <tr key={i} className="border-t border-slate-100">
+                        <td className="px-3 py-2">
+                          <span className={'px-2 py-0.5 rounded-full text-[10px] font-black ' + (p.role === 'OWNER' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700')}>
+                            {p.role}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-medium text-slate-800">{p.name}</td>
+                        <td className="px-3 py-2 font-mono text-slate-600">{p.phone}</td>
+                        <td className="px-3 py-2 text-slate-500">{p.code}</td>
+                        <td className="px-3 py-2">
+                          <span className="font-mono font-black text-indigo-700 text-sm tracking-widest">{p.pin}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-slate-400">⚠️ Save this file now — PINs cannot be retrieved after you close this page.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Reset individual PIN */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+        <div>
+          <h3 className="font-black text-slate-800">Reset a User's PIN</h3>
+          <p className="text-xs text-slate-500 mt-1">Enter a user ID and role to generate a new PIN for them. Give them the new PIN — they'll be asked to change it on next login.</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            type="number"
+            placeholder="User ID"
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm w-28 focus:outline-none focus:border-indigo-400"
+            value={resetTarget ? resetTarget.user_id : ''}
+            onChange={function(e) { setResetTarget(function(t) { return Object.assign({}, t, { user_id: e.target.value }); }); }}
+          />
+          <select
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            value={resetTarget ? resetTarget.role : 'OWNER'}
+            onChange={function(e) { setResetTarget(function(t) { return Object.assign({}, t, { role: e.target.value }); }); }}
+          >
+            <option value="OWNER">Owner</option>
+            <option value="DRIVER">Driver</option>
+          </select>
+          <button
+            onClick={function() { if (resetTarget && resetTarget.user_id) resetPin(resetTarget.user_id, resetTarget.role || 'OWNER'); }}
+            disabled={resetting || !resetTarget || !resetTarget.user_id}
+            className="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-black disabled:opacity-50">
+            {resetting ? 'Resetting…' : '🔄 Reset PIN'}
+          </button>
+        </div>
+        {resetResult && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+            <p className="text-sm font-black text-emerald-700">✅ PIN reset for {resetResult.name} ({resetResult.phone})</p>
+            <p className="text-sm mt-1">New PIN: <span className="font-mono font-black text-indigo-700 tracking-widest text-lg">{resetResult.pin}</span></p>
+            <p className="text-[11px] text-slate-400 mt-2">Share this PIN with the user — it won't be shown again.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
@@ -2509,6 +2693,7 @@ function AdminPanelInner() {
     { key: 'transactions', label: 'Transactions',   icon: 'transactions' },
     { key: 'chat',         label: 'Chat',           icon: 'chat' },
     { key: 'audit',        label: 'Audit Log',      icon: 'audit' },
+    { key: 'pins',         label: 'PIN Management', icon: 'pins' },
   ];
 
   const doLogout = () => { clearToken(); window.location.href = '/login'; };
@@ -2688,6 +2873,7 @@ function AdminPanelInner() {
           {tab === 'transactions' && <Transactions />}
           {tab === 'chat'         && <ChatViewer />}
           {tab === 'audit'        && <AuditLog />}
+          {tab === 'pins'         && <PinManagementSection />}
         </div>
       </main>
 

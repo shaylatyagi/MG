@@ -1188,4 +1188,100 @@ router.put('/document-approvals/:id/reject', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN PIN MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// POST /api/admin/generate-pins
+// Generates random 6-digit PINs for all owners/drivers that don't have one yet.
+// Returns the plain-text PINs (only time they're visible) for admin to export.
+router.post('/generate-pins', verifyAdmin, async (req, res) => {
+  var bcrypt = require('bcryptjs');
+  try {
+    // Fetch all owners without a PIN
+    var ownersRes = await pool.query(
+      "SELECT id, full_name, mobile_number, owner_code FROM public.owners WHERE pin_hash IS NULL AND status != 'INACTIVE' ORDER BY id"
+    );
+    // Fetch all drivers without a PIN
+    var driversRes = await pool.query(
+      "SELECT id, full_name, mobile_number, driver_code FROM public.drivers WHERE pin_hash IS NULL AND status != 'INACTIVE' ORDER BY id"
+    );
+
+    var generated = [];
+
+    for (var o of ownersRes.rows) {
+      var pin = String(Math.floor(100000 + Math.random() * 900000));
+      var hash = await bcrypt.hash(pin, 10);
+      await pool.query(
+        'UPDATE public.owners SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true WHERE id=$2',
+        [hash, o.id]
+      );
+      generated.push({ role: 'OWNER', name: o.full_name, phone: o.mobile_number, code: o.owner_code, pin: pin });
+    }
+
+    for (var d of driversRes.rows) {
+      var pin = String(Math.floor(100000 + Math.random() * 900000));
+      var hash = await bcrypt.hash(pin, 10);
+      await pool.query(
+        'UPDATE public.drivers SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true WHERE id=$2',
+        [hash, d.id]
+      );
+      generated.push({ role: 'DRIVER', name: d.full_name, phone: d.mobile_number, code: d.driver_code, pin: pin });
+    }
+
+    res.json({ success: true, count: generated.length, pins: generated });
+  } catch (err) {
+    console.error('generate-pins error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/admin/reset-pin  — Body: { user_id, role }
+// Resets a single user's PIN and returns the new plain-text PIN.
+router.post('/reset-pin', verifyAdmin, async (req, res) => {
+  var bcrypt = require('bcryptjs');
+  var userId = parseInt(req.body.user_id);
+  var role   = (req.body.role || '').toUpperCase();
+  if (!userId || !role) return res.status(400).json({ success: false, message: 'user_id and role required' });
+
+  try {
+    var table   = role === 'DRIVER' ? 'drivers' : 'owners';
+    var nameCol = 'full_name';
+    var pin     = String(Math.floor(100000 + Math.random() * 900000));
+    var hash    = await bcrypt.hash(pin, 10);
+    var upd = await pool.query(
+      'UPDATE public.' + table + ' SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=true WHERE id=$2 RETURNING ' + nameCol + ', mobile_number',
+      [hash, userId]
+    );
+    if (!upd.rows[0]) return res.status(404).json({ success: false, message: 'User not found' });
+
+    res.json({
+      success: true,
+      pin: pin,
+      name: upd.rows[0][nameCol],
+      phone: upd.rows[0].mobile_number,
+    });
+  } catch (err) {
+    console.error('admin reset-pin error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/admin/pin-status
+// Returns counts of owners/drivers with and without PINs set.
+router.get('/pin-status', verifyAdmin, async (req, res) => {
+  try {
+    var r = await pool.query(
+      "SELECT " +
+      "  (SELECT COUNT(*) FROM public.owners  WHERE pin_hash IS NOT NULL) AS owners_with_pin," +
+      "  (SELECT COUNT(*) FROM public.owners  WHERE pin_hash IS NULL AND status != 'INACTIVE') AS owners_without_pin," +
+      "  (SELECT COUNT(*) FROM public.drivers WHERE pin_hash IS NOT NULL) AS drivers_with_pin," +
+      "  (SELECT COUNT(*) FROM public.drivers WHERE pin_hash IS NULL AND status != 'INACTIVE') AS drivers_without_pin"
+    );
+    res.json({ success: true, ...r.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
