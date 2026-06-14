@@ -10,7 +10,25 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MobilityGrid" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" id="mg-manifest" />
+    <script>
+      // Switch manifest based on role (driver gets green manifest)
+      (function() {
+        var path = window.location.pathname + window.location.search;
+        var isDriver = path.includes('role=driver') || path.includes('/driver/');
+        var stored = '';
+        try { stored = localStorage.getItem('user'); } catch(e) {}
+        if (!isDriver && stored) {
+          try { var u = JSON.parse(stored); isDriver = u.role === 'DRIVER'; } catch(e) {}
+        }
+        if (isDriver) {
+          var el = document.getElementById('mg-manifest');
+          if (el) el.setAttribute('href', '/driver-manifest.json');
+          var tc = document.querySelector('meta[name="theme-color"]');
+          if (tc) tc.setAttribute('content', '#16a34a');
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
     <title>MobilityGrid</title>

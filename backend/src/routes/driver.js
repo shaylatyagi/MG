@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../middleware/auth.middleware');
+const { sendSOS } = require('../services/fcm');
 
 // ==================== EXISTING ROUTE ====================
 router.post('/profile', verifyToken, async (req, res) => {
@@ -346,6 +347,10 @@ router.post('/sos', verifyToken, async (req, res) => {
        VALUES ($1, 'owner', 'SOS', $2, $3, NOW())`,
       [ownerId, `🚨 SOS from ${driverName}`, body]
     ).catch(err => console.error('SOS db notification failed:', err.message));
+
+    // FCM push — high priority, bypasses silent mode on Android
+    sendSOS(pool, ownerId, 'owner', `🚨 SOS from ${driverName}`, body)
+      .catch(err => console.error('SOS FCM failed:', err.message));
 
     res.json({
       success: true,

@@ -62,15 +62,35 @@ async function _sendPush(pool, tokens, title, body, data = {}) {
     Object.entries(data).map(([k, v]) => [k, String(v)])
   );
 
+  const isSOS = stringData.type === 'SOS';
   const response = await getMessaging(app).sendEachForMulticast({
     tokens,
     notification: { title, body },
     data:         stringData,
     webpush: {
-      notification: { title, body, icon: '/logo192.png', badge: '/badge72.png' },
-      fcmOptions:   { link: '/' },
+      notification: { title, body, icon: '/logo192.png', badge: '/badge72.png',
+        requireInteraction: isSOS, tag: isSOS ? 'sos-alert' : undefined,
+        vibrate: isSOS ? [500,200,500,200,500] : undefined },
+      fcmOptions: { link: isSOS ? '/owner/dashboard?tab=sos' : '/' },
+      headers: isSOS ? { Urgency: 'very-low', TTL: '0' } : {},
     },
-    android: { priority: 'high', notification: { channelId: 'mg_default' } },
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: isSOS ? 'mg_sos' : 'mg_default',
+        sound:     isSOS ? 'default' : 'default',
+        defaultSound: true,
+        notificationPriority: isSOS ? 'PRIORITY_MAX' : 'PRIORITY_DEFAULT',
+        visibility: 'PUBLIC',
+        vibrateTimingsMillis: isSOS ? [0, 500, 200, 500, 200, 500] : undefined,
+        lightSettings: isSOS ? { color: '#FF0000', lightOnDurationMillis: 300, lightOffDurationMillis: 300 } : undefined,
+      },
+      ttl: isSOS ? 60000 : 3600000,
+    },
+    apns: isSOS ? {
+      headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+      payload: { aps: { sound: 'default', 'interruption-level': 'time-sensitive', badge: 1 } },
+    } : undefined,
   });
 
   // Prune stale / invalid tokens
@@ -92,4 +112,11 @@ async function _sendPush(pool, tokens, title, body, data = {}) {
   }
 }
 
-module.exports = { sendToUser };
+/**
+ * Send high-priority SOS notification — bypasses normal priority limits.
+ */
+async function sendSOS(pool, userId, userRole, title, body) {
+  return sendToUser(pool, userId, userRole, title, body, { type: 'SOS' });
+}
+
+module.exports = { sendToUser, sendSOS };

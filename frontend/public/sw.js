@@ -40,14 +40,19 @@ self.addEventListener('fetch', function(e) {
 self.addEventListener('push', function(e) {
   var data = {};
   try { data = e.data.json(); } catch(err) { data = { title: 'MobilityGrid', body: e.data ? e.data.text() : 'New notification' }; }
+  var isSOS = (data.data && data.data.type === 'SOS') || (data.title && data.title.includes('SOS'));
   e.waitUntil(
     self.registration.showNotification(data.title || 'MobilityGrid', {
       body: data.body || '',
-      icon: '/icon-192.png',
+      icon: isSOS ? '/icon-driver-192.png' : '/icon-192.png',
       badge: '/icon-192.png',
-      tag: data.tag || 'mg-notification',
-      data: data.url || '/',
-      vibrate: [200, 100, 200]
+      tag: isSOS ? 'sos-alert' : (data.tag || 'mg-notification'),
+      data: isSOS ? '/owner/dashboard?tab=sos' : (data.url || '/'),
+      vibrate: isSOS ? [500, 200, 500, 200, 500, 200, 500] : [200, 100, 200],
+      requireInteraction: isSOS,
+      silent: false,
+      renotify: isSOS,
+      actions: isSOS ? [{ action: 'view', title: 'View Location' }] : []
     })
   );
 });
