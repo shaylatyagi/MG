@@ -314,11 +314,8 @@ function DocumentsSection({ userType, userId }) {
 
 // ── LOGIN PAGE ─────────────────────────────────────────────────────────────────
 function LoginPage({ onLogin }) {
-  const [step, setStep]         = useState('login'); // 'login' | 'forgot' | 'otp'
   const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
-  const [forgotPhone, setForgotPhone] = useState('');
-  const [otp, setOtp]           = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -336,115 +333,128 @@ function LoginPage({ onLogin }) {
     finally { setLoading(false); }
   };
 
-  const sendOtp = async (e) => {
-    e.preventDefault(); setError(''); setLoading(true);
-    try {
-      await api('/api/auth/admin-send-otp', {
-        method: 'POST',
-        body: JSON.stringify({ phone_number: forgotPhone, admin_secret: '' }),
-      });
-      setStep('otp');
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
-  };
-
-  const verifyOtp = async (e) => {
-    e.preventDefault(); setError(''); setLoading(true);
-    try {
-      const data = await api('/api/auth/admin-verify-otp', {
-        method: 'POST',
-        body: JSON.stringify({ phone_number: forgotPhone, otp, admin_secret: '' }),
-      });
-      setToken(data.token);
-      onLogin();
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
-  };
+  const inputCls = "w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition";
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-indigo-600 rounded-xl mx-auto mb-4 flex items-center justify-center">
-            <span className="text-white text-xl font-bold">M</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">MobilityGrid</h1>
-          <p className="text-gray-500 text-sm mt-1">Platform Admin Access</p>
-        </div>
+    <div style={{
+      minHeight:'100vh', background:'#030712',
+      display:'flex', alignItems:'stretch',
+      fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
+    }}>
+      {/* ── Left panel — branding ── */}
+      <div style={{
+        flex:'0 0 45%', background:'linear-gradient(135deg,#1e1b4b 0%,#0f172a 60%,#0c1222 100%)',
+        display:'flex', flexDirection:'column', justifyContent:'space-between',
+        padding:'48px', borderRight:'1px solid rgba(255,255,255,0.06)',
+        position:'relative', overflow:'hidden'
+      }} className="hidden lg:flex">
+        {/* Ambient glow */}
+        <div style={{position:'absolute',top:'-80px',left:'-80px',width:320,height:320,borderRadius:'50%',background:'radial-gradient(circle,rgba(99,102,241,0.15) 0%,transparent 70%)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',bottom:'-60px',right:'-60px',width:240,height:240,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,0.1) 0%,transparent 70%)',pointerEvents:'none'}}/>
 
-        {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
-
-        {step === 'login' && (
-          <form onSubmit={login} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-              <input type="tel" value={phone} autoFocus
-                onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
-                required placeholder="10-digit number"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
+        {/* Logo */}
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:40,height:40,borderRadius:12,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 24px rgba(99,102,241,0.4)'}}>
+              <span style={{color:'white',fontWeight:900,fontSize:18}}>M</span>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <div className="relative">
+              <p style={{color:'white',fontWeight:700,fontSize:16,letterSpacing:'-0.02em'}}>MobilityGrid</p>
+              <p style={{color:'rgba(255,255,255,0.35)',fontSize:11,fontWeight:500,marginTop:1}}>by PayYantra</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Center copy */}
+        <div>
+          <div style={{display:'inline-flex',alignItems:'center',gap:6,background:'rgba(99,102,241,0.15)',border:'1px solid rgba(99,102,241,0.3)',borderRadius:20,padding:'4px 12px',marginBottom:24}}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:'#6366f1',display:'inline-block'}}/>
+            <span style={{color:'#a5b4fc',fontSize:11,fontWeight:600,letterSpacing:'0.04em'}}>SUPER ADMIN CONSOLE</span>
+          </div>
+          <h1 style={{color:'white',fontSize:36,fontWeight:800,lineHeight:1.15,letterSpacing:'-0.03em',marginBottom:16}}>
+            Fleet operations,<br/><span style={{color:'#818cf8'}}>fully in control.</span>
+          </h1>
+          <p style={{color:'rgba(255,255,255,0.4)',fontSize:14,lineHeight:1.65,maxWidth:340}}>
+            Manage fleets, drivers, KYC, payments, and compliance across all companies on the MobilityGrid platform.
+          </p>
+
+          {/* Metrics strip */}
+          <div style={{display:'flex',gap:32,marginTop:40}}>
+            {[['Fleets','Multi-company'],['KYC','Automated'],['Payments','Real-time']].map(([val,label])=>(
+              <div key={val}>
+                <p style={{color:'white',fontWeight:700,fontSize:16}}>{val}</p>
+                <p style={{color:'rgba(255,255,255,0.35)',fontSize:11,marginTop:2}}>{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p style={{color:'rgba(255,255,255,0.2)',fontSize:11}}>© 2026 PayYantra · Confidential</p>
+      </div>
+
+      {/* ── Right panel — form ── */}
+      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'48px 24px'}}>
+        <div style={{width:'100%',maxWidth:400}}>
+
+          {/* Mobile logo (hidden on desktop) */}
+          <div className="lg:hidden" style={{display:'flex',alignItems:'center',gap:10,marginBottom:40}}>
+            <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <span style={{color:'white',fontWeight:900,fontSize:16}}>M</span>
+            </div>
+            <p style={{color:'white',fontWeight:700,fontSize:15}}>MobilityGrid Admin</p>
+          </div>
+
+          {/* Heading */}
+          <div style={{marginBottom:32}}>
+            <h2 style={{color:'white',fontWeight:700,fontSize:24,letterSpacing:'-0.02em',marginBottom:6}}>
+              Sign in to console
+            </h2>
+            <p style={{color:'rgba(255,255,255,0.35)',fontSize:13}}>Authorised personnel only.</p>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:10,padding:'10px 14px',color:'#f87171',fontSize:13,marginBottom:20}}>
+              {error}
+            </div>
+          )}
+
+          {/* Login form — phone + password only, no OTP self-service */}
+          <form onSubmit={login} style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div>
+              <label style={{display:'block',color:'rgba(255,255,255,0.5)',fontSize:12,fontWeight:500,marginBottom:8,letterSpacing:'0.02em'}}>PHONE NUMBER</label>
+              <input type="tel" value={phone} autoFocus
+                onChange={e => setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
+                required placeholder="10-digit mobile number"
+                className={inputCls} />
+            </div>
+            <div>
+              <label style={{display:'block',color:'rgba(255,255,255,0.5)',fontSize:12,fontWeight:500,marginBottom:8,letterSpacing:'0.02em'}}>PASSWORD</label>
+              <div style={{position:'relative'}}>
                 <input type={showPass ? 'text' : 'password'} value={password}
                   onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm pr-12" />
+                  className={inputCls} style={{paddingRight:56}} />
                 <button type="button" onClick={() => setShowPass(p => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">
+                  style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',color:'rgba(255,255,255,0.3)',fontSize:12,fontWeight:500,background:'none',border:'none',cursor:'pointer'}}>
                   {showPass ? 'Hide' : 'Show'}
                 </button>
               </div>
             </div>
-            <button type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
-              {loading ? 'Signing in…' : 'Sign In'}
-            </button>
-            <button type="button" onClick={() => { setStep('forgot'); setError(''); }}
-              className="w-full text-sm text-gray-500 hover:text-gray-700">
-              Forgot password? Use OTP
-            </button>
-          </form>
-        )}
-
-        {step === 'forgot' && (
-          <form onSubmit={sendOtp} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Phone</label>
-              <input type="tel" value={forgotPhone} autoFocus
-                onChange={e => setForgotPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
-                required placeholder="10-digit number"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" />
-            </div>
-            <button type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
-              {loading ? 'Sending…' : 'Send OTP'}
-            </button>
-            <button type="button" onClick={() => { setStep('login'); setError(''); }}
-              className="w-full text-sm text-gray-500 hover:text-gray-700">
-              ← Back to login
+            <button type="submit" disabled={loading} style={{
+              width:'100%',padding:'14px',marginTop:8,
+              background: loading ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+              color:'white',fontWeight:600,fontSize:14,borderRadius:12,border:'none',cursor:'pointer',
+              boxShadow: loading ? 'none' : '0 4px 16px rgba(99,102,241,0.35)',
+              transition:'all 0.2s'
+            }}>
+              {loading ? 'Signing in…' : 'Sign In →'}
             </button>
           </form>
-        )}
 
-        {step === 'otp' && (
-          <form onSubmit={verifyOtp} className="space-y-4">
-            <p className="text-sm text-gray-600 text-center">OTP sent to <strong>+91{forgotPhone}</strong></p>
-            <input type="text" value={otp}
-              onChange={e => setOtp(e.target.value)} required autoFocus
-              placeholder="6-digit OTP" maxLength={6}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-center text-2xl tracking-widest" />
-            <button type="submit" disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50">
-              {loading ? 'Verifying…' : 'Login'}
-            </button>
-            <button type="button" onClick={() => { setStep('forgot'); setOtp(''); }}
-              className="w-full text-sm text-gray-500 hover:text-gray-700">
-              ← Resend OTP
-            </button>
-          </form>
-        )}
-
-        <p className="text-center text-xs text-gray-400 mt-6">MobilityGrid by PayYantra · Confidential</p>
+          <p style={{color:'rgba(255,255,255,0.15)',fontSize:11,marginTop:40,textAlign:'center'}}>
+            MobilityGrid Admin Console · PayYantra · Confidential
+          </p>
+        </div>
       </div>
     </div>
   );

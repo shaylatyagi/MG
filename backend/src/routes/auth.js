@@ -248,14 +248,20 @@ router.post('/admin-verify-otp', async (req, res) => {
 });
 
 // POST /api/auth/admin-login  — Body: { phone_number, password }
+// Security: phone_number must match ADMIN_PHONE env var AND password must match ADMIN_PASSWORD.
+// Both checks always run (no short-circuit) so attacker can't enumerate which field is wrong.
 router.post('/admin-login', async (req, res) => {
   const { phone_number, password } = req.body;
   if (!phone_number || !password)
     return res.status(400).json({ success: false, message: 'phone_number and password required' });
-  const expectedPw = process.env.ADMIN_PASSWORD;
-  if (!expectedPw)
-    return res.status(500).json({ success: false, message: 'Server misconfiguration: ADMIN_PASSWORD not set' });
-  if (password !== expectedPw)
+  const expectedPw   = process.env.ADMIN_PASSWORD;
+  const expectedPhone = process.env.ADMIN_PHONE;
+  if (!expectedPw || !expectedPhone)
+    return res.status(500).json({ success: false, message: 'Server misconfiguration' });
+  // Always compare both — same generic error either way (no enumeration)
+  const phoneOk = phone_number === expectedPhone;
+  const passOk  = password === expectedPw;
+  if (!phoneOk || !passOk)
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
   const token = jwt.sign({ id: 'admin', role: 'admin', phone: phone_number }, process.env.JWT_SECRET, { expiresIn: '30d' });
   res.json({ success: true, token, user: { role: 'admin', phone: phone_number } });
