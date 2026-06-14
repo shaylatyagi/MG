@@ -3306,6 +3306,7 @@ const ProfileTab = () => {
     const [loading, setLoading] = React.useState(true);
     const [lastRefresh, setLastRefresh] = React.useState(null);
     const [apiError, setApiError] = React.useState(null);
+    const [mapDriver, setMapDriver] = React.useState(null); // driver shown in in-app map modal
     const mapsKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     const fetchLocations = async () => {
@@ -3348,17 +3349,57 @@ const ProfileTab = () => {
       return `https://maps.googleapis.com/maps/api/staticmap?center=${center.last_lat},${center.last_lng}&zoom=13&size=400x220&${markers}&key=${mapsKey}`;
     };
 
-    const openAllOnMaps = () => {
-      if (!drivers.length) return;
-      if (drivers.length === 1) {
-        window.open(`https://maps.google.com/?q=${drivers[0].last_lat},${drivers[0].last_lng}`, '_blank');
-      } else {
-        const url = `https://maps.google.com/maps/dir/${drivers.map(d => `${d.last_lat},${d.last_lng}`).join('/')}`;
-        window.open(url, '_blank');
-      }
-    };
+    // Embed URL for in-app interactive map (uses Maps Embed API)
+    const embedUrl = (d) => mapsKey
+      ? `https://www.google.com/maps/embed/v1/view?key=${mapsKey}&center=${d.last_lat},${d.last_lng}&zoom=16&maptype=roadmap`
+      : null;
 
     return (
+      <>
+      {/* ── In-app map modal ── */}
+      {mapDriver && (
+        <div className="absolute inset-0 z-[500] flex flex-col bg-slate-900">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-800 shrink-0">
+            <button onClick={() => setMapDriver(null)}
+              className="text-white font-black text-sm flex items-center gap-2">
+              ← Back
+            </button>
+            <div className="text-center">
+              <div className="text-white text-xs font-black">{mapDriver.full_name}</div>
+              <div className="text-slate-400 text-[9px]">Last seen {timeAgo(mapDriver.last_location_at)}</div>
+            </div>
+            <a href={`https://www.google.com/maps/dir/?api=1&destination=${mapDriver.last_lat},${mapDriver.last_lng}`}
+               target="_blank" rel="noreferrer"
+               className="text-indigo-300 text-[10px] font-black">
+              Directions ↗
+            </a>
+          </div>
+          {/* Map iframe */}
+          {embedUrl(mapDriver) ? (
+            <iframe
+              title="driver-location"
+              src={embedUrl(mapDriver)}
+              className="flex-1 w-full border-0"
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <span className="text-5xl">📍</span>
+              <span className="text-white font-black text-sm">{mapDriver.full_name}</span>
+              <span className="text-slate-400 text-xs">{mapDriver.last_lat}, {mapDriver.last_lng}</span>
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${mapDriver.last_lat},${mapDriver.last_lng}`}
+                 target="_blank" rel="noreferrer"
+                 className="bg-indigo-600 text-white font-black px-6 py-3 rounded-2xl text-sm mt-2">
+                Open in Google Maps
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="pb-4 space-y-3">
         {/* Header row */}
         <div className="flex items-center justify-between">
@@ -3374,7 +3415,7 @@ const ProfileTab = () => {
           </button>
         </div>
 
-        {/* Map image or fallback */}
+        {/* Overview static map */}
         {loading ? (
           <div className="bg-slate-100 rounded-2xl h-40 flex items-center justify-center text-xs text-slate-400 animate-pulse font-black">
             Fetching driver locations...
@@ -3393,21 +3434,19 @@ const ProfileTab = () => {
             <span className="text-[10px] text-slate-300">Drivers send GPS every 30s when assigned a vehicle</span>
           </div>
         ) : staticMapUrl(drivers) ? (
-          <div className="relative rounded-2xl overflow-hidden shadow-md">
+          <div className="relative rounded-2xl overflow-hidden shadow-md cursor-pointer"
+               onClick={() => setMapDriver(drivers[0])}>
             <img src={staticMapUrl(drivers)} alt="Driver locations" className="w-full object-cover" />
-            <button onClick={openAllOnMaps}
-              className="absolute bottom-2 right-2 bg-white text-indigo-700 text-[10px] font-black px-3 py-1.5 rounded-xl shadow flex items-center gap-1">
-              📍 Open in Maps
-            </button>
+            <div className="absolute inset-0 bg-black/10 flex items-end justify-end p-2">
+              <span className="bg-white text-indigo-700 text-[10px] font-black px-3 py-1.5 rounded-xl shadow">
+                Tap to view live map
+              </span>
+            </div>
           </div>
         ) : (
           <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl h-36 flex flex-col items-center justify-center gap-2 shadow-md">
             <span className="text-2xl">🗺️</span>
             <span className="text-white text-xs font-black">{drivers.length} driver{drivers.length > 1 ? 's' : ''} online</span>
-            <button onClick={openAllOnMaps}
-              className="bg-white text-indigo-700 text-[10px] font-black px-4 py-1.5 rounded-xl mt-1">
-              📍 View on Google Maps
-            </button>
           </div>
         )}
 
@@ -3424,13 +3463,13 @@ const ProfileTab = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-black text-slate-800 truncate">{d.full_name || 'Unknown Driver'}</div>
-                  <div className="text-[10px] text-slate-400 font-semibold">{d.vehicle_type || ''} {d.reg_number ? `• ${d.reg_number}` : ''}</div>
+                  <div className="text-[10px] text-slate-400 font-semibold">{d.vehicle_type || ''} {d.vehicle_number ? `• ${d.vehicle_number}` : ''}</div>
                   <div className="flex items-center gap-1 mt-0.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>
                     <span className="text-[9px] text-green-600 font-black">{timeAgo(d.last_location_at)}</span>
                   </div>
                 </div>
-                <button onClick={() => window.open(`https://maps.google.com/?q=${d.last_lat},${d.last_lng}`, '_blank')}
+                <button onClick={() => setMapDriver(d)}
                   className="shrink-0 bg-indigo-600 text-white text-[9px] font-black px-2.5 py-1.5 rounded-xl flex items-center gap-1">
                   📍 Map
                 </button>
@@ -3439,6 +3478,7 @@ const ProfileTab = () => {
           </div>
         )}
       </div>
+      </>
     );
   };
 
