@@ -85,6 +85,19 @@ export default function Login() {
     { type: 'admin',  name: 'Platform Admin', icon: <Shield size={20} />,   redirect: '/admin' },
   ];
 
+  // ── Auto-select role from URL param (?role=driver or ?role=owner) ──────────
+  useEffect(function() {
+    var params = new URLSearchParams(window.location.search);
+    var roleParam = params.get('role');
+    if (roleParam === 'driver') {
+      var driverRole = roles.find(function(r) { return r.type === 'driver'; });
+      if (driverRole) { setSelectedRole(driverRole); setStep('pin-login'); }
+    } else if (roleParam === 'owner') {
+      var ownerRole = roles.find(function(r) { return r.type === 'owner'; });
+      if (ownerRole) { setSelectedRole(ownerRole); setStep('pin-login'); }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Passkey check (silent, on phone change) ───────────────────────────────
   useEffect(function() {
     if (!selectedRole || selectedRole.type === 'admin') return;
