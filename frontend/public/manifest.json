@@ -21,11 +21,11 @@
   "categories": ["business", "productivity"],
   "screenshots": [
     {
-      "src": "icon-512.png",
-      "sizes": "512x512",
+      "src": "screenshot-owner.png",
+      "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "MobilityGrid Owner Dashboard"
+      "label": "MobilityGrid Fleet Owner Dashboard"
     }
   ]
 }

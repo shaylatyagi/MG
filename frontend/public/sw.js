@@ -1,63 +1,78 @@
-// MobilityGrid Service Worker
-// Handles offline caching + background sync for PWA/TWA
+// MobilityGrid Service Worker v2
+const CACHE_NAME = 'mg-v2';
+const STATIC = ['/', '/login', '/icon-192.png', '/icon-512.png', '/manifest.json'];
 
-const CACHE_NAME = 'mg-cache-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/login',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/manifest.json'
-];
-
-// Install: cache static assets
+// Install
 self.addEventListener('install', function(e) {
   self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(STATIC_ASSETS).catch(function() {});
+    caches.open(CACHE_NAME).then(function(c) { return c.addAll(STATIC).catch(function(){}); })
+  );
+});
+
+// Activate
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.filter(function(k){ return k !== CACHE_NAME; }).map(function(k){ return caches.delete(k); }));
+    }).then(function(){ return self.clients.claim(); })
+  );
+});
+
+// Fetch — network-first, cache fallback
+self.addEventListener('fetch', function(e) {
+  if (e.request.method !== 'GET') return;
+  if (e.request.url.includes('/api/') || e.request.url.includes('render.com') || e.request.url.includes('neon.tech')) return;
+  e.respondWith(
+    fetch(e.request).then(function(res) {
+      if (res && res.status === 200) {
+        var clone = res.clone();
+        caches.open(CACHE_NAME).then(function(c){ c.put(e.request, clone); });
+      }
+      return res;
+    }).catch(function() {
+      return caches.match(e.request).then(function(cached){ return cached || caches.match('/'); });
     })
   );
 });
 
-// Activate: clean old caches
-self.addEventListener('activate', function(e) {
+// Push Notifications
+self.addEventListener('push', function(e) {
+  var data = {};
+  try { data = e.data.json(); } catch(err) { data = { title: 'MobilityGrid', body: e.data ? e.data.text() : 'New notification' }; }
   e.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(
-        keys.filter(function(k) { return k !== CACHE_NAME; })
-            .map(function(k) { return caches.delete(k); })
-      );
-    }).then(function() { return self.clients.claim(); })
+    self.registration.showNotification(data.title || 'MobilityGrid', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: data.tag || 'mg-notification',
+      data: data.url || '/',
+      vibrate: [200, 100, 200]
+    })
   );
 });
 
-// Fetch: network-first for API, cache-first for assets
-self.addEventListener('fetch', function(e) {
-  var url = e.request.url;
-
-  // Skip non-GET and API requests (always network for API)
-  if (e.request.method !== 'GET') return;
-  if (url.includes('/api/')) return;
-  if (url.includes('render.com')) return;
-
-  e.respondWith(
-    fetch(e.request)
-      .then(function(res) {
-        // Cache successful responses for static assets
-        if (res && res.status === 200) {
-          var resClone = res.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(e.request, resClone);
-          });
-        }
-        return res;
-      })
-      .catch(function() {
-        // Offline fallback: serve from cache
-        return caches.match(e.request).then(function(cached) {
-          return cached || caches.match('/');
-        });
-      })
+// Notification click
+self.addEventListener('notificationclick', function(e) {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: 'window' }).then(function(list) {
+      for (var c of list) { if (c.url && 'focus' in c) return c.focus(); }
+      if (clients.openWindow) return clients.openWindow(e.notification.data || '/');
+    })
   );
+});
+
+// Background Sync
+self.addEventListener('sync', function(e) {
+  if (e.tag === 'mg-sync') {
+    e.waitUntil(Promise.resolve());
+  }
+});
+
+// Periodic Background Sync
+self.addEventListener('periodicsync', function(e) {
+  if (e.tag === 'mg-periodic') {
+    e.waitUntil(Promise.resolve());
+  }
 });

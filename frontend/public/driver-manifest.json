@@ -2,11 +2,13 @@
   "id": "/login?role=driver",
   "short_name": "MG Driver",
   "name": "MobilityGrid - Driver App",
-  "description": "Track trips, earnings, and manage your EV vehicle",
+  "description": "Track trips, earnings, and manage your EV vehicle with MobilityGrid",
   "icons": [
     { "src": "favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" },
-    { "src": "icon-driver-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icon-driver-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icon-driver-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-driver-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-driver-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-driver-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "start_url": "/login?role=driver",
   "display": "standalone",
@@ -19,8 +21,8 @@
   "categories": ["business", "productivity"],
   "screenshots": [
     {
-      "src": "icon-driver-512.png",
-      "sizes": "512x512",
+      "src": "screenshot-driver.png",
+      "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "MobilityGrid Driver Dashboard"
