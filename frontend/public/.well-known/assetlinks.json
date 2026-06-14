@@ -1,0 +1,18 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.mobilitygrid.owner",
+      "sha256_cert_fingerprints": ["7C:42:24:90:E3:99:A8:35:31:D4:5A:3C:FA:1F:76:6A:A4:C2:CA:EB:28:18:BB:08:03:46:00:C4:35:4A:33:9F"]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.mobilitygrid.driver",
+      "sha256_cert_fingerprints": ["7C:42:24:90:E3:99:A8:35:31:D4:5A:3C:FA:1F:76:6A:A4:C2:CA:EB:28:18:BB:08:03:46:00:C4:35:4A:33:9F"]
+    }
+  }
+]
