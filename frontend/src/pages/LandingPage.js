@@ -104,6 +104,7 @@ function LandingPage() {
             <a href="#gaps" className="nav-link">The Problem</a>
             <a href="#product" className="nav-link">Product</a>
             <a href="#how" className="nav-link">How it Works</a>
+            <a href="#pricing" className="nav-link">Pricing</a>
           </div>
           <div className="nav-actions">
             <a href="#signup" className="btn btn-primary btn-sm">Get Early Access</a>
@@ -630,6 +631,82 @@ function LandingPage() {
               </ul>
             </div>
           </div>
+        </div>
+      </section>
+
+
+      {/* ── PRICING SECTION ─────────────────────────────────────────────── */}
+      <section className="pricing-section" id="pricing">
+        <div className="container">
+          <p className="section-label" style={{ textAlign: 'center', marginBottom: '12px' }}>Simple Pricing</p>
+          <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '8px' }}>Start free. Scale when you're ready.</h2>
+          <p className="section-sub" style={{ textAlign: 'center', marginBottom: '48px', maxWidth: '520px', margin: '0 auto 48px' }}>
+            No hidden fees. No contracts. Pay only when your fleet grows.
+          </p>
+
+          <div className="pricing-grid">
+            {/* FREE */}
+            <div className="pricing-card">
+              <div className="pricing-badge">Free Forever</div>
+              <div className="pricing-price">₹0<span>/month</span></div>
+              <div className="pricing-desc">Perfect for small fleet owners getting started</div>
+              <ul className="pricing-features">
+                <li><span className="pf-check">✓</span> Owner account &amp; dashboard</li>
+                <li><span className="pf-check">✓</span> Up to 5 drivers</li>
+                <li><span className="pf-check">✓</span> Vehicle management</li>
+                <li><span className="pf-check">✓</span> KYC document collection</li>
+                <li><span className="pf-check">✓</span> SOS emergency alerts</li>
+                <li><span className="pf-check">✓</span> Basic earnings tracking</li>
+                <li><span className="pf-cross">✗</span> Bulk driver upload</li>
+                <li><span className="pf-cross">✗</span> Online payment collection</li>
+                <li><span className="pf-cross">✗</span> Advanced analytics</li>
+              </ul>
+              <a href="#signup" className="pricing-btn pricing-btn-outline">Get Started Free</a>
+            </div>
+
+            {/* GROWTH */}
+            <div className="pricing-card pricing-card-featured">
+              <div className="pricing-badge pricing-badge-featured">Most Popular</div>
+              <div className="pricing-price">₹100<span>/driver/month</span></div>
+              <div className="pricing-desc">For growing fleets that need more power</div>
+              <ul className="pricing-features">
+                <li><span className="pf-check">✓</span> Everything in Free</li>
+                <li><span className="pf-check">✓</span> Unlimited drivers</li>
+                <li><span className="pf-check">✓</span> Bulk CSV upload</li>
+                <li><span className="pf-check">✓</span> Online payment collection</li>
+                <li><span className="pf-check">✓</span> Advanced analytics &amp; reports</li>
+                <li><span className="pf-check">✓</span> Priority support</li>
+                <li><span className="pf-check">✓</span> Multi-company management</li>
+                <li><span className="pf-check">✓</span> Custom payment cycles</li>
+                <li><span className="pf-check">✓</span> Driver performance tracking</li>
+              </ul>
+              <div className="pricing-note">First 10 drivers — 50% off for 3 months</div>
+              <a href="#signup" className="pricing-btn pricing-btn-primary">Start Growing</a>
+            </div>
+
+            {/* ENTERPRISE */}
+            <div className="pricing-card">
+              <div className="pricing-badge">Enterprise</div>
+              <div className="pricing-price">Custom<span> pricing</span></div>
+              <div className="pricing-desc">For large fleets and aggregators</div>
+              <ul className="pricing-features">
+                <li><span className="pf-check">✓</span> Everything in Growth</li>
+                <li><span className="pf-check">✓</span> Dedicated account manager</li>
+                <li><span className="pf-check">✓</span> Custom integrations</li>
+                <li><span className="pf-check">✓</span> White-label option</li>
+                <li><span className="pf-check">✓</span> SLA guarantee</li>
+                <li><span className="pf-check">✓</span> On-site onboarding</li>
+                <li><span className="pf-check">✓</span> API access</li>
+                <li><span className="pf-check">✓</span> Custom reporting</li>
+                <li><span className="pf-check">✓</span> 24/7 support</li>
+              </ul>
+              <a href="mailto:hello@mobilitygrid.in" className="pricing-btn pricing-btn-outline">Contact Us</a>
+            </div>
+          </div>
+
+          <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#94a3b8' }}>
+            ₹25,000 one-time onboarding fee waived for early access partners · No credit card required for free plan
+          </p>
         </div>
       </section>
 
