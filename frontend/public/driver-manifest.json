@@ -103,5 +103,68 @@
   "launch_handler": {
     "client_mode": "focus-existing"
   },
-  "handle_links": "preferred"
+  "handle_links": "preferred",
+  "display_override": [
+    "window-controls-overlay",
+    "tabbed",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "file_handlers": [
+    {
+      "action": "/driver/dashboard",
+      "accept": {
+        "image/jpeg": [
+          ".jpg",
+          ".jpeg"
+        ],
+        "image/png": [
+          ".png"
+        ],
+        "application/pdf": [
+          ".pdf"
+        ]
+      }
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+mgdriver",
+      "url": "/driver/dashboard?q=%s"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "Driver Status",
+      "tag": "driver-status",
+      "ms_ac_template": "/widget/driver-ac-template.json",
+      "data": "/api/widget/driver-status",
+      "description": "Today's trips and earnings",
+      "screenshots": [
+        {
+          "src": "screenshot-driver.png",
+          "sizes": "1080x1920",
+          "label": "Driver Status"
+        }
+      ],
+      "icons": [
+        {
+          "src": "icon-driver-192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "auth": false,
+      "update": 1800
+    }
+  ],
+  "note_taking": {
+    "new_note_url": "/driver/dashboard?action=note"
+  },
+  "tab_strip": {
+    "home_tab_icon": {
+      "src": "icon-driver-192.png",
+      "sizes": "192x192"
+    }
+  }
 }

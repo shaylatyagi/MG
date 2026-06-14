@@ -106,5 +106,71 @@
   "handle_links": "preferred",
   "edge_side_panel": {
     "preferred_width": 400
+  },
+  "display_override": [
+    "window-controls-overlay",
+    "tabbed",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "file_handlers": [
+    {
+      "action": "/owner/dashboard",
+      "accept": {
+        "text/csv": [
+          ".csv"
+        ],
+        "application/pdf": [
+          ".pdf"
+        ],
+        "image/jpeg": [
+          ".jpg",
+          ".jpeg"
+        ],
+        "image/png": [
+          ".png"
+        ]
+      }
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+mg",
+      "url": "/owner/dashboard?q=%s"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "Fleet Status",
+      "tag": "fleet-status",
+      "ms_ac_template": "/widget/ac-template.json",
+      "data": "/api/widget/fleet-status",
+      "description": "Quick fleet overview widget",
+      "screenshots": [
+        {
+          "src": "screenshot-owner.png",
+          "sizes": "1080x1920",
+          "label": "Fleet Status"
+        }
+      ],
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "auth": false,
+      "update": 3600
+    }
+  ],
+  "note_taking": {
+    "new_note_url": "/owner/dashboard?action=note"
+  },
+  "tab_strip": {
+    "home_tab_icon": {
+      "src": "icon-192.png",
+      "sizes": "192x192"
+    }
   }
 }
