@@ -65,7 +65,7 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
     await pool.query(
       `INSERT INTO public.user_documents
          (user_id, user_type, doc_type, original_name, s3_key, file_size, mime_type, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'UPLOADED')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING')
        ON CONFLICT (user_id, user_type, doc_type)
        DO UPDATE SET
          original_name = EXCLUDED.original_name,
@@ -77,13 +77,13 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
       [uId, uType, doc_type, file.originalname, s3Key, file.size, file.mimetype]
     );
 
-    // Notify admin — fire-and-forget
+    // Notify admin with uploader's name — fire-and-forget
     pool.query(
       `INSERT INTO public.notifications (user_type, title, message, created_at)
        VALUES ('ADMIN', $1, $2, NOW())`,
       [
-        `📄 New Document: ${doc_type}`,
-        `${uType} ID ${uId} uploaded ${doc_type} — awaiting review`,
+        `📄 Document Uploaded: ${doc_type.replace(/_/g, ' ')}`,
+        `${uType === 'OWNER' ? 'Owner' : uType === 'DRIVER' ? 'Driver' : uType} (ID ${uId}) uploaded ${doc_type.replace(/_/g, ' ')} — awaiting review`,
       ]
     ).catch(() => {});
 

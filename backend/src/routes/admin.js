@@ -1117,7 +1117,7 @@ router.get('/document-approvals', async (req, res) => {
     const result = await pool.query(`
       SELECT
         ud.*,
-        COALESCE(d.name, o.full_name)                 AS user_name,
+        COALESCE(d.full_name, o.full_name)             AS user_name,
         COALESCE(d.mobile_number, o.mobile_number)    AS user_phone,
         c.company_name
       FROM public.user_documents ud
