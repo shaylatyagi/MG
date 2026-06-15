@@ -5221,10 +5221,11 @@ const ProfileTab = () => {
           </div>
         </div>
       </div>
-  
-      {/* ════════════════════════════════════════════════════════════
-          VEHICLE INSPECTION MODAL — 4-direction photos + AI compare
-          ════════════════════════════════════════════════════════════ */}
+    )}
+
+    {/* ════════════════════════════════════════════════════════════
+        VEHICLE INSPECTION MODAL — 4-direction photos + AI compare
+        ════════════════════════════════════════════════════════════ */}
       {showInspectionModal && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-end justify-center">
           <div className="bg-white w-full max-w-[412px] rounded-t-3xl overflow-y-auto"
