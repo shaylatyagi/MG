@@ -97,6 +97,8 @@ export default function DriverPWA() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   // Passkey one-time nudge
   const [showPasskeyNudge, setShowPasskeyNudge] = useState(false);
+  // Notification permission nudge
+  const [showNotifNudge, setShowNotifNudge] = useState(false);
   const [enrollingPasskey, setEnrollingPasskey] = useState(false);
   const [chatMsgs, setChatMsgs] = useState([]);
 
@@ -381,6 +383,13 @@ export default function DriverPWA() {
   };
 
   const confirmLogout = () => setShowLogoutConfirm(true);
+  // Notification nudge: show after 7s if not already dismissed
+  useEffect(() => {
+    if (localStorage.getItem('mg_notif_nudge_dismissed')) return;
+    if ('Notification' in window && Notification.permission === 'granted') return;
+    const t = setTimeout(() => setShowNotifNudge(true), 7000);
+    return () => clearTimeout(t);
+  }, []);
   // Passkey nudge: show once if driver has no passkey and hasn't been asked in 7 days
   useEffect(() => {
     const dismissed = localStorage.getItem('mg_passkey_nudge_dismissed');
@@ -426,6 +435,19 @@ export default function DriverPWA() {
   const dismissPasskeyNudge = () => {
     setShowPasskeyNudge(false);
     localStorage.setItem('mg_passkey_nudge_dismissed', (Date.now() + 7 * 24 * 3600 * 1000).toString());
+  };
+
+  const requestNotifPermission = async () => {
+    setShowNotifNudge(false);
+    localStorage.setItem('mg_notif_nudge_dismissed', '1');
+    if ('Notification' in window) {
+      await Notification.requestPermission();
+    }
+  };
+
+  const dismissNotifNudge = () => {
+    setShowNotifNudge(false);
+    localStorage.setItem('mg_notif_nudge_dismissed', '1');
   };
 
   const logout = async () => {
