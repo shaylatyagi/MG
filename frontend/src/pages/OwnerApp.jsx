@@ -1326,6 +1326,34 @@ return () => clearInterval(interval);
     setTimeout(() => setShowNotifNudge(true), 6000); // 6s after mount
   }, []);
 
+  // SOS alarm: service worker postMessage → play Web Audio alarm
+  useEffect(() => {
+    function playSOSAlarm() {
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        function beep(freq, startAt, dur) {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'square'; osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.7, ctx.currentTime + startAt);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startAt + dur);
+          osc.start(ctx.currentTime + startAt);
+          osc.stop(ctx.currentTime + startAt + dur + 0.05);
+        }
+        // SOS morse: ... --- ...
+        [0, 0.25, 0.5].forEach(function(t) { beep(880, t, 0.15); });
+        [0.9, 1.35, 1.8].forEach(function(t) { beep(440, t, 0.35); });
+        [2.4, 2.65, 2.9].forEach(function(t) { beep(880, t, 0.15); });
+      } catch(e) { console.warn('SOS audio failed:', e); }
+    }
+    function onSWMessage(e) {
+      if (e.data && e.data.type === 'SOS_ALARM') playSOSAlarm();
+    }
+    navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', onSWMessage);
+    return () => { navigator.serviceWorker && navigator.serviceWorker.removeEventListener('message', onSWMessage); };
+  }, []);
+
   const requestNotifPermission = async () => {
     setShowNotifNudge(false);
     localStorage.setItem('mg_notif_nudge_dismissed', (Date.now() + 30 * 24 * 3600 * 1000).toString());

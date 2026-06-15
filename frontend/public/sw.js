@@ -41,6 +41,7 @@ self.addEventListener('push', function(e) {
   var data = {};
   try { data = e.data.json(); } catch(err) { data = { title: 'MobilityGrid', body: e.data ? e.data.text() : 'New notification' }; }
   var isSOS = (data.data && data.data.type === 'SOS') || (data.title && data.title.includes('SOS'));
+
   e.waitUntil(
     self.registration.showNotification(data.title || 'MobilityGrid', {
       body: data.body || '',
@@ -52,7 +53,16 @@ self.addEventListener('push', function(e) {
       requireInteraction: isSOS,
       silent: false,
       renotify: isSOS,
-      actions: isSOS ? [{ action: 'view', title: 'View Location' }] : []
+      actions: isSOS ? [{ action: 'view', title: 'View SOS' }] : []
+    }).then(function() {
+      // For SOS: postMessage to all open clients so they can play alarm audio
+      if (isSOS) {
+        return self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(function(list) {
+          list.forEach(function(client) {
+            client.postMessage({ type: 'SOS_ALARM', title: data.title, body: data.body });
+          });
+        });
+      }
     })
   );
 });
