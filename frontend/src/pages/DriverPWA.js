@@ -6,7 +6,7 @@ import {
   CreditCard, Eye, EyeOff, X, Send, CheckCircle, Clock,
   MessageCircle, ShieldAlert, FileText, Camera, LogOut,
   PlusCircle, ArrowDownLeft, Fingerprint, FileCheck2,
-  Landmark, ChevronLeft, ChevronRight, ArrowUpRight, Zap, MapPin, Navigation
+  Landmark, ChevronLeft, ChevronRight, ArrowUpRight, Zap, MapPin, Navigation, FolderOpen
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Chatbot from '../components/Chatbot';
@@ -840,19 +840,58 @@ export default function DriverPWA() {
 
   // ── ACCOUNT TAB ───────────────────────────────────────────────────────────
   const AccountTab = () => {
-    const [uploadPreview, setUploadPreview] = useState(null); // { docType, file, dataUrl }
+    const [uploadPreview, setUploadPreview] = useState(null); // { docType, file, dataUrl, ocrFields }
     const [uploading, setUploading]         = useState(false);
     const [uploadDone, setUploadDone]       = useState('');
+    const [ocrLoading, setOcrLoading]       = useState(false);
 
     const selectForPreview = (docType, file) => {
       if (!file) return;
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => setUploadPreview({ docType, file, dataUrl: e.target.result });
-        reader.readAsDataURL(file);
-      } else {
-        setUploadPreview({ docType, file, dataUrl: null });
-      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const dataUrl = file.type.startsWith('image/') ? e.target.result : null;
+        setUploadPreview({ docType, file, dataUrl, ocrFields: null });
+
+        if (!file.type.startsWith('image/')) return;
+
+        setOcrLoading(true);
+        try {
+          const formData = new FormData();
+          formData.append('document', file);
+          formData.append('doc_type', docType);
+          const res  = await fetch(`${API}/api/kyc/ocr`, {
+            method:  'POST',
+            headers: { Authorization: `Bearer ${tk()}` },
+            body:    formData,
+          });
+          const data = await res.json();
+          if (data.success && data.fields) {
+            const f = data.fields;
+
+            if (docType === 'AADHAAR' && f.aadhaar_number) {
+              setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, value: f.aadhaar_number.replace(/\D/g,'').slice(0,12) } }));
+            }
+            if (docType === 'PAN' && f.pan_number) {
+              setKycState(s => ({ ...s, pan: { ...s.pan, value: f.pan_number.toUpperCase() } }));
+            }
+            if (docType === 'DL') {
+              if (f.dl_number) setKycState(s => ({ ...s, dl: { ...s.dl, value: f.dl_number } }));
+              if (f.dob)       setKycState(s => ({ ...s, dl: { ...s.dl, dob: f.dob } }));
+            }
+            if (docType === 'BANK') {
+              if (f.account_number) setKycState(s => ({ ...s, bank: { ...s.bank, acc: f.account_number } }));
+              if (f.ifsc)           setKycState(s => ({ ...s, bank: { ...s.bank, ifsc: f.ifsc.toUpperCase() } }));
+            }
+
+            setUploadPreview(prev => prev ? { ...prev, ocrFields: f } : prev);
+          }
+        } catch (err) {
+          console.warn('OCR failed (non-critical):', err);
+        } finally {
+          setOcrLoading(false);
+        }
+      };
+      reader.readAsDataURL(file);
     };
 
     const confirmUpload = async () => {
@@ -913,9 +952,33 @@ export default function DriverPWA() {
                   <span className="text-xs font-black text-slate-500">PDF Document</span>
                 </div>
               )}
-              <p className="text-[10px] text-slate-400 text-center mt-2">
-                ✅ Upload ho jaega aur admin review karega
-              </p>
+              {/* OCR loading */}
+              {ocrLoading && (
+                <div className="mt-2 flex items-center justify-center gap-2 text-xs text-indigo-600 font-black animate-pulse">
+                  <span className="animate-spin">🔍</span> Reading document…
+                </div>
+              )}
+              {/* OCR extracted fields */}
+              {uploadPreview.ocrFields && !ocrLoading && (
+                <div className="mt-3 bg-indigo-50 border border-indigo-200 rounded-2xl p-3">
+                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">✨ Auto-filled from document</p>
+                  {Object.entries(uploadPreview.ocrFields)
+                    .filter(([k, v]) => v && k !== 'raw')
+                    .map(([k, v]) => (
+                      <div key={k} className="flex justify-between items-center py-1 border-b border-indigo-100 last:border-0">
+                        <span className="text-[10px] text-indigo-400 font-black capitalize">{k.replace(/_/g,' ')}</span>
+                        <span className="text-xs font-black text-indigo-800 truncate max-w-[55%] text-right">{v}</span>
+                      </div>
+                    ))
+                  }
+                  <p className="text-[10px] text-indigo-400 mt-2 text-center">Fields filled ↑ — verify before submitting</p>
+                </div>
+              )}
+              {!ocrLoading && !uploadPreview.ocrFields && (
+                <p className="text-[10px] text-slate-400 text-center mt-2">
+                  ✅ Upload ho jaega aur admin review karega
+                </p>
+              )}
             </div>
             {/* Actions */}
             <div className="px-4 pb-8 grid grid-cols-2 gap-3">
@@ -926,9 +989,9 @@ export default function DriverPWA() {
               </button>
               <button
                 onClick={confirmUpload}
-                disabled={uploading}
+                disabled={uploading || ocrLoading}
                 className="py-3.5 bg-indigo-600 text-white font-black rounded-2xl text-sm hover:bg-indigo-700 disabled:opacity-60 transition flex items-center justify-center gap-2">
-                {uploading ? <><span className="animate-spin">⏳</span> Uploading…</> : '✅ Submit'}
+                {uploading ? <><span className="animate-spin">⏳</span> Uploading…</> : ocrLoading ? <><span className="animate-spin">🔍</span> Reading…</> : '✅ Submit'}
               </button>
             </div>
           </div>
@@ -1028,10 +1091,16 @@ export default function DriverPWA() {
                 <button onClick={kycAadhaarVerify} className="bg-slate-800 text-white px-4 rounded-xl text-xs font-black">Verify</button>
               </div>
             )}
-            <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed mt-2">
-              <Camera size={11}/> Upload Aadhaar
-              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => selectForPreview('AADHAAR', e.target.files[0])}/>
-            </label>
+            <div className="flex gap-2 mt-2">
+              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
+                <FolderOpen size={11}/> Gallery
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => selectForPreview('AADHAAR', e.target.files[0])}/>
+              </label>
+              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-indigo-50 rounded-xl text-[10px] font-black text-indigo-600 cursor-pointer hover:bg-indigo-100 border border-indigo-200 border-dashed">
+                <Camera size={11}/> Camera
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => selectForPreview('AADHAAR', e.target.files[0])}/>
+              </label>
+            </div>
           </div>
 
           {/* PAN */}
@@ -1048,10 +1117,16 @@ export default function DriverPWA() {
                 className="bg-indigo-600 text-white px-4 rounded-xl text-xs font-black hover:bg-indigo-700 transition">Verify</button>
             </div>
             {kycState.pan.verifiedName && <p className="text-[10px] text-indigo-600 font-black mb-2">✓ {kycState.pan.verifiedName}</p>}
-            <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
-              <Camera size={11}/> Upload PAN
-              <input type="file" accept="image/*" className="hidden" onChange={e => selectForPreview('PAN', e.target.files[0])}/>
-            </label>
+            <div className="flex gap-2">
+              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
+                <FolderOpen size={11}/> Gallery
+                <input type="file" accept="image/*" className="hidden" onChange={e => selectForPreview('PAN', e.target.files[0])}/>
+              </label>
+              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-indigo-50 rounded-xl text-[10px] font-black text-indigo-600 cursor-pointer hover:bg-indigo-100 border border-indigo-200 border-dashed">
+                <Camera size={11}/> Camera
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => selectForPreview('PAN', e.target.files[0])}/>
+              </label>
+            </div>
           </div>
 
           {/* DL */}
@@ -1070,10 +1145,16 @@ export default function DriverPWA() {
             <input type="date" value={kycState.dl.dob}
               onChange={e => setKycState(s => ({ ...s, dl: { ...s.dl, dob: e.target.value } }))}
               className="w-full border border-slate-200 rounded-xl p-2.5 text-sm mb-2 bg-slate-50 focus:outline-none focus:border-indigo-500"/>
-            <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
-              <Camera size={11}/> Upload License
-              <input type="file" accept="image/*" className="hidden" onChange={e => selectForPreview('DL', e.target.files[0])}/>
-            </label>
+            <div className="flex gap-2">
+              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
+                <FolderOpen size={11}/> Gallery
+                <input type="file" accept="image/*" className="hidden" onChange={e => selectForPreview('DL', e.target.files[0])}/>
+              </label>
+              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-indigo-50 rounded-xl text-[10px] font-black text-indigo-600 cursor-pointer hover:bg-indigo-100 border border-indigo-200 border-dashed">
+                <Camera size={11}/> Camera
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => selectForPreview('DL', e.target.files[0])}/>
+              </label>
+            </div>
           </div>
 
           {/* Bank */}
@@ -1092,10 +1173,16 @@ export default function DriverPWA() {
               <button onClick={kycVerifyBank} disabled={kycLoading === 'bank'}
                 className="bg-indigo-600 text-white px-4 rounded-xl text-xs font-black hover:bg-indigo-700 transition">Verify</button>
             </div>
-            <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
-              <Camera size={11}/> Upload Cheque
-              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => selectForPreview('BANK', e.target.files[0])}/>
-            </label>
+            <div className="flex gap-2">
+              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
+                <FolderOpen size={11}/> Gallery
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => selectForPreview('BANK', e.target.files[0])}/>
+              </label>
+              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-indigo-50 rounded-xl text-[10px] font-black text-indigo-600 cursor-pointer hover:bg-indigo-100 border border-indigo-200 border-dashed">
+                <Camera size={11}/> Camera
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => selectForPreview('BANK', e.target.files[0])}/>
+              </label>
+            </div>
           </div>
         </div>
 

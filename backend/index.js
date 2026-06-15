@@ -55,6 +55,23 @@ pool.query(`
   ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES public.branches(id) ON DELETE SET NULL;
 `).catch(err => console.warn('Branches migration warning:', err.message));
 
+pool.query(`
+  CREATE TABLE IF NOT EXISTS public.vehicle_inspections (
+    id               SERIAL PRIMARY KEY,
+    assignment_id    INTEGER,
+    vehicle_id       INTEGER,
+    driver_id        INTEGER,
+    inspection_type  VARCHAR(20) NOT NULL CHECK (inspection_type IN ('DELIVERY','RETURN')),
+    photo_front      TEXT,
+    photo_rear       TEXT,
+    photo_left       TEXT,
+    photo_right      TEXT,
+    ai_damage_report JSONB,
+    damage_detected  BOOLEAN DEFAULT FALSE,
+    created_at       TIMESTAMPTZ DEFAULT NOW()
+  );
+`).catch(err => console.warn('vehicle_inspections migration warning:', err.message));
+
 const app = express();
 // CORS fixed
 app.use(cors({
@@ -104,7 +121,8 @@ app.use('/api/admin', verifyAdmin, require('./src/routes/admin'));
 
 app.use('/api/owner',  ownerRoutes);
 app.use('/api/chat',   require('./src/routes/chat'));
-app.use('/api/kyc',    require('./src/routes/kyc'));
+app.use('/api/kyc',        require('./src/routes/kyc'));
+app.use('/api/inspection', verifyToken, require('./src/routes/inspection'));
 app.use('/api/device', verifyToken, require('./src/routes/device'));
 
 const rateLimit = require('express-rate-limit');

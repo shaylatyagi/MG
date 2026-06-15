@@ -13,13 +13,14 @@ const logAssignment = async (driverId, vehicleId, ownerId, dailyRent, rentType) 
       [driverId]
     );
     // New record
-    await pool.query(
+    const insResult = await pool.query(
       `INSERT INTO public.driver_vehicle_history
          (driver_id, vehicle_id, owner_id, daily_rent, rent_type, reason)
-       VALUES ($1, $2, $3, $4, $5, 'ASSIGNED')`,
+       VALUES ($1, $2, $3, $4, $5, 'ASSIGNED') RETURNING id`,
       [driverId, vehicleId, ownerId || null, dailyRent || 0, rentType || 'DAILY']
     );
-  } catch (e) { console.error('logAssignment error:', e.message); }
+    return insResult.rows[0]?.id || null;
+  } catch (e) { console.error('logAssignment error:', e.message); return null; }
 };
 
 const logUnassignment = async (vehicleId) => {
@@ -295,12 +296,15 @@ await pool.query(
 
     // ✅ History log — BEFORE res.json
     const ownerIdFromBody = req.body.owner_id || null;
-    await logAssignment(driverId, vehicleId, ownerIdFromBody, finalDailyRent, rentType);
+    const assignmentId = await logAssignment(driverId, vehicleId, ownerIdFromBody, finalDailyRent, rentType);
 
     res.json({ 
       success: true, 
       message: 'Vehicle assigned successfully',
-      driverName: driverCheck.rows[0].full_name
+      driverName: driverCheck.rows[0].full_name,
+      assignment_id: assignmentId,
+      vehicle_id: vehicleId,
+      driver_id: driverId,
     });
     
   } catch (error) {

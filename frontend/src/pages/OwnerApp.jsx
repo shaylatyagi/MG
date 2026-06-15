@@ -397,6 +397,20 @@ const [showAssignModal, setShowAssignModal] = useState(false);
 const [selectedDriverForAssign, setSelectedDriverForAssign] = useState(null);
 const [selectedVehicleForAssign, setSelectedVehicleForAssign] = useState(null);
 const [assigning, setAssigning] = useState(false);
+
+  // ── Vehicle Inspection ───────────────────────────────────────────────────
+  const [showInspectionModal, setShowInspectionModal]       = useState(false);
+  const [inspectionType, setInspectionType]                 = useState('DELIVERY');
+  const [inspectionAssignmentId, setInspectionAssignmentId] = useState(null);
+  const [inspectionVehicleId, setInspectionVehicleId]       = useState(null);
+  const [inspectionDriverId, setInspectionDriverId]         = useState(null);
+  const [inspectionDriverName, setInspectionDriverName]     = useState('');
+  const [inspectionId, setInspectionId]                     = useState(null);
+  const [inspectionPhotos, setInspectionPhotos]             = useState({front:null,rear:null,left:null,right:null});
+  const [inspectionUploading, setInspectionUploading]       = useState(false);
+  const [inspectionReport, setInspectionReport]             = useState(null);
+  const [comparingDamage, setComparingDamage]               = useState(false);
+
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -2116,12 +2130,32 @@ const DriversTab = () => {
       const data = await response.json();
       
       if (data.success) {
-        alert(`✅ Vehicle assigned to ${selectedDriverForAssignInTab.full_name}`);
+        // Start DELIVERY inspection
+        const inspRes = await fetch(`${API}/api/inspection/start`, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', Authorization:`Bearer ${token()}` },
+          body: JSON.stringify({
+            assignment_id: data.assignment_id,
+            vehicle_id:    data.vehicle_id || selectedVehicleForAssign?.id,
+            driver_id:     data.driver_id  || selectedDriverForAssignInTab?.id,
+            type:          'DELIVERY',
+          })
+        });
+        const inspData = inspRes.ok ? await inspRes.json() : {};
+        setInspectionId(inspData.inspection_id || null);
+        setInspectionAssignmentId(data.assignment_id);
+        setInspectionVehicleId(data.vehicle_id);
+        setInspectionDriverId(data.driver_id || selectedDriverForAssignInTab?.id);
+        setInspectionDriverName(selectedDriverForAssignInTab?.full_name || '');
+        setInspectionType('DELIVERY');
+        setInspectionPhotos({front:null,rear:null,left:null,right:null});
+        setInspectionReport(null);
         setShowDriverAssignModal(false);
         setSelectedDriverForAssignInTab(null);
         setSelectedVehicleForAssign(null);
         fetchAllData();
         fetchUnassignedData();
+        setShowInspectionModal(true);
       } else {
         alert(data.error || 'Assignment failed');
       }
@@ -2257,7 +2291,6 @@ const DriversTab = () => {
             const avBg = avColors[ch.charCodeAt(0) % avColors.length];
 
             return (
-              {/* Payment stripe: emerald=clear, amber=has dues, grey=no vehicle */}
               <div key={i}
                 className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm press-card relative"
                 style={{borderLeft: `3px solid ${!hasVehicle ? '#cbd5e1' : parseFloat(driver.pending||0)>0 ? '#f59e0b' : '#22c55e'}`}}
@@ -5189,6 +5222,199 @@ const ProfileTab = () => {
         </div>
       </div>
   
+      {/* ════════════════════════════════════════════════════════════
+          VEHICLE INSPECTION MODAL — 4-direction photos + AI compare
+          ════════════════════════════════════════════════════════════ */}
+      {showInspectionModal && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-end justify-center">
+          <div className="bg-white w-full max-w-[412px] rounded-t-3xl overflow-y-auto"
+            style={{maxHeight:'92vh',animation:'slideUp 0.25s cubic-bezier(0.34,1.1,0.64,1)'}}>
+
+            {/* Header */}
+            <div style={{background: inspectionType==='DELIVERY'
+              ? 'linear-gradient(135deg,#6366f1,#4f46e5)'
+              : 'linear-gradient(135deg,#059669,#10b981)',
+              padding:'20px 20px 16px',borderRadius:'24px 24px 0 0'}}>
+              <div className="flex items-center justify-between mb-1">
+                <span style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.6)',textTransform:'uppercase',letterSpacing:'0.08em'}}>
+                  {inspectionType === 'DELIVERY' ? '🚛 Pre-Delivery Inspection' : '🔍 Return Inspection'}
+                </span>
+                <button onClick={() => setShowInspectionModal(false)}
+                  style={{background:'rgba(255,255,255,0.15)',border:'none',borderRadius:8,width:28,height:28,cursor:'pointer',color:'white',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <X size={14}/>
+                </button>
+              </div>
+              <p style={{fontSize:18,fontWeight:900,color:'white',margin:'4px 0 2px'}}>
+                {inspectionType === 'DELIVERY' ? 'Before Handing Over' : 'When Receiving Back'}
+              </p>
+              <p style={{fontSize:11,color:'rgba(255,255,255,0.6)'}}>
+                {inspectionDriverName} · Take 4 photos of the vehicle
+              </p>
+              {/* Progress bar */}
+              <div style={{marginTop:12,background:'rgba(255,255,255,0.2)',borderRadius:6,height:4}}>
+                <div style={{
+                  height:4,borderRadius:6,background:'white',
+                  width:`${(Object.values(inspectionPhotos).filter(Boolean).length/4)*100}%`,
+                  transition:'width 0.3s ease'
+                }}/>
+              </div>
+              <p style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginTop:5}}>
+                {Object.values(inspectionPhotos).filter(Boolean).length}/4 photos captured
+              </p>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* 2×2 photo grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {key:'front', icon:'⬆️', label:'Front'},
+                  {key:'rear',  icon:'⬇️', label:'Rear'},
+                  {key:'left',  icon:'⬅️', label:'Left Side'},
+                  {key:'right', icon:'➡️', label:'Right Side'},
+                ].map(({key, icon, label}) => (
+                  <div key={key} style={{
+                    border: inspectionPhotos[key] ? '2px solid #22c55e' : '2px dashed #e2e8f0',
+                    borderRadius:16, overflow:'hidden', background:'#f8fafc',
+                    minHeight:120, position:'relative',
+                  }}>
+                    {inspectionPhotos[key] ? (
+                      <>
+                        <img src={URL.createObjectURL(inspectionPhotos[key])}
+                          alt={label}
+                          style={{width:'100%',height:120,objectFit:'cover',display:'block'}}/>
+                        <div style={{position:'absolute',top:6,left:6,background:'#22c55e',borderRadius:8,padding:'2px 8px',fontSize:10,fontWeight:800,color:'white'}}>
+                          ✓ {label}
+                        </div>
+                        <label style={{position:'absolute',bottom:6,right:6,background:'rgba(0,0,0,0.5)',border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontSize:10,color:'white',fontWeight:700}}>
+                          Retake
+                          <input type="file" accept="image/*" capture="environment" className="hidden"
+                            onChange={e => { if(e.target.files[0]) setInspectionPhotos(p => ({...p,[key]:e.target.files[0]})) }}/>
+                        </label>
+                      </>
+                    ) : (
+                      <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:120,cursor:'pointer',gap:8}}>
+                        <div style={{width:44,height:44,borderRadius:14,background:'#eef2ff',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <Camera size={20} color="#6366f1"/>
+                        </div>
+                        <div style={{textAlign:'center'}}>
+                          <p style={{fontSize:13,fontWeight:700,color:'#334155'}}>{icon} {label}</p>
+                          <p style={{fontSize:10,color:'#94a3b8'}}>Tap to capture</p>
+                        </div>
+                        <input type="file" accept="image/*" capture="environment" className="hidden"
+                          onChange={e => { if(e.target.files[0]) setInspectionPhotos(p => ({...p,[key]:e.target.files[0]})) }}/>
+                      </label>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Instructions */}
+              <div style={{background:'#f8fafc',borderRadius:14,padding:'12px 14px'}}>
+                <p style={{fontSize:11,fontWeight:700,color:'#64748b',marginBottom:6}}>📋 Inspection Tips</p>
+                <ul style={{fontSize:11,color:'#94a3b8',paddingLeft:16,margin:0,lineHeight:1.8}}>
+                  <li>Ensure good lighting before taking photos</li>
+                  <li>Include the full side of the vehicle in frame</li>
+                  <li>Capture any existing scratches or dents clearly</li>
+                </ul>
+              </div>
+
+              {/* AI Damage Report (for RETURN inspections) */}
+              {inspectionType === 'RETURN' && inspectionReport && (
+                <div style={{
+                  background: inspectionReport.damage_detected ? '#fef2f2' : '#ecfdf5',
+                  border: `1px solid ${inspectionReport.damage_detected ? '#fecaca' : '#bbf7d0'}`,
+                  borderRadius:14, padding:'14px'
+                }}>
+                  <p style={{fontSize:13,fontWeight:800,color: inspectionReport.damage_detected ? '#dc2626' : '#059669', marginBottom:6}}>
+                    {inspectionReport.damage_detected ? '⚠️ New Damage Detected' : '✅ No New Damage Found'}
+                  </p>
+                  <p style={{fontSize:12,color:'#64748b',marginBottom:8}}>{inspectionReport.summary}</p>
+                  {inspectionReport.recommendation && (
+                    <p style={{fontSize:11,fontWeight:700,color:'#475569',background:'rgba(0,0,0,0.04)',padding:'8px 10px',borderRadius:8}}>
+                      👉 {inspectionReport.recommendation}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="space-y-2">
+                <button
+                  disabled={inspectionUploading || Object.values(inspectionPhotos).filter(Boolean).length === 0}
+                  onClick={async () => {
+                    if (!inspectionId) { setShowInspectionModal(false); return; }
+                    setInspectionUploading(true);
+                    try {
+                      // Upload each captured photo
+                      for (const dir of ['front','rear','left','right']) {
+                        const file = inspectionPhotos[dir];
+                        if (!file) continue;
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        fd.append('direction', dir);
+                        await fetch(`${API}/api/inspection/${inspectionId}/photo`, {
+                          method:'POST', headers:{ Authorization:`Bearer ${token()}` }, body:fd
+                        });
+                      }
+                      // For RETURN inspections, run AI comparison
+                      if (inspectionType === 'RETURN' && inspectionAssignmentId) {
+                        setComparingDamage(true);
+                        const cmpRes = await fetch(`${API}/api/inspection/compare`, {
+                          method:'POST',
+                          headers:{'Content-Type':'application/json', Authorization:`Bearer ${token()}`},
+                          body: JSON.stringify({ assignment_id: inspectionAssignmentId })
+                        });
+                        if (cmpRes.ok) {
+                          const cmpData = await cmpRes.json();
+                          setInspectionReport(cmpData.report);
+                          setComparingDamage(false);
+                          // Don't close — show the report
+                          return;
+                        }
+                        setComparingDamage(false);
+                      }
+                      setShowInspectionModal(false);
+                    } catch(e) {
+                      alert('Upload failed: ' + e.message);
+                    } finally {
+                      setInspectionUploading(false);
+                    }
+                  }}
+                  style={{
+                    width:'100%',padding:'14px',borderRadius:14,border:'none',cursor:'pointer',
+                    fontFamily:'inherit',fontSize:14,fontWeight:800,
+                    background: Object.values(inspectionPhotos).filter(Boolean).length===0
+                      ? '#e2e8f0' : inspectionType==='DELIVERY'
+                      ? 'linear-gradient(135deg,#6366f1,#4f46e5)'
+                      : 'linear-gradient(135deg,#059669,#10b981)',
+                    color: Object.values(inspectionPhotos).filter(Boolean).length===0 ? '#94a3b8' : 'white',
+                    opacity: inspectionUploading ? 0.7 : 1,
+                  }}>
+                  {inspectionUploading ? '⏳ Uploading…'
+                    : comparingDamage ? '🔍 AI Comparing…'
+                    : inspectionType === 'RETURN'
+                    ? `Save & Compare with AI (${Object.values(inspectionPhotos).filter(Boolean).length}/4 photos)`
+                    : `Save Inspection (${Object.values(inspectionPhotos).filter(Boolean).length}/4 photos)`}
+                </button>
+
+                {/* Close/Done button after report shown */}
+                {inspectionReport && (
+                  <button onClick={() => { setShowInspectionModal(false); setInspectionReport(null); }}
+                    style={{width:'100%',padding:'12px',borderRadius:14,border:'1px solid #e2e8f0',background:'white',fontFamily:'inherit',fontSize:13,fontWeight:700,color:'#475569',cursor:'pointer'}}>
+                    Done
+                  </button>
+                )}
+
+                <button onClick={() => setShowInspectionModal(false)}
+                  style={{width:'100%',padding:'12px',borderRadius:14,border:'none',background:'transparent',fontFamily:'inherit',fontSize:12,fontWeight:700,color:'#94a3b8',cursor:'pointer'}}>
+                  Skip Inspection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     )}
   </div>
   );

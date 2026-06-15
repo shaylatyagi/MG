@@ -391,6 +391,103 @@ router.post('/upload-document', kycDocUpload.single('document'), async (req, res
 });
 
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/kyc/ocr
+// Accepts an image file + doc_type, extracts fields using Gemini Vision (FREE)
+// Returns: { success, doc_type, fields: { number, name, dob, ... } }
+// API key from: aistudio.google.com  — free tier, no credit card needed
+// ─────────────────────────────────────────────────────────────────────────────
+const ocrUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+
+router.post('/ocr', ocrUpload.single('document'), async (req, res) => {
+  const file    = req.file;
+  const docType = (req.body.doc_type || '').toUpperCase();
+
+  if (!file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+  if (!['AADHAAR','PAN','DL','BANK'].includes(docType)) {
+    return res.status(400).json({ success: false, message: 'doc_type must be AADHAAR|PAN|DL|BANK' });
+  }
+
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_KEY) {
+    return res.status(503).json({ success: false, message: 'OCR not available — set GEMINI_API_KEY on Render (free from aistudio.google.com)' });
+  }
+
+  const prompts = {
+    AADHAAR: `Extract from this Aadhaar card image:
+- aadhaar_number: the 12-digit number (digits only, no spaces)
+- name: cardholder full name as printed
+- dob: date of birth in YYYY-MM-DD format
+- gender: MALE or FEMALE
+- address: full address as printed
+Return ONLY valid JSON. Example: {"aadhaar_number":"123412341234","name":"Ravi Kumar","dob":"1990-05-14","gender":"MALE","address":"123 Main St"}`,
+
+    PAN: `Extract from this PAN card image:
+- pan_number: 10-character PAN (format ABCDE1234F, uppercase)
+- name: cardholder name exactly as printed
+- dob: date of birth in YYYY-MM-DD format if visible
+Return ONLY valid JSON. Example: {"pan_number":"ABCDE1234F","name":"Ravi Kumar","dob":"1990-05-14"}`,
+
+    DL: `Extract from this Driving License image:
+- dl_number: license number exactly as printed
+- name: holder full name
+- dob: date of birth in YYYY-MM-DD format
+Return ONLY valid JSON. Example: {"dl_number":"DL0420110149646","name":"Ravi Kumar","dob":"1990-05-14"}`,
+
+    BANK: `Extract from this bank cheque or passbook image:
+- account_number: bank account number (digits only)
+- ifsc: IFSC code (11 characters, e.g. SBIN0001234)
+- bank_name: name of the bank
+- account_holder: account holder name
+Return ONLY valid JSON. Example: {"account_number":"123456789012","ifsc":"SBIN0001234","bank_name":"State Bank of India","account_holder":"Ravi Kumar"}`,
+  };
+
+  try {
+    const base64   = file.buffer.toString('base64');
+    const mimeType = file.mimetype.startsWith('image/') ? file.mimetype : 'image/jpeg';
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+      {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompts[docType] },
+              { inline_data: { mime_type: mimeType, data: base64 } },
+            ],
+          }],
+          generationConfig: { maxOutputTokens: 512, temperature: 0 },
+        }),
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const err = await geminiRes.text();
+      console.error('Gemini OCR error:', err);
+      return res.status(502).json({ success: false, message: 'OCR service error' });
+    }
+
+    const geminiData = await geminiRes.json();
+    const rawText    = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+
+    let fields = {};
+    try {
+      const match = rawText.match(/\{[\s\S]*?\}/);
+      if (match) fields = JSON.parse(match[0]);
+    } catch {
+      fields = { raw: rawText };
+    }
+
+    res.json({ success: true, doc_type: docType, fields });
+  } catch (err) {
+    console.error('KYC OCR error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
 module.exports = router;
 
 // =====================================================================
