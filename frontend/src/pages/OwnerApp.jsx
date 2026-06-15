@@ -2002,6 +2002,25 @@ const removeRule = (i) => setIncentiveRules(prev => ({
 };
 const DriversTab = () => {
   const [localSearch, setLocalSearch] = useState('');
+  const [showAttendance, setShowAttendance] = useState(false);
+  const [attendanceData, setAttendanceData] = useState(null);
+  const [attendanceMonth, setAttendanceMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+
+  const fetchAttendance = async (month) => {
+    setLoadingAttendance(true);
+    try {
+      const res = await fetch(`${API}/api/payment/owner/attendance?ownerId=${ownerId()}&month=${month}`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      });
+      const data = await res.json();
+      setAttendanceData(data);
+    } catch { setAttendanceData(null); }
+    finally { setLoadingAttendance(false); }
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (showAttendance) fetchAttendance(attendanceMonth); }, [showAttendance, attendanceMonth]);
   const [selectedDriverForAssignInTab, setSelectedDriverForAssignInTab] = useState(null);
   const [showDriverAssignModal, setShowDriverAssignModal] = useState(false);
   const [availableVehiclesForDriverTab, setAvailableVehiclesForDriverTab] = useState([]);
@@ -2095,6 +2114,71 @@ const DriversTab = () => {
         )}
       </div>
       
+      {/* Attendance Toggle */}
+      <button
+        onClick={() => setShowAttendance(v => !v)}
+        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-black transition ${showAttendance ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'}`}
+      >
+        <span className="flex items-center gap-2">📅 Attendance</span>
+        <span className="text-[10px] font-medium opacity-60">{showAttendance ? 'Hide ▲' : 'Show ▼'}</span>
+      </button>
+
+      {/* Attendance View */}
+      {showAttendance && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Monthly Attendance</p>
+            <input
+              type="month"
+              value={attendanceMonth}
+              onChange={e => setAttendanceMonth(e.target.value)}
+              className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400"
+            />
+          </div>
+          {loadingAttendance ? (
+            <div className="p-6 text-center text-xs text-slate-400">Loading...</div>
+          ) : !attendanceData || attendanceData.drivers?.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400">No data for this month</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[10px]" style={{minWidth: 600}}>
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="text-left px-3 py-2 font-black text-slate-500 sticky left-0 bg-slate-50" style={{minWidth:120}}>Driver</th>
+                    {Array.from({length: attendanceData.daysInMonth}, (_, i) => (
+                      <th key={i+1} className="px-1 py-2 font-semibold text-slate-400 text-center" style={{minWidth:22}}>{i+1}</th>
+                    ))}
+                    <th className="px-3 py-2 font-black text-slate-500 text-center">Present</th>
+                    <th className="px-3 py-2 font-black text-slate-500 text-center">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendanceData.drivers.map((d, i) => (
+                    <tr key={d.driverId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                      <td className="px-3 py-2 font-black text-slate-700 sticky left-0 bg-inherit" style={{minWidth:120}}>
+                        <div>{d.name}</div>
+                        <div className="font-normal text-slate-400">{d.code}</div>
+                      </td>
+                      {Array.from({length: attendanceData.daysInMonth}, (_, j) => {
+                        const day = j + 1;
+                        const present = d.presentDays.includes(day);
+                        return (
+                          <td key={day} className="px-1 py-2 text-center">
+                            <span className={`inline-block w-4 h-4 rounded-full ${present ? 'bg-emerald-400' : 'bg-slate-100'}`} title={present ? 'Present' : 'Absent'} />
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-center font-black text-emerald-600">{d.totalPresent}/{attendanceData.daysInMonth}</td>
+                      <td className="px-3 py-2 text-center font-black" style={{color: d.attendancePct >= 80 ? '#059669' : d.attendancePct >= 50 ? '#d97706' : '#dc2626'}}>{d.attendancePct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action Row */}
       <div className="flex items-center gap-2">
         <button onClick={() => setShowAddDriver(true)}
@@ -2821,6 +2905,54 @@ const PaymentsTab = () => {
   const liveTx = transactions.filter(tx => tx.payment_mode !== 'CASH');
   const cashTx = transactions.filter(tx => tx.payment_mode === 'CASH');
   const cashTotal = cashTx.reduce((s, tx) => s + parseFloat(tx.order_amount || 0), 0);
+
+  const downloadPDF = async () => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.setTextColor(99, 102, 241);
+      doc.text('MobilityGrid — Payment Report', 14, 18);
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Owner: ${owner?.full_name || '—'}  |  Company: ${owner?.company_name || '—'}`, 14, 26);
+      doc.text(`Period: Last 30 days  |  Generated: ${new Date().toLocaleDateString('en-IN')}`, 14, 32);
+      autoTable(doc, {
+        startY: 40,
+        head: [['Summary', 'Amount']],
+        body: [
+          ['Online + UPI Collections', `Rs. ${stats.todayCollection.toLocaleString('en-IN')}`],
+          ['Cash Collected', `Rs. ${cashTotal.toLocaleString('en-IN')}`],
+          ['Total Collection', `Rs. ${(stats.todayCollection + cashTotal).toLocaleString('en-IN')}`],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [99, 102, 241], fontStyle: 'bold' },
+        styles: { fontSize: 9 }
+      });
+      const allTx = [...cashTx, ...liveTx];
+      if (allTx.length > 0) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 8,
+          head: [['Date', 'Driver', 'Amount', 'Mode']],
+          body: allTx.map(tx => [
+            tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-IN') : (tx.order_completion_date ? new Date(tx.order_completion_date).toLocaleDateString('en-IN') : '—'),
+            tx.driver_name || tx.customer_name || '—',
+            `Rs. ${parseFloat(tx.order_amount || 0).toLocaleString('en-IN')}`,
+            tx.payment_mode || '—'
+          ]),
+          theme: 'striped',
+          headStyles: { fillColor: [99, 102, 241], fontStyle: 'bold' },
+          styles: { fontSize: 8 }
+        });
+      }
+      doc.save(`MG_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+    } catch(e) { alert('PDF generation failed. Please try again.'); console.error(e); }
+  };
+
+  const downloadExcelLocked = () => {
+    alert('Excel export is a Premium feature. Upgrade your plan to unlock it.');
+  };
   const [showAllTx, setShowAllTx] = useState(false);
   const displayedTx = showAllTx ? liveTx : liveTx.slice(0, 5);
 
@@ -2864,6 +2996,23 @@ const PaymentsTab = () => {
           <p className="text-sm font-black text-slate-700">₹{(owner?.payment_mode === 'CASH_ONLY' ? cashTotal : stats.todayCollection + cashTotal).toLocaleString('en-IN')}</p>
         </div>
         <p className="text-[9px] text-slate-400 mt-1">Last 30 days</p>
+      </div>
+
+      {/* Download Report Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={downloadPDF}
+          className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-indigo-200 rounded-xl text-xs font-black text-indigo-600 hover:bg-indigo-50 transition shadow-sm"
+        >
+          📄 Download PDF Report
+        </button>
+        <button
+          onClick={downloadExcelLocked}
+          className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-400 transition shadow-sm relative"
+        >
+          📊 Excel Report
+          <span className="absolute -top-1.5 -right-1.5 bg-amber-400 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">PRO</span>
+        </button>
       </div>
 
       {/* Transaction History */}

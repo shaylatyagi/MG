@@ -3111,6 +3111,83 @@ router.post('/owner/driver-incentive-rule', verifyToken, async (req, res) => {
   }
 });
 
+
+// ─── DRIVER ATTENDANCE (from vehicle assignment history) ─────────────────────
+router.get('/owner/attendance', async (req, res) => {
+  try {
+    const { ownerId, month } = req.query;
+    if (!ownerId) return res.status(400).json({ error: 'ownerId required' });
+
+    // Default to current month if not specified
+    const targetMonth = month || new Date().toISOString().slice(0, 7); // YYYY-MM
+    const [year, mon] = targetMonth.split('-').map(Number);
+    const monthStart = new Date(year, mon - 1, 1);
+    const monthEnd   = new Date(year, mon, 0, 23, 59, 59); // last day of month
+    const daysInMonth = monthEnd.getDate();
+
+    // Get owner_code
+    const ownerRes = await pool.query(
+      'SELECT owner_code FROM public.owners WHERE id=$1', [parseInt(ownerId)]
+    );
+    if (!ownerRes.rows[0]) return res.status(404).json({ error: 'Owner not found' });
+    const ownerCode = ownerRes.rows[0].owner_code;
+
+    // Get all drivers for this owner
+    const driversRes = await pool.query(
+      `SELECT id, full_name, driver_code FROM public.drivers WHERE owner_code=$1 ORDER BY full_name`,
+      [ownerCode]
+    );
+
+    // Get all assignment history for these drivers in this month
+    const driverIds = driversRes.rows.map(d => d.id);
+    if (driverIds.length === 0) return res.json({ month: targetMonth, daysInMonth, drivers: [] });
+
+    const histRes = await pool.query(
+      `SELECT driver_id, assigned_at, unassigned_at
+       FROM public.driver_vehicle_history
+       WHERE driver_id = ANY($1::int[])
+         AND assigned_at <= $3
+         AND (unassigned_at >= $2 OR unassigned_at IS NULL)`,
+      [driverIds, monthStart.toISOString(), monthEnd.toISOString()]
+    );
+
+    // Build per-driver attendance
+    const attendanceMap = {};
+    driversRes.rows.forEach(d => {
+      attendanceMap[d.id] = { driverId: d.id, name: d.full_name, code: d.driver_code, presentDays: new Set() };
+    });
+
+    histRes.rows.forEach(h => {
+      const start = new Date(Math.max(new Date(h.assigned_at), monthStart));
+      const end   = new Date(Math.min(h.unassigned_at ? new Date(h.unassigned_at) : monthEnd, monthEnd));
+      let cur = new Date(start);
+      cur.setHours(0, 0, 0, 0);
+      while (cur <= end) {
+        const dayNum = cur.getDate();
+        if (dayNum >= 1 && dayNum <= daysInMonth) {
+          attendanceMap[h.driver_id]?.presentDays.add(dayNum);
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+
+    const drivers = Object.values(attendanceMap).map(d => ({
+      driverId: d.driverId,
+      name: d.name,
+      code: d.code,
+      presentDays: Array.from(d.presentDays).sort((a, b) => a - b),
+      totalPresent: d.presentDays.size,
+      totalAbsent: daysInMonth - d.presentDays.size,
+      attendancePct: Math.round((d.presentDays.size / daysInMonth) * 100)
+    }));
+
+    res.json({ month: targetMonth, daysInMonth, drivers });
+  } catch (err) {
+    console.error('Attendance error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 // ─── PREMIUM PLAN CHECK ──────────────────────────────────────────────────────
 const isPremium = async (ownerId) => {
