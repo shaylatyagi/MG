@@ -1277,6 +1277,14 @@ router.post('/reset-pin', async (req, res) => {
   }
 });
 
+// GET /api/admin/leads — waitlist/interest form submissions
+router.get('/leads', async (req, res) => {
+  try {
+    var r = await pool.query('SELECT * FROM public.waitlist_leads ORDER BY submitted_at DESC');
+    res.json({ success: true, leads: r.rows });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 // GET /api/admin/companies-list — lightweight list for PIN scope dropdown
 router.get('/companies-list', async (req, res) => {
   try {

@@ -759,4 +759,36 @@ router.post('/reset-pin', async (req, res) => {
   }
 });
 
+// POST /api/auth/waitlist — Landing page interest form
+router.post('/waitlist', async (req, res) => {
+  var { name, phone, company, role, fleet, city, type } = req.body;
+  if (!name || !phone) return res.status(400).json({ success: false, message: 'name and phone required' });
+  try {
+    await pool.query(
+      'INSERT INTO public.waitlist_leads (name, phone, company, role, fleet, city, type) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [name, phone, company || null, role || null, fleet || null, city || null, type || null]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('waitlist error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/auth/waitlist — Landing page interest form
+router.post('/waitlist', async (req, res) => {
+  var { name, phone, company, role, fleet, city, type } = req.body;
+  if (!name || !phone) return res.status(400).json({ success: false, message: 'name and phone required' });
+  try {
+    await pool.query(
+      'INSERT INTO public.waitlist_leads (name, phone, company, role, fleet, city, type) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [name, phone, company || null, role || null, fleet || null, city || null, type || null]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('waitlist error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

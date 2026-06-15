@@ -2496,6 +2496,71 @@ const NAV_ICONS = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PIN MANAGEMENT SECTION
 // ═══════════════════════════════════════════════════════════════════════════════
+function LeadsSection() {
+  const [leads, setLeads] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetch(API + '/api/admin/leads', {
+      headers: { Authorization: 'Bearer ' + (localStorage.getItem('mg_admin_token') || '') }
+    })
+      .then(r => r.json())
+      .then(d => { setLeads(d.leads || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const downloadCSV = () => {
+    const headers = ['Name', 'Phone', 'Company', 'Role', 'Fleet Size', 'City', 'Type', 'Submitted At'];
+    const rows = leads.map(l => [l.name, l.phone, l.company||'', l.role||'', l.fleet||'', l.city||'', l.type||'', new Date(l.submitted_at).toLocaleString('en-IN')]);
+    const csv = [headers, ...rows].map(r => r.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+    a.download = 'mg_leads.csv'; a.click();
+  };
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '900px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Landing Page Leads</h2>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0' }}>{leads.length} total submissions</p>
+        </div>
+        <button onClick={downloadCSV} style={{ padding: '8px 16px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          Download CSV
+        </button>
+      </div>
+      {loading ? <p style={{ color: '#64748b' }}>Loading…</p> : leads.length === 0 ? (
+        <p style={{ color: '#94a3b8', textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: '#f8fafc' }}>
+                {['Name', 'Phone', 'Company', 'Role', 'Fleet', 'City', 'Date'].map(h => (
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((l, i) => (
+                <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{l.name}</td>
+                  <td style={{ padding: '10px 12px', color: '#4f46e5', fontWeight: 600 }}>{l.phone}</td>
+                  <td style={{ padding: '10px 12px', color: '#334155' }}>{l.company || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: '#334155' }}>{l.role || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: '#334155' }}>{l.fleet || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: '#334155' }}>{l.city || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: '#64748b' }}>{new Date(l.submitted_at).toLocaleDateString('en-IN')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function PinManagementSection() {
   const [status, setStatus]             = React.useState(null);
   const [companies, setCompanies]       = React.useState([]);
@@ -2722,6 +2787,7 @@ function AdminPanelInner() {
     { key: 'chat',         label: 'Chat',           icon: 'chat' },
     { key: 'audit',        label: 'Audit Log',      icon: 'audit' },
     { key: 'pins',         label: 'PIN Management', icon: 'pins' },
+    { key: 'leads',        label: 'Leads',          icon: 'leads' },
   ];
 
   const doLogout = () => { clearToken(); window.location.href = '/login'; };
@@ -2902,6 +2968,7 @@ function AdminPanelInner() {
           {tab === 'chat'         && <ChatViewer />}
           {tab === 'audit'        && <AuditLog />}
           {tab === 'pins'         && <PinManagementSection />}
+          {tab === 'leads'        && <LeadsSection />}
         </div>
       </main>
 
