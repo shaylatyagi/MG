@@ -661,7 +661,7 @@ function LandingPage() {
                 <li><span className="pf-cross">✗</span> Online payment collection</li>
                 <li><span className="pf-cross">✗</span> Advanced analytics</li>
               </ul>
-              <a href="#signup" className="pricing-btn pricing-btn-outline">Get Started Free</a>
+              <a href="/login?role=owner&signup=true" className="pricing-btn pricing-btn-outline">Get Started Free</a>
             </div>
 
             {/* GROWTH */}
@@ -681,7 +681,7 @@ function LandingPage() {
                 <li><span className="pf-check">✓</span> Driver performance tracking</li>
               </ul>
               <div className="pricing-note">First 10 drivers — 50% off for 3 months</div>
-              <a href="#signup" className="pricing-btn pricing-btn-primary">Start Growing</a>
+              <a href="/login?role=owner&signup=true" className="pricing-btn pricing-btn-primary">Start Growing</a>
             </div>
 
             {/* ENTERPRISE */}

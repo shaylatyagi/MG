@@ -100,7 +100,14 @@ export default function Login() {
       if (driverRole) { setSelectedRole(driverRole); setStep('pin-login'); }
     } else if (roleParam === 'owner') {
       var ownerRole = roles.find(function(r) { return r.type === 'owner'; });
-      if (ownerRole) { setSelectedRole(ownerRole); setStep('pin-login'); }
+      if (ownerRole) {
+        setSelectedRole(ownerRole);
+        if (params.get('signup') === 'true') {
+          setStep('owner-signup');
+        } else {
+          setStep('pin-login');
+        }
+      }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -706,4 +713,141 @@ export default function Login() {
           </div>
         </div>
         <button onClick={submitResetPin} disabled={!canReset} style={!canReset ? btnDisabled : btnPrimary}>
-          {loading ? 'Resetting…' : 'Re
+          {loading ? 'Resetting…' : 'Reset PIN & Login'} {!loading && <ArrowRight size={14} />}
+        </button>
+        <div style={{ textAlign: 'right', marginTop: '12px' }}>
+          <button onClick={sendForgotOtp} disabled={resendTimer > 0}
+            style={{ fontSize: '12px', color: resendTimer > 0 ? '#94a3b8' : '#4f46e5',
+              background: 'none', border: 'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
+              fontWeight: 600, fontFamily: 'inherit' }}>
+            {resendTimer > 0 ? 'Resend in ' + resendTimer + 's' : 'Resend OTP'}
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Owner Self-Signup: Form ───────────────────────────────────────────────
+  if (step === 'owner-signup') {
+    var canSignup = signupName.trim().length > 1 && signupPhone.length === 10
+      && signupEmail.includes('@') && !loading;
+    return (
+      <Shell showBack onBack={function() { setStep('pin-login'); setError(''); setSuccess(''); }}
+        title="Create Owner Account" subtitle="Get started with MobilityGrid">
+        <Alert />
+        {/* Full Name */}
+        <div style={{ marginBottom: '12px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>Full Name *</label>
+          <input type="text" value={signupName} autoFocus placeholder="e.g. Rajesh Kumar" style={inputStyle}
+            onChange={function(e) { setSignupName(e.target.value); }} />
+        </div>
+        {/* Phone */}
+        <div style={{ marginBottom: '12px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>Mobile Number *</label>
+          <div style={{ position: 'relative' }}>
+            <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input type="tel" value={signupPhone} placeholder="10-digit mobile number" style={inputStyle} inputMode="numeric"
+              onChange={function(e) { setSignupPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); }} />
+          </div>
+        </div>
+        {/* Email */}
+        <div style={{ marginBottom: '12px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>Email Address *</label>
+          <input type="email" value={signupEmail} placeholder="you@example.com" style={inputStyle}
+            onChange={function(e) { setSignupEmail(e.target.value); }}
+            onKeyDown={function(e) { if (e.key === 'Enter' && canSignup) sendSignupOtp(); }} />
+        </div>
+        {/* Company (optional) */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+            Company / Fleet Name <span style={{ color: '#94a3b8', fontWeight: 400 }}>(optional)</span>
+          </label>
+          <input type="text" value={signupCompany} placeholder="e.g. Kumar Logistics" style={inputStyle}
+            onChange={function(e) { setSignupCompany(e.target.value); }}
+            onKeyDown={function(e) { if (e.key === 'Enter' && canSignup) sendSignupOtp(); }} />
+        </div>
+        <button onClick={sendSignupOtp} disabled={!canSignup} style={!canSignup ? btnDisabled : btnPrimary}>
+          {loading ? 'Sending OTP…' : 'Send Verification OTP'} {!loading && <ArrowRight size={14} />}
+        </button>
+        <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+          <span style={{ fontSize: '13px', color: '#64748b' }}>Already have an account? </span>
+          <button onClick={function() { setStep('pin-login'); setError(''); setSuccess(''); }}
+            style={{ fontSize: '13px', color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit' }}>
+            Sign in
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Owner Self-Signup: OTP Verify ─────────────────────────────────────────
+  if (step === 'owner-signup-otp') {
+    var canVerify = signupOtp.length === 6 && !loading;
+    return (
+      <Shell showBack onBack={function() { setStep('owner-signup'); setError(''); setSuccess(''); }}
+        title="Verify Your Email" subtitle={'OTP sent to ' + signupEmail}>
+        <Alert />
+        <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px', lineHeight: '1.6' }}>
+          Enter the 6-digit code we sent to <strong style={{ color: '#0f172a' }}>{signupEmail}</strong>
+        </p>
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>OTP Code</label>
+          <input type="text" value={signupOtp} autoFocus placeholder="6-digit code" style={{ ...inputStyle, letterSpacing: '0.3em', textAlign: 'center', fontSize: '20px' }}
+            maxLength={6} inputMode="numeric"
+            onChange={function(e) { setSignupOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); }}
+            onKeyDown={function(e) { if (e.key === 'Enter' && canVerify) verifySignupOtp(); }} />
+        </div>
+        <button onClick={verifySignupOtp} disabled={!canVerify} style={!canVerify ? btnDisabled : btnPrimary}>
+          {loading ? 'Verifying…' : 'Verify & Create Account'} {!loading && <ArrowRight size={14} />}
+        </button>
+        <div style={{ textAlign: 'center', marginTop: '14px' }}>
+          <button onClick={sendSignupOtp} disabled={loading}
+            style={{ fontSize: '12px', color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+            Resend OTP
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Admin login ───────────────────────────────────────────────────────────
+  if (step === 'admin-login') {
+    var adminReady = adminPhone.length === 10 && adminPassword.length > 0;
+    return (
+      <Shell showBack onBack={handleBack} title="Platform Admin Login">
+        <Alert />
+        <div style={{ marginBottom: '12px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>Admin Phone</label>
+          <div style={{ position: 'relative' }}>
+            <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input type="tel" value={adminPhone} autoFocus placeholder="10-digit mobile number"
+              style={inputStyle}
+              onChange={function(e) { setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); }}
+              onKeyDown={function(e) { if (e.key === 'Enter' && adminReady && !loading) loginAdmin(); }}
+            />
+          </div>
+        </div>
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>Password</label>
+          <div style={{ position: 'relative' }}>
+            <input type={showAdminPass ? 'text' : 'password'} value={adminPassword} placeholder="••••••••"
+              style={{ ...inputStyle, paddingRight: '52px' }}
+              onChange={function(e) { setAdminPassword(e.target.value); }}
+              onKeyDown={function(e) { if (e.key === 'Enter' && adminReady && !loading) loginAdmin(); }}
+            />
+            <button type="button" onClick={function() { setShowAdminPass(function(p) { return !p; }); }}
+              style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>
+              {showAdminPass ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        </div>
+        <button onClick={loginAdmin} disabled={loading || !adminReady} style={loading || !adminReady ? btnDisabled : btnPrimary}>
+          {loading ? 'Signing in…' : 'Sign In'} <ArrowRight size={14} />
+        </button>
+      </Shell>
+    );
+  }
+
+  return null;
+}

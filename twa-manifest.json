@@ -1,0 +1,99 @@
+{
+  "packageId": "in.mobilitygrid.owner",
+  "host": "www.mobilitygrid.in",
+  "name": "MobilityGrid Owner",
+  "launcherName": "MG Owner",
+  "display": "standalone",
+  "themeColor": "#16A34A",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#FFFFFF",
+  "enableNotifications": true,
+  "startUrl": "/login?role=owner",
+  "iconUrl": "https://www.mobilitygrid.in/icon-512.png",
+  "maskableIconUrl": "https://www.mobilitygrid.in/icon-512-maskable.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\Bharat\\Downloads\\projects\\voltops\\android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "3",
+  "appVersionCode": 3,
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "shortName": "Dashboard",
+      "url": "https://www.mobilitygrid.in/driver/dashboard",
+      "chosenIconUrl": "https://www.mobilitygrid.in/icon-driver-192.png"
+    },
+    {
+      "name": "My Earnings",
+      "shortName": "Earnings",
+      "url": "https://www.mobilitygrid.in/driver/dashboard?tab=earnings",
+      "chosenIconUrl": "https://www.mobilitygrid.in/icon-driver-192.png"
+    },
+    {
+      "name": "SOS",
+      "shortName": "SOS",
+      "url": "https://www.mobilitygrid.in/driver/dashboard?tab=sos",
+      "chosenIconUrl": "https://www.mobilitygrid.in/icon-driver-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://www.mobilitygrid.in/driver-manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://www.mobilitygrid.in/",
+  "minSdkVersion": 21,
+  "shareTarget": {
+    "action": "https://www.mobilitygrid.in/driver/dashboard",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [
+    {
+      "protocol": "web+mgdriver",
+      "url": "https://www.mobilitygrid.in/driver/dashboard?q=%s"
+    }
+  ],
+  "fileHandlers": [
+    {
+      "actionUrl": "https://www.mobilitygrid.in/driver/dashboard",
+      "mimeTypes": [
+        "image/jpeg",
+        "image/png",
+        "application/pdf"
+      ]
+    }
+  ],
+  "launchHandlerClientMode": "focus-existing",
+  "displayOverride": [
+    "window-controls-overlay",
+    "tabbed",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "appVersion": "3"
+}

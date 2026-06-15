@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="display_override">
+    
+      
+        <item>window-controls-overlay</item>
+      
+    
+      
+        <item>tabbed</item>
+      
+    
+      
+        <item>standalone</item>
+      
+    
+      
+        <item>minimal-ui</item>
+      
+    
+      
+        <item>browser</item>
+      
+    
+    </string-array>
+    <bool name="enableNotification">true</bool>
+    <bool name="enableSiteSettingsShortcut">true</bool>
+    <color name="backgroundColor">#FFFFFF</color>
+    <color name="colorPrimary">#16A34A</color>
+    <color name="colorPrimaryDark">#000000</color>
+    <color name="navigationColor">#000000</color>
+    <color name="navigationColorDark">#000000</color>
+    <color name="navigationDividerColor">#000000</color>
+    <color name="navigationDividerColorDark">#000000</color>
+    <color name="shortcut_background">#F5F5F5</color>
+    <integer name="splashScreenFadeOutDuration">300</integer>
+    <string name="appName" translatable="false">MobilityGrid Owner</string>
+    <string name="assetStatements">
+    [{
+        \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+        \"target\": {
+            \"namespace\": \"web\",
+            \"site\": \"https://www.mobilitygrid.in\"
+        }
+    }]
+    
+  </string>
+    <string name="fallbackType" translatable="false">customtabs</string>
+    <string name="fileHandlingActionUrl0" translatable="false">https://www.mobilitygrid.in/driver/dashboard</string>
+    <string name="fullScopeUrl" translatable="false">https://www.mobilitygrid.in/</string>
+    <string name="generatorApp" translatable="false">bubblewrap-cli</string>
+    <string name="hostName" translatable="false">www.mobilitygrid.in</string>
+    <string name="launchHandlerClientMode" translatable="false">focus-existing</string>
+    <string name="launchUrl" translatable="false">https://www.mobilitygrid.in/login?role=owner</string>
+    <string name="launcherName" translatable="false">MG Owner</string>
+    <string name="orientation" translatable="false">portrait</string>
+    <string name="providerAuthority" translatable="false">in.mobilitygrid.owner.fileprovider</string>
+    <string name="shareTarget" translatable="false">{\"action\":\"https://www.mobilitygrid.in/driver/dashboard\",\"method\":\"GET\",\"params\":{\"title\":\"title\",\"text\":\"text\",\"url\":\"url\"}}</string>
+    <string name="shortcut_name_0" translatable="false">Dashboard</string>
+    <string name="shortcut_name_1" translatable="false">My Earnings</string>
+    <string name="shortcut_name_2" translatable="false">SOS</string>
+    <string name="shortcut_short_name_0" translatable="false">Dashboard</string>
+    <string name="shortcut_short_name_1" translatable="false">Earnings</string>
+    <string name="shortcut_short_name_2" translatable="false">SOS</string>
+    <string name="webManifestUrl" translatable="false">https://www.mobilitygrid.in/driver-manifest.json</string>
+</resources>

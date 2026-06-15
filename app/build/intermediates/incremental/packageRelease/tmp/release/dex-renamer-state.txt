@@ -1,0 +1,4 @@
+#Mon Jun 15 01:18:10 IST 2026
+base.0=C\:\\Users\\Bharat\\Downloads\\projects\\voltops\\app\\build\\intermediates\\dex\\release\\minifyReleaseWithR8\\classes.dex
+renamed.0=classes.dex
+path.0=classes.dex
