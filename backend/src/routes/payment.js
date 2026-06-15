@@ -3255,4 +3255,16 @@ router.delete('/owner/managers/:managerId', async (req, res) => {
 router.get('/manager/profile', async (req, res) => {
   try {
     const { phone } = req.query;
-    const 
+    const r = await pool.query(
+      `SELECT m.*, o.full_name as owner_name, o.owner_code, o.mobile_number as owner_phone
+       FROM public.managers m
+       JOIN public.owners o ON o.id = m.owner_id
+       WHERE m.mobile_number=$1 AND m.status='ACTIVE'`,
+      [phone]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'Not a manager' });
+    res.json({ success: true, manager: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Upgrade to premium (admin manually upgrades, or payment webhook)
