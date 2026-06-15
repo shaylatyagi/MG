@@ -792,3 +792,130 @@ router.post('/waitlist', async (req, res) => {
 });
 
 module.exports = router;
+
+// ── OWNER SELF-SIGNUP ─────────────────────────────────────────────────────
+// Step 1: POST /api/auth/owner-signup — collect details, send OTP
+router.post('/owner-signup', async (req, res) => {
+  var { full_name, mobile_number, email, company_name } = req.body;
+  full_name      = (full_name || '').trim();
+  mobile_number  = (mobile_number || '').trim();
+  email          = (email || '').trim().toLowerCase();
+  company_name   = (company_name || '').trim();
+
+  if (!full_name || !mobile_number || !email)
+    return res.status(400).json({ success: false, message: 'Name, phone and email are required' });
+  if (!/^\d{10}$/.test(mobile_number))
+    return res.status(400).json({ success: false, message: 'Enter a valid 10-digit mobile number' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ success: false, message: 'Enter a valid email address' });
+
+  try {
+    // Check if already registered
+    var existing = await pool.query(
+      'SELECT id FROM public.owners WHERE mobile_number=$1', [mobile_number]
+    );
+    if (existing.rows[0])
+      return res.status(409).json({ success: false, message: 'An account with this number already exists. Please login.' });
+
+    // Send OTP
+    var otp = Math.floor(100000 + Math.random() * 900000).toString();
+    var otpHash = await bcrypt.hash(otp, 10);
+    await pool.query(
+      "INSERT INTO otps (phone_number, otp, expires_at) VALUES ($1,$2,NOW()+INTERVAL '10 minutes') ON CONFLICT (phone_number) DO UPDATE SET otp=$2, expires_at=NOW()+INTERVAL '10 minutes'",
+      [mobile_number, otpHash]
+    );
+
+    var devBypass = process.env.DEV_BYPASS_OTP === 'true';
+    if (!devBypass) {
+      var nodemailer = require('nodemailer');
+      var transporter = nodemailer.createTransport({
+        host: 'smtp-relay.brevo.com', port: 587, secure: false,
+        auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
+      });
+      await transporter.sendMail({
+        from: '"MobilityGrid" <' + process.env.BREVO_USER + '>',
+        to: email,
+        subject: 'Verify your MobilityGrid account',
+        html: '<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid</h2><p>Your verification OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">' + otp + '</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes.</p></div>'
+      });
+      res.json({ success: true, message: 'OTP sent to ' + email });
+    } else {
+      res.json({ success: true, otp: otp, message: 'DEV: OTP is ' + otp });
+    }
+  } catch (err) {
+    console.error('owner-signup error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Step 2: POST /api/auth/owner-signup/verify — verify OTP + create account
+router.post('/owner-signup/verify', async (req, res) => {
+  var { full_name, mobile_number, email, company_name, otp } = req.body;
+  full_name     = (full_name || '').trim();
+  mobile_number = (mobile_number || '').trim();
+  email         = (email || '').trim().toLowerCase();
+  company_name  = (company_name || '').trim();
+  otp           = (otp || '').trim();
+
+  if (!full_name || !mobile_number || !email || !otp)
+    return res.status(400).json({ success: false, message: 'All fields required' });
+
+  try {
+    // Verify OTP
+    var isDevBypass = process.env.DEV_BYPASS_OTP === 'true' && otp === '000000';
+    if (!isDevBypass) {
+      var otpRes = await pool.query(
+        'SELECT * FROM otps WHERE phone_number=$1 AND expires_at > NOW() LIMIT 1', [mobile_number]
+      );
+      var validHash = otpRes.rows[0] && await bcrypt.compare(otp, otpRes.rows[0].otp);
+      if (!validHash) return res.status(400).json({ success: false, message: 'OTP invalid or expired' });
+      await pool.query('DELETE FROM otps WHERE phone_number=$1', [mobile_number]);
+    }
+
+    // Double-check not already registered
+    var existing = await pool.query('SELECT id FROM public.owners WHERE mobile_number=$1', [mobile_number]);
+    if (existing.rows[0])
+      return res.status(409).json({ success: false, message: 'Account already exists. Please login.' });
+
+    // Generate owner_code
+    var namePrefix = full_name.replace(/\s+/g,'').toUpperCase().slice(0,3);
+    var phoneEnd   = mobile_number.slice(-4);
+    var owner_code = 'MG-OWN-' + namePrefix + phoneEnd;
+
+    // Create company if provided
+    var company_id = null;
+    if (company_name) {
+      var compRes = await pool.query(
+        "INSERT INTO public.companies (name, status) VALUES ($1, 'ACTIVE') RETURNING id",
+        [company_name]
+      );
+      company_id = compRes.rows[0].id;
+    }
+
+    // Create owner
+    var ownerRes = await pool.query(
+      `INSERT INTO public.owners (full_name, mobile_number, email, owner_code, status, pin_must_change, company_id)
+       VALUES ($1,$2,$3,$4,'ACTIVE',true,$5) RETURNING id, full_name, mobile_number, email, owner_code, status`,
+      [full_name, mobile_number, email, owner_code, company_id]
+    );
+    var owner = ownerRes.rows[0];
+
+    // Issue JWT
+    var token = require('jsonwebtoken').sign(
+      { id: owner.id, role: 'OWNER', mobile_number: owner.mobile_number },
+      process.env.JWT_SECRET, { expiresIn: '30d' }
+    );
+
+    res.json({
+      success: true,
+      token,
+      user: { id: owner.id, name: owner.full_name, mobile_number: owner.mobile_number, email: owner.email, role: 'OWNER' },
+      pin_must_change: true,
+      redirect: '/owner/dashboard',
+      message: 'Account created! Please set your PIN to continue.'
+    });
+  } catch (err) {
+    console.error('owner-signup/verify error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});

@@ -78,6 +78,12 @@ export default function Login() {
   const [showEnrollSheet, setShowEnrollSheet]   = useState(false);
   const [enrolling, setEnrolling]               = useState(false);
   const pendingNav = useRef(null);
+  // Owner self-signup
+  const [signupName, setSignupName]           = useState('');
+  const [signupPhone, setSignupPhone]         = useState('');
+  const [signupEmail, setSignupEmail]         = useState('');
+  const [signupCompany, setSignupCompany]     = useState('');
+  const [signupOtp, setSignupOtp]             = useState('');
 
   const roles = [
     { type: 'driver', name: 'Driver',         icon: <Truck size={20} />,    redirect: '/driver/dashboard' },
@@ -324,6 +330,46 @@ export default function Login() {
     setLoading(false);
   };
 
+  // ── Owner Signup ──────────────────────────────────────────────────────────
+  const sendSignupOtp = async function() {
+    setLoading(true); setError('');
+    try {
+      var res  = await fetch(API + '/api/auth/owner-signup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: signupName, mobile_number: signupPhone, email: signupEmail, company_name: signupCompany }),
+      });
+      var data = await res.json();
+      if (data.success) {
+        if (data.otp) setSignupOtp(data.otp); // DEV bypass
+        setStep('owner-signup-otp');
+        setSuccess('OTP sent to ' + signupEmail);
+      } else { setError(data.message || 'Signup failed'); }
+    } catch { setError('Network error'); }
+    setLoading(false);
+  };
+
+  const verifySignupOtp = async function() {
+    setLoading(true); setError('');
+    try {
+      var res  = await fetch(API + '/api/auth/owner-signup/verify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: signupName, mobile_number: signupPhone, email: signupEmail, company_name: signupCompany, otp: signupOtp }),
+      });
+      var data = await res.json();
+      if (data.success) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setPendingToken(data.token);
+        setPendingUser(data.user);
+        setPendingPath('/owner/dashboard');
+        setChangePin(''); setChangePinConfirm('');
+        setStep('change-pin');
+        setSuccess('Account created! Please set your PIN.');
+      } else { setError(data.message || 'Verification failed'); }
+    } catch { setError('Network error'); }
+    setLoading(false);
+  };
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   const handleRoleSelect = function(role) {
     setSelectedRole(role);
@@ -509,6 +555,19 @@ export default function Login() {
           {!loading && <ArrowRight size={14} />}
         </button>
         {showEnrollSheet && <EnrollSheet />}
+        {/* New here? — Owner only */}
+        {selectedRole && selectedRole.type === 'owner' && (
+          <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
+            <span style={{ fontSize: '13px', color: '#64748b' }}>New here? </span>
+            <button onClick={function() {
+              setStep('owner-signup'); setError(''); setSuccess('');
+              setSignupName(''); setSignupPhone(''); setSignupEmail(''); setSignupCompany(''); setSignupOtp('');
+            }} style={{ fontSize: '13px', color: '#4f46e5', background: 'none', border: 'none',
+              cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit' }}>
+              Create account
+            </button>
+          </div>
+        )}
       </Shell>
     );
   }
@@ -517,7 +576,7 @@ export default function Login() {
   if (step === 'change-pin') {
     var canChange = changePin.length >= 4 && changePin === changePinConfirm && !loading;
     return (
-      <Shell title="Set Your PIN" subtitle="Your admin set a temporary PIN. Please create your own.">
+      <Shell title="Set Your PIN" subtitle={step === 'change-pin' && signupName ? 'Almost done! Set a secure PIN to protect your account.' : 'Your admin set a temporary PIN. Please create your own.'}>
         <Alert />
         <div style={{ marginBottom: '12px' }}>
           <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
@@ -647,58 +706,4 @@ export default function Login() {
           </div>
         </div>
         <button onClick={submitResetPin} disabled={!canReset} style={!canReset ? btnDisabled : btnPrimary}>
-          {loading ? 'Resetting…' : 'Reset PIN & Login'} {!loading && <ArrowRight size={14} />}
-        </button>
-        <div style={{ textAlign: 'right', marginTop: '12px' }}>
-          <button onClick={sendForgotOtp} disabled={resendTimer > 0}
-            style={{ fontSize: '12px', color: resendTimer > 0 ? '#94a3b8' : '#4f46e5',
-              background: 'none', border: 'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
-              fontWeight: 600, fontFamily: 'inherit' }}>
-            {resendTimer > 0 ? 'Resend in ' + resendTimer + 's' : 'Resend OTP'}
-          </button>
-        </div>
-      </Shell>
-    );
-  }
-
-  // ── Admin login ───────────────────────────────────────────────────────────
-  if (step === 'admin-login') {
-    var adminReady = adminPhone.length === 10 && adminPassword.length > 0;
-    return (
-      <Shell showBack onBack={handleBack} title="Platform Admin Login">
-        <Alert />
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>Admin Phone</label>
-          <div style={{ position: 'relative' }}>
-            <Phone size={15} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input type="tel" value={adminPhone} autoFocus placeholder="10-digit mobile number"
-              style={inputStyle}
-              onChange={function(e) { setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); }}
-              onKeyDown={function(e) { if (e.key === 'Enter' && adminReady && !loading) loginAdmin(); }}
-            />
-          </div>
-        </div>
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>Password</label>
-          <div style={{ position: 'relative' }}>
-            <input type={showAdminPass ? 'text' : 'password'} value={adminPassword} placeholder="••••••••"
-              style={{ ...inputStyle, paddingRight: '52px' }}
-              onChange={function(e) { setAdminPassword(e.target.value); }}
-              onKeyDown={function(e) { if (e.key === 'Enter' && adminReady && !loading) loginAdmin(); }}
-            />
-            <button type="button" onClick={function() { setShowAdminPass(function(p) { return !p; }); }}
-              style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>
-              {showAdminPass ? 'Hide' : 'Show'}
-            </button>
-          </div>
-        </div>
-        <button onClick={loginAdmin} disabled={loading || !adminReady} style={loading || !adminReady ? btnDisabled : btnPrimary}>
-          {loading ? 'Signing in…' : 'Sign In'} <ArrowRight size={14} />
-        </button>
-      </Shell>
-    );
-  }
-
-  return null;
-}
+          {loading ? 'Resetting…' : 'Re
