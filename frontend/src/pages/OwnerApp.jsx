@@ -8,7 +8,7 @@ import {
   Camera, Edit2, Building, MapPin, Mail, Phone, User,
   Home, Users, Truck, Wallet, CreditCard, Bell, BellRing,
   LogOut, MessageCircle, X, Send, CheckCircle, Clock,
-  AlertCircle, ChevronLeft, Plus, Eye, EyeOff, Search,
+  AlertCircle, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Eye, EyeOff, Search,
   Filter, UserPlus, TruckIcon, TrendingUp, ArrowUpRight,
   ArrowDownRight, Settings, Shield, Star, Menu, Calendar,
   DollarSign, Copy, FileText, Landmark, Fingerprint, FileCheck2
@@ -102,7 +102,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
 
       <div className="divide-y">
         {ledgerData.length === 0 && (
-          <div className="p-6 text-center text-slate-400 text-xs">No ledger data yet</div>
+          <div className="p-6 text-center text-slate-400 text-xs">No ledger data yet — record a cash payment or wait for online payments.</div>
         )}
         {ledgerData.map((d, i) => (
           <div key={i}>
@@ -148,7 +148,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   return <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Settled ✅</span>;
 })()}
                 <span className="text-slate-400 text-xs ml-1">
-                  {expandedDriver === d.id ? '▲' : '▼'}
+                  {expandedDriver === d.id ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
                 </span>
               </div>
             </div>
@@ -264,6 +264,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
 export default function OwnerDashboard() {
   const [activeSOS, setActiveSOS] = useState(null); // current SOS alert
 const [showSOSAlert, setShowSOSAlert] = useState(false);
+const [lastSOS, setLastSOS] = useState(null);
 const [seenSosIds, setSeenSosIds] = useState(new Set());
 
 // SOS polling
@@ -1794,7 +1795,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
         <div className="flex items-center justify-between">
           <div>
             <p style={{fontSize:10,fontWeight:600,color:'#94a3b8',marginBottom:6,letterSpacing:'0.01em'}}>{title}</p>
-            <p style={{fontSize:isMoney?17:22,fontWeight:800,color:'#1e293b',fontFamily:isMoney?'monospace':'inherit',letterSpacing:isMoney?'-0.02em':'-0.01em',lineHeight:1}}>
+            <p className="stat-value-animate" style={{fontSize:isMoney?17:22,fontWeight:800,color:'#1e293b',fontFamily:isMoney?'monospace':'inherit',letterSpacing:isMoney?'-0.02em':'-0.01em',lineHeight:1}}>
               {isMoney ? <><span style={{fontSize:12,color:'#64748b',marginRight:1}}>₹</span>{(value||0).toLocaleString('en-IN')}</> : (value||0)}
             </p>
             {trend && (
@@ -1819,7 +1820,15 @@ const removeRule = (i) => setIncentiveRules(prev => ({
     const firstName = (owner?.full_name || '').split(' ')[0] || 'there';
     const todayStr = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
     return (
-    <div className="space-y-4 pb-4">
+    <div className="space-y-4 pb-4 tab-fade">
+
+    {/* Overdue Alert Banner */}
+    {overdueDrivers.length > 0 && (
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+        <span className="text-xs font-black text-amber-800">⏰ {overdueDrivers.length} drivers haven't paid today</span>
+        <button onClick={() => setShowOverdue(true)} className="text-[10px] font-black text-amber-600 underline">View & Remind →</button>
+      </div>
+    )}
 
     {/* Greeting */}
     <div className="flex items-center justify-between pt-1">
@@ -1832,6 +1841,34 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           {owner.company_name}
         </span>
       )}
+    </div>
+
+    {/* Quick Actions */}
+    <div className="grid grid-cols-4 gap-2">
+      <button className="quick-action-btn" onClick={() => { setCashDriver(null); setShowCashModal(true); }}>
+        <div style={{width:36,height:36,borderRadius:12,background:'#ecfdf5',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <span style={{fontSize:18}}>₹</span>
+        </div>
+        <span>Record<br/>Payment</span>
+      </button>
+      <button className="quick-action-btn" onClick={() => { setActiveTab('drivers'); setShowAddDriver(true); }}>
+        <div style={{width:36,height:36,borderRadius:12,background:'#eef2ff',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <svg width={16} height={16} fill="none" stroke="#6366f1" strokeWidth={2.2} viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        </div>
+        <span>Add<br/>Driver</span>
+      </button>
+      <button className="quick-action-btn" onClick={() => setActiveTab('payments')}>
+        <div style={{width:36,height:36,borderRadius:12,background:'#fffbeb',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <svg width={16} height={16} fill="none" stroke="#b45309" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </div>
+        <span>View<br/>Payments</span>
+      </button>
+      <button className="quick-action-btn" onClick={() => setActiveTab('vehicles')}>
+        <div style={{width:36,height:36,borderRadius:12,background:'#fff1f2',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <svg width={16} height={16} fill="none" stroke="#e11d48" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <span>View<br/>Fleet</span>
+      </button>
     </div>
 
     {/* Yield Ledger — YAHAN ADD KARO */}
@@ -1861,6 +1898,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           }}>
           <span className="text-[9px] text-slate-500 font-black uppercase block">{t.outstanding} ›</span>
           <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
+          <span className="text-[9px] text-indigo-500 font-black block mt-1">See who owes ›</span>
         </button>
       </div>
       <div className="flex items-center justify-between text-[9px] text-slate-400">
@@ -1898,7 +1936,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           </ResponsiveContainer>
         ) : (
           <div className="h-32 flex items-center justify-center">
-            <p className="text-[10px] text-slate-300">No collection data yet</p>
+            <p className="text-[10px] text-slate-300">No payments yet — trend will appear once payments are recorded.</p>
           </div>
         )}
       </div>
@@ -2096,7 +2134,7 @@ const DriversTab = () => {
   };
   
   return (
-    <div className="space-y-3 pb-4">
+    <div className="space-y-3 pb-4 tab-fade">
       {/* SEARCH BAR — local state so parent re-renders don't kill focus */}
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -2136,7 +2174,15 @@ const DriversTab = () => {
             />
           </div>
           {loadingAttendance ? (
-            <div className="p-6 text-center text-xs text-slate-400">Loading...</div>
+            <div className="space-y-2 p-2">
+              {[...Array(4)].map((_,i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="skeleton skeleton-text w-24" />
+                  <div className="flex-1 skeleton" style={{height:10,borderRadius:6}} />
+                  <div className="skeleton skeleton-text w-8" />
+                </div>
+              ))}
+            </div>
           ) : !attendanceData || attendanceData.drivers?.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-400">No data for this month</div>
           ) : (
@@ -2200,6 +2246,7 @@ const DriversTab = () => {
             </div>
             <p className="text-sm text-slate-500 font-medium">{localSearch ? 'No drivers match your search' : 'No drivers added yet'}</p>
             <p className="text-xs text-slate-400 mt-1">Tap "Add New Driver" to get started</p>
+            {!localSearch && <button onClick={() => setShowAddDriver(true)} className="mt-3 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black">+ Add First Driver</button>}
           </div>
         ) : (
           localFilteredDrivers.map((driver, i) => {
@@ -2210,8 +2257,10 @@ const DriversTab = () => {
             const avBg = avColors[ch.charCodeAt(0) % avColors.length];
 
             return (
+              {/* Payment stripe: emerald=clear, amber=has dues, grey=no vehicle */}
               <div key={i}
-                className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm cursor-pointer active:scale-[0.99] transition-transform"
+                className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm press-card relative"
+                style={{borderLeft: `3px solid ${!hasVehicle ? '#cbd5e1' : parseFloat(driver.pending||0)>0 ? '#f59e0b' : '#22c55e'}`}}
                 onClick={() => { setSelectedDriverDetails(driver); setShowDriverDetailsModal(true); }}
               >
                 <div className="flex items-center gap-3">
@@ -2223,8 +2272,11 @@ const DriversTab = () => {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-slate-800 text-sm truncate">{driver.full_name || driver.name}</p>
+                      {(!driver.agreement_url && !driver.agreement_uploaded) && (
+                        <span className="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-black">⚠️ No Agreement</span>
+                      )}
                       {/* Status dot-pill */}
                       <span className={`flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${
                         hasVehicle ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
@@ -2239,6 +2291,7 @@ const DriversTab = () => {
                     </p>
                   </div>
 
+                  <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
                   {/* Actions */}
                   <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
                     {!hasVehicle && (
@@ -2618,7 +2671,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
   )}
 
   {damages.length === 0 ? (
-    <p className="text-xs text-slate-400 text-center py-2">No damage records</p>
+    <p className="text-xs text-slate-400 text-center py-2">No damage records. Use '+ Add Damage' if a vehicle was damaged.</p>
   ) : (
     <div className="space-y-2">
       {damages.map((d,i)=>(
@@ -2780,8 +2833,19 @@ const VehiclesTab = () => {
       (v.driver_name || '').toLowerCase().includes(vehicleSearch.toLowerCase())
     )
     .sort((a,b) => (a.driver_id ? 1 : -1) - (b.driver_id ? 1 : -1));
+  const expiringVehicles = vehicles.filter(v => {
+    if (!v.insurance_expiry) return false;
+    const days = Math.floor((new Date(v.insurance_expiry) - new Date()) / 86400000);
+    return days <= 30;
+  });
   return (
-  <div className="space-y-3 pb-4">
+  <div className="space-y-3 pb-4 tab-fade">
+    {/* Insurance Expiry Warning */}
+    {expiringVehicles.length > 0 && (
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3">
+        <p className="text-xs font-black text-amber-800">⚠️ {expiringVehicles.length} vehicle(s) have insurance expiring within 30 days</p>
+      </div>
+    )}
     {/* Search Bar */}
     <div className="relative">
       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -2821,7 +2885,7 @@ const VehiclesTab = () => {
         return (
           <div key={i}
             onClick={() => { setSelectedVehicleDetails(vehicle); fetchUnassignedDriversList(); setShowVehicleDetailModal(true); }}
-            className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm cursor-pointer active:scale-[0.99] transition-transform"
+            className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm press-card relative"
           >
             {/* Top row: icon + reg/model + rent */}
             <div className="flex items-center gap-3">
@@ -2836,12 +2900,16 @@ const VehiclesTab = () => {
                       {opBadge.label}
                     </span>
                   )}
+                  {(vehicle.open_damages > 0 || vehicle.damage_status === 'OPEN') && (
+                    <span className="text-[8px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-black">⚠️ Damage</span>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">{vehicle.vehicle_model}</p>
               </div>
               <span className="text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-xl shrink-0">
                 ₹{vehicle.daily_rent}/day
               </span>
+              <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
             </div>
 
             {/* Bottom row: assigned driver */}
@@ -2957,7 +3025,7 @@ const PaymentsTab = () => {
   const displayedTx = showAllTx ? liveTx : liveTx.slice(0, 5);
 
   return (
-    <div className="space-y-4 pb-4">
+    <div className="space-y-4 pb-4 tab-fade">
 
       {/* Pay Links shortcut — hidden for CASH_ONLY companies */}
       {owner?.payment_mode !== 'CASH_ONLY' && (
@@ -3015,6 +3083,30 @@ const PaymentsTab = () => {
         </button>
       </div>
 
+      {/* Remind All Overdue Drivers */}
+      <button
+        onClick={async () => {
+          const oId = ownerId();
+          if (!oId) return;
+          const res = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()).catch(() => []);
+          if (!Array.isArray(res) || res.length === 0) { alert('✅ Sab drivers ne aaj pay kar diya!'); return; }
+          const confirm = window.confirm(`${res.length} drivers ne aaj abhi tak pay nahi kiya.\nSabko reminder bhejein?`);
+          if (!confirm) return;
+          await fetch(`${API}/api/payment/owner/remind-overdue?ownerId=${oId}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } }).catch(() => {});
+          alert(`🔔 Reminder bhej diya ${res.length} drivers ko!`);
+        }}
+        className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🔔</span>
+          <div className="text-left">
+            <p className="text-sm font-black text-amber-800">Remind All Unpaid Drivers</p>
+            <p className="text-[10px] text-amber-600">Jinhe aaj abhi tak pay nahi kiya unhe notification bhejo</p>
+          </div>
+        </div>
+        <span className="text-amber-400 font-black">›</span>
+      </button>
+
       {/* Transaction History */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
@@ -3023,12 +3115,22 @@ const PaymentsTab = () => {
         </div>
         <div className="divide-y">
           {loadingTx ? (
-            <div className="p-8 text-center text-slate-400 text-xs">Loading...</div>
+            <div className="divide-y">
+              {[...Array(5)].map((_,i) => (
+                <div key={i} className="px-4 py-3 flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="skeleton skeleton-text w-28" />
+                    <div className="skeleton skeleton-text w-20" />
+                  </div>
+                  <div className="skeleton skeleton-text w-16" />
+                </div>
+              ))}
+            </div>
           ) : liveTx.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-xs">{t.noTx}</div>
           ) : (
             displayedTx.map((tx, i) => (
-              <div key={i} onClick={() => setSelectedTx(tx)} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition cursor-pointer active:bg-slate-100">
+              <div key={i} onClick={() => setSelectedTx(tx)} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition cursor-pointer active:bg-slate-100 group">
                 <div>
                   <p className="text-xs font-black text-slate-800">{tx.driver_name || tx.payer_name || 'Driver'}</p>
                   <p className="text-[9px] text-slate-400">{tx.vehicle_number || '—'}</p>
@@ -3036,15 +3138,18 @@ const PaymentsTab = () => {
                     {new Date(tx.order_completion_date || tx.order_initiation_date).toLocaleString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-slate-800">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
-                    tx.transaction_status === 'SUCCESS' ? 'bg-green-50 text-green-600 border-green-100' :
-                    tx.transaction_status === 'PENDING' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
-                    'bg-red-50 text-red-500 border-red-100'
-                  }`}>
-                    {tx.transaction_status || 'SUCCESS'}
-                  </span>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <p className="text-sm font-black text-slate-800">₹{parseFloat(tx.order_amount).toLocaleString('en-IN')}</p>
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
+                      tx.transaction_status === 'SUCCESS' ? 'bg-green-50 text-green-600 border-green-100' :
+                      tx.transaction_status === 'PENDING' ? 'bg-yellow-50 text-yellow-600 border-yellow-100' :
+                      'bg-red-50 text-red-500 border-red-100'
+                    }`}>
+                      {tx.transaction_status || 'SUCCESS'}
+                    </span>
+                  </div>
+                  <span className="text-slate-300 text-base">›</span>
                 </div>
               </div>
             ))
@@ -4074,7 +4179,34 @@ const ProfileTab = () => {
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28">
           {loading ? (
-            <div className="text-center py-16 text-xs font-black text-slate-400 animate-pulse">Loading...</div>
+            <div className="space-y-3 pt-1">
+              {/* Skeleton stat cards */}
+              <div className="grid grid-cols-2 gap-3">
+                {[...Array(4)].map((_,i) => (
+                  <div key={i} className="skeleton-card" style={{borderLeft:'3px solid #e2e8f0'}}>
+                    <div className="skeleton skeleton-text w-16 mb-3" />
+                    <div className="skeleton skeleton-title w-20" />
+                  </div>
+                ))}
+              </div>
+              {/* Skeleton ledger card */}
+              <div className="skeleton-card">
+                <div className="skeleton skeleton-text w-24 mb-4" />
+                <div className="grid grid-cols-2 gap-3">
+                  {[...Array(4)].map((_,i) => <div key={i} className="skeleton" style={{height:52,borderRadius:12}} />)}
+                </div>
+              </div>
+              {/* Skeleton list rows */}
+              {[...Array(3)].map((_,i) => (
+                <div key={i} className="skeleton-card flex items-center gap-3">
+                  <div className="skeleton skeleton-avatar" style={{width:42,height:42}} />
+                  <div className="flex-1 space-y-2">
+                    <div className="skeleton skeleton-text w-32" />
+                    <div className="skeleton skeleton-text w-20" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <>
               {activeTab === 'home' && <HomeTab />}
@@ -4596,6 +4728,7 @@ const ProfileTab = () => {
             headers: { Authorization: `Bearer ${token()}` }
           }).catch(() => {});
           
+          setLastSOS(activeSOS);
           setShowSOSAlert(false);
           
           // ✅ Chat open karo usi driver ke saath
@@ -4619,6 +4752,7 @@ const ProfileTab = () => {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token()}` }
           }).catch(() => {});
+          setLastSOS(activeSOS);
           setShowSOSAlert(false);
           setActiveSOS(null);
         }}
@@ -4627,6 +4761,12 @@ const ProfileTab = () => {
         Dismiss Alert
       </button>
     </div>
+  </div>
+)}
+{lastSOS && !showSOSAlert && (
+  <div className="bg-red-600 text-white px-4 py-2 text-xs font-black flex justify-between items-center">
+    <span>🚨 SOS from {lastSOS.driver_name || lastSOS.full_name} at {new Date(lastSOS.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</span>
+    <button onClick={() => setLastSOS(null)} className="underline">Dismiss</button>
   </div>
 )}
         {showVehicleDetailModal && <VehicleDetailModal />}

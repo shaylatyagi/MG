@@ -381,3 +381,330 @@ html.dark nav.bg-white { background-color: #1e293b !important; }
 .mg-theme-toggle {
   transition: all 0.2s ease;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   SKELETON / SHIMMER LOADERS
+   ══════════════════════════════════════════════════════════════════ */
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+
+.skeleton-text {
+  height: 12px;
+  border-radius: 6px;
+}
+
+.skeleton-title {
+  height: 16px;
+  border-radius: 6px;
+}
+
+.skeleton-avatar {
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.skeleton-card {
+  background: white;
+  border-radius: 16px;
+  padding: 14px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+/* Dark mode skeletons */
+html.dark .skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+html.dark .skeleton-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MICRO-ANIMATIONS — press feedback on tappable cards
+   ══════════════════════════════════════════════════════════════════ */
+
+.press-card {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.press-card:active {
+  transform: scale(0.975);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODAL BACKDROP — standardized
+   ══════════════════════════════════════════════════════════════════ */
+
+.mg-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 0 0;
+  animation: fadeIn 0.18s ease;
+}
+
+.mg-modal-sheet {
+  background: white;
+  border-radius: 24px 24px 0 0;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.22s cubic-bezier(0.34,1.1,0.64,1);
+}
+
+.mg-modal-center {
+  border-radius: 20px;
+  width: calc(100% - 32px);
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: popIn 0.2s cubic-bezier(0.34,1.1,0.64,1);
+  align-self: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes popIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   STATUS STRIPE HELPER — left border color by payment state
+   ══════════════════════════════════════════════════════════════════ */
+
+.stripe-clear    { border-left: 3px solid #22c55e !important; }
+.stripe-dues     { border-left: 3px solid #f59e0b !important; }
+.stripe-overdue  { border-left: 3px solid #ef4444 !important; }
+.stripe-inactive { border-left: 3px solid #cbd5e1 !important; }
+
+/* ══════════════════════════════════════════════════════════════════
+   STAT CARD PULSE — number appears with fade
+   ══════════════════════════════════════════════════════════════════ */
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stat-value-animate {
+  animation: countUp 0.4s ease forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TAB CONTENT FADE — smooth tab switching
+   ══════════════════════════════════════════════════════════════════ */
+
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tab-fade {
+  animation: tabFadeIn 0.22s ease forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FORM INPUT SYSTEM — standardized inputs everywhere
+   ══════════════════════════════════════════════════════════════════ */
+
+.mg-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  font-family: 'Inter', sans-serif;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  -webkit-appearance: none;
+}
+.mg-input:focus {
+  border-color: #6366f1;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
+}
+.mg-input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+.mg-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Input label ──────────────────────────────────────────────── */
+.mg-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   BUTTON SYSTEM — standardized buttons
+   ══════════════════════════════════════════════════════════════════ */
+
+.mg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Inter', sans-serif;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  letter-spacing: -0.01em;
+}
+.mg-btn:active {
+  transform: scale(0.96);
+}
+.mg-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.mg-btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+}
+.mg-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(99,102,241,0.38);
+}
+
+.mg-btn-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16,185,129,0.28);
+}
+
+.mg-btn-danger {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(239,68,68,0.25);
+}
+
+.mg-btn-ghost {
+  background: #f1f5f9;
+  color: #475569;
+  box-shadow: none;
+}
+.mg-btn-ghost:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.mg-btn-sm {
+  padding: 7px 14px;
+  font-size: 11px;
+  border-radius: 9px;
+}
+
+.mg-btn-full {
+  width: 100%;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SECTION HEADER — consistent list section labels
+   ══════════════════════════════════════════════════════════════════ */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 8px;
+}
+.section-header-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   QUICK ACTION GRID — home tab shortcut buttons
+   ══════════════════════════════════════════════════════════════════ */
+
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 14px 8px;
+  background: white;
+  border: 1px solid #f1f5f9;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-action-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+.quick-action-btn span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CARD VARIANTS — for different data types
+   ══════════════════════════════════════════════════════════════════ */
+
+.metric-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.metric-chip-success { background: #ecfdf5; color: #059669; }
+.metric-chip-warning { background: #fffbeb; color: #b45309; }
+.metric-chip-danger  { background: #fef2f2; color: #dc2626; }
+.metric-chip-info    { background: #eff6ff; color: #2563eb; }
+.metric-chip-muted   { background: #f8fafc; color: #64748b; }

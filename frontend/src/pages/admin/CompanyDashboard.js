@@ -461,16 +461,18 @@ function LoginPage({ onLogin }) {
 
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function Dashboard() {
-  const [stats, setStats]     = useState(null);
-  const [kyc, setKyc]         = useState(null);
-  const [loading, setLoading] = useState(true);
+function Dashboard({ onSetTab }) {
+  const [stats, setStats]         = useState(null);
+  const [kyc, setKyc]             = useState(null);
+  const [pendingDocs, setPendingDocs] = useState(0);
+  const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     Promise.all([
       api('/api/admin/platform-stats').catch(() => null),
       api('/api/admin/kyc/summary').catch(() => null),
-    ]).then(([s, k]) => { setStats(s); setKyc(k); setLoading(false); });
+      api('/api/admin/document-approvals').catch(() => null),
+    ]).then(([s, k, docs]) => { setStats(s); setKyc(k); setPendingDocs((docs?.docs || []).filter(d => d.status === 'PENDING').length); setLoading(false); });
   }, []);
 
   if (loading) return <Spinner />;
@@ -484,10 +486,12 @@ function Dashboard() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Platform Dashboard</h2>
       {pending > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-sm">
-          ⚠️ <strong>{pending} KYC verification(s)</strong> pending review
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-sm flex items-center justify-between">
+          <span>⚠️ <strong>{pending} KYC verification(s)</strong> pending review</span>
+          {onSetTab && <button onClick={() => onSetTab('kyc')} className="text-xs font-black text-yellow-700 underline ml-4">Review →</button>}
         </div>
       )}
+      {pendingDocs > 0 && <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-2 flex items-center justify-between"><span className="text-sm font-black text-blue-800">📄 {pendingDocs} documents pending approval</span>{onSetTab && <button onClick={() => onSetTab('docs')} className="text-xs font-black text-blue-600 underline">Review →</button>}</div>}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Companies"    value={s.total_companies || 0} color="indigo" />
         <StatCard label="Fleet Owners" value={s.total_owners   || 0} color="blue"   />
@@ -503,10 +507,10 @@ function Dashboard() {
         <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-4">KYC Status Overview</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {['VERIFIED','PENDING','SUBMITTED','UNDER_REVIEW','REJECTED'].map(status => (
-            <div key={status} className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <button key={status} onClick={() => onSetTab && onSetTab('kyc')} className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:ring-2 hover:ring-indigo-300 transition cursor-pointer w-full">
               <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{k[status] || 0}</p>
               <Badge status={status} />
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -1571,7 +1575,7 @@ function Companies() {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No companies found</p>}
+          {filtered.length === 0 && <div className="text-center py-12"><p className="text-gray-400 mb-3">No companies onboarded yet.</p><button onClick={() => setShowAdd(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold">+ Onboard First Company</button></div>}
         </div>
       )}
 
@@ -1734,7 +1738,7 @@ function KycReview() {
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">KYC Review</h2>
       <div className="flex gap-2 border-b dark:border-gray-700">
-        {[['pending','Pending Review'],['VERIFIED','Approved'],['REJECTED','Rejected'],['all','All']].map(([k,label]) => (
+        {[['pending',`Pending (${drivers.filter(d => d.kyc_status === 'PENDING' || d.kyc_status === 'SUBMITTED').length})`],['VERIFIED',`Approved (${drivers.filter(d => d.kyc_status === 'VERIFIED' || d.kyc_status === 'APPROVED').length})`],['REJECTED',`Rejected (${drivers.filter(d => d.kyc_status === 'REJECTED').length})`],['all',`All (${drivers.length})`]].map(([k,label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition -mb-px ${tab===k ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
             {label}
@@ -1851,53 +1855,97 @@ function AllDrivers() {
     return matchQ && (!statusFilter || d.kyc_status === statusFilter);
   });
 
+  const avColors = ['#4f46e5','#7c3aed','#0891b2','#059669','#b45309','#be185d','#0f766e'];
+  const av = (name) => {
+    const ch = (name||'?').charAt(0).toUpperCase();
+    return { ch, bg: avColors[ch.charCodeAt(0) % avColors.length] };
+  };
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">All Drivers <span className="text-sm font-normal text-gray-400 dark:text-gray-500">({drivers.length})</span></h2>
-      <div className="flex gap-2">
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:0}}>All Drivers</h2>
+          <p style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{drivers.length} registered · {filtered.length} shown</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{display:'flex',gap:10}}>
         <input type="text" placeholder="Search name, phone, owner, vehicle…" value={q} onChange={e => setQ(e.target.value)}
-          className="flex-1 px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          className="mg-input" style={{flex:1,fontSize:13,padding:'8px 14px'}} />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border rounded-lg text-sm focus:outline-none">
+          style={{padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:12,fontSize:12,fontWeight:600,color:'#475569',background:'#f8fafc',outline:'none',cursor:'pointer'}}>
           <option value="">All KYC</option>
           {['PENDING','SUBMITTED','UNDER_REVIEW','VERIFIED','REJECTED'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
-      {loading ? <Spinner /> : (
-        <div className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase">
-              <tr>
-                <th className="px-4 py-3 text-left">Driver</th>
-                <th className="px-4 py-3 text-left">Phone</th>
-                <th className="px-4 py-3 text-left">Owner</th>
-                <th className="px-4 py-3 text-left">Company</th>
-                <th className="px-4 py-3 text-left">Vehicle</th>
-                <th className="px-4 py-3 text-right">Today</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3 text-left">KYC</th>
-                <th className="px-4 py-3 text-left">Joined</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map(d => (
-                <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                  onClick={() => push({ type: 'driver', id: d.id, label: d.full_name })}>
-                  <td className="px-4 py-3 font-medium text-indigo-700 hover:underline">{d.full_name}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{d.mobile_number}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{d.owner_name || '—'}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{d.company_name || '—'}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{d.vehicle_number || '—'}</td>
-                  <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{fmt(d.paid_today)}</td>
-                  <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{fmt(d.total_paid)}</td>
-                  <td className="px-4 py-3"><Badge status={d.kyc_status} /></td>
-                  <td className="px-4 py-3 text-gray-400">{timeSince(d.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No drivers</p>}
+      {loading ? <Spinner /> : filtered.length === 0 ? (
+        <div style={{background:'white',borderRadius:16,padding:'40px 20px',textAlign:'center',border:'1px solid #f1f5f9'}}>
+          <div style={{width:48,height:48,borderRadius:16,background:'#f8fafc',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
+            <svg width={20} height={20} fill="none" stroke="#cbd5e1" strokeWidth={2} viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <p style={{fontSize:14,fontWeight:600,color:'#64748b'}}>No drivers found</p>
+          <p style={{fontSize:12,color:'#94a3b8',marginTop:4}}>Try adjusting your search or filters</p>
+        </div>
+      ) : (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:12}}>
+          {filtered.map(d => {
+            const {ch, bg} = av(d.full_name);
+            const kycColor = {VERIFIED:'#059669',REJECTED:'#dc2626',SUBMITTED:'#2563eb',UNDER_REVIEW:'#d97706',PENDING:'#94a3b8'}[d.kyc_status]||'#94a3b8';
+            const kycBg    = {VERIFIED:'#ecfdf5',REJECTED:'#fef2f2',SUBMITTED:'#eff6ff',UNDER_REVIEW:'#fffbeb',PENDING:'#f8fafc'}[d.kyc_status]||'#f8fafc';
+            return (
+              <div key={d.id} className="press-card"
+                style={{background:'white',borderRadius:16,padding:'14px 16px',border:'1px solid #f1f5f9',boxShadow:'0 1px 4px rgba(0,0,0,0.04)',borderLeft:`3px solid ${d.vehicle_number ? '#22c55e' : '#e2e8f0'}`}}
+                onClick={() => push({ type: 'driver', id: d.id, label: d.full_name })}>
+                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                  {/* Avatar */}
+                  <div style={{width:42,height:42,borderRadius:14,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>
+                    {ch}
+                  </div>
+                  {/* Info */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                      <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{d.full_name}</span>
+                      <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,background:kycBg,color:kycColor}}>{d.kyc_status||'—'}</span>
+                    </div>
+                    <p style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace',marginTop:2}}>{d.mobile_number}</p>
+                  </div>
+                  {/* Arrow */}
+                  <svg width={14} height={14} fill="none" stroke="#cbd5e1" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+                {/* Details row */}
+                <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+                  {d.vehicle_number && (
+                    <span style={{fontSize:10,fontWeight:600,color:'#059669',background:'#ecfdf5',padding:'3px 10px',borderRadius:20}}>🚗 {d.vehicle_number}</span>
+                  )}
+                  {d.company_name && (
+                    <span style={{fontSize:10,fontWeight:600,color:'#475569',background:'#f8fafc',padding:'3px 10px',borderRadius:20,border:'1px solid #e2e8f0'}}>{d.company_name}</span>
+                  )}
+                  {d.owner_name && (
+                    <span style={{fontSize:10,fontWeight:600,color:'#6366f1',background:'#eef2ff',padding:'3px 10px',borderRadius:20}}>👤 {d.owner_name}</span>
+                  )}
+                </div>
+                {/* Revenue row */}
+                <div style={{display:'flex',gap:16,marginTop:10,paddingTop:10,borderTop:'1px solid #f8fafc'}}>
+                  <div>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Today</p>
+                    <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(d.paid_today)}</p>
+                  </div>
+                  <div>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
+                    <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(d.total_paid)}</p>
+                  </div>
+                  <div style={{marginLeft:'auto',textAlign:'right'}}>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Joined</p>
+                    <p style={{fontSize:11,fontWeight:600,color:'#64748b'}}>{timeSince(d.created_at)}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1969,45 +2017,77 @@ function AllOwners() {
     o.owner_code?.toLowerCase().includes(q.toLowerCase())
   );
 
+  const avColors = ['#4f46e5','#7c3aed','#0891b2','#059669','#b45309','#be185d'];
+  const av = (name) => {
+    const ch = (name||'?').charAt(0).toUpperCase();
+    return { ch, bg: avColors[ch.charCodeAt(0) % avColors.length] };
+  };
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Fleet Owners <span className="text-sm font-normal text-gray-400 dark:text-gray-500">({owners.length})</span></h2>
-      <input type="text" placeholder="Search name, phone, code…" value={q} onChange={e => setQ(e.target.value)}
-        className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:0}}>Fleet Owners</h2>
+          <p style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{owners.length} registered · {filtered.length} shown</p>
+        </div>
+      </div>
 
-      {loading ? <Spinner /> : (
-        <div className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs uppercase">
-              <tr>
-                <th className="px-4 py-3 text-left">Owner</th>
-                <th className="px-4 py-3 text-left">Phone</th>
-                <th className="px-4 py-3 text-left">Code</th>
-                <th className="px-4 py-3 text-right">Drivers</th>
-                <th className="px-4 py-3 text-right">Vehicles</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3 text-right">Month</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map(o => (
-                <tr key={o.id} className="hover:bg-indigo-50 cursor-pointer"
-                  onClick={() => push({ type: 'owner', id: o.id, label: o.full_name })}>
-                  <td className="px-4 py-3 font-medium text-indigo-700 hover:underline">{o.full_name}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400" onClick={e => e.stopPropagation()}>
-                    <span>{o.mobile_number}</span>
-                    <button onClick={e => startEditPhone(e, o)} className="ml-2 text-gray-300 hover:text-indigo-500 text-xs" title="Edit phone">✏️</button>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 font-mono text-xs">{o.owner_code}</td>
-                  <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{o.total_drivers || 0}</td>
-                  <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{o.total_vehicles || 0}</td>
-                  <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{fmt(o.collection_total)}</td>
-                  <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{fmt(o.collection_month)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length === 0 && <p className="text-center text-gray-400 py-8">No owners</p>}
+      <input type="text" placeholder="Search name, phone, code…" value={q} onChange={e => setQ(e.target.value)}
+        className="mg-input" style={{fontSize:13,padding:'8px 14px'}} />
+
+      {loading ? <Spinner /> : filtered.length === 0 ? (
+        <div style={{background:'white',borderRadius:16,padding:'40px 20px',textAlign:'center',border:'1px solid #f1f5f9'}}>
+          <p style={{fontSize:14,fontWeight:600,color:'#64748b'}}>No owners found</p>
+        </div>
+      ) : (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:12}}>
+          {filtered.map(o => {
+            const {ch, bg} = av(o.full_name);
+            return (
+              <div key={o.id} className="press-card"
+                style={{background:'white',borderRadius:16,padding:'14px 16px',border:'1px solid #f1f5f9',boxShadow:'0 1px 4px rgba(0,0,0,0.04)',borderLeft:'3px solid #6366f1'}}
+                onClick={() => push({ type: 'owner', id: o.id, label: o.full_name })}>
+                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                  {/* Avatar */}
+                  <div style={{width:42,height:42,borderRadius:14,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>
+                    {ch}
+                  </div>
+                  {/* Info */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{o.full_name}</span>
+                    <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}} onClick={e => e.stopPropagation()}>
+                      <span style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace'}}>{o.mobile_number}</span>
+                      <button onClick={e => startEditPhone(e, o)}
+                        style={{fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',padding:'0 2px'}}
+                        title="Edit phone">✏️</button>
+                    </div>
+                    <span style={{fontSize:10,fontWeight:700,color:'#6366f1',background:'#eef2ff',padding:'2px 8px',borderRadius:20,fontFamily:'monospace',display:'inline-block',marginTop:4}}>{o.owner_code}</span>
+                  </div>
+                  <svg width={14} height={14} fill="none" stroke="#cbd5e1" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+                {/* Stats row */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginTop:12,paddingTop:12,borderTop:'1px solid #f8fafc'}}>
+                  <div style={{textAlign:'center'}}>
+                    <p style={{fontSize:16,fontWeight:800,color:'#0f172a'}}>{o.total_drivers||0}</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Drivers</p>
+                  </div>
+                  <div style={{textAlign:'center'}}>
+                    <p style={{fontSize:16,fontWeight:800,color:'#0f172a'}}>{o.total_vehicles||0}</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Vehicles</p>
+                  </div>
+                  <div style={{textAlign:'center'}}>
+                    <p style={{fontSize:13,fontWeight:800,color:'#059669',fontFamily:'monospace'}}>{fmt(o.collection_month)}</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Month</p>
+                  </div>
+                  <div style={{textAlign:'center'}}>
+                    <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(o.collection_total)}</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -2697,6 +2777,7 @@ function PinManagementSection() {
         )}
         {pins.length > 0 && (
           <div className="space-y-3">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4"><p className="text-sm font-black text-red-700">⚠️ Save this file NOW — PINs cannot be retrieved after leaving this page</p></div>
             <button onClick={downloadCSV}
               className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-black">
               ⬇️ Download PIN List (CSV)
@@ -2885,7 +2966,7 @@ function AdminPanelInner() {
 
             {/* Bell */}
             <div style={{ position: 'relative' }}>
-              <button onClick={() => { setShowNotifs(v => !v); if (!showNotifs && unread > 0) markAllRead(); }}
+              <button onClick={() => { setShowNotifs(v => !v); if (!showNotifs && unread > 0) setTimeout(() => markAllRead(), 2000); }}
                 style={{
                   width: 36, height: 36, borderRadius: 8, border: '1px solid #e5e7eb',
                   background: showNotifs ? '#f3f4f6' : '#fff', cursor: 'pointer',
@@ -2956,7 +3037,7 @@ function AdminPanelInner() {
 
         {/* Content */}
         <div style={{ padding: 24, flex: 1 }}>
-          {tab === 'dashboard'    && <Dashboard />}
+          {tab === 'dashboard'    && <Dashboard onSetTab={setTab} />}
           {tab === 'companies'    && <Companies />}
           {tab === 'owners'       && <AllOwners />}
           {tab === 'drivers'      && <AllDrivers />}

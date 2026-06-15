@@ -6,7 +6,7 @@ import {
   CreditCard, Eye, EyeOff, X, Send, CheckCircle, Clock,
   MessageCircle, ShieldAlert, FileText, Camera, LogOut,
   PlusCircle, ArrowDownLeft, Fingerprint, FileCheck2,
-  Landmark, ChevronLeft, ArrowUpRight, Zap, MapPin, Navigation
+  Landmark, ChevronLeft, ChevronRight, ArrowUpRight, Zap, MapPin, Navigation
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Chatbot from '../components/Chatbot';
@@ -35,11 +35,11 @@ export default function DriverPWA() {
       availableFloat: 'Wallet Balance', addFloat2: 'Add Funds',
       requestPayout2: 'Withdraw', totalPaidLabel: 'Total Paid',
       outstandingLabel: 'Outstanding', txHistoryLabel: 'Transaction History',
-      noTxLabel: 'No transactions yet', lifetime: 'Lifetime',
+      noTxLabel: 'No payments yet. Once you make a payment, your transaction history will appear here.', lifetime: 'Lifetime',
       outstanding: "Outstanding", duesPending: 'Due',
       settled: 'Settled', pay: 'Pay Now',
       recent: 'Recent', viewAll: 'View all',
-      noTx: 'No transactions yet', emergency: 'Emergency',
+      noTx: 'No payments yet. Once you make a payment, your transaction history will appear here.', emergency: 'Emergency',
       triggerSos: 'SOS'
     },
     hi: {
@@ -537,6 +537,7 @@ export default function DriverPWA() {
   // ── HOME TAB ─────────────────────────────────────────────────────────────
   const HomeTab = () => (
     <div className="space-y-3 pb-4">
+      {kycState && kycState.aadhaar?.status !== 'verified' && (<div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between"><span className="text-xs font-black text-amber-800">⚠️ KYC Incomplete — Complete to avoid suspension</span><button onClick={() => setActiveTab('account')} className="text-[10px] font-black text-amber-600 underline">Complete →</button></div>)}
       {/* Outstanding / Pay card */}
       {dues <= 0 ? (
         /* SETTLED — show simple confirmation, no pay option */
@@ -621,7 +622,7 @@ export default function DriverPWA() {
           </div>
           <div className="text-right">
             <p className="text-xs font-black text-indigo-600">₹{assignedVehicle.dailyRent}/day</p>
-            <span className="text-[9px] font-black text-slate-400 flex items-center gap-1 justify-end">
+            <span className="text-[11px] font-black text-slate-400 flex items-center gap-1 justify-end">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block animate-pulse"/>Active · tap for details
             </span>
           </div>
@@ -666,7 +667,10 @@ export default function DriverPWA() {
                   <p className="text-[9px] text-slate-400 font-mono">{p.date}</p>
                 </div>
               </div>
-              <p className={`text-sm font-black ${p.status === 'SUCCESS' ? 'text-slate-800' : 'text-slate-400'}`}>₹{p.amount}</p>
+              <div className="flex items-center gap-2">
+                <p className={`text-sm font-black ${p.status === 'SUCCESS' ? 'text-slate-800' : 'text-slate-400'}`}>₹{p.amount}</p>
+                <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
+              </div>
             </div>
           ))}
           {payments.length === 0 && !loading && (
@@ -682,7 +686,7 @@ export default function DriverPWA() {
     const [showAll, setShowAll] = useState(false);
     const displayed = showAll ? payments : payments.slice(0, 5);
     return (
-      <div className="space-y-3 pb-4">
+      <div className="space-y-3 pb-4 tab-fade">
         {historyFrom === 'transaction' && (
           <button onClick={() => { setHistoryFrom('tab'); setTab('home'); setActiveTab('dashboard'); }}
             className="flex items-center gap-1 text-indigo-600 font-black text-sm bg-white border border-slate-200 px-3 py-2 rounded-xl">
@@ -691,35 +695,34 @@ export default function DriverPWA() {
         )}
 
         {/* Balance card */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t.availableFloat}</p>
-          <div className="flex items-center gap-2 mb-4">
-            <p className="text-3xl font-black text-slate-900 font-mono">{showBalance ? `₹${wallet.toLocaleString('en-IN')}` : '₹ ••••'}</p>
-            <button onClick={() => setShowBal(!showBalance)} className="text-slate-400 hover:text-slate-600">
-              {showBalance ? <EyeOff size={14}/> : <Eye size={14}/>}
+        <div style={{background:'linear-gradient(135deg,#0f172a 0%,#1e293b 100%)',borderRadius:20,padding:20}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+            <p style={{fontSize:10,fontWeight:800,letterSpacing:'0.1em',textTransform:'uppercase',color:'rgba(255,255,255,0.4)'}}>{t.availableFloat}</p>
+            <button onClick={() => setShowBal(!showBalance)} style={{background:'rgba(255,255,255,0.08)',border:'none',borderRadius:8,padding:'4px 8px',cursor:'pointer',color:'rgba(255,255,255,0.5)',display:'flex',alignItems:'center'}}>
+              {showBalance ? <EyeOff size={12}/> : <Eye size={12}/>}
             </button>
           </div>
-          <div className="flex gap-2">
-            <button onClick={addFloat} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition">
-              <PlusCircle size={12}/> {t.addFloat2}
-            </button>
-            <button onClick={() => alert('Coming soon')} className="flex-1 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition hover:border-slate-300">
-              <ArrowDownLeft size={12}/> {t.requestPayout2}
-            </button>
-          </div>
+          <p style={{fontSize:36,fontWeight:900,color:'white',fontFamily:'monospace',letterSpacing:'-0.02em',lineHeight:1,marginBottom:16}}>
+            <span style={{fontSize:20,opacity:.5,marginRight:2}}>₹</span>
+            {showBalance ? wallet.toLocaleString('en-IN') : '••••'}
+          </p>
+          <button onClick={addFloat} style={{width:'100%',background:'rgba(99,102,241,0.85)',border:'none',borderRadius:14,padding:'11px',color:'white',fontSize:13,fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,backdropFilter:'blur(8px)'}}>
+            <PlusCircle size={14}/> {t.addFloat2}
+          </button>
+          <p style={{fontSize:10,color:'rgba(255,255,255,0.25)',textAlign:'center',marginTop:8}}>Payout requests — coming soon</p>
         </div>
 
         {/* Summary */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">{t.paymentSummary2}</p>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-50 rounded-xl p-3">
-              <p className="text-[9px] text-slate-400 mb-1">{t.totalPaidLabel}</p>
-              <p className="text-lg font-black text-slate-800">₹{totalPaid.toLocaleString('en-IN')}</p>
+            <div style={{background:'linear-gradient(135deg,#ecfdf5,#d1fae5)',borderRadius:14,padding:'14px 12px',border:'1px solid #a7f3d0'}}>
+              <p style={{fontSize:9,fontWeight:700,color:'#059669',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:6}}>✓ {t.totalPaidLabel}</p>
+              <p style={{fontSize:20,fontWeight:900,color:'#065f46',fontFamily:'monospace'}}>₹{totalPaid.toLocaleString('en-IN')}</p>
             </div>
-            <div className="bg-slate-50 rounded-xl p-3">
-              <p className="text-[9px] text-slate-400 mb-1">{t.outstandingLabel}</p>
-              <p className="text-lg font-black text-slate-800">₹{dues.toLocaleString('en-IN')}</p>
+            <div style={{background:dues > 0 ? 'linear-gradient(135deg,#fffbeb,#fef3c7)' : 'linear-gradient(135deg,#f8fafc,#f1f5f9)',borderRadius:14,padding:'14px 12px',border:`1px solid ${dues > 0 ? '#fde68a' : '#e2e8f0'}`}}>
+              <p style={{fontSize:9,fontWeight:700,color:dues > 0 ? '#b45309':'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:6}}>{dues > 0 ? '⏳' : '—'} {t.outstandingLabel}</p>
+              <p style={{fontSize:20,fontWeight:900,color:dues > 0 ? '#92400e':'#64748b',fontFamily:'monospace'}}>₹{dues.toLocaleString('en-IN')}</p>
             </div>
           </div>
         </div>
@@ -735,15 +738,35 @@ export default function DriverPWA() {
               <p className="p-6 text-center text-[11px] text-slate-400">{t.noTxLabel}</p>
             ) : displayed.map((p, i) => (
               <div key={i} onClick={() => { setSelTxn(p); setShowReceipt(true); }}
-                className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition">
-                <div>
-                  <p className="text-xs font-black text-slate-800">{p.type}</p>
-                  <p className="text-[9px] text-slate-400 font-mono mt-0.5">{p.date}</p>
+                className="px-4 py-3 flex items-center gap-3 press-card hover:bg-slate-50/50">
+                {/* Status icon */}
+                <div style={{
+                  width:38,height:38,borderRadius:12,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
+                  background: p.status === 'SUCCESS' ? '#ecfdf5' : p.status === 'PENDING' ? '#fffbeb' : '#fef2f2'
+                }}>
+                  {p.status === 'SUCCESS'
+                    ? <svg width={16} height={16} fill="none" stroke="#059669" strokeWidth={2.5} viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    : p.status === 'PENDING'
+                    ? <svg width={16} height={16} fill="none" stroke="#b45309" strokeWidth={2.5} viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    : <svg width={16} height={16} fill="none" stroke="#dc2626" strokeWidth={2.5} viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  }
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-slate-800">₹{p.amount}</p>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${p.status === 'SUCCESS' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                    {p.status === 'SUCCESS' ? 'Paid' : p.status}
+                {/* Text */}
+                <div style={{flex:1,minWidth:0}}>
+                  <p style={{fontSize:13,fontWeight:700,color:'#0f172a'}}>{p.type}</p>
+                  <p style={{fontSize:10,color:'#94a3b8',fontFamily:'monospace',marginTop:2}}>{p.date}</p>
+                </div>
+                {/* Amount + status */}
+                <div style={{textAlign:'right',flexShrink:0}}>
+                  <p style={{fontSize:15,fontWeight:800,color: p.status === 'SUCCESS' ? '#059669' : p.status === 'PENDING' ? '#b45309' : '#dc2626',fontFamily:'monospace'}}>
+                    ₹{parseFloat(p.amount).toLocaleString('en-IN')}
+                  </p>
+                  <span style={{
+                    fontSize:9,fontWeight:700,padding:'2px 8px',borderRadius:20,display:'inline-block',marginTop:3,
+                    background: p.status === 'SUCCESS' ? '#ecfdf5' : p.status === 'PENDING' ? '#fffbeb' : '#fef2f2',
+                    color: p.status === 'SUCCESS' ? '#059669' : p.status === 'PENDING' ? '#b45309' : '#dc2626',
+                  }}>
+                    {p.status === 'SUCCESS' ? '✓ Paid' : p.status === 'PENDING' ? '⏳ Pending' : p.status}
                   </span>
                 </div>
               </div>
@@ -799,7 +822,7 @@ export default function DriverPWA() {
 
           <div className="divide-y divide-slate-50 max-h-48 overflow-y-auto">
             {(earnings.earnings || []).length === 0 ? (
-              <p className="p-4 text-center text-[11px] text-slate-400">No earnings logged yet</p>
+              <p className="p-4 text-center text-[11px] text-slate-400">Track your daily income here — only you can see this. Tap '+ Add' to log today's earnings.</p>
             ) : (earnings.earnings || []).slice(0, 10).map((e, i) => (
               <div key={i} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
@@ -968,6 +991,22 @@ export default function DriverPWA() {
         {/* KYC Verification */}
         <div className="space-y-2">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">KYC Verification</p>
+
+          {(() => {
+  const total = 4;
+  const done = [kycState?.aadhaar?.status, kycState?.pan?.status, kycState?.dl?.status, kycState?.bank?.status].filter(s => s === 'verified').length;
+  return (
+    <div className="mb-4 p-3 bg-indigo-50 rounded-xl">
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-xs font-black text-indigo-700">KYC Progress</span>
+        <span className="text-xs font-black text-indigo-700">{done}/{total} verified</span>
+      </div>
+      <div className="h-2 bg-indigo-100 rounded-full overflow-hidden">
+        <div className="h-full bg-indigo-500 rounded-full transition-all" style={{width: `${(done/total)*100}%`}} />
+      </div>
+    </div>
+  );
+})()}
 
           {/* Aadhaar */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4">
@@ -1160,7 +1199,7 @@ export default function DriverPWA() {
         </div>
 
         {/* Demo banner */}
-        <div style={{background:'#fef9c3',padding:'6px 12px',fontSize:11,color:'#92400e',borderRadius:8,margin:'8px 16px'}}>Demo data — live availability coming soon</div>
+        <div className="mx-4 mb-3 bg-amber-100 border border-amber-300 rounded-xl p-3 text-center"><p className="text-xs font-black text-amber-800">⚠️ Demo Data Only</p><p className="text-[10px] text-amber-700 mt-0.5">Live station availability coming soon. Do not rely on this data.</p></div>
         {/* Station cards */}
         <div className="space-y-3">
           {stations.map(function(s) { return (
@@ -1320,7 +1359,32 @@ export default function DriverPWA() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 pt-4 bg-slate-50">
-          {loading ? <div className="text-center py-16 text-xs font-black text-slate-400 animate-pulse">Loading…</div> : (
+          {loading ? (
+            <div className="space-y-3 pt-1">
+              {/* balance card skeleton */}
+              <div className="skeleton" style={{height:96,borderRadius:20}} />
+              {/* rent card skeleton */}
+              <div className="skeleton" style={{height:80,borderRadius:20}} />
+              {/* quick actions */}
+              <div className="grid grid-cols-2 gap-3">
+                {[...Array(2)].map((_,i) => <div key={i} className="skeleton" style={{height:72,borderRadius:16}} />)}
+              </div>
+              {/* recent tx */}
+              <div className="skeleton-card">
+                <div className="skeleton skeleton-text w-28 mb-4" />
+                {[...Array(3)].map((_,i) => (
+                  <div key={i} className="flex items-center gap-3 py-2">
+                    <div className="skeleton skeleton-avatar" style={{width:32,height:32}} />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="skeleton skeleton-text w-32" />
+                      <div className="skeleton skeleton-text w-20" />
+                    </div>
+                    <div className="skeleton skeleton-text w-14" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
             <>
               {tab === 'home' && <HomeTab/>}
               {tab === 'wallet' && <WalletTab/>}
@@ -1485,7 +1549,7 @@ export default function DriverPWA() {
               {chatMsgs.length === 0 ? (
                 <div className="text-center text-slate-400 text-xs py-12">
                   <MessageCircle size={28} className="mx-auto mb-2 opacity-20"/>
-                  <p>No messages yet</p>
+                  <p>No messages yet. Type below to contact your fleet owner.</p>
                 </div>
               ) : chatMsgs.map((msg, i) => (
                 <div key={i} className={`flex ${msg.sender_type === 'DRIVER' ? 'justify-end' : 'justify-start'}`}>
