@@ -7,8 +7,7 @@ const API_URL = isProduction
   ? 'https://newmg.onrender.com'  // Your deployed backend
   : 'http://localhost:5000';         // Local development
 
-console.log(`🔧 API running in ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} mode`);
-console.log(`📍 API URL: ${API_URL}`);
+if (!isProduction) console.log(`🔧 API: ${API_URL}`);
 
 const api = axios.create({
   baseURL: API_URL,
@@ -25,7 +24,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log(`📤 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    if (!isProduction) console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => {
@@ -37,12 +36,12 @@ api.interceptors.request.use(
 // Response interceptor - Handle errors
 api.interceptors.response.use(
   (response) => {
-    console.log(`📥 Response: ${response.status} ${response.config.url}`);
+    if (!isProduction) console.log(`📥 ${response.status} ${response.config.url}`);
     return response;
   },
   (error) => {
     if (error.response?.status === 401) {
-      console.warn('Unauthorized! Redirecting to login...');
+      if (!isProduction) console.warn('Unauthorized, redirecting...');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

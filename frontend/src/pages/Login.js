@@ -279,7 +279,7 @@ export default function Login() {
       });
       var data = await res.json();
       if (data.success) {
-        setOtpValue(data.otp || '');
+        if (process.env.NODE_ENV !== 'production') setOtpValue(data.otp || ''); // DEV only
         var via = data.via === 'dev' ? 'DEV OTP: ' + data.otp
                 : data.masked_email ? 'OTP sent to ' + data.masked_email
                 : 'OTP sent';
@@ -347,7 +347,7 @@ export default function Login() {
       });
       var data = await res.json();
       if (data.success) {
-        if (data.otp) setSignupOtp(data.otp); // DEV bypass
+        if (data.otp && process.env.NODE_ENV !== 'production') setSignupOtp(data.otp); // DEV only
         setStep('owner-signup-otp');
         setSuccess('OTP sent to ' + signupEmail);
       } else { setError(data.message || 'Signup failed'); }

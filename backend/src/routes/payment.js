@@ -242,7 +242,7 @@ router.post('/driver/activity/ping', async (req, res) => {
 });
 
 // ─── OWNER: GET INCENTIVE CONFIG ─────────────────────────────────────
-router.get('/owner/incentive-config', async (req, res) => {
+router.get('/owner/incentive-config', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     const result = await pool.query(
@@ -258,7 +258,7 @@ router.get('/owner/incentive-config', async (req, res) => {
 });
 
 // ─── OWNER: SAVE INCENTIVE CONFIG ────────────────────────────────────
-router.post('/owner/incentive-config', async (req, res) => {
+router.post('/owner/incentive-config', verifyToken, async (req, res) => {
   try {
     const { ownerId, isEnabled, minActiveHours, incentiveType, incentiveValue } = req.body;
     await pool.query(
@@ -385,9 +385,14 @@ router.post('/driver/activity/logout', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 // Driver ki puri history
-router.get('/owner/driver-history/:driverId', async (req, res) => {
+router.get('/owner/driver-history/:driverId', verifyToken, async (req, res) => {
   try {
     const { driverId } = req.params;
+    // Ownership check
+    const own = await pool.query('SELECT owner_code FROM public.owners WHERE id=$1',[req.user.id]);
+    if (!own.rows[0]) return res.status(403).json({ error: 'Not authorized' });
+    const dCheck = await pool.query('SELECT id FROM public.drivers WHERE id=$1 AND owner_code=$2',[driverId, own.rows[0].owner_code]);
+    if (!dCheck.rows[0]) return res.status(403).json({ error: 'Driver not in your fleet' });
 
     const [vehicleHistory, dailyLog] = await Promise.all([
       pool.query(
@@ -420,9 +425,12 @@ router.get('/owner/driver-history/:driverId', async (req, res) => {
 });
 
 // Vehicle ki puri history
-router.get('/owner/vehicle-history/:vehicleId', async (req, res) => {
+router.get('/owner/vehicle-history/:vehicleId', verifyToken, async (req, res) => {
   try {
     const { vehicleId } = req.params;
+    // Ownership check
+    const vCheck = await pool.query('SELECT id FROM public.vehicles WHERE id=$1 AND owner_id=$2',[vehicleId, req.user.id]);
+    if (!vCheck.rows[0]) return res.status(403).json({ error: 'Vehicle not in your fleet' });
     const result = await pool.query(
       `SELECT 
          dvh.*,
@@ -441,7 +449,7 @@ router.get('/owner/vehicle-history/:vehicleId', async (req, res) => {
 });
 
 // Today's activity for owner
-router.get('/owner/driver-activity', async (req, res) => {
+router.get('/owner/driver-activity', verifyToken, async (req, res) => {
   try {
     const { ownerId, date } = req.query;
     const actDate = date || new Date().toISOString().split('T')[0];
@@ -464,7 +472,7 @@ router.get('/owner/driver-activity', async (req, res) => {
 });
 
 // Incentive rules
-router.get('/owner/incentive-rules', async (req, res) => {
+router.get('/owner/incentive-rules', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     const res2 = await pool.query(
@@ -474,7 +482,7 @@ router.get('/owner/incentive-rules', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.post('/owner/incentive-rules', async (req, res) => {
+router.post('/owner/incentive-rules', verifyToken, async (req, res) => {
   try {
     const { ownerId, isEnabled, rules } = req.body;
     await pool.query(
@@ -487,50 +495,14 @@ router.post('/owner/incentive-rules', async (req, res) => {
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-// TEST ENDPOINT - Set test dues for a driver (REMOVE IN PRODUCTION)
-router.post('/driver/set-test-dues', async (req, res) => {
-  try {
-    const { phone, amount } = req.body;
-    
-    // Create a test vehicle assignment
-    const userResult = await pool.query(
-      'SELECT id FROM auth.users WHERE mobile_number = $1',
-      [phone]
-    );
-    
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Driver not found' });
-    }
-    
-    const driverId = userResult.rows[0].id;
-    
-    // Check if driver already has a vehicle
-    const existingVehicle = await pool.query(
-      'SELECT id FROM auth.owner_vehicles WHERE driver_id = $1',
-      [driverId]
-    );
-    
-    if (existingVehicle.rows.length === 0) {
-      // Create a test vehicle for this driver
-      await pool.query(
-        `INSERT INTO auth.owner_vehicles 
-         (owner_id, vehicle_number, vehicle_model, daily_rent, driver_id, status)
-         VALUES 
-         ((SELECT id FROM auth.users WHERE user_type = 'PLATFORM_ADMIN' LIMIT 1),
-          'TEST-001', 'Test EV Vehicle', $1, $2, 'ASSIGNED')`,
-        [amount || 850, driverId]
-      );
-    }
-    
-    res.json({ success: true, message: `Test dues set to ₹${amount || 850}` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Failed to set test dues' });
-  }
-});
-router.get('/driver/dues', async (req, res) => {
+// set-test-dues removed (security)
+
+router.get('/driver/dues', verifyToken, async (req, res) => {
   try {
     const { phone } = req.query;
+    // Only allow driver to fetch their own dues
+    if (req.user.role === 'DRIVER' && req.user.mobile_number && req.user.mobile_number !== phone)
+      return res.status(403).json({ error: 'Not authorized' });
     const result = await pool.query(
       `SELECT d.*, v.daily_rent as vehicle_daily_rent, v.vehicle_number
        FROM public.drivers d
@@ -941,9 +913,11 @@ router.get('/owner/driver-ledger/csv', async (req, res) => {
   }
 });
 
-router.post('/owner/notify-unpaid', async (req, res) => {
+router.post('/owner/notify-unpaid', verifyToken, async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const ownRes = await pool.query('SELECT owner_code FROM public.owners WHERE id=$1',[req.user.id]);
+    if (!ownRes.rows[0]) return res.status(403).json({ error: 'Not authorized' });
+    const ownerCode = ownRes.rows[0].owner_code;
     const paidResult = await pool.query(
       `SELECT DISTINCT payer_mobile FROM ms_orders 
        WHERE transaction_status='SUCCESS' AND DATE(order_completion_date)=CURRENT_DATE`
@@ -951,8 +925,8 @@ router.post('/owner/notify-unpaid', async (req, res) => {
     const paidPhones = paidResult.rows.map(r => r.payer_mobile);
     const unpaidDrivers = await pool.query(
       `SELECT id, full_name, mobile_number FROM public.drivers 
-       WHERE status='ACTIVE' AND mobile_number != ALL($1::text[])`,
-      [paidPhones]
+       WHERE status='ACTIVE' AND owner_code=$1 AND mobile_number != ALL($2::text[])`,
+      [ownerCode, paidPhones]
     );
     let count = 0;
     for (const driver of unpaidDrivers.rows) {
@@ -1348,63 +1322,35 @@ router.get('/owner/transactions', async (req, res) => {
     res.json([]);
   }
 });
-// GET all active drivers for login screen - NO HARDCODE, ONLY DATABASE
-router.get('/drivers/list', async (req, res) => {
+// GET drivers for owner — requires JWT, scoped to owner
+router.get('/drivers/list', verifyToken, async (req, res) => {
   try {
-    console.log('📋 Fetching all active drivers from database...');
-    
+    const ownerRes = await pool.query('SELECT owner_code FROM public.owners WHERE id=$1', [req.user.id]);
+    if (!ownerRes.rows[0]) return res.status(403).json({ success: false, drivers: [] });
+    const ownerCode = ownerRes.rows[0].owner_code;
     const result = await pool.query(
-      `SELECT 
-         d.id, 
-         d.full_name, 
-         d.mobile_number, 
-         d.driver_code,
-         COALESCE(d.wallet_balance, 0) as wallet_balance,
-         d.status
-       FROM public.drivers d
-       WHERE d.status = 'ACTIVE'
-       ORDER BY d.full_name`
+      `SELECT id, full_name, mobile_number, driver_code,
+              COALESCE(wallet_balance,0) as wallet_balance, status
+       FROM public.drivers WHERE status='ACTIVE' AND owner_code=$1 ORDER BY full_name`,
+      [ownerCode]
     );
-    
-    console.log(`✅ Found ${result.rows.length} active drivers in database`);
-    
-    if (result.rows.length === 0) {
-      console.log('⚠️ No active drivers found in database');
-      return res.status(404).json({ 
-        success: false, 
-        message: 'No active drivers found in database',
-        drivers: [] 
-      });
-    }
-    
-    res.json({ 
-      success: true, 
-      drivers: result.rows,
-      count: result.rows.length
-    });
-    
+    res.json({ success: true, drivers: result.rows, count: result.rows.length });
   } catch (err) {
-    console.error('Error fetching drivers:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Database error: ' + err.message,
-      drivers: [] 
-    });
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message, drivers: [] });
   }
 });
 
-// GET all owners list (for login screen)
+// GET owners list — no phone numbers exposed publicly
 router.get('/owners/list', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, full_name, mobile_number, owner_code
+      `SELECT id, full_name, owner_code
        FROM public.owners 
        WHERE status = 'ACTIVE'
        ORDER BY full_name`
     );
     res.json({ owners: result.rows });
   } catch (err) {
-    console.error('Error fetching owners:', err);
     res.json({ owners: [] });
   }
 });
@@ -1777,13 +1723,15 @@ router.get('/my-ip', async (req, res) => {
   const d = await r.json();
   res.json({ server_ip: d.ip });
 });
-router.get('/owner/driver-statement', async (req, res) => {
+router.get('/owner/driver-statement', verifyToken, async (req, res) => {
   try {
     const { driverId } = req.query;
-
+    // Verify driver belongs to this owner
+    const ownerRes = await pool.query('SELECT owner_code FROM public.owners WHERE id=$1', [req.user.id]);
+    if (!ownerRes.rows[0]) return res.status(403).json({ error: 'Not authorized' });
     const driver = await pool.query(
-      `SELECT full_name, mobile_number FROM public.drivers WHERE id = $1`,
-      [driverId]
+      `SELECT full_name, mobile_number FROM public.drivers WHERE id=$1 AND owner_code=$2`,
+      [driverId, ownerRes.rows[0].owner_code]
     );
     if (!driver.rows[0]) return res.status(404).json({ error: 'Driver not found' });
     
@@ -2278,10 +2226,13 @@ router.get('/my-transactions', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch transactions' });
   }
 });
-router.get('/driver/profile', async (req, res) => {
+router.get('/driver/profile', verifyToken, async (req, res) => {
   try {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ message: 'Phone required' });
+    // Only allow driver to fetch their own profile (owners can fetch any of their drivers' profiles)
+    if (req.user.role === 'DRIVER' && req.user.mobile_number && req.user.mobile_number !== phone)
+      return res.status(403).json({ error: 'Not authorized' });
 
     const result = await pool.query(
   `SELECT 
@@ -2370,8 +2321,17 @@ router.get('/owner/sos-alerts', verifyToken, requirePermission('sos_alerts'), as
   } catch(err) { res.json([]); }
 });
 
-router.put('/owner/sos-dismiss/:id', async (req, res) => {
+router.put('/owner/sos-dismiss/:id', verifyToken, async (req, res) => {
   try {
+    // Verify the SOS alert belongs to this owner's driver
+    const check = await pool.query(
+      `SELECT sa.id FROM public.sos_alerts sa
+       JOIN public.drivers d ON d.id = sa.driver_id
+       JOIN public.owners o ON o.owner_code = d.owner_code
+       WHERE sa.id=$1 AND o.id=$2`,
+      [req.params.id, req.user.id]
+    );
+    if (!check.rows[0]) return res.status(403).json({ error: 'Not authorized' });
     await pool.query(
       `UPDATE public.sos_alerts SET resolved_at = NOW(), status = 'DISMISSED' WHERE id=$1`,
       [req.params.id]
@@ -3011,7 +2971,7 @@ router.post('/sync-all-orders', async (req, res) => {
 
 });
 // ── DRIVER LOGIN: List all active drivers ──
-router.get('/drivers-list', async (req, res) => {
+router.get('/drivers-list', verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT d.id, d.full_name, d.mobile_number, d.driver_code,

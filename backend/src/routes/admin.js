@@ -27,6 +27,21 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
+
+// ─── ADMIN AUTH MIDDLEWARE ────────────────────────────────────────────────────
+const jwt = require('jsonwebtoken');
+function verifyAdmin(req, res, next) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Admin token required' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Admin access only' });
+    req.admin = decoded;
+    next();
+  } catch { return res.status(401).json({ error: 'Invalid or expired token' }); }
+}
+
 // ─── EXISTING ROUTES (unchanged) ─────────────────────────────────────────────
 router.get('/tenants', async (req, res) => {
   try {
@@ -414,7 +429,7 @@ router.get('/drivers/:driverId', async (req, res) => {
 });
 
 // ─── DEBUG: Check ms_orders columns ──────────────────────────────────────────
-router.get('/debug/transactions', async (req, res) => {
+router.get('/debug/transactions', verifyAdmin, async (req, res) => {
   try {
     const r = await pool.query(`SELECT * FROM public.ms_orders ORDER BY id DESC LIMIT 3`);
     res.json({ 
@@ -426,7 +441,7 @@ router.get('/debug/transactions', async (req, res) => {
 });
 
 // ─── TRANSACTIONS (PayYantra style filtered view) ─────────────────────────────
-router.get('/transactions', async (req, res) => {
+router.get('/transactions', verifyAdmin, async (req, res) => {
   try {
     const { search, status, mode, dateFrom, dateTo } = req.query;
     const conditions = [];

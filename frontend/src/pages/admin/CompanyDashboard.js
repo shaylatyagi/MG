@@ -34,8 +34,7 @@ class ErrorBoundary extends Component {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const API          = 'https://mg-qw5s.onrender.com';
 const TOKEN_KEY    = 'mg_admin_token';
-const ADMIN_PHONE  = process.env.REACT_APP_ADMIN_PHONE  || '';
-const ADMIN_SECRET = process.env.REACT_APP_ADMIN_SECRET || '';
+// Admin identity read from JWT token only — no secrets in frontend bundle
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 const fmt      = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN')}`;

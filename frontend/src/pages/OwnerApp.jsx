@@ -3939,7 +3939,7 @@ const ProfileTab = () => {
                       <span>←</span> Back
                     </button>
                   </div>
-                  <PaymentLinks token={localStorage.getItem('mg_token')} />
+                  <PaymentLinks token={localStorage.getItem('token')} />
                 </div>
               )}
               {activeTab === 'profile' && <ProfileTab />}
@@ -4900,3 +4900,8 @@ const ProfileTab = () => {
         </div>
       </div>
   
+    )}
+  </div>
+</div>
+  );
+}
