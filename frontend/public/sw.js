@@ -73,21 +73,4 @@ self.addEventListener('notificationclick', function(e) {
   e.waitUntil(
     clients.matchAll({ type: 'window' }).then(function(list) {
       for (var c of list) { if (c.url && 'focus' in c) return c.focus(); }
-      if (clients.openWindow) return clients.openWindow(e.notification.data || '/');
-    })
-  );
-});
-
-// Background Sync
-self.addEventListener('sync', function(e) {
-  if (e.tag === 'mg-sync') {
-    e.waitUntil(Promise.resolve());
-  }
-});
-
-// Periodic Background Sync
-self.addEventListener('periodicsync', function(e) {
-  if (e.tag === 'mg-periodic') {
-    e.waitUntil(Promise.resolve());
-  }
-});
+    

@@ -1572,47 +1572,4 @@ export default function DriverPWA() {
             <div style={{ textAlign: 'center', marginBottom: '16px' }}>
               <div style={{ fontSize: '40px', marginBottom: '8px' }}>🔔</div>
               <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>Enable Notifications</h2>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
-                Get instant alerts for payment updates, owner messages, and important fleet notifications.
-              </p>
-            </div>
-            <button onClick={requestNotifPermission} style={{
-              width: '100%', padding: '13px', borderRadius: '12px',
-              background: '#16a34a', color: '#fff', border: 'none',
-              fontSize: '14px', fontWeight: 700, cursor: 'pointer', marginBottom: '10px',
-              fontFamily: 'inherit',
-            }}>
-              Allow Notifications
-            </button>
-            <button onClick={dismissNotifNudge} style={{
-              width: '100%', padding: '11px', borderRadius: '12px',
-              background: 'transparent', color: '#94a3b8', border: 'none',
-              fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit',
-            }}>
-              Not now
-            </button>
-          </div>
-        </div>
-      )}
-      {/* Logout confirm */}
-      {showLogoutConfirm && (
-        <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
-              <LogOut size={20} className="text-red-500" />
-            </div>
-            <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
-            <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
-              <button onClick={logout}
-                className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
-            </div>
-          </div>
-        </div>
-      )}
-      </div>
-    </div>
-  );
-}
+   

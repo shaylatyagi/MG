@@ -281,6 +281,7 @@ useEffect(() => {
           setActiveSOS(latest);
           setShowSOSAlert(true);
           setSeenSosIds(prev => new Set([...prev, latest.id]));
+          if (window.__mgPlaySOSAlarm) window.__mgPlaySOSAlarm();
         }
       }
     } catch(e) {}
@@ -1326,27 +1327,56 @@ return () => clearInterval(interval);
     setTimeout(() => setShowNotifNudge(true), 6000); // 6s after mount
   }, []);
 
-  // SOS alarm: service worker postMessage → play Web Audio alarm
+  // SOS alarm: unlock AudioContext on first touch/click (mobile + desktop), play silent buffer to warm up
+  const sosAudioCtxRef = React.useRef(null);
+  useEffect(() => {
+    function unlockAudio() {
+      if (sosAudioCtxRef.current) return;
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        sosAudioCtxRef.current = ctx;
+        // Play a silent 1-sample buffer — this "unlocks" audio on mobile Chrome/Safari
+        var buf = ctx.createBuffer(1, 1, 22050);
+        var src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+        ctx.resume();
+      } catch(e) {}
+    }
+    document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+    return () => {
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+    };
+  }, []);
+
   useEffect(() => {
     function playSOSAlarm() {
       try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        function beep(freq, startAt, dur) {
-          var osc = ctx.createOscillator();
-          var gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.type = 'square'; osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.7, ctx.currentTime + startAt);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startAt + dur);
-          osc.start(ctx.currentTime + startAt);
-          osc.stop(ctx.currentTime + startAt + dur + 0.05);
-        }
-        // SOS morse: ... --- ...
-        [0, 0.25, 0.5].forEach(function(t) { beep(880, t, 0.15); });
-        [0.9, 1.35, 1.8].forEach(function(t) { beep(440, t, 0.35); });
-        [2.4, 2.65, 2.9].forEach(function(t) { beep(880, t, 0.15); });
+        var ctx = sosAudioCtxRef.current || new (window.AudioContext || window.webkitAudioContext)();
+        sosAudioCtxRef.current = ctx;
+        ctx.resume().then(function() {
+          function beep(freq, startAt, dur) {
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type = 'square'; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.8, ctx.currentTime + startAt);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startAt + dur);
+            osc.start(ctx.currentTime + startAt);
+            osc.stop(ctx.currentTime + startAt + dur + 0.05);
+          }
+          // SOS morse: ... --- ...
+          [0, 0.25, 0.5].forEach(function(t) { beep(880, t, 0.15); });
+          [0.9, 1.35, 1.8].forEach(function(t) { beep(440, t, 0.35); });
+          [2.4, 2.65, 2.9].forEach(function(t) { beep(880, t, 0.15); });
+        });
       } catch(e) { console.warn('SOS audio failed:', e); }
     }
+    // Expose globally so SOS alerts in-app can also trigger it
+    window.__mgPlaySOSAlarm = playSOSAlarm;
     function onSWMessage(e) {
       if (e.data && e.data.type === 'SOS_ALARM') playSOSAlarm();
     }
@@ -4402,6 +4432,13 @@ const ProfileTab = () => {
 
     {/* Action buttons */}
     <div className="p-6 space-y-3">
+      <button
+        onClick={() => { if (window.__mgPlaySOSAlarm) window.__mgPlaySOSAlarm(); }}
+        className="w-full py-3 rounded-2xl font-bold text-sm"
+        style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: '2px solid rgba(255,255,255,0.4)' }}
+      >
+        🔊 Replay Alarm
+      </button>
       <button
         onClick={async () => {
           // Dismiss SOS
