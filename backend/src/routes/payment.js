@@ -1109,19 +1109,30 @@ router.post('/owner/cash-payment', verifyToken, requirePermission('record_cash')
 router.get('/owner/ledger', async (req, res) => {
   try {
     const { period } = req.query;
-    let where = '';
+    const ownerId = req.query.ownerId;
+    if (!ownerId) return res.json({ received: 0, outstanding: 0 });
+
+    // Get drivers belonging to this owner
+    const driverRows = await pool.query(
+      `SELECT id FROM public.drivers WHERE owner_id=$1`, [ownerId]
+    );
+    if (driverRows.rows.length === 0) return res.json({ received: 0, outstanding: 0 });
+    const driverIds = driverRows.rows.map(r => r.id);
+    const idList = driverIds.join(',');
+
+    let where = `driver_id IN (${idList})`;
     switch(period) {
-      case 'yesterday': where = `DATE(order_completion_date) = CURRENT_DATE - INTERVAL '1 day'`; break;
-      case 'week':      where = `order_completion_date >= NOW() - INTERVAL '7 days'`; break;
-      case 'this_month':where = `DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW())`; break;
-      case 'last_month':where = `DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')`; break;
-      default:          where = `DATE(order_completion_date) = CURRENT_DATE`;
+      case 'yesterday':  where += ` AND DATE(order_completion_date) = CURRENT_DATE - INTERVAL '1 day'`; break;
+      case 'week':       where += ` AND order_completion_date >= NOW() - INTERVAL '7 days'`; break;
+      case 'this_month': where += ` AND DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW())`; break;
+      case 'last_month': where += ` AND DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')`; break;
+      default:           where += ` AND DATE(order_completion_date) = CURRENT_DATE`;
     }
     const received = await pool.query(
       `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='SUCCESS' AND ${where}`
     );
     const pending = await pool.query(
-      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='PENDING' AND DATE(order_initiation_date)=CURRENT_DATE`
+      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='PENDING' AND driver_id IN (${idList}) AND DATE(order_initiation_date)=CURRENT_DATE`
     );
     res.json({
       received: parseFloat(received.rows[0].total),
@@ -3244,16 +3255,4 @@ router.delete('/owner/managers/:managerId', async (req, res) => {
 router.get('/manager/profile', async (req, res) => {
   try {
     const { phone } = req.query;
-    const r = await pool.query(
-      `SELECT m.*, o.full_name as owner_name, o.owner_code, o.mobile_number as owner_phone
-       FROM public.managers m
-       JOIN public.owners o ON o.id = m.owner_id
-       WHERE m.mobile_number=$1 AND m.status='ACTIVE'`,
-      [phone]
-    );
-    if (!r.rows[0]) return res.status(404).json({ error: 'Not a manager' });
-    res.json({ success: true, manager: r.rows[0] });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Upgrade to premium (admin manually upgrades, or payment webhook)
+    const 

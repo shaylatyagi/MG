@@ -1209,7 +1209,7 @@ setOwner({
 useEffect(() => {
   const fetchLedger = async () => {
     try {
-      const res = await fetch(`${API}/api/payment/owner/ledger?period=${horizon}`, {
+      const res = await fetch(`${API}/api/payment/owner/ledger?period=${horizon}&ownerId=${ownerId()}`, {
         headers: { Authorization: `Bearer ${token()}` }
       });
       const d = await res.json();
@@ -4899,7 +4899,4 @@ const ProfileTab = () => {
           </div>
         </div>
       </div>
-    )}
-  </div>
-  );
-}
+  
