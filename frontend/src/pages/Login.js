@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Truck, Building2, Shield, Phone, ArrowRight, Lock, Eye, EyeOff } from 'lucide-react';
 
-const API = 'https://mg-qw5s.onrender.com';
+const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 const Shell = ({ children, showBack, onBack, title, subtitle }) => (
@@ -279,7 +279,6 @@ export default function Login() {
       });
       var data = await res.json();
       if (data.success) {
-        if (process.env.NODE_ENV !== 'production') setOtpValue(data.otp || ''); // DEV only
         var via = data.via === 'dev' ? 'DEV OTP: ' + data.otp
                 : data.masked_email ? 'OTP sent to ' + data.masked_email
                 : 'OTP sent';
@@ -347,7 +346,6 @@ export default function Login() {
       });
       var data = await res.json();
       if (data.success) {
-        if (data.otp && process.env.NODE_ENV !== 'production') setSignupOtp(data.otp); // DEV only
         setStep('owner-signup-otp');
         setSuccess('OTP sent to ' + signupEmail);
       } else { setError(data.message || 'Signup failed'); }

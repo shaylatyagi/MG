@@ -1086,27 +1086,35 @@ router.get('/owner/ledger', async (req, res) => {
     const ownerId = req.query.ownerId;
     if (!ownerId) return res.json({ received: 0, outstanding: 0 });
 
-    // Get drivers belonging to this owner
+    // Get owner_code for this owner (drivers table uses owner_code not owner_id)
+    const ownerCodeRes = await pool.query(
+      `SELECT owner_code FROM public.owners WHERE id=$1`, [ownerId]
+    );
+    if (ownerCodeRes.rows.length === 0) return res.json({ received: 0, outstanding: 0 });
+    const ownerCode = ownerCodeRes.rows[0].owner_code;
+
+    // Get drivers belonging to this owner via owner_code
     const driverRows = await pool.query(
-      `SELECT id FROM public.drivers WHERE owner_id=$1`, [ownerId]
+      `SELECT id FROM public.drivers WHERE owner_code=$1`, [ownerCode]
     );
     if (driverRows.rows.length === 0) return res.json({ received: 0, outstanding: 0 });
     const driverIds = driverRows.rows.map(r => r.id);
-    const idList = driverIds.join(',');
 
-    let where = `driver_id IN (${idList})`;
+    let dateFilter = '';
     switch(period) {
-      case 'yesterday':  where += ` AND DATE(order_completion_date) = CURRENT_DATE - INTERVAL '1 day'`; break;
-      case 'week':       where += ` AND order_completion_date >= NOW() - INTERVAL '7 days'`; break;
-      case 'this_month': where += ` AND DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW())`; break;
-      case 'last_month': where += ` AND DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')`; break;
-      default:           where += ` AND DATE(order_completion_date) = CURRENT_DATE`;
+      case 'yesterday':  dateFilter = ` AND DATE(order_completion_date) = CURRENT_DATE - INTERVAL '1 day'`; break;
+      case 'week':       dateFilter = ` AND order_completion_date >= NOW() - INTERVAL '7 days'`; break;
+      case 'this_month': dateFilter = ` AND DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW())`; break;
+      case 'last_month': dateFilter = ` AND DATE_TRUNC('month', order_completion_date) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')`; break;
+      default:           dateFilter = ` AND DATE(order_completion_date) = CURRENT_DATE`;
     }
     const received = await pool.query(
-      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='SUCCESS' AND ${where}`
+      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='SUCCESS' AND driver_id = ANY($1::int[])${dateFilter}`,
+      [driverIds]
     );
     const pending = await pool.query(
-      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='PENDING' AND driver_id IN (${idList}) AND DATE(order_initiation_date)=CURRENT_DATE`
+      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='PENDING' AND driver_id = ANY($1::int[]) AND DATE(order_initiation_date)=CURRENT_DATE`,
+      [driverIds]
     );
     res.json({
       received: parseFloat(received.rows[0].total),
@@ -1913,7 +1921,10 @@ router.post('/chat/send', async (req, res) => {
       );
       senderId      = driverId;
       senderRole    = 'DRIVER';
-      recipientId   = ownerRes.rows[0]?.id || parseInt(ownerId) || 1;
+      if (!ownerRes.rows[0]) {
+        return res.status(404).json({ error: 'Owner not found' });
+      }
+      recipientId   = ownerRes.rows[0].id;
       recipientRole = 'OWNER';
     }
 
@@ -2066,13 +2077,13 @@ if (driverUser.rows.length === 0) {
   console.log('Driver not found for phone:', driverPhone);
 } else {
   const driverUserId = driverUser.rows[0].id;    
-    // Update driver_details
+    // Update drivers wallet
     await pool.query(
-      `UPDATE public.driver_details 
+      `UPDATE public.drivers
        SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
            amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
            updated_at = NOW()
-       WHERE user_id = $2`,
+       WHERE mobile_number = (SELECT phone_number FROM users WHERE id = $2 LIMIT 1)`,
       [amount, driverUserId]
     );
     
@@ -2493,8 +2504,8 @@ router.put('/notifications/mark-read', async (req, res) => {
       );
     } else if (ownerId) {
       await pool.query(
-        'UPDATE public.notifications SET is_read = TRUE WHERE user_type = $1',
-        ['OWNER']
+        'UPDATE public.notifications SET is_read = TRUE WHERE user_type = $1 AND (owner_id = $2 OR driver_id = $3)',
+        ['OWNER', ownerId, null]
       );
     }
     
@@ -2506,7 +2517,10 @@ router.put('/notifications/mark-read', async (req, res) => {
 });
 
 // CHECK PENDING (Inquiry API) 
-router.post('/check-pending', async (req, res) => {
+router.post('/check-pending', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
 
   try {
 
@@ -2557,11 +2571,11 @@ router.post('/check-pending', async (req, res) => {
 
             await pool.query(
 
-              `UPDATE driver_details 
+              `UPDATE public.drivers
                SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
                    amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
                    updated_at = NOW()
-               WHERE user_id = (SELECT id FROM users WHERE phone_number = $2 LIMIT 1)`,
+               WHERE mobile_number = $2`,
 
               [amount, order.payer_mobile]
 
@@ -2731,11 +2745,11 @@ router.get('/inquiry-by-order/:payyantraOrderId', async (req, res) => {
 
       await pool.query(
 
-        `UPDATE driver_details 
+        `UPDATE public.drivers
          SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
              amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
              updated_at = NOW()
-         WHERE user_id = (SELECT id FROM users WHERE phone_number = $2 LIMIT 1)`,
+         WHERE mobile_number = $2`,
 
         [amount, localOrderResult.rows[0].payer_mobile]
 
@@ -2832,11 +2846,11 @@ router.get('/verify-by-reference/:orderId', verifyToken, async (req, res) => {
     const amount = parseFloat(order.order_amount || 0);
     if (newStatus === 'SUCCESS' && order.transaction_status !== 'SUCCESS') {
       await pool.query(
-        `UPDATE driver_details 
+        `UPDATE public.drivers
          SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
              amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
              updated_at = NOW()
-         WHERE user_id = (SELECT id FROM users WHERE phone_number = $2 LIMIT 1)`,
+         WHERE mobile_number = $2`,
         [amount, order.payer_mobile]
       );
       console.log(`💰 Wallet credited ₹${amount} for ${order.payer_mobile} via verify-by-reference`);
@@ -3002,46 +3016,7 @@ router.post('/driver-otp-request', async (req, res) => {
 
 // ── DRIVER OTP VERIFY ──
 router.post('/driver-otp-verify', async (req, res) => {
-  try {
-    const { phone, otp } = req.body;
-    if (otp !== '123456')
-      return res.status(400).json({ success: false, message: 'Invalid OTP. Demo OTP is 123456' });
-
-    const driver = await pool.query(
-      `SELECT d.id, d.full_name, d.mobile_number, d.driver_code, d.wallet_balance,
-              COALESCE(v.vehicle_number, 'Not Assigned') as vehicle_number,
-              COALESCE(v.vehicle_model, '') as vehicle_model,
-              COALESCE(v.daily_rent, 0) as daily_rent
-       FROM public.drivers d
-       LEFT JOIN public.vehicles v ON v.driver_id = d.id
-       WHERE d.mobile_number = $1 AND d.status = 'ACTIVE'`,
-      [phone]
-    );
-    if (driver.rows.length === 0)
-      return res.status(404).json({ success: false, message: 'Driver not found' });
-
-    const d = driver.rows[0];
-    const jwt = require('jsonwebtoken');
-    const token = jwt.sign(
-      { id: d.id, driver_code: d.driver_code, user_type: 'VEHICLE_DRIVER' },
-      process.env.JWT_SECRET || 'voltops_super_secret_key_2025',
-      { expiresIn: '7d' }
-    );
-    res.json({
-      success: true, token,
-      data: {
-        id:           d.id,
-        name:         d.full_name,
-        usercode:     d.driver_code,
-        phone_number: d.mobile_number,
-        phone:        d.mobile_number,
-        mobile_number:d.mobile_number,
-        vehicle:      d.vehicle_number,
-        daily_rent:   d.daily_rent,
-        userType:     'VEHICLE_DRIVER'
-      }
-    });
-  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+  return res.status(503).json({ success: false, message: 'OTP login not yet available — use PIN login' });
 });
 router.get('/driver/notifications', async (req, res) => {
   try {
@@ -3100,14 +3075,32 @@ const generateDailyRentEntries = async () => {
   }
 };
 // Manual trigger for testing
-router.post('/admin/generate-daily-rent', async (req, res) => {
+router.post('/admin/generate-daily-rent', verifyToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
   await generateDailyRentEntries();
   res.json({ success: true, message: 'Done!' });
 });
 // ─── PER-DRIVER INCENTIVE RULE ───────────────────────────────────────
-router.post('/owner/driver-incentive-rule', async (req, res) => {
+router.post('/owner/driver-incentive-rule', verifyToken, async (req, res) => {
   try {
     const { driverId, ruleIndex } = req.body;
+    // Verify the driver belongs to the requesting owner
+    const ownerCodeRes = await pool.query(
+      `SELECT owner_code FROM public.owners WHERE id = $1`, [req.user.id]
+    );
+    if (ownerCodeRes.rows.length === 0) {
+      return res.status(403).json({ error: 'Owner not found' });
+    }
+    const ownerCode = ownerCodeRes.rows[0].owner_code;
+    const driverCheck = await pool.query(
+      `SELECT id FROM public.drivers WHERE id = $1 AND owner_code = $2`,
+      [driverId, ownerCode]
+    );
+    if (driverCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Driver does not belong to this owner' });
+    }
     await pool.query(
       `UPDATE public.drivers SET incentive_rule_index = $1 WHERE id = $2`,
       [ruleIndex, driverId]

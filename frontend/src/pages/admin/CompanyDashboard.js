@@ -32,7 +32,7 @@ class ErrorBoundary extends Component {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const API          = 'https://mg-qw5s.onrender.com';
+const API          = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
 const TOKEN_KEY    = 'mg_admin_token';
 // Admin identity read from JWT token only — no secrets in frontend bundle
 
@@ -609,7 +609,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
       )}
 
       {tab === 'docs' && (
-        <DocumentsSection userType="VEHICLE" userId={vehicleId} />
+        <DocumentsSection userType="DRIVER" userId={vehicleId} />
       )}
     </Modal>
   );
@@ -2450,7 +2450,6 @@ function useAdminNotifications() {
 
   const fetchNotifs = () => {
     api('/api/admin/notifications')
-      .then(r => r.json())
       .then(d => { if (d.success) { setNotifications(d.notifications || []); setUnread(d.unread || 0); } })
       .catch(() => {});
   };

@@ -12,13 +12,14 @@ import { useNavigate } from 'react-router-dom';
 import Chatbot from '../components/Chatbot';
 import DocumentSection from '../components/DocumentSection';
 
-const API = 'https://mg-qw5s.onrender.com';
-const KYC_API = 'https://mg-qw5s.onrender.com';
+const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
 
 export default function DriverPWA() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tab, setTab] = useState('home');
+  // D-03: sync tab → activeTab so single source drives rendering
+  useEffect(() => { setActiveTab(tab === 'home' ? 'dashboard' : tab); }, [tab]);
   const [historyFrom, setHistoryFrom] = useState('tab');
   const [lang, setLang] = useState('en');
   const [companyPayMode, setCompanyPayMode] = useState('BOTH'); // CASH_ONLY | ONLINE_ONLY | BOTH
@@ -295,7 +296,7 @@ export default function DriverPWA() {
       try { localStorage.setItem('mg_notifs_cached', JSON.stringify(updated)); } catch {}
       return updated;
     });
-    try { await fetch(`${API}/api/payment/notifications/mark-read?userId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch {}
+    try { await fetch(`${API}/api/payment/notifications/mark-read?driverId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch {}
   };
 
   const fetchEarnings = async () => {
@@ -325,7 +326,7 @@ export default function DriverPWA() {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
       const r = await fetch(`${API}/api/payment/create-order`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-        body: JSON.stringify({ amount: payAmt || dues || 850, customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || 'driver@mg.com', purpose: 'RENT' })
+        body: JSON.stringify({ amount: payAmt || dues || 0, customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || '', purpose: 'RENT' })
       });
       const d = await r.json();
       if (payAbortRef.current) return; // user cancelled mid-request
@@ -345,7 +346,7 @@ export default function DriverPWA() {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
       const r = await fetch(`${API}/api/payment/create-order`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-        body: JSON.stringify({ amount: Number(amt), customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || 'driver@mg.com', purpose: 'WALLET' })
+        body: JSON.stringify({ amount: Number(amt), customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || '', purpose: 'WALLET' })
       });
       const d = await r.json();
       const url = d?.checkoutUrl || d?.data?.checkoutUrl || d?.intentURL || d?.data?.intentURL;
@@ -490,7 +491,7 @@ export default function DriverPWA() {
   const kycCall = async (endpoint, body, docKey) => {
     setKycLoading(docKey);
     try {
-      const r = await fetch(`${KYC_API}/api/kyc/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` }, body: JSON.stringify({ ...body, phone: phone() }) });
+      const r = await fetch(`${API}/api/kyc/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` }, body: JSON.stringify({ ...body, phone: phone() }) });
       return await r.json();
     } catch (e) { return { success: false, message: e.message }; }
     finally { setKycLoading(''); }
@@ -1068,6 +1069,7 @@ export default function DriverPWA() {
 
   // ── STATIONS TAB ──────────────────────────────────────────────────────────
   // Stations with real coordinates — sorted by GPS distance from driver
+  // TODO: Replace with live API — these are demo stations only
   const ALL_STATIONS = [
     { id: 1, name: 'Dwarka Sec 10 Swap Point', type: 'Battery Swap', address: 'Sector 10 Market, Dwarka, Delhi',   lat: 28.5734, lng: 77.0539, slots: 4, open: true },
     { id: 2, name: 'Uttam Nagar EV Hub',       type: 'Fast Charge',  address: 'Uttam Nagar West, New Delhi',       lat: 28.6219, lng: 77.0494, slots: 2, open: true },
@@ -1157,6 +1159,8 @@ export default function DriverPWA() {
           ); })}
         </div>
 
+        {/* Demo banner */}
+        <div style={{background:'#fef9c3',padding:'6px 12px',fontSize:11,color:'#92400e',borderRadius:8,margin:'8px 16px'}}>Demo data — live availability coming soon</div>
         {/* Station cards */}
         <div className="space-y-3">
           {stations.map(function(s) { return (

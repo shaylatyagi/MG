@@ -17,7 +17,7 @@ import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah
 import DocumentSection from '../components/DocumentSection';
 import PaymentLinks from './owner/PaymentLinks';
 import ThemeToggle from '../components/ThemeToggle';
-const API ='https://mg-qw5s.onrender.com';
+const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
 const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [ledgerData, setLedgerData] = useState([]);
   const [expandedDriver, setExpandedDriver] = useState(null);
@@ -438,7 +438,7 @@ const [multipleDrivers, setMultipleDrivers] = useState([{ name:'', phone:'' }]);
   
   // Form states
   const [newVehicle, setNewVehicle] = useState({ 
-  number: '', model: '', type: 'EV', rent: 850,
+  number: '', model: '', type: 'EV', rent: '',
   insuranceExpiry: '', fitnessExpiry: '', chassisNumber: ''
 });
   const [newDriver, setNewDriver] = useState({ 
@@ -472,7 +472,7 @@ const ownerCode = () => getUser().owner_code;
   const fetchUnassignedDriversList = async () => {
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API}/api/assignment/unassigned/drivers`, {
+    const response = await fetch(`${API}/api/assignment/unassigned/drivers?ownerId=${ownerId()}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const data = await response.json();
@@ -486,10 +486,10 @@ const fetchUnassignedData = async () => {
   try {
     const token = localStorage.getItem('token');
     const [driversRes, vehiclesRes] = await Promise.all([
-      fetch(`${API}/api/assignment/unassigned/drivers`, {
+      fetch(`${API}/api/assignment/unassigned/drivers?ownerId=${ownerId()}`, {
         headers: { Authorization: `Bearer ${token}` }
       }),
-      fetch(`${API}/api/assignment/unassigned/vehicles`, {
+      fetch(`${API}/api/assignment/unassigned/vehicles?ownerId=${ownerId()}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
     ]);
@@ -508,7 +508,7 @@ const fetchUnassignedData = async () => {
 const fetchAvailableVehicles = async (driverId) => {
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API}/api/assignment/available/vehicles?driverId=${driverId}`, {
+    const response = await fetch(`${API}/api/assignment/available/vehicles?driverId=${driverId}&ownerId=${ownerId()}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const data = await response.json();
@@ -682,7 +682,7 @@ const DriverDetailsModal = () => {
               </div>
               <div className="flex justify-between items-center py-2 border-b border-slate-100">
                 <span className="text-sm text-slate-500">Owner Code</span>
-                <span className="text-sm font-mono">{driver.owner_code || 'OWN701951'}</span>
+                <span className="text-sm font-mono">{driver.owner_code || '—'}</span>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-slate-500">Joined</span>
@@ -816,7 +816,7 @@ const DriverDetailsModal = () => {
               <span className="text-3xl">📄</span>
               <div>
                 <p className="text-xs font-black text-slate-800 truncate max-w-[200px]">{agreementFile.name}</p>
-                <p className="text-[10px] text-slate-400">{(agreementFile.size/1024).toFixed(0)} KB · PDF</p>
+                <p className="text-[10px] text-slate-400">{(agreementFile.size/1024).toFixed(0)} KB · {agreementFile.name?.split('.').pop()?.toUpperCase() || 'FILE'}</p>
               </div>
             </div>
           )}
@@ -964,7 +964,7 @@ const DriverDetailsModal = () => {
 const fetchAvailableDrivers = async (vehicleId) => {
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${API}/api/assignment/available/drivers?vehicleId=${vehicleId}`, {
+    const response = await fetch(`${API}/api/assignment/available/drivers?vehicleId=${vehicleId}&ownerId=${ownerId()}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const data = await response.json();
@@ -979,7 +979,7 @@ const openAddVehicleModal = () => {
   setShowAddVehicle(true);
   fetchAvailableDrivers();
   setSelectedDriverId('');
-  setNewVehicle({ number: '', model: '', rent: 850 });
+  setNewVehicle({ number: '', model: '', rent: '' });
 };
 const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, customRent) => {
   setAssigning(true);
@@ -1171,7 +1171,7 @@ if (!oId) { navigate('/login'); return; }
   setStats({
     totalVehicles: data.total_vehicles || 0,
     totalDrivers: data.total_drivers || 0,
-    todayCollection: data.total_earnings || 0,
+    todayCollection: data.earnings_month || 0,
     pendingDues: totalPending  // ← real data
   });
 }
@@ -1767,7 +1767,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   // Dynamic header title
   const getHeaderTitle = () => ({
   home: t.title, drivers: t.drivers, vehicles: t.fleet,
-  payments: t.collection, profile: t.editProfile
+  payments: t.txHistory || 'Payments', profile: t.editProfile
 })[activeTab] || 'MobilityGrid';
 
   const getHeaderSubtitle = () => {
@@ -2021,7 +2021,7 @@ const DriversTab = () => {
   const fetchAvailableVehiclesForDriverTab = async (driverId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API}/api/assignment/available/vehicles?driverId=${driverId}`, {
+      const response = await fetch(`${API}/api/assignment/available/vehicles?driverId=${driverId}&ownerId=${ownerId()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await response.json();
@@ -3024,8 +3024,8 @@ const ProfileTab = () => {
       <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3 cursor-pointer hover:bg-white/30 transition">
         <Camera size={24} className="text-white" />
       </div>
-      <h2 className="text-lg font-black">{owner?.full_name || owner?.name || 'Rajesh Kumar'}</h2>
-      <p className="text-xs text-indigo-200">Owner Code: {owner?.owner_code || 'OWN701951'}</p>
+      <h2 className="text-lg font-black">{owner?.full_name || owner?.name || '—'}</h2>
+      <p className="text-xs text-indigo-200">Owner Code: {owner?.owner_code || '—'}</p>
       <p className="text-[10px] text-indigo-200 mt-1">Member since {new Date().toLocaleDateString()}</p>
     </div>
     
@@ -3161,7 +3161,7 @@ const ProfileTab = () => {
               const u = JSON.parse(localStorage.getItem('user') || '{}');
               const r = await fetch(`${API}/api/payment/create-order`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-                body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || 'owner@mg.com', purpose: 'PREMIUM_MANAGER' })
+                body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || '', purpose: 'PREMIUM_MANAGER' })
               }).then(r => r.json());
               const url = r?.checkoutUrl || r?.data?.checkoutUrl;
               if (url) window.location.href = url; else alert('Contact support to upgrade.');
@@ -3248,7 +3248,7 @@ const ProfileTab = () => {
                     const u = JSON.parse(localStorage.getItem('user') || '{}');
                     const r = await fetch(`${API}/api/payment/create-order`, {
                       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-                      body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || 'owner@mg.com', purpose: 'PREMIUM_MANAGER' })
+                      body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || '', purpose: 'PREMIUM_MANAGER' })
                     }).then(r => r.json());
                     const url = r?.checkoutUrl || r?.data?.checkoutUrl;
                     if (url) window.location.href = url; else alert('Contact support to upgrade.');
@@ -4105,7 +4105,7 @@ const ProfileTab = () => {
           onChange={e => setNewVehicle({...newVehicle, rent: parseInt(e.target.value)})} 
         />
         <p className="text-[9px] text-slate-400 mt-1">
-          {rentType === 'DAILY' && 'Driver will pay ₹850 every day'}
+          {rentType === 'DAILY' && `Driver will pay ₹${newVehicle.rent || 0} every day`}
           {rentType === 'WEEKLY' && `Driver will pay ₹${newVehicle.rent || 5950} every week`}
           {rentType === 'MONTHLY' && `Driver will pay ₹${newVehicle.rent || 25500} every month`}
         </p>
