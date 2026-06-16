@@ -3075,4 +3075,15 @@ function AdminPanelInner() {
             </div>
           </div>
         </div>
-   
+      )}
+    </div>
+  );
+}
+
+export default function AdminPanel() {
+  return (
+    <ErrorBoundary>
+      <AdminPanelInner />
+    </ErrorBoundary>
+  );
+}
