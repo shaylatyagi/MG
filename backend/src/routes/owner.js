@@ -821,4 +821,18 @@ router.get('/driver-locations', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PUT /api/owner/update-profile
+router.put('/update-profile', async (req, res) => {
+  try {
+    const { ownerId, full_name, email } = req.body;
+    if (!ownerId || !full_name) return res.status(400).json({ success: false, message: 'ownerId and full_name required' });
+    await pool.query(
+      `UPDATE public.owners SET full_name=$1, email=$2 WHERE id=$3`,
+      [full_name, email || null, ownerId]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+
 module.exports = router;

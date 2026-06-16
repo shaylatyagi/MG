@@ -65,7 +65,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
 
   useEffect(() => {
     fetchLedger();
-    const interval = setInterval(fetchLedger, 30000);
+    const interval = setInterval(fetchLedger, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -288,11 +288,12 @@ useEffect(() => {
     } catch(e) {}
   };
   
-  const interval = setInterval(pollSOS, 10000);
+  const interval = setInterval(pollSOS, 60000);
   pollSOS();
   return () => clearInterval(interval);
 }, [seenSosIds]);
   const [chatMessages, setChatMessages] = useState([]);
+  const chatEndRef = React.useRef(null);
   const [lang, setLang] = useState('en');
   const T = {
   en: {
@@ -347,6 +348,10 @@ const t = T[lang];
 const [ledger, setLedger] = useState({ received: 0, outstanding: 0 });
   const [showCashModal, setShowCashModal] = useState(false);
 const [cashDriver, setCashDriver] = useState(null);
+const [showEditProfile, setShowEditProfile] = useState(false);
+const [editName, setEditName] = useState('');
+const [editEmail, setEditEmail] = useState('');
+const [editSaving, setEditSaving] = useState(false);
 const [cashAmount, setCashAmount] = useState('');
 const [cashConfirm, setCashConfirm] = useState(false);
 const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -473,7 +478,7 @@ const [multipleDrivers, setMultipleDrivers] = useState([{ name:'', phone:'' }]);
       setTime(`${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`);
     };
     tick();
-    const id = setInterval(tick, 300000);//every 5 minutes
+    const id = setInterval(tick, 60000);//every 5 minutes
     return () => clearInterval(id);
   }, []);
   const token = () => localStorage.getItem('token');
@@ -1193,8 +1198,10 @@ if (!oId) { navigate('/login'); return; }
     
     if (notifRes.ok) {
       const notifs = await notifRes.json();
-      setNotifications(notifs);
-      setUnreadCount(notifs.filter(n => !n.is_read).length);
+      const ownerReadIds = JSON.parse(localStorage.getItem('mg_owner_read_notif_ids') || '[]');
+      const mergedNotifs = notifs.map(x => ownerReadIds.includes(x.id) ? { ...x, is_read: true } : x);
+      setNotifications(mergedNotifs);
+      setUnreadCount(mergedNotifs.filter(n => !n.is_read).length);
     }
 setOwner({
   id: u.id,
@@ -1271,8 +1278,10 @@ useEffect(() => {
         });
         const data = await res.json();
         if (Array.isArray(data)) {
-          setNotifications(data);
-          const newUnread = data.filter(n => !n.is_read).length;
+          setNotifications(mergedData);
+          const ownerReadIds2 = JSON.parse(localStorage.getItem('mg_owner_read_notif_ids') || '[]');
+          const mergedData = data.map(x => ownerReadIds2.includes(x.id) ? { ...x, is_read: true } : x);
+          const newUnread = mergedData.filter(n => !n.is_read).length;
           if (newUnread > unreadCount) {
             // New notification arrived
             setUnreadCount(newUnread);
@@ -1310,7 +1319,7 @@ return () => clearInterval(interval);
     } catch(e) {}
   };
 
-  const interval = setInterval(pollChat, 3000);
+  const interval = setInterval(pollChat, 60000);
   return () => clearInterval(interval);
 }, [showChat, selectedDriver]);
 
@@ -1457,7 +1466,15 @@ return () => clearInterval(interval);
 
   const markRead = async () => {
     setUnreadCount(0);
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, is_read: true }));
+      try {
+        const readIds = updated.map(n => n.id).filter(Boolean);
+        const existing = JSON.parse(localStorage.getItem('mg_owner_read_notif_ids') || '[]');
+        localStorage.setItem('mg_owner_read_notif_ids', JSON.stringify([...new Set([...existing, ...readIds])]));
+      } catch {}
+      return updated;
+    });
     try {
       const userId = ownerId();
       await fetch(`${API}/api/payment/notifications/mark-read?userId=${userId}`, {
@@ -3346,7 +3363,8 @@ const ProfileTab = () => {
       </div>
     </div>
     
-    <button className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
+    <button onClick={() => { setEditName(owner?.full_name || owner?.name || ''); setEditEmail(owner?.email || ''); setShowEditProfile(true); }}
+      className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
       <Edit2 size={14} /> {t.editProfile}
     </button>
 
@@ -3853,7 +3871,7 @@ const ProfileTab = () => {
     // Fetch on mount + every 30s
     React.useEffect(() => {
       fetchLocations();
-      const id = setInterval(fetchLocations, 30000);
+      const id = setInterval(fetchLocations, 60000);
       return () => clearInterval(id);
     }, [fetchLocations]);
 
@@ -3900,7 +3918,7 @@ const ProfileTab = () => {
 
         {/* Bottom driver info sheet — slides up on pin tap */}
         {selectedDriver && (
-          <div className="absolute bottom-0 left-0 right-0 z-20 bg-white rounded-t-3xl p-5 shadow-2xl"
+          <div className="absolute bottom-0 left-0 right-0 z-[200] bg-white rounded-t-3xl p-5 shadow-2xl pb-24"
                onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"/>
             <div className="flex items-center gap-4 mb-4">
@@ -4306,7 +4324,7 @@ const ProfileTab = () => {
                 </div>
                 <button onClick={() => setShowChat(false)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center"><X size={16} /></button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={el => { if (el) el.scrollTop = el.scrollHeight; }}>
                 {chatHistory.map((msg, i) => (
                   <div key={i} className={`flex ${msg.from === 'owner' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[75%] p-3 rounded-2xl text-sm ${msg.from === 'owner' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
@@ -4804,13 +4822,13 @@ const ProfileTab = () => {
 )}
         {showVehicleDetailModal && <VehicleDetailModal />}
 {showDriverDetailsModal && <DriverDetailsModal />}
-{showCashModal && cashDriver && (
+{showCashModal && (
   <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
     <div className="bg-white rounded-3xl w-full max-w-sm p-6">
       {!cashConfirm ? (
         <>
           <h3 className="text-lg font-black mb-1">Record Cash Payment</h3>
-          <p className="text-sm text-slate-500 mb-4">{cashDriver.full_name} — {cashDriver.phone_number}</p>
+          {cashDriver && <p className="text-sm text-slate-500 mb-4">{cashDriver.full_name} — {cashDriver.phone_number}</p>}
           <input
             type="number"
             placeholder="Enter amount (₹)"
@@ -5205,6 +5223,52 @@ const ProfileTab = () => {
     )}
 
     {/* ── Logout Confirm Modal — outside overflow:hidden, z-9999 ── */}
+
+    {/* ── Edit Profile Modal ── */}
+    {showEditProfile && (
+      <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl w-full max-w-xs p-6">
+          <h3 className="text-base font-black text-slate-900 mb-4">Edit Profile</h3>
+          <div className="space-y-3 mb-5">
+            <div>
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Name</label>
+              <input value={editName} onChange={e => setEditName(e.target.value)}
+                className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500"/>
+            </div>
+            <div>
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Email</label>
+              <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email"
+                className="w-full mt-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500"/>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setShowEditProfile(false)}
+              className="flex-1 py-3 bg-slate-100 text-slate-700 font-black rounded-2xl text-sm">Cancel</button>
+            <button disabled={editSaving || !editName.trim()}
+              onClick={async () => {
+                setEditSaving(true);
+                try {
+                  const res = await fetch(`${API}/api/owner/update-profile`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                    body: JSON.stringify({ ownerId: ownerId(), full_name: editName.trim(), email: editEmail.trim() }),
+                  });
+                  const d = await res.json();
+                  if (d.success) {
+                    setOwner(prev => ({ ...prev, full_name: editName.trim(), name: editName.trim(), email: editEmail.trim() }));
+                    setShowEditProfile(false);
+                  } else { alert(d.message || 'Update failed'); }
+                } catch { alert('Network error'); }
+                finally { setEditSaving(false); }
+              }}
+              className="flex-1 py-3 bg-indigo-600 text-white font-black rounded-2xl text-sm disabled:opacity-60">
+              {editSaving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     {showLogoutConfirm && (
       <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">

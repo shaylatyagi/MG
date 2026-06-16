@@ -322,11 +322,14 @@ await pool.query(
 // Unassigned vehicles
 router.get('/unassigned/vehicles', async (req, res) => {
   try {
+    const { ownerId } = req.query;
     const result = await pool.query(
       `SELECT id, vehicle_number, vehicle_model, daily_rent, status
        FROM public.vehicles
        WHERE driver_id IS NULL
-       ORDER BY vehicle_number`
+         AND ($1::int IS NULL OR owner_id = $1::int)
+       ORDER BY vehicle_number`,
+      [ownerId ? parseInt(ownerId) : null]
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {

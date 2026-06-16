@@ -131,7 +131,7 @@ export default function DriverPWA() {
     const tick = () => {
       const n = new Date(); const h = n.getHours(), m = String(n.getMinutes()).padStart(2, '0');
       setTime(`${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`);
-    }; tick(); const id = setInterval(tick, 30000); return () => clearInterval(id);
+    }; tick(); const id = setInterval(tick, 60000); return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -164,14 +164,16 @@ export default function DriverPWA() {
         if (Array.isArray(data)) {
           // Always use fresh server data — no local cache merging
           const top = data.slice(0, 50);
-          setNotifs(top);
-          setUnread(top.filter(n => !n.is_read).length);
+          const readIds2 = JSON.parse(localStorage.getItem('mg_read_notif_ids') || '[]');
+          const mergedTop = top.map(x => readIds2.includes(x.id) ? { ...x, is_read: true } : x);
+          setNotifs(mergedTop);
+          setUnread(mergedTop.filter(n => !n.is_read).length);
         }
       } catch {}
     };
     fetchNotifications();
     fetchEarnings();
-    const interval = setInterval(fetchNotifications, 15000);
+    const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -184,7 +186,7 @@ export default function DriverPWA() {
   useEffect(() => {
     if (!user) return;
     fetchChat();
-    const interval = setInterval(fetchChat, 5000);
+    const interval = setInterval(fetchChat, 60000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -198,8 +200,9 @@ export default function DriverPWA() {
     fetchChat();
   };
 
-  const fetchAll = useCallback(async () => {
-    if (!user) return; setLoading(true);
+  const fetchAll = useCallback(async (silent = false) => {
+    if (!user) return;
+    if (!silent) setLoading(true); // only spinner on first load
     try {
       const ph = phone(); const H = { Authorization: `Bearer ${tk()}` };
       const [txR, prR, nR] = await Promise.all([
@@ -225,11 +228,15 @@ export default function DriverPWA() {
         const d = p.vehicle_number ? parseFloat(p.total_outstanding || p.current_dues || 0) : 0;
         setDues(d); setPayAmt(d > 0 ? d : 0);
         setTelemetry({ vehicleNumber: p.vehicle_number || '', vehicleModel: p.vehicle_model || '', dailyRent: parseFloat(p.vehicle_daily_rent || 0), dailyDepositRecovery: parseFloat(p.daily_deposit_recovery || 0) });
-        if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, dailyRent: p.vehicle_daily_rent, status: p.vehicle_status || 'ACTIVE', assignedSince: p.assigned_since });
+        if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, dailyRent: p.vehicle_daily_rent, status: 'Assigned', assignedSince: p.assigned_since });
         if (p.owner_name) setFleetOwner(p.owner_name);
         if (p.company_name) setFleetCompany(p.company_name);
       }
-      if (nR.ok) { const n = await nR.json(); const a = Array.isArray(n) ? n : []; setNotifs(a); setUnread(a.filter(x => !x.is_read).length); }
+      if (nR.ok) { const n = await nR.json(); const a = Array.isArray(n) ? n : [];
+        // Cross-ref with locally stored read IDs so count doesn't reset on login
+        const readIds = JSON.parse(localStorage.getItem('mg_read_notif_ids') || '[]');
+        const merged = a.map(x => readIds.includes(x.id) ? { ...x, is_read: true } : x);
+        setNotifs(merged); setUnread(merged.filter(x => !x.is_read).length); }
       // Fetch company payment mode
       try {
         const cfgR = await fetch(`${API}/api/driver/company-config`, { headers: H });
@@ -259,7 +266,7 @@ export default function DriverPWA() {
       );
     };
     pingLocation();
-    const interval = setInterval(pingLocation, 30000);
+    const interval = setInterval(pingLocation, 60000);
     return () => clearInterval(interval);
   }, [user, assignedVehicle]);
   useEffect(() => {
@@ -293,7 +300,13 @@ export default function DriverPWA() {
     setUnread(0);
     setNotifs(p => {
       const updated = p.map(n => ({ ...n, is_read: true }));
-      try { localStorage.setItem('mg_notifs_cached', JSON.stringify(updated)); } catch {}
+      // Persist read IDs in localStorage so they survive logout/refresh
+      try {
+        const readIds = updated.map(n => n.id).filter(Boolean);
+        const existing = JSON.parse(localStorage.getItem('mg_read_notif_ids') || '[]');
+        const merged = [...new Set([...existing, ...readIds])];
+        localStorage.setItem('mg_read_notif_ids', JSON.stringify(merged));
+      } catch {}
       return updated;
     });
     try { await fetch(`${API}/api/payment/notifications/mark-read?driverId=${user?.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${tk()}` } }); } catch {}
@@ -537,7 +550,7 @@ export default function DriverPWA() {
   // ── HOME TAB ─────────────────────────────────────────────────────────────
   const HomeTab = () => (
     <div className="space-y-3 pb-4">
-      {kycState && kycState.aadhaar?.status !== 'verified' && (<div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between"><span className="text-xs font-black text-amber-800">⚠️ KYC Incomplete — Complete to avoid suspension</span><button onClick={() => setActiveTab('account')} className="text-[10px] font-black text-amber-600 underline">Complete →</button></div>)}
+      {kycState && kycState.aadhaar?.status !== 'verified' && (<div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between"><span className="text-xs font-black text-amber-800">⚠️ KYC Incomplete — Complete to avoid suspension</span><button onClick={() => { setActiveTab('account'); setTab('account'); }} className="text-[10px] font-black text-amber-600 underline">Complete →</button></div>)}
       {/* Outstanding / Pay card */}
       {dues <= 0 ? (
         /* SETTLED — show simple confirmation, no pay option */
@@ -1632,7 +1645,7 @@ export default function DriverPWA() {
                 <p className="text-[9px] text-slate-400">{fleetCompany || 'MobilityGrid'}</p>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={el => { if (el) el.scrollTop = el.scrollHeight; }}>
               {chatMsgs.length === 0 ? (
                 <div className="text-center text-slate-400 text-xs py-12">
                   <MessageCircle size={28} className="mx-auto mb-2 opacity-20"/>
