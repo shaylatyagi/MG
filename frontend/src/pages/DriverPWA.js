@@ -868,7 +868,7 @@ export default function DriverPWA() {
             </div>
             {attendance.todayPresent !== undefined && (
               <p className="text-[10px] mt-2 font-bold" style={{color: attendance.todayPresent ? '#059669' : '#dc2626'}}>
-                {attendance.todayPresent ? '✓ You're marked present today' : '✗ Not marked present today — open the app daily to mark attendance'}
+                {attendance.todayPresent ? "✓ You're marked present today" : "✗ Not marked present today — open the app daily to mark attendance"}
               </p>
             )}
           </div>
