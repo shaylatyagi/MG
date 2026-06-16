@@ -1999,16 +1999,8 @@ function AllOwners() {
   };
 
   useEffect(() => {
-    api('/api/admin/companies')
-      .then(async (cos) => {
-        const list = cos.data || cos || [];
-        const allOwners = await Promise.all(
-          list.map(c => api(`/api/admin/companies/${c.id}/owners`).catch(() => []))
-        );
-        const flat = allOwners.flat().filter((o, i, arr) => arr.findIndex(x => x.id === o.id) === i);
-        setOwners(flat);
-        setLoading(false);
-      })
+    api('/api/admin/owners')
+      .then(d => { setOwners(d.data || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -2166,7 +2158,7 @@ function Transactions() {
       .catch(() => setLoading(false));
   }, [search, status, dateFrom, dateTo]);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, [load]);
 
   const totalSuccess = rows.filter(r => r.transaction_status === 'SUCCESS')
     .reduce((s, r) => s + parseFloat(r.order_amount || 0), 0);
@@ -2569,6 +2561,7 @@ const NAV_ICONS = {
   chat:         ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
   audit:        ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
   pins:         ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'M12 8v4', 'M12 16h.01'],
+  leads:        ['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', 'M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8', 'M23 21v-2a4 4 0 0 0-3-3.87', 'M20 8a3 3 0 0 1 0 5.83'],
 };
 
 
@@ -3032,7 +3025,9 @@ function AdminPanelInner() {
               }}>
                 <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SA</span>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Super Admin</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                {(() => { try { const p = JSON.parse(atob((localStorage.getItem('mg_admin_token')||'..').split('.')[1])); return p.phone ? `+91 ••••${String(p.phone).slice(-4)}` : 'Super Admin'; } catch { return 'Super Admin'; } })()}
+              </span>
             </div>
           </div>
         </header>
@@ -3071,6 +3066,18 @@ function AdminPanelInner() {
               <button onClick={doLogout} style={{
                 flex: 1, padding: '10px', background: '#ef4444', borderRadius: 10,
                 border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff'
+              }}>Sign Out</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AdminPanel() {
+  return (
+     fontWeight: 600, color: '#fff'
               }}>Sign Out</button>
             </div>
           </div>

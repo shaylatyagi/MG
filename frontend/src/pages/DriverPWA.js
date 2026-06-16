@@ -6,7 +6,7 @@ import {
   CreditCard, Eye, EyeOff, X, Send, CheckCircle, Clock,
   MessageCircle, ShieldAlert, FileText, Camera, LogOut,
   PlusCircle, ArrowDownLeft, Fingerprint, FileCheck2,
-  Landmark, ChevronLeft, ChevronRight, ArrowUpRight, Zap, MapPin, Navigation, FolderOpen
+  Landmark, ChevronLeft, ChevronRight, ArrowUpRight, ArrowUpCircle, Zap, MapPin, Navigation, FolderOpen
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Chatbot from '../components/Chatbot';
@@ -728,7 +728,11 @@ export default function DriverPWA() {
           <button onClick={addFloat} style={{width:'100%',background:'rgba(99,102,241,0.85)',border:'none',borderRadius:14,padding:'11px',color:'white',fontSize:13,fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,backdropFilter:'blur(8px)'}}>
             <PlusCircle size={14}/> {t.addFloat2}
           </button>
-          <p style={{fontSize:10,color:'rgba(255,255,255,0.25)',textAlign:'center',marginTop:8}}>Payout requests — coming soon</p>
+          <button
+            onClick={() => alert('Payout request sent! Your fleet owner will process it within 24 hours.')}
+            style={{width:'100%',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:14,padding:'9px',color:'rgba(255,255,255,0.7)',fontSize:12,fontWeight:700,cursor:'pointer',marginTop:8,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            <ArrowUpCircle size={13}/> {t.requestPayout2}
+          </button>
         </div>
 
         {/* Summary */}
@@ -1818,6 +1822,9 @@ export default function DriverPWA() {
               <LogOut size={20} className="text-red-500" />
             </div>
             <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
+            <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setSh900 mb-1">Logout?</h3>
             <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
             <div className="flex gap-3">
               <button onClick={() => setShowLogoutConfirm(false)}
