@@ -1,6 +1,7 @@
 // frontend/src/pages/OwnerDashboard.js
 // Complete with ALL buttons - Notification Bell, Logout, Chat, Search
 
+import { VEHICLE_TYPE_GROUPS, DEFAULT_VEHICLE_TYPE, vehicleTypeLabel } from '../constants/vehicleTypes';
 import { toast, ToastContainer } from '../components/Toast';
 import { SkeletonDashboard } from '../components/Skeleton';
 import Onboarding, { useOnboarding } from '../components/Onboarding';

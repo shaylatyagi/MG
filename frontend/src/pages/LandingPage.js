@@ -639,29 +639,29 @@ function LandingPage() {
       <section className="pricing-section" id="pricing">
         <div className="container">
           <p className="section-label" style={{ textAlign: 'center', marginBottom: '12px' }}>Simple Pricing</p>
-          <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '8px' }}>Start free. Scale when you're ready.</h2>
+          <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '8px' }}>Transparent pricing. No hidden fees.</h2>
           <p className="section-sub" style={{ textAlign: 'center', marginBottom: '48px', maxWidth: '520px', margin: '0 auto 48px' }}>
-            No hidden fees. No contracts. Pay only when your fleet grows.
+            One-time onboarding. Pay per driver. Scale at your own pace.
           </p>
 
           <div className="pricing-grid">
-            {/* FREE */}
+            {/* STARTER */}
             <div className="pricing-card">
-              <div className="pricing-badge">Free Forever</div>
-              <div className="pricing-price">₹0<span>/month</span></div>
-              <div className="pricing-desc">Perfect for small fleet owners getting started</div>
+              <div className="pricing-badge">Starter</div>
+              <div className="pricing-price">₹25,000<span> onboarding</span></div>
+              <div className="pricing-desc">One-time setup for fleets up to 20 drivers</div>
               <ul className="pricing-features">
-                <li><span className="pf-check">✓</span> Owner account &amp; dashboard</li>
-                <li><span className="pf-check">✓</span> Up to 5 drivers</li>
-                <li><span className="pf-check">✓</span> Vehicle management</li>
+                <li><span className="pf-check">✓</span> Owner dashboard &amp; driver app</li>
+                <li><span className="pf-check">✓</span> Up to 20 drivers</li>
+                <li><span className="pf-check">✓</span> Vehicle management &amp; assignment</li>
                 <li><span className="pf-check">✓</span> KYC document collection</li>
                 <li><span className="pf-check">✓</span> SOS emergency alerts</li>
-                <li><span className="pf-check">✓</span> Basic earnings tracking</li>
+                <li><span className="pf-check">✓</span> ₹100 / driver / month</li>
                 <li><span className="pf-cross">✗</span> Bulk driver upload</li>
                 <li><span className="pf-cross">✗</span> Online payment collection</li>
                 <li><span className="pf-cross">✗</span> Advanced analytics</li>
               </ul>
-              <a href="/login?role=owner&signup=true" className="pricing-btn pricing-btn-outline">Get Started Free</a>
+              <a href="mailto:hello@mobilitygrid.in" className="pricing-btn pricing-btn-outline">Get Onboarded</a>
             </div>
 
             {/* GROWTH */}
@@ -705,8 +705,45 @@ function LandingPage() {
           </div>
 
           <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#94a3b8' }}>
-            ₹25,000 one-time onboarding fee waived for early access partners · No credit card required for free plan
+            ₹25,000 onboarding · First 10 drivers at 50% off for 3 months · No hidden charges
           </p>
+        </div>
+      </section>
+
+
+      {/* ── PARTNERS SECTION ──────────────────────────────────────── */}
+      <section style={{ background: '#f8fafc', padding: '80px 0' }} id="partners">
+        <div className="container">
+          <p className="section-label" style={{ textAlign: 'center', marginBottom: '12px' }}>Fleet Partners</p>
+          <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '8px' }}>Fleets running on MobilityGrid</h2>
+          <p className="section-sub" style={{ textAlign: 'center', marginBottom: '48px', maxWidth: '480px', margin: '0 auto 48px' }}>
+            Verified fleet operators who have onboarded their drivers and vehicles on our platform.
+          </p>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 40 }}>
+            {/* Recovery Nest card */}
+            <a href="/partners/recoverynest" style={{ textDecoration: 'none' }}>
+              <div style={{
+                background: 'white', borderRadius: 20, padding: '24px 28px',
+                border: '1.5px solid #e2e8f0', width: 240, cursor: 'pointer',
+                transition: 'box-shadow 0.2s, transform 0.2s',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+              }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow='0 8px 32px rgba(79,70,229,0.12)'; e.currentTarget.style.transform='translateY(-2px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'; e.currentTarget.style.transform='translateY(0)'; }}
+              >
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#1e40af,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, color: 'white', fontWeight: 900, fontSize: 18 }}>RN</div>
+                <p style={{ fontWeight: 800, fontSize: 15, color: '#1e293b', marginBottom: 4 }}>Recovery Nest</p>
+                <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.4 }}>Fleet Recovery &amp; Logistics</p>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: 20 }}>✓ Verified Partner</span>
+              </div>
+            </a>
+            {/* Add more partners here */}
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <a href="/partners" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700, color: '#4f46e5', textDecoration: 'none' }}>
+              View all partners →
+            </a>
+          </div>
         </div>
       </section>
 

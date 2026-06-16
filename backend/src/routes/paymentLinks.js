@@ -4,8 +4,8 @@ const router = express.Router();
 const pool = require('../config/db');
 const { verifyToken } = require('../middleware/auth.middleware');
 
-const FRONTEND = process.env.FRONTEND_URL || 'https://mg-xi.vercel.app';
-const BASE_PY   = process.env.PAYYANTRA_BASE_URL || 'https://payin-api-uat.payyantra.com';
+const FRONTEND = process.env.FRONTEND_URL || 'https://mobilitygrid.in';
+const BASE_PY   = process.env.PAYYANTRA_BASE_URL || 'https://payin-api.payyantra.com';
 
 // ── Auto-create table on first use ───────────────────────────────────
 const ensureTable = async () => {
@@ -135,7 +135,7 @@ router.post('/:token/initiate', async (req, res) => {
     if (!pyToken) return res.status(500).json({ success: false, message: 'PayYantra auth failed' });
 
     const orderId = `PL-${link.id.split('-')[0]}-${Date.now()}`;
-    const orderRes = await fetch(`${BASE_PY}/api/create-order`, {
+    const orderRes = await fetch(`${BASE_PY}/api/merchant/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${pyToken}` },
       body: JSON.stringify({
@@ -144,25 +144,34 @@ router.post('/:token/initiate', async (req, res) => {
         customerName:   customerName || link.driver_name,
         customerPhone:  customerPhone || link.driver_phone || '9999999999',
         customerEmail:  'driver@mobilitygrid.in',
-        currency:       'INR',
-        description:    link.description,
+        returnUrl:      `${FRONTEND}/pay/${link.token}?status=success`,
         notifyUrl:      'https://mg-qw5s.onrender.com/api/payment-links/webhook',
-        redirectUrl:    `${FRONTEND}/pay/${link.token}?status=success`,
       }),
     });
     const orderData = await orderRes.json();
-    const paymentUrl =
-      orderData.data?.paymentUrl || orderData.paymentUrl ||
-      orderData.data?.redirectUrl || orderData.redirectUrl;
+    console.log('PaymentLink order response:', JSON.stringify(orderData).slice(0, 300));
 
-    if (!paymentUrl)
+    const checkoutUrl = orderData.data?.checkoutUrl || orderData.checkoutUrl;
+    const upiQrLink   = orderData.data?.upiQrLink   || orderData.upiQrLink;
+
+    // Extract UPI intent from upiQrLink
+    let intentURL = orderData.data?.intentURL || orderData.intentURL;
+    if (!intentURL && upiQrLink) {
+      try {
+        const u = new URL(upiQrLink);
+        const ex = decodeURIComponent(u.searchParams.get('intent') || '');
+        if (ex.startsWith('upi://')) intentURL = ex;
+      } catch (_) {}
+    }
+
+    if (!checkoutUrl && !intentURL)
       return res.status(500).json({ success: false, message: 'PG order failed', raw: orderData });
 
     await pool.query(
       `UPDATE public.payment_links SET order_id=$1, status='PROCESSING' WHERE token=$2`,
       [orderId, link.token]
     );
-    res.json({ success: true, paymentUrl, orderId });
+    res.json({ success: true, paymentUrl: checkoutUrl, intentURL, upiQrLink, orderId });
   } catch (err) {
     console.error('initiate error:', err);
     res.status(500).json({ success: false, message: err.message });

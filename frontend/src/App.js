@@ -8,6 +8,7 @@ import DriverPWA from './pages/DriverPWA';
 import Profile from './pages/Profile';
 import PaymentResult from './pages/PaymentResult';
 import PartnerHub from './pages/PartnerHub';
+import PartnersPage from './pages/PartnersPage';
 import AdminPanel from './pages/admin/CompanyDashboard';
 import PaymentLinkPage from './pages/PaymentLinkPage';
 import ManagerApp from './pages/ManagerApp';
@@ -28,6 +29,8 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/partner" element={<PartnerHub />} />
+        <Route path="/partners" element={<PartnersPage />} />
+        <Route path="/partners/:slug" element={<PartnersPage />} />
         <Route path="/payment-result" element={<PaymentResult />} />
         {/* Payment Links — public, no auth required */}
         <Route path="/pay/:token" element={<PaymentLinkPage />} />

@@ -931,8 +931,9 @@ router.post('/owner/notify-unpaid', verifyToken, async (req, res) => {
     );
     const paidPhones = paidResult.rows.map(r => r.payer_mobile);
     const unpaidDrivers = await pool.query(
-      `SELECT id, full_name, mobile_number FROM public.drivers 
-       WHERE status='ACTIVE' AND owner_code=$1 AND mobile_number != ALL($2::text[])`,
+      `SELECT d.id, d.full_name, d.mobile_number FROM public.drivers d
+       JOIN public.vehicles v ON v.driver_id = d.id AND v.daily_rent > 0
+       WHERE d.status='ACTIVE' AND d.owner_code=$1 AND d.mobile_number != ALL($2::text[])`,
       [ownerCode, paidPhones]
     );
     let count = 0;
@@ -966,7 +967,7 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
                 WHERE driver_id = d.id AND entry_type IN ('PAYMENT','CASH_PAYMENT','ADVANCE_CREDIT','INCENTIVE','REFUND')
               ), 0) * -1 AS balance
        FROM public.drivers d
-       LEFT JOIN public.vehicles v ON v.driver_id = d.id
+       JOIN public.vehicles v ON v.driver_id = d.id AND v.daily_rent > 0
        WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
          AND d.status = 'ACTIVE'
          AND d.id NOT IN (
@@ -991,6 +992,7 @@ router.post('/owner/remind-overdue', verifyToken, async (req, res) => {
     const ownerId = req.user.id;
     const overdue = await pool.query(
       `SELECT d.id, d.full_name FROM public.drivers d
+       JOIN public.vehicles v ON v.driver_id = d.id AND v.daily_rent > 0
        WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
          AND d.status = 'ACTIVE'
          AND d.id NOT IN (

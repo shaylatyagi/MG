@@ -13,6 +13,7 @@ export default function PaymentLinkPage() {
   const [link, setLink]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying]   = useState(false);
+  const [showQR, setShowQR]   = useState(null); // { qrLink, intentURL, amount }
   const [screen, setScreen]   = useState('loading'); // loading | pay | success | paid | expired | error
   const [phone, setPhone]     = useState('');
   const [name, setName]       = useState('');
@@ -43,6 +44,11 @@ export default function PaymentLinkPage() {
       });
       const data = await res.json();
       if (data.demo) { setScreen('success'); return; }
+      const intentURL = data.intentURL;
+      const qrLink    = data.upiQrLink;
+      const isAndroid = /android/i.test(navigator.userAgent);
+      if (isAndroid && intentURL) { window.location.href = intentURL; return; }
+      if (qrLink || intentURL) { setShowQR({ qrLink, intentURL, amount: link?.amount }); return; }
       if (data.paymentUrl) { window.location.href = data.paymentUrl; return; }
       alert(data.message || 'Payment initiation failed');
     } catch (err) {
@@ -51,6 +57,34 @@ export default function PaymentLinkPage() {
   };
 
   const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+
+  if (showQR) return (
+    <div className="min-h-screen bg-gradient-to-b from-[#0F4C81] to-[#0a3460] flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl">
+        <div className="w-10 h-10 bg-[#0F4C81] rounded-full flex items-center justify-center mx-auto mb-3">
+          <span style={{color:'white',fontSize:18,fontWeight:900}}>₹</span>
+        </div>
+        <h3 className="font-black text-slate-800 text-base mb-1">Scan to Pay</h3>
+        <p className="text-xs text-slate-500 mb-4">Open any UPI app and scan this QR code</p>
+        {showQR.qrLink ? (
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(showQR.intentURL || showQR.qrLink)}`}
+            alt="UPI QR Code"
+            className="mx-auto rounded-xl border border-slate-100 mb-3"
+            style={{width:200,height:200}}
+          />
+        ) : (
+          <div className="bg-slate-100 rounded-xl p-3 text-xs text-slate-500 break-all mb-3">{showQR.intentURL}</div>
+        )}
+        {showQR.amount && (
+          <p className="text-xs text-slate-500 mb-4">Amount: <span className="font-black text-slate-800">₹{Number(showQR.amount).toLocaleString('en-IN')}</span></p>
+        )}
+        <button onClick={() => setShowQR(null)} className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm">
+          Back
+        </button>
+      </div>
+    </div>
+  );
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
