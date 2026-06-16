@@ -5,6 +5,12 @@ const jwt      = require('jsonwebtoken');
 const bcrypt   = require('bcrypt');
 const crypto   = require('crypto');
 const { generateToken, verifyToken } = require('../middleware/auth.middleware');
+const { validate } = require('../middleware/validate');
+const {
+  SendOtpSchema, VerifyOtpSchema, LoginPinSchema, SetPinSchema,
+  ResetPinSchema, ForgotPinSchema, OwnerSignupSchema, OwnerSignupVerifySchema,
+  AdminSendOtpSchema, AdminVerifyOtpSchema, AdminLoginSchema,
+} = require('../schemas/auth.schemas');
 const nodemailer = require('nodemailer');
 
 // C-2: safe table lookup — NEVER interpolate user-supplied role directly into SQL
@@ -15,27 +21,54 @@ const safeTable = (role) => {
   return t;
 };
 
-// OTP rate limiting — { phone: { attempts: N, lockedUntil: ms } }
-const otpAttempts = new Map();
-const MAX_ATTEMPTS  = 3;
-const LOCKOUT_MS    = 15 * 60 * 1000; // 15 minutes
+// ── OTP rate limiting — DB-backed (survives restarts, works multi-instance) ───
+// Table: public.otp_rate_limits (created in migrations/023_startup_schema.sql)
+const MAX_ATTEMPTS = 3;
+const LOCKOUT_MIN  = 15;
 
-const checkLock = (phone) => {
-  const rec = otpAttempts.get(phone);
+const checkLock = async (phone) => {
+  const r = await pool.query(
+    'SELECT attempts, locked_until FROM public.otp_rate_limits WHERE phone_number=$1',
+    [phone]
+  );
+  const rec = r.rows[0];
   if (!rec) return null;
-  if (rec.lockedUntil && Date.now() < rec.lockedUntil) {
-    const minsLeft = Math.ceil((rec.lockedUntil - Date.now()) / 60000);
+  if (rec.locked_until && new Date(rec.locked_until) > new Date()) {
+    const minsLeft = Math.ceil((new Date(rec.locked_until) - Date.now()) / 60000);
     return `Too many failed attempts. Try again in ${minsLeft} minute${minsLeft !== 1 ? 's' : ''}.`;
   }
   return null;
 };
-const recordFail = (phone) => {
-  const rec = otpAttempts.get(phone) || { attempts: 0, lockedUntil: null };
-  rec.attempts += 1;
-  if (rec.attempts >= MAX_ATTEMPTS) rec.lockedUntil = Date.now() + LOCKOUT_MS;
-  otpAttempts.set(phone, rec);
+
+const recordFail = async (phone) => {
+  await pool.query(`
+    INSERT INTO public.otp_rate_limits (phone_number, attempts, locked_until, updated_at)
+    VALUES ($1, 1, NULL, NOW())
+    ON CONFLICT (phone_number) DO UPDATE
+      SET attempts   = CASE
+                         WHEN otp_rate_limits.locked_until IS NOT NULL AND otp_rate_limits.locked_until < NOW()
+                         THEN 1
+                         ELSE otp_rate_limits.attempts + 1
+                       END,
+          locked_until = CASE
+                           WHEN (CASE
+                                   WHEN otp_rate_limits.locked_until IS NOT NULL AND otp_rate_limits.locked_until < NOW()
+                                   THEN 1
+                                   ELSE otp_rate_limits.attempts + 1
+                                 END) >= $2
+                           THEN NOW() + ($3 || ' minutes')::INTERVAL
+                           ELSE NULL
+                         END,
+          updated_at = NOW()
+  `, [phone, MAX_ATTEMPTS, LOCKOUT_MIN]);
 };
-const clearAttempts = (phone) => otpAttempts.delete(phone);
+
+const clearAttempts = async (phone) => {
+  await pool.query(
+    'DELETE FROM public.otp_rate_limits WHERE phone_number=$1',
+    [phone]
+  ).catch(() => {}); // non-critical
+};
 
 // Send admin OTP via email (free — uses same Brevo SMTP as forgot-pin)
 const sendAdminOtpEmail = async (otp) => {
@@ -61,13 +94,14 @@ const sendAdminOtpEmail = async (otp) => {
 };
 
 // ── POST /api/auth/send-otp ───────────────────────────────────────────────────
+// validate(SendOtpSchema) placed inline below
 // Security: `role` param (DRIVER | OWNER | MANAGER) scopes the lookup.
 // A driver's phone cannot trigger an OTP on the owner portal and vice versa.
-router.post('/send-otp', async (req, res) => {
+router.post('/send-otp', validate(SendOtpSchema), async (req, res) => {
   const phone_number = (req.body.phone || req.body.phone_number || '').trim();
   const role = (req.body.role || '').toUpperCase(); // DRIVER | OWNER | MANAGER
   if (!phone_number) return res.status(400).json({ success: false, message: 'Phone required' });
-  const lockMsg = checkLock(phone_number);
+  const lockMsg = await checkLock(phone_number);
   if (lockMsg) return res.status(429).json({ success: false, message: lockMsg });
   try {
     let userRes;
@@ -108,13 +142,13 @@ router.post('/send-otp', async (req, res) => {
 // ── POST /api/auth/verify-otp ─────────────────────────────────────────────────
 // Security: after OTP is verified, confirm the resolved user's role matches
 // the `role` param sent by the frontend. Prevents cross-portal login.
-router.post('/verify-otp', async (req, res) => {
+router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
   const phone_number = (req.body.phone || req.body.phone_number || '').trim();
   const otp = (req.body.otp || '').trim();
   const expectedRole = (req.body.role || '').toUpperCase(); // DRIVER | OWNER | MANAGER
   if (!phone_number || !otp)
     return res.status(400).json({ success: false, message: 'Phone and OTP required' });
-  const lockMsg = checkLock(phone_number);
+  const lockMsg = await checkLock(phone_number);
   if (lockMsg) return res.status(429).json({ success: false, message: lockMsg });
   try {
     // Fetch by phone + expiry only (not by value — bcrypt comparison needed)
@@ -124,15 +158,20 @@ router.post('/verify-otp', async (req, res) => {
     );
     const validHash = otpRes.rows[0] && await bcrypt.compare(otp, otpRes.rows[0].otp);
     if (!otpRes.rows[0] || !validHash) {
-      recordFail(phone_number);
-      const rec = otpAttempts.get(phone_number);
-      const remaining = MAX_ATTEMPTS - (rec?.attempts || 0);
-      const msg = rec?.lockedUntil
-        ? `Account locked for 15 minutes.`
+      await recordFail(phone_number);
+      const recRow = await pool.query(
+        'SELECT attempts, locked_until FROM public.otp_rate_limits WHERE phone_number=$1',
+        [phone_number]
+      );
+      const rec = recRow.rows[0];
+      const isLocked = rec?.locked_until && new Date(rec.locked_until) > new Date();
+      const remaining = Math.max(0, MAX_ATTEMPTS - (rec?.attempts || 0));
+      const msg = isLocked
+        ? `Account locked for ${LOCKOUT_MIN} minutes.`
         : `OTP invalid. ${remaining} attempt${remaining !== 1 ? 's' : ''} left.`;
       return res.status(400).json({ success: false, message: msg });
     }
-    clearAttempts(phone_number);
+    await clearAttempts(phone_number);
     await pool.query('DELETE FROM otps WHERE phone_number = $1', [phone_number]);
     const driverRes = await pool.query(
       "SELECT *, 'DRIVER' as role FROM public.drivers WHERE mobile_number = $1 LIMIT 1",
@@ -229,7 +268,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/admin-send-otp  — Body: { phone_number, admin_secret }
-router.post('/admin-send-otp', async (req, res) => {
+router.post('/admin-send-otp', validate(AdminSendOtpSchema), async (req, res) => {
   const { phone_number, admin_secret } = req.body;
   const expected = process.env.ADMIN_SECRET_KEY;
   const adminPhone = process.env.ADMIN_PHONE;
@@ -255,7 +294,7 @@ router.post('/admin-send-otp', async (req, res) => {
 });
 
 // POST /api/auth/admin-verify-otp  — Body: { phone_number, otp, admin_secret }
-router.post('/admin-verify-otp', async (req, res) => {
+router.post('/admin-verify-otp', validate(AdminVerifyOtpSchema), async (req, res) => {
   const { phone_number, otp, admin_secret } = req.body;
   const expected = process.env.ADMIN_SECRET_KEY;
   if (!admin_secret || admin_secret !== expected)
@@ -285,7 +324,7 @@ router.post('/admin-verify-otp', async (req, res) => {
 // POST /api/auth/admin-login  — Body: { phone_number, password }
 // Security: phone_number must match ADMIN_PHONE env var AND password must match ADMIN_PASSWORD.
 // Both checks always run (no short-circuit) so attacker can't enumerate which field is wrong.
-router.post('/admin-login', async (req, res) => {
+router.post('/admin-login', validate(AdminLoginSchema), async (req, res) => {
   const { phone_number, password } = req.body;
   if (!phone_number || !password)
     return res.status(400).json({ success: false, message: 'phone_number and password required' });
@@ -572,7 +611,7 @@ router.post('/passkey/auth-verify', async (req, res) => {
 
 // POST /api/auth/login-pin  — Body: { phone_number, pin, role }
 // Primary login flow. Returns JWT same shape as verify-otp.
-router.post('/login-pin', async (req, res) => {
+router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
   var phone = (req.body.phone_number || '').trim();
   var pin   = (req.body.pin || '').trim();
   var role  = (req.body.role || '').toUpperCase();
@@ -622,7 +661,7 @@ router.post('/login-pin', async (req, res) => {
 });
 
 // POST /api/auth/set-pin  — Requires JWT. Body: { current_pin (optional for first set), new_pin }
-router.post('/set-pin', verifyToken, async (req, res) => {
+router.post('/set-pin', verifyToken, validate(SetPinSchema), async (req, res) => {
   var currentPin = (req.body.current_pin || '').trim();
   var newPin     = (req.body.new_pin || '').trim();
   if (!newPin || newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin))
@@ -660,7 +699,7 @@ router.post('/set-pin', verifyToken, async (req, res) => {
 // Rules:
 //   - Owners with email: send OTP to email (free). One-time only — after that contact admin.
 //   - Drivers / Owners without email: contact admin (no OTP ever).
-router.post('/forgot-pin', async (req, res) => {
+router.post('/forgot-pin', validate(ForgotPinSchema), async (req, res) => {
   var phone = (req.body.phone_number || '').trim();
   var role  = (req.body.role || '').toUpperCase();
   if (!phone || !role)
@@ -735,7 +774,7 @@ router.post('/forgot-pin', async (req, res) => {
 });
 
 // POST /api/auth/reset-pin  — Body: { phone_number, role, otp, new_pin }
-router.post('/reset-pin', async (req, res) => {
+router.post('/reset-pin', validate(ResetPinSchema), async (req, res) => {
   var phone  = (req.body.phone_number || '').trim();
   var role   = (req.body.role || '').toUpperCase();
   var otp    = (req.body.otp || '').trim();
@@ -794,7 +833,7 @@ router.post('/waitlist', async (req, res) => {
 
 // ── OWNER SELF-SIGNUP ─────────────────────────────────────────────────────
 // Step 1: POST /api/auth/owner-signup — collect details, send OTP
-router.post('/owner-signup', async (req, res) => {
+router.post('/owner-signup', validate(OwnerSignupSchema), async (req, res) => {
   var { full_name, mobile_number, email, company_name } = req.body;
   full_name      = (full_name || '').trim();
   mobile_number  = (mobile_number || '').trim();
@@ -848,7 +887,7 @@ router.post('/owner-signup', async (req, res) => {
 });
 
 // Step 2: POST /api/auth/owner-signup/verify — verify OTP + create account
-router.post('/owner-signup/verify', async (req, res) => {
+router.post('/owner-signup/verify', validate(OwnerSignupVerifySchema), async (req, res) => {
   var { full_name, mobile_number, email, company_name, otp } = req.body;
   full_name     = (full_name || '').trim();
   mobile_number = (mobile_number || '').trim();

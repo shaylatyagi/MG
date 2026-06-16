@@ -1,3 +1,5 @@
+// DEPRECATED: This file is not imported. Use routes/chat.js instead.
+// Kept for reference only.
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');

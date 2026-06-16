@@ -5,6 +5,12 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/db');
 const { verifyToken } = require('../middleware/auth.middleware');
+const { validate } = require('../middleware/validate');
+const {
+  AddDriverSchema, UpdateDriverSchema,
+  AddVehicleSchema, UpdateVehicleSchema,
+  AdvanceSchema, AssignVehicleSchema,
+} = require('../schemas/owner.schemas');
 
 // All owner routes require a valid JWT
 router.use(verifyToken);
@@ -148,7 +154,7 @@ router.get('/vehicles', async (req, res) => {
 
 // POST /api/owner/vehicles
 // Body: { reg_number, type, rent_type, daily_rent, model? }
-router.post('/vehicles', async (req, res) => {
+router.post('/vehicles', validate(AddVehicleSchema), async (req, res) => {
   const { reg_number, type, rent_type = 'DAILY', daily_rent, model } = req.body;
   if (!reg_number || !type)
     return res.status(400).json({ success: false, message: 'reg_number and type are required' });
@@ -234,7 +240,7 @@ router.get('/drivers', async (req, res) => {
 
 // POST /api/owner/drivers
 // Body: { name, phone_number, emergency_contact? }
-router.post('/drivers', async (req, res) => {
+router.post('/drivers', validate(AddDriverSchema), async (req, res) => {
   const { name, phone_number, emergency_contact } = req.body;
   if (!name || !phone_number)
     return res.status(400).json({ success: false, message: 'name and phone_number are required' });
@@ -279,7 +285,7 @@ router.post('/drivers', async (req, res) => {
 // ─── ASSIGN VEHICLE → DRIVER ──────────────────────────────────────────────────
 // POST /api/owner/assign
 // Body: { driver_id, vehicle_id, rent_type?, rent_amount?, deposit_amount? }
-router.post('/assign', async (req, res) => {
+router.post('/assign', validate(AssignVehicleSchema), async (req, res) => {
   const { driver_id, vehicle_id, rent_type = 'DAILY', rent_amount, deposit_amount = 0 } = req.body;
   if (!driver_id || !vehicle_id)
     return res.status(400).json({ success: false, message: 'driver_id and vehicle_id are required' });
@@ -917,8 +923,5 @@ router.get('/merchant-profile', async (req, res) => {
     res.json({ success: true, profile: r.rows[0] || null });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
-// PATCH /api/admin/companies/:id/onboarding-status — admin approves/rejects merchant profile
-// (kept in admin.js but referenced here for completeness)
 
 module.exports = router;

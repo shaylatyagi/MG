@@ -822,6 +822,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
             <Row label="Business"      value={o.business_name || '—'} />
             <Row label="Email"         value={o.email || '—'} />
             <Row label="City"          value={o.city || '—'} />
+            <Row label="Plan"          value={<PlanBadge plan={o.plan || 'FREE'} />} />
             <Row label="Subscription"  value={o.subscription_end_date ? fmtDate(o.subscription_end_date) : '—'} />
             <Row label="Joined"        value={fmtDate(o.created_at)} />
           </div>
@@ -1038,6 +1039,12 @@ function CompanyDocsSection({ companyId }) {
   );
 }
 
+const PlanBadge = ({ plan }) => (
+  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${plan === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+    {plan === 'PAID' ? '⭐ PAID' : 'FREE'}
+  </span>
+);
+
 function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwner }) {
   const [owners, setOwners]           = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -1095,6 +1102,15 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
   }, [company.id]);
 
   useEffect(() => { if (tab === 'branches') loadBranches(); }, [tab, loadBranches]);
+
+  const togglePlan = async (e, ownerId, currentPlan) => {
+    e.stopPropagation();
+    const next = currentPlan === 'PAID' ? 'FREE' : 'PAID';
+    try {
+      await api(`/api/admin/owners/${ownerId}/plan`, { method: 'PATCH', body: JSON.stringify({ plan: next }) });
+      setOwners(prev => prev.map(o => o.id === ownerId ? { ...o, plan: next } : o));
+    } catch (err) { toast.error(err.message); }
+  };
 
   const approvePmRequest = async (id, newMode) => {
     setPmLoading(true);
@@ -1202,6 +1218,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                 <tr>
                   <th className="px-3 py-2 text-left">Owner</th>
                   <th className="px-3 py-2 text-left">Phone</th>
+                  <th className="px-3 py-2 text-left">Plan</th>
                   <th className="px-3 py-2 text-right">Drivers</th>
                   <th className="px-3 py-2 text-right">Vehicles</th>
                   <th className="px-3 py-2 text-right">Total</th>
@@ -1211,11 +1228,21 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {owners.length === 0
-                  ? <tr><td colSpan={7} className="py-8 text-center text-gray-400 dark:text-gray-500">No owners found</td></tr>
+                  ? <tr><td colSpan={8} className="py-8 text-center text-gray-400 dark:text-gray-500">No owners found</td></tr>
                   : owners.map(o => (
                     <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-100">{o.full_name}</td>
                       <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{o.mobile_number}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <PlanBadge plan={o.plan || 'FREE'} />
+                          <button
+                            onClick={e => togglePlan(e, o.id, o.plan || 'FREE')}
+                            className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-400 hover:border-indigo-400 hover:text-indigo-600 transition font-medium">
+                            {o.plan === 'PAID' ? '↓ FREE' : '↑ PAID'}
+                          </button>
+                        </div>
+                      </td>
                       <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{o.total_drivers || 0}</td>
                       <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{o.total_vehicles || 0}</td>
                       <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">{fmt(o.collection_total)}</td>

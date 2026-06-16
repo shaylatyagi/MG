@@ -5,6 +5,8 @@ const pool = require('../config/db');
 const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { sendSOS } = require('../services/fcm');
+const { validate } = require('../middleware/validate');
+const { UpdateLocationSchema, SosAlertSchema, DailyLogSchema, PaymentRequestSchema } = require('../schemas/driver.schemas');
 
 // ==================== EXISTING ROUTE ====================
 router.post('/profile', verifyToken, async (req, res) => {
@@ -283,7 +285,7 @@ router.post('/earnings', verifyToken, async (req, res) => {
 // POST /api/driver/sos
 // Body: { lat?, lng?, message? }
 // Requires driver JWT. Inserts sos_alerts row + notifies owner.
-router.post('/sos', verifyToken, async (req, res) => {
+router.post('/sos', verifyToken, validate(SosAlertSchema), async (req, res) => {
   const { lat, lng, message } = req.body;
 
   try {
@@ -556,7 +558,7 @@ router.get('/company-config', verifyToken, async (req, res) => {
 });
 
 // POST /api/driver/location — driver pings GPS every 30s
-router.post('/location', verifyToken, async (req, res) => {
+router.post('/location', verifyToken, validate(UpdateLocationSchema), async (req, res) => {
   try {
     const { lat, lng } = req.body;
     if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });

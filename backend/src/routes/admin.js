@@ -544,6 +544,24 @@ router.patch('/owners/:id/phone', async (req, res) => {
   }
 });
 
+// PATCH /api/admin/owners/:id/plan — toggle FREE / PAID plan label
+router.patch('/owners/:id/plan', async (req, res) => {
+  try {
+    const { plan } = req.body;
+    if (!['FREE', 'PAID'].includes(plan))
+      return res.status(400).json({ error: 'plan must be FREE or PAID' });
+    const result = await pool.query(
+      `UPDATE public.owners SET plan=$1, updated_at=NOW() WHERE id=$2 RETURNING id, full_name, plan`,
+      [plan, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Owner not found' });
+    logAudit('OWNER_PLAN_CHANGED', 'owner', req.params.id, 'admin', { plan });
+    res.json({ success: true, owner: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.patch('/companies/:id/status', async (req, res) => {
   try {
     const { status } = req.body;

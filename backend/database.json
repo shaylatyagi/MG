@@ -1,0 +1,13 @@
+{
+  "defaultEnv": "default",
+  "default": {
+    "url": {
+      "ENV": "DATABASE_URL"
+    },
+    "ssl": true,
+    "dir": "migrations",
+    "direction": "up",
+    "count": 999,
+    "ignorePattern": "^$"
+  }
+}
