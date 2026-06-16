@@ -358,7 +358,7 @@ export default function DriverPWA() {
       if (qrLink) {
         try { const qrUrl = new URL(qrLink); const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent")); if (intentLink?.startsWith('upi://')) { window.location.href = intentLink; return; } } catch {}
       }
-      const url = d?.checkoutUrl || d?.data?.checkoutUrl || d?.intentURL || d?.data?.intentURL;
+      const url = d?.intentURL || d?.data?.intentURL || d?.checkoutUrl || d?.data?.checkoutUrl;
       if (url) { window.location.href = url; } else { toast.error('Payment error: ' + (d?.message || 'No URL')); setShowPaying(false); }
     } catch (e) { if (!payAbortRef.current) toast.error('Network error: ' + e.message); setShowPaying(false); }
   };
@@ -377,7 +377,7 @@ export default function DriverPWA() {
         body: JSON.stringify({ amount: Number(amt), customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || '', purpose: 'WALLET' })
       });
       const d = await r.json();
-      const url = d?.checkoutUrl || d?.data?.checkoutUrl || d?.intentURL || d?.data?.intentURL;
+      const url = d?.intentURL || d?.data?.intentURL || d?.checkoutUrl || d?.data?.checkoutUrl;
       if (url) { window.location.href = url; } else { toast.error('Payment gateway error.'); setShowPaying(false); }
     } catch { toast.error('Network error.'); setShowPaying(false); }
   };
