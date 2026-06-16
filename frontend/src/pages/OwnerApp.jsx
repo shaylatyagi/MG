@@ -20,7 +20,7 @@ import {
   Filter, UserPlus, TruckIcon, TrendingUp, ArrowUpRight,
   ArrowDownRight, Settings, Shield, Star, Menu, Calendar,
   DollarSign, Copy, FileText, Landmark, Fingerprint, FileCheck2
-} from 'lucide-react';
+, Edit3} from 'lucide-react';
 import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah "Chatbot"
 import DocumentSection from '../components/DocumentSection';
 import PaymentLinks from './owner/PaymentLinks';
@@ -459,6 +459,10 @@ const [bulkResult, setBulkResult] = useState(null);
 const [bulkFile, setBulkFile] = useState(null);
 const [addDriverMode, setAddDriverMode] = useState('single');
 const [multipleDrivers, setMultipleDrivers] = useState([{ name:'', phone:'' }]);
+const [showChangeRent, setShowChangeRent] = useState(false);
+const [changeRentDriver, setChangeRentDriver] = useState(null); // { driverId, vehicleId, vehicleNumber, currentRent }
+const [changeRentAmt, setChangeRentAmt] = useState('');
+const [changeRentLoading, setChangeRentLoading] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
@@ -472,7 +476,7 @@ const [multipleDrivers, setMultipleDrivers] = useState([{ name:'', phone:'' }]);
   
   // Form states
   const [newVehicle, setNewVehicle] = useState({ 
-  number: '', model: '', type: 'EV', rent: '',
+  number: '', model: '', type: DEFAULT_VEHICLE_TYPE, rent: '',
   insuranceExpiry: '', fitnessExpiry: '', chassisNumber: ''
 });
   const [newDriver, setNewDriver] = useState({ 
@@ -1026,7 +1030,6 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
     const driverIdNum = parseInt(driverId);
     const rentAmountNum = parseFloat(customRent);
     
-    console.log('Sending assignment:', { vehicleIdNum, driverIdNum, rentType, rentAmountNum });
     
     // Calculate rent based on type
     let dailyRent = 0;
@@ -1050,10 +1053,9 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
     });
     
     const data = await response.json();
-    console.log('Assignment response:', data);
     
     if (data.success) {
-      toast.success('Vehicle assigned to ${data.driverName} with ${rentType} rent of ₹${customRent}');
+      toast.success(`Vehicle assigned to ${data.driverName} with ${rentType} rent of ₹${customRent}`);
       setShowVehicleDetailModal(false);
       setSelectedVehicleDetails(null);
       // Refresh all data
@@ -1072,7 +1074,15 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
 // Updated addVehicle function with driver assignment
 const addVehicle = async () => {
   if (!newVehicle.number || !newVehicle.model) {
-    toast.warn('Please fill vehicle number and model');
+    toast.warn('Vehicle number aur model required hai');
+    return;
+  }
+  if (!newVehicle.rent || parseInt(newVehicle.rent) <= 0) {
+    toast.warn('Rent amount required hai — ₹0 allowed nahi');
+    return;
+  }
+  if (!newVehicle.type) {
+    toast.warn('Vehicle type select karo');
     return;
   }
   
@@ -1098,7 +1108,7 @@ const addVehicle = async () => {
     if (response.ok && data.success) {
       toast.success('Vehicle added successfully!');
       setShowAddVehicle(false);
-      setNewVehicle({ number: '', model: '', type: 'EV', rent: 850 });
+      setNewVehicle({ number: '', model: '', type: DEFAULT_VEHICLE_TYPE, rent: 850 });
       setSelectedDriverId('');
       fetchAllData(); // Refresh vehicles list
     } else {
@@ -1134,7 +1144,7 @@ const handleAssignVehicle = async () => {
     const data = await response.json();
     
     if (data.success) {
-      toast.success('Successfully assigned ${selectedDriverForAssign.full_name} to vehicle');
+      toast.success(`Successfully assigned ${selectedDriverForAssign.full_name} to vehicle`);
       setShowAssignModal(false);
       setSelectedDriverForAssign(null);
       setSelectedVehicleForAssign(null);
@@ -1151,6 +1161,25 @@ const handleAssignVehicle = async () => {
     setAssigning(false);
   }
 };
+const submitChangeRent = async () => {
+  if (!changeRentAmt || isNaN(changeRentAmt) || Number(changeRentAmt) <= 0) return;
+  setChangeRentLoading(true);
+  try {
+    const res = await fetch(`${API}/api/owner/vehicles/${changeRentDriver.vehicleId}/rent`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ daily_rent: changeRentAmt }),
+    });
+    const d = await res.json();
+    if (d.success) {
+      toast.success(`Rent updated to ₹${changeRentAmt}/day`);
+      setShowChangeRent(false);
+      fetchAllData();
+    } else { toast.error(d.message || 'Failed to update rent'); }
+  } catch { toast.error('Network error'); }
+  setChangeRentLoading(false);
+};
+
 const fetchAllData = useCallback(async () => {
   setLoading(true);
   try {
@@ -1159,7 +1188,6 @@ const fetchAllData = useCallback(async () => {
 const oId = u.id;
 if (!oId) { navigate('/login'); return; }
     
-    console.log('Fetching data for owner ID:', oId);
     
     const [vehiclesRes, driversRes, statsRes, notifRes, ledgerRes] = await Promise.all([
   fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
@@ -1176,18 +1204,14 @@ if (!oId) { navigate('/login'); return; }
     }
     if (vehiclesRes.ok) {
   const vehiclesData = await vehiclesRes.json();
-  console.log('Vehicles raw:', vehiclesData);
   const vehiclesList = Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData.vehicles || vehiclesData.data || []);
-  console.log('Vehicles list:', vehiclesList);
   setVehicles(vehiclesList);
 }
     
     if (driversRes.ok) {
   const data = await driversRes.json();
-  console.log('Drivers raw:', data);
   // Handle both array and object response
   const driversList = Array.isArray(data) ? data : (data.drivers || []);
-  console.log('Drivers list:', driversList);
   setDrivers(driversList);
 }
     
@@ -1613,7 +1637,7 @@ const importBulkVehicles = async () => {
     setBulkResult(data);
     if (data.imported > 0) {
       fetchAllData();
-      toast.success('${data.imported} vehicles import ho gaye!');
+      toast.success(`${data.imported} vehicles import ho gaye!`);
     }
   } catch(err) { toast.error('Network error: ' + err.message); }
   finally { setBulkLoading(false); }
@@ -1665,10 +1689,9 @@ const importBulkDrivers = async () => {
     setBulkResult(data);
     if (data.imported > 0) {
       fetchAllData();
-      toast.success('${data.imported} drivers import ho gaye!');
+      toast.success(`${data.imported} drivers import ho gaye!`);
     }
     if (data.failed > 0) {
-      console.log('Failed:', data.failures);
     }
   } catch(err) { toast.error('Network error: ' + err.message); }
   finally { setBulkLoading(false); }
@@ -2375,6 +2398,17 @@ const DriversTab = () => {
                         title="Record Cash Payment"
                       >₹</button>
                     )}
+                    {hasVehicle && assignedVehicle && (
+                      <button
+                        onClick={() => {
+                          setChangeRentDriver({ driverId: driver.id, vehicleId: assignedVehicle.vehicle_id, vehicleNumber: assignedVehicle.vehicle_number, currentRent: assignedVehicle.daily_rent });
+                          setChangeRentAmt(String(assignedVehicle.daily_rent || ''));
+                          setShowChangeRent(true);
+                        }}
+                        className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600"
+                        title="Change Rent"
+                      ><Edit3 size={13} /></button>
+                    )}
                     <button
                       onClick={() => openChatWithDriver(driver)}
                       className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500"
@@ -2594,7 +2628,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
         </div>
         {/* Image Header */}
         <div className="relative h-48 bg-gradient-to-r from-indigo-500 to-indigo-700">
-          <img src={getVehicleImage(vehicle.vehicle_type||'TRUCK')} alt={vehicle.vehicle_model}
+          <img src={getVehicleImage(vehicle.vehicle_type||DEFAULT_VEHICLE_TYPE)} alt={vehicle.vehicle_model}
             className="w-full h-full object-contain p-4" />
         </div>
 
@@ -3152,7 +3186,7 @@ const PaymentsTab = () => {
           const confirm = window.confirm(`${res.length} drivers ne aaj abhi tak pay nahi kiya.\nSabko reminder bhejein?`);
           if (!confirm) return;
           await fetch(`${API}/api/payment/owner/remind-overdue?ownerId=${oId}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } }).catch(() => {});
-          toast.info('Reminder bhej diya ${res.length} drivers ko!');
+          toast.info(`Reminder bhej diya ${res.length} drivers ko!`);
         }}
         className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl shadow-sm"
       >
@@ -3665,7 +3699,7 @@ const ProfileTab = () => {
                 if (r.success) {
                   setManagers(p=>[r.manager,...p]); setShowAddManager(false);
                   setNewManager({name:'',phone:'',permissions:{assign_vehicles:true,record_cash:true,view_financials:true,chat_drivers:true,add_drivers:false,remove_drivers:false,add_vehicles:false,bulk_import:false,upload_documents:false}});
-                  toast.success('${newManager.name} added as manager!');
+                  toast.success(`${newManager.name} added as manager!`);
                 } else toast.error(r.error || 'Failed');
               }} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black hover:bg-indigo-700 transition">
                 Add Manager
@@ -4357,127 +4391,192 @@ const ProfileTab = () => {
           </div>
         )}
 
-        {/* Add Vehicle Modal with Driver Assignment */}
+        {/* Add Vehicle Modal */}
 {showAddVehicle && (
-  <div className="absolute inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-    <div className="bg-white rounded-3xl w-full max-w-sm p-6">
-      <h3 className="text-lg font-black mb-4">Add New Vehicle</h3>
-      
-      {/* Vehicle Number */}
-      <input 
-        type="text"
-        placeholder="Vehicle Number (e.g., MH01AB1234)" 
-        className="w-full border rounded-xl p-3 mb-3 text-sm" 
-        value={newVehicle.number} 
-        onChange={e => setNewVehicle({...newVehicle, number: e.target.value})} 
-      />
-      
-      {/* Vehicle Model */}
-      <input 
-        placeholder="Model (e.g., Tata Ace)" 
-        className="w-full border rounded-xl p-3 mb-3 text-sm"
-        value={newVehicle.model} 
-        onChange={e => setNewVehicle({...newVehicle, model: e.target.value})} 
-      />
-      
-      {/* Vehicle Type Dropdown */}
-      <select 
-        className="w-full border rounded-xl p-3 mb-3 text-sm bg-white"
-        value={newVehicle.type || 'TRUCK'}
-        onChange={e => setNewVehicle({...newVehicle, type: e.target.value})}
-      >
-        <option value="TRUCK">🚛 Truck</option>
-        <option value="CAR">🚗 Car</option>
-        <option value="BUS">🚌 Bus</option>
-        <option value="TEMP TRAVELLER">🚐 Tempo Traveller</option>
-        <option value="AUTO">🛺 Auto Rickshaw</option>
-      </select>
-      
-      {/* Rent Type Dropdown */}
-      <div className="mb-3">
-        <label className="text-[10px] font-black text-slate-500 block mb-1">Rent Type</label>
-        <select 
-          value={rentType}
-          onChange={(e) => setRentType(e.target.value)}
-          className="w-full border rounded-xl p-3 text-sm bg-white"
-        >
-          <option value="DAILY">📅 Daily Rent</option>
-          <option value="WEEKLY">📆 Weekly Rent</option>
-          <option value="MONTHLY">📅 Monthly Rent</option>
-        </select>
+  <div className="absolute inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-black text-slate-800">Add New Vehicle</p>
+          <p className="text-xs text-slate-400 mt-0.5">All fields except Chassis are required</p>
+        </div>
+        <button onClick={() => setShowAddVehicle(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-lg font-black">×</button>
       </div>
-      {/* Insurance + Fitness */}
-<div className="grid grid-cols-2 gap-2 mb-3">
-  <div>
-    <label className="text-[10px] font-black text-slate-500 block mb-1">🛡️ Insurance Expiry</label>
-    <input 
-      type="date"
-      className="w-full border rounded-xl p-3 text-sm bg-white"
-      value={newVehicle.insuranceExpiry || ''}
-      onChange={e => setNewVehicle({...newVehicle, insuranceExpiry: e.target.value})}
-    />
-  </div>
-  <div>
-    <label className="text-[10px] font-black text-slate-500 block mb-1">📋 Fitness Expiry</label>
-    <input 
-      type="date"
-      className="w-full border rounded-xl p-3 text-sm bg-white"
-      value={newVehicle.fitnessExpiry || ''}
-      onChange={e => setNewVehicle({...newVehicle, fitnessExpiry: e.target.value})}
-    />
-  </div>
-</div>
 
-{/* Chassis Number */}
-<input
-  placeholder="Chassis Number (optional)"
-  className="w-full border rounded-xl p-3 mb-3 text-sm uppercase font-mono"
-  value={newVehicle.chassisNumber || ''}
-  onChange={e => setNewVehicle({...newVehicle, chassisNumber: e.target.value.toUpperCase()})}
-/>
-      
-      {/* Daily/Weekly/Monthly Rent Amount */}
-      <div className="mb-3">
-        <label className="text-[10px] font-black text-slate-500 block mb-1">
-          {rentType === 'DAILY' && 'Daily Rent (₹ per day)'}
-          {rentType === 'WEEKLY' && 'Weekly Rent (₹ per week)'}
-          {rentType === 'MONTHLY' && 'Monthly Rent (₹ per month)'}
-        </label>
-        <input 
-          type="number" 
-          placeholder={rentType === 'DAILY' ? "e.g., 850" : rentType === 'WEEKLY' ? "e.g., 5950" : "e.g., 25500"} 
-          className="w-full border rounded-xl p-3 text-sm"
-          value={newVehicle.rent} 
-          onChange={e => setNewVehicle({...newVehicle, rent: parseInt(e.target.value)})} 
+      <div className="p-5 space-y-3 overflow-y-auto max-h-[70vh]">
+        {/* Vehicle Number */}
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">Vehicle Number *</label>
+          <input
+            type="text"
+            placeholder="e.g. MH01AB1234"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition uppercase"
+            value={newVehicle.number}
+            onChange={e => setNewVehicle({...newVehicle, number: e.target.value.toUpperCase()})}
+          />
+        </div>
+
+        {/* Model */}
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">Vehicle Model *</label>
+          <input
+            placeholder="e.g. Tata Ace EV"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
+            value={newVehicle.model}
+            onChange={e => setNewVehicle({...newVehicle, model: e.target.value})}
+          />
+        </div>
+
+        {/* Vehicle Type */}
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">Vehicle Type *</label>
+          <select
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
+            value={newVehicle.type || DEFAULT_VEHICLE_TYPE}
+            onChange={e => setNewVehicle({...newVehicle, type: e.target.value})}
+          >
+            {VEHICLE_TYPE_GROUPS.map(g => (
+              <optgroup key={g.group} label={g.group}>
+                {g.types.map(t => (
+                  <option key={t.code} value={t.code}>{t.icon} {t.label} · {t.code}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        {/* Rent Type + Amount — side by side */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 block mb-1">Rent Type *</label>
+            <select
+              value={rentType}
+              onChange={e => setRentType(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
+            >
+              <option value="DAILY">Daily</option>
+              <option value="WEEKLY">Weekly</option>
+              <option value="MONTHLY">Monthly</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 block mb-1">
+              Rent Amount (₹) *
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">₹</span>
+              <input
+                type="number"
+                min="1"
+                placeholder="850"
+                className="w-full border border-slate-200 rounded-xl pl-7 pr-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
+                value={newVehicle.rent || ''}
+                onChange={e => setNewVehicle({...newVehicle, rent: parseInt(e.target.value) || ''})}
+              />
+            </div>
+          </div>
+        </div>
+        {newVehicle.rent > 0 && (
+          <p className="text-xs text-indigo-600 font-semibold -mt-1">
+            Driver will pay ₹{Number(newVehicle.rent).toLocaleString('en-IN')} per {rentType === 'DAILY' ? 'day' : rentType === 'WEEKLY' ? 'week' : 'month'}
+          </p>
+        )}
+        {(!newVehicle.rent || newVehicle.rent <= 0) && (
+          <p className="text-xs text-rose-500 font-semibold -mt-1">⚠ Rent cannot be ₹0 or free</p>
+        )}
+
+        {/* Insurance + Fitness */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 block mb-1">Insurance Expiry</label>
+            <input
+              type="date"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
+              value={newVehicle.insuranceExpiry || ''}
+              onChange={e => setNewVehicle({...newVehicle, insuranceExpiry: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 block mb-1">Fitness Expiry</label>
+            <input
+              type="date"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
+              value={newVehicle.fitnessExpiry || ''}
+              onChange={e => setNewVehicle({...newVehicle, fitnessExpiry: e.target.value})}
+            />
+          </div>
+        </div>
+
+        {/* Chassis — optional, monospace ok for ID fields */}
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">Chassis Number <span className="font-normal text-slate-400">(optional)</span></label>
+          <input
+            placeholder="e.g. MA1TB2EL1NM123456"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition uppercase tracking-wider"
+            value={newVehicle.chassisNumber || ''}
+            onChange={e => setNewVehicle({...newVehicle, chassisNumber: e.target.value.toUpperCase()})}
+          />
+        </div>
+
+        {/* Assign Driver */}
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-1">Assign Driver <span className="font-normal text-slate-400">(optional)</span></label>
+          <select
+            value={selectedDriverId}
+            onChange={e => setSelectedDriverId(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
+          >
+            <option value="">— Select Driver —</option>
+            {drivers.filter(d => !vehicles.some(v => v.driver_id === d.id)).map(driver => (
+              <option key={driver.id} value={driver.id}>
+                {driver.full_name} · {driver.mobile_number}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Footer buttons */}
+      <div className="px-5 py-4 border-t border-slate-100 flex gap-3">
+        <button onClick={() => setShowAddVehicle(false)} className="flex-1 py-2.5 bg-slate-100 rounded-xl text-sm font-semibold text-slate-600">Cancel</button>
+        <button onClick={addVehicle} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold">Add Vehicle</button>
+      </div>
+    </div>
+  </div>
+)}
+{showChangeRent && changeRentDriver && (
+  <div className="absolute inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
+    <div className="bg-white rounded-3xl w-full max-w-xs p-6">
+      <h3 className="text-base font-black text-slate-900 mb-1">Change Daily Rent</h3>
+      <p className="text-xs text-slate-400 mb-4">Vehicle: {changeRentDriver.vehicleNumber}</p>
+      <div className="relative mb-3">
+        <span className="absolute left-3 top-3.5 text-slate-400 font-black">₹</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          placeholder={`Current: ₹${changeRentDriver.currentRent}/day`}
+          value={changeRentAmt}
+          onChange={e => setChangeRentAmt(e.target.value)}
+          autoFocus
+          className="w-full border-2 border-slate-200 rounded-xl pl-7 pr-4 py-3 text-lg font-black focus:outline-none focus:border-violet-500"
         />
-        <p className="text-[9px] text-slate-400 mt-1">
-          {rentType === 'DAILY' && `Driver will pay ₹${newVehicle.rent || 0} every day`}
-          {rentType === 'WEEKLY' && `Driver will pay ₹${newVehicle.rent || 5950} every week`}
-          {rentType === 'MONTHLY' && `Driver will pay ₹${newVehicle.rent || 25500} every month`}
-        </p>
       </div>
-      
-      {/* Assign Driver Dropdown */}
-      <div className="mb-4">
-        <label className="text-[10px] font-black text-slate-500 block mb-1">Assign Driver (Optional)</label>
-        <select 
-          value={selectedDriverId} 
-          onChange={(e) => setSelectedDriverId(e.target.value)}
-          className="w-full border rounded-xl p-3 text-sm bg-white"
-        >
-          <option value="">-- Select Driver --</option>
-          {drivers.filter(d => !vehicles.some(v => v.driver_id === d.id)).map(driver => (
-            <option key={driver.id} value={driver.id}>
-              {driver.full_name} - {driver.mobile_number}
-            </option>
-          ))}
-        </select>
+      <div className="flex gap-2 mb-3">
+        {[500, 750, 850, 1000].map(amt => (
+          <button key={amt} onClick={() => setChangeRentAmt(String(amt))}
+            className="flex-1 py-1.5 bg-slate-100 rounded-lg text-xs font-black text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition">
+            ₹{amt}
+          </button>
+        ))}
       </div>
-      
-      {/* Buttons */}
       <div className="flex gap-3">
-        <button onClick={() => setShowAddVehicle(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
-        <button onClick={addVehicle} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black">Add Vehicle</button>
+        <button onClick={() => setShowChangeRent(false)}
+          className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
+        <button onClick={submitChangeRent} disabled={changeRentLoading || !changeRentAmt || Number(changeRentAmt) <= 0}
+          className="flex-1 py-3 bg-violet-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
+          {changeRentLoading ? 'Saving…' : 'Update Rent'}
+        </button>
       </div>
     </div>
   </div>
@@ -4688,7 +4787,7 @@ const ProfileTab = () => {
                   method: 'POST', headers: { Authorization: `Bearer ${token()}` }
                 }).catch(() => {});
                 setRemindingAll(false);
-                toast.success('Reminder bhej diya ${overdueDrivers.length} drivers ko');
+                toast.success(`Reminder bhej diya ${overdueDrivers.length} drivers ko`);
               }}
               className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
               {remindingAll ? 'Sending…' : '🔔 Remind All'}
@@ -5214,7 +5313,7 @@ const ProfileTab = () => {
                             <td className="px-1 py-1">
                               <select value={v.vehicle_type||'EV'} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],vehicle_type:e.target.value};return u;})}}
                                 className="border border-slate-200 rounded px-1.5 py-1 text-xs bg-white focus:outline-none">
-                                <option>EV</option><option>TRUCK</option><option>AUTO</option><option>CAR</option><option>BUS</option>
+                                {VEHICLE_TYPE_GROUPS.map(g => g.types.map(t => <option key={t.code} value={t.code}>{t.icon} {t.label}</option>))}
                               </select>
                             </td>
                             <td className="px-1 py-1">

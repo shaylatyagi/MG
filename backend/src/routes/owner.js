@@ -574,6 +574,30 @@ router.put('/cash/:id', async (req, res) => {
 // ─── VEH-03: MARK VEHICLE UNDER MAINTENANCE ──────────────────────────────────
 // PUT /api/owner/vehicles/:id/maintenance
 // Body: { reason, under_maintenance: true|false }
+// PATCH /api/owner/vehicles/:id/rent — owner changes daily rent for a vehicle
+router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
+  try {
+    const { daily_rent } = req.body;
+    const rent = parseFloat(daily_rent);
+    if (!rent || rent <= 0) return res.status(400).json({ success: false, message: 'Valid rent amount required' });
+
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const veh = await pool.query(
+      'SELECT id, vehicle_number FROM vehicles WHERE id = $1 AND owner_id = $2',
+      [req.params.id, owner.id]
+    );
+    if (!veh.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+
+    await pool.query(
+      'UPDATE vehicles SET daily_rent = $1, updated_at = NOW() WHERE id = $2',
+      [rent, req.params.id]
+    );
+    res.json({ success: true, message: `Rent updated to ₹${rent}/day`, daily_rent: rent });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 router.put('/vehicles/:id/maintenance', async (req, res) => {
   const { reason = '', under_maintenance = true } = req.body;
   try {
