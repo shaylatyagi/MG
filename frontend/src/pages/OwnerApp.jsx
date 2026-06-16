@@ -4828,7 +4828,24 @@ const ProfileTab = () => {
       {!cashConfirm ? (
         <>
           <h3 className="text-lg font-black mb-1">Record Cash Payment</h3>
-          {cashDriver && <p className="text-sm text-slate-500 mb-4">{cashDriver.full_name} — {cashDriver.phone_number}</p>}
+          {cashDriver
+            ? <p className="text-sm text-slate-500 mb-4">{cashDriver.full_name} — {cashDriver.phone_number}</p>
+            : (
+              <select
+                className="w-full border border-slate-200 rounded-xl p-3 mb-3 text-sm bg-white"
+                value={cashDriver ? cashDriver.id : ''}
+                onChange={e => {
+                  const d = drivers.find(dr => String(dr.id) === e.target.value);
+                  setCashDriver(d || null);
+                }}
+              >
+                <option value="">— Select Driver —</option>
+                {drivers.map(d => (
+                  <option key={d.id} value={d.id}>{d.full_name} · {d.phone_number}</option>
+                ))}
+              </select>
+            )
+          }
           <input
             type="number"
             placeholder="Enter amount (₹)"
@@ -4837,9 +4854,10 @@ const ProfileTab = () => {
             className="w-full border rounded-xl p-3 mb-4 text-sm font-mono"
           />
           <div className="flex gap-3">
-            <button onClick={() => { setShowCashModal(false); setCashAmount(''); }} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
+            <button onClick={() => { setShowCashModal(false); setCashAmount(''); setCashDriver(null); }} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
             <button
               onClick={() => {
+                if (!cashDriver) return alert('Select a driver first');
                 if (!cashAmount || parseFloat(cashAmount) <= 0) return alert('Enter valid amount');
                 setCashConfirm(true);
               }}
