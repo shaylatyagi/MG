@@ -4,6 +4,7 @@ const router     = express.Router();
 const pool       = require('../config/db');
 const { logAudit } = require('../utils/audit');
 const fcm          = require('../services/fcm');
+const { verifyAdmin } = require('../middleware/auth.middleware');
 const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -26,21 +27,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
 });
-
-
-// ─── ADMIN AUTH MIDDLEWARE ────────────────────────────────────────────────────
-const jwt = require('jsonwebtoken');
-function verifyAdmin(req, res, next) {
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  if (!token) return res.status(401).json({ error: 'Admin token required' });
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== 'admin') return res.status(403).json({ error: 'Admin access only' });
-    req.admin = decoded;
-    next();
-  } catch { return res.status(401).json({ error: 'Invalid or expired token' }); }
-}
 
 // ─── EXISTING ROUTES (unchanged) ─────────────────────────────────────────────
 router.get('/tenants', async (req, res) => {

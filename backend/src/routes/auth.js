@@ -4,7 +4,7 @@ const pool     = require('../config/db');
 const jwt      = require('jsonwebtoken');
 const bcrypt   = require('bcrypt');
 const crypto   = require('crypto');
-const { generateToken, verifyToken } = require('../middleware/auth');
+const { generateToken, verifyToken } = require('../middleware/auth.middleware');
 const nodemailer = require('nodemailer');
 
 // C-2: safe table lookup — NEVER interpolate user-supplied role directly into SQL

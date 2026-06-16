@@ -284,56 +284,22 @@ app.use('/api/kyc',        require('./src/routes/kyc'));
 app.use('/api/inspection', verifyToken, require('./src/routes/inspection'));
 app.use('/api/device',     verifyToken, require('./src/routes/device'));
 
-// Check Health
+// ── Health check — used by Render uptime monitor ─────────────────────────────
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', ts: Date.now(), env: process.env.NODE_ENV || 'development' });
+});
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Mobility Grid API is running ✅',
-    env: process.env.NODE_ENV || 'development'
-  });
+  res.json({ message: 'MobilityGrid API ✅', env: process.env.NODE_ENV || 'development' });
 });
-// SCHEDULER
-const BASE_URL = 'https://mg-qw5s.onrender.com';
-const checkPendingOrders = async () => {
-  try {
-    const res = await fetch(`${BASE_URL}/api/payment/check-pending`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    console.log('✅ Pending orders checked:', data);
-  } catch (err) {
-    console.error('❌ Scheduler error:', err.message);
-  }
-};
-setInterval(checkPendingOrders, 5 * 60 * 1000);
-// Reset Daily
-const scheduleDailyReset = () => {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 0, 0);
-  const msUntilMidnight = midnight - now;
-  setTimeout(async () => {
-    try {
-      await pool.query('UPDATE driver_details SET amount_paid_today = 0, updated_at = NOW()');
-      console.log('✅ Daily reset done');
-    } catch (err) {
-      console.error('❌ Daily reset error:', err);
-    }
-  }, msUntilMidnight);
-};
-scheduleDailyReset();
-// Handle Erorr 404
-app.use((req, res) => {
-  res.status(404).json({ message: ' ' });
-});
-// SERVER START
-const PORT = process.env.PORT || 5000;
+
+// ── 404 + global error handler — MUST be last ─────────────────────────────────
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
+
+// ── SERVER START ──────────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 Base URL: http://localhost:${PORT}`);
 });
 process.on('uncaughtException', (err) => {
   console.error('There was an uncaught error', err);

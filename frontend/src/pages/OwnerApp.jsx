@@ -474,10 +474,29 @@ const [changeRentLoading, setChangeRentLoading] = useState(false);
   const [showAddDriver, setShowAddDriver] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState(null);
+
+  // Attendance state — lives here so HomeTab can render the panel
+  const [showAttendance, setShowAttendance] = useState(false);
+  const [attendanceData, setAttendanceData] = useState(null);
+  const [attendanceMonth, setAttendanceMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const fetchAttendance = React.useCallback(async (month) => {
+    setLoadingAttendance(true);
+    try {
+      const res = await fetch(`${API}/api/payment/owner/attendance?ownerId=${ownerId()}&month=${month}`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      });
+      const data = await res.json();
+      setAttendanceData(data);
+    } catch { setAttendanceData(null); }
+    finally { setLoadingAttendance(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  React.useEffect(() => { if (showAttendance) fetchAttendance(attendanceMonth); }, [showAttendance, attendanceMonth, fetchAttendance]);
   
   // Form states
-  const [newVehicle, setNewVehicle] = useState({ 
-  number: '', model: '', type: DEFAULT_VEHICLE_TYPE, rent: '',
+  const [newVehicle, setNewVehicle] = useState({
+  vehicleNumber: '', vehicleModel: '', vehicleType: DEFAULT_VEHICLE_TYPE, dailyRent: '',
   insuranceExpiry: '', fitnessExpiry: '', chassisNumber: ''
 });
   const [newDriver, setNewDriver] = useState({ 
@@ -1019,7 +1038,7 @@ const openAddVehicleModal = () => {
   setShowAddVehicle(true);
   fetchAvailableDrivers(); // no vehicleId — fetches unassigned drivers for owner
   setSelectedDriverId('');
-  setNewVehicle({ number: '', model: '', rent: '' });
+  setNewVehicle({ vehicleNumber: '', vehicleModel: '', vehicleType: DEFAULT_VEHICLE_TYPE, dailyRent: '', insuranceExpiry: '', fitnessExpiry: '', chassisNumber: '' });
 };
 const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, customRent) => {
   setAssigning(true);
@@ -1074,42 +1093,42 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
 };
 // Updated addVehicle function with driver assignment
 const addVehicle = async () => {
-  if (!newVehicle.number || !newVehicle.model) {
+  if (!newVehicle.vehicleNumber || !newVehicle.vehicleModel) {
     toast.warn('Vehicle number aur model required hai');
     return;
   }
-  if (!newVehicle.rent || parseInt(newVehicle.rent) <= 0) {
+  if (!newVehicle.dailyRent || parseInt(newVehicle.dailyRent) <= 0) {
     toast.warn('Rent amount required hai — ₹0 allowed nahi');
     return;
   }
-  if (!newVehicle.type) {
+  if (!newVehicle.vehicleType) {
     toast.warn('Vehicle type select karo');
     return;
   }
-  
+
   try {
     const response = await fetch(`${API}/api/payment/owner/vehicles`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Authorization': `Bearer ${token()}` 
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token()}`
       },
       body: JSON.stringify({
-  vehicle_number: newVehicle.number,
-  vehicle_model: newVehicle.model,
-  vehicle_type: newVehicle.type,
-  daily_rent: newVehicle.rent,
-  rent_type: rentType,
-  owner_id: ownerId()   // ← function use karo
-})
+        vehicle_number: newVehicle.vehicleNumber,
+        vehicle_model: newVehicle.vehicleModel,
+        vehicle_type: newVehicle.vehicleType,
+        daily_rent: newVehicle.dailyRent,
+        rent_type: rentType,
+        owner_id: ownerId(),
+      })
     });
-    
+
     const data = await response.json();
-    
+
     if (response.ok && data.success) {
       toast.success('Vehicle added successfully!');
       setShowAddVehicle(false);
-      setNewVehicle({ number: '', model: '', type: DEFAULT_VEHICLE_TYPE, rent: 850 });
+      setNewVehicle({ vehicleNumber: '', vehicleModel: '', vehicleType: DEFAULT_VEHICLE_TYPE, dailyRent: 850, insuranceExpiry: '', fitnessExpiry: '', chassisNumber: '' });
       setSelectedDriverId('');
       fetchAllData(); // Refresh vehicles list
     } else {
@@ -2081,6 +2100,78 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           )}
         </div>
       </div>
+
+      {/* Attendance Panel */}
+      <button
+        onClick={() => setShowAttendance(v => !v)}
+        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-black transition ${showAttendance ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'}`}
+      >
+        <span className="flex items-center gap-2">📅 Driver Attendance</span>
+        <span className="text-[10px] font-medium opacity-60">{showAttendance ? 'Hide ▲' : 'Show ▼'}</span>
+      </button>
+      {showAttendance && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Monthly Attendance</p>
+            <input
+              type="month"
+              value={attendanceMonth}
+              onChange={e => setAttendanceMonth(e.target.value)}
+              className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400"
+            />
+          </div>
+          {loadingAttendance ? (
+            <div className="space-y-2 p-2">
+              {[...Array(4)].map((_,i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="skeleton skeleton-text w-24" />
+                  <div className="flex-1 skeleton" style={{height:10,borderRadius:6}} />
+                  <div className="skeleton skeleton-text w-8" />
+                </div>
+              ))}
+            </div>
+          ) : !attendanceData || attendanceData.drivers?.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400">No data for this month</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[10px]" style={{minWidth: 600}}>
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="text-left px-3 py-2 font-black text-slate-500 sticky left-0 bg-slate-50" style={{minWidth:120}}>Driver</th>
+                    {Array.from({length: attendanceData.daysInMonth}, (_, i) => (
+                      <th key={i+1} className="px-1 py-2 font-semibold text-slate-400 text-center" style={{minWidth:22}}>{i+1}</th>
+                    ))}
+                    <th className="px-3 py-2 font-black text-slate-500 text-center">Present</th>
+                    <th className="px-3 py-2 font-black text-slate-500 text-center">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendanceData.drivers.map((d, i) => (
+                    <tr key={d.driverId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                      <td className="px-3 py-2 font-black text-slate-700 sticky left-0 bg-inherit" style={{minWidth:120}}>
+                        <div>{d.name}</div>
+                        <div className="font-normal text-slate-400">{d.code}</div>
+                      </td>
+                      {Array.from({length: attendanceData.daysInMonth}, (_, j) => {
+                        const day = j + 1;
+                        const present = d.presentDays.includes(day);
+                        return (
+                          <td key={day} className="px-1 py-2 text-center">
+                            <span className={`inline-block w-4 h-4 rounded-full ${present ? 'bg-emerald-400' : day < (d.firstAssignedDay || 1) ? 'bg-slate-50' : 'bg-slate-100'}`}
+                              title={day < (d.firstAssignedDay || 1) ? 'Before assignment' : present ? 'Present' : 'Absent'} />
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-center font-black text-emerald-600">{d.totalPresent}/{d.eligibleDays ?? attendanceData.daysInMonth}</td>
+                      <td className="px-3 py-2 text-center font-black" style={{color: d.attendancePct >= 80 ? '#059669' : d.attendancePct >= 50 ? '#d97706' : '#dc2626'}}>{d.attendancePct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
     );
   };
@@ -2104,25 +2195,6 @@ const removeRule = (i) => setIncentiveRules(prev => ({
 };
 const DriversTab = () => {
   const [localSearch, setLocalSearch] = useState('');
-  const [showAttendance, setShowAttendance] = useState(false);
-  const [attendanceData, setAttendanceData] = useState(null);
-  const [attendanceMonth, setAttendanceMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [loadingAttendance, setLoadingAttendance] = useState(false);
-
-  const fetchAttendance = async (month) => {
-    setLoadingAttendance(true);
-    try {
-      const res = await fetch(`${API}/api/payment/owner/attendance?ownerId=${ownerId()}&month=${month}`, {
-        headers: { Authorization: `Bearer ${token()}` }
-      });
-      const data = await res.json();
-      setAttendanceData(data);
-    } catch { setAttendanceData(null); }
-    finally { setLoadingAttendance(false); }
-  };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  React.useEffect(() => { if (showAttendance) fetchAttendance(attendanceMonth); }, [showAttendance, attendanceMonth]);
   const [selectedDriverForAssignInTab, setSelectedDriverForAssignInTab] = useState(null);
   const [showDriverAssignModal, setShowDriverAssignModal] = useState(false);
   const [availableVehiclesForDriverTab, setAvailableVehiclesForDriverTab] = useState([]);
@@ -2236,79 +2308,6 @@ const DriversTab = () => {
         )}
       </div>
       
-      {/* Attendance Toggle */}
-      <button
-        onClick={() => setShowAttendance(v => !v)}
-        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-black transition ${showAttendance ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'}`}
-      >
-        <span className="flex items-center gap-2">📅 Attendance</span>
-        <span className="text-[10px] font-medium opacity-60">{showAttendance ? 'Hide ▲' : 'Show ▼'}</span>
-      </button>
-
-      {/* Attendance View */}
-      {showAttendance && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 pt-4 pb-2">
-            <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Monthly Attendance</p>
-            <input
-              type="month"
-              value={attendanceMonth}
-              onChange={e => setAttendanceMonth(e.target.value)}
-              className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400"
-            />
-          </div>
-          {loadingAttendance ? (
-            <div className="space-y-2 p-2">
-              {[...Array(4)].map((_,i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="skeleton skeleton-text w-24" />
-                  <div className="flex-1 skeleton" style={{height:10,borderRadius:6}} />
-                  <div className="skeleton skeleton-text w-8" />
-                </div>
-              ))}
-            </div>
-          ) : !attendanceData || attendanceData.drivers?.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-400">No data for this month</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[10px]" style={{minWidth: 600}}>
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="text-left px-3 py-2 font-black text-slate-500 sticky left-0 bg-slate-50" style={{minWidth:120}}>Driver</th>
-                    {Array.from({length: attendanceData.daysInMonth}, (_, i) => (
-                      <th key={i+1} className="px-1 py-2 font-semibold text-slate-400 text-center" style={{minWidth:22}}>{i+1}</th>
-                    ))}
-                    <th className="px-3 py-2 font-black text-slate-500 text-center">Present</th>
-                    <th className="px-3 py-2 font-black text-slate-500 text-center">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attendanceData.drivers.map((d, i) => (
-                    <tr key={d.driverId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                      <td className="px-3 py-2 font-black text-slate-700 sticky left-0 bg-inherit" style={{minWidth:120}}>
-                        <div>{d.name}</div>
-                        <div className="font-normal text-slate-400">{d.code}</div>
-                      </td>
-                      {Array.from({length: attendanceData.daysInMonth}, (_, j) => {
-                        const day = j + 1;
-                        const present = d.presentDays.includes(day);
-                        return (
-                          <td key={day} className="px-1 py-2 text-center">
-                            <span className={`inline-block w-4 h-4 rounded-full ${present ? 'bg-emerald-400' : 'bg-slate-100'}`} title={present ? 'Present' : 'Absent'} />
-                          </td>
-                        );
-                      })}
-                      <td className="px-3 py-2 text-center font-black text-emerald-600">{d.totalPresent}/{attendanceData.daysInMonth}</td>
-                      <td className="px-3 py-2 text-center font-black" style={{color: d.attendancePct >= 80 ? '#059669' : d.attendancePct >= 50 ? '#d97706' : '#dc2626'}}>{d.attendancePct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Action Row */}
       <div className="flex items-center gap-2">
         <button onClick={() => setShowAddDriver(true)}
@@ -4413,8 +4412,8 @@ const ProfileTab = () => {
             type="text"
             placeholder="e.g. MH01AB1234"
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition uppercase"
-            value={newVehicle.number}
-            onChange={e => setNewVehicle({...newVehicle, number: e.target.value.toUpperCase()})}
+            value={newVehicle.vehicleNumber}
+            onChange={e => setNewVehicle({...newVehicle, vehicleNumber: e.target.value.toUpperCase()})}
           />
         </div>
 
@@ -4424,8 +4423,8 @@ const ProfileTab = () => {
           <input
             placeholder="e.g. Tata Ace EV"
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
-            value={newVehicle.model}
-            onChange={e => setNewVehicle({...newVehicle, model: e.target.value})}
+            value={newVehicle.vehicleModel}
+            onChange={e => setNewVehicle({...newVehicle, vehicleModel: e.target.value})}
           />
         </div>
 
@@ -4434,8 +4433,8 @@ const ProfileTab = () => {
           <label className="text-xs font-semibold text-slate-500 block mb-1">Vehicle Type *</label>
           <select
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
-            value={newVehicle.type || DEFAULT_VEHICLE_TYPE}
-            onChange={e => setNewVehicle({...newVehicle, type: e.target.value})}
+            value={newVehicle.vehicleType || DEFAULT_VEHICLE_TYPE}
+            onChange={e => setNewVehicle({...newVehicle, vehicleType: e.target.value})}
           >
             {VEHICLE_TYPE_GROUPS.map(g => (
               <optgroup key={g.group} label={g.group}>
@@ -4472,19 +4471,19 @@ const ProfileTab = () => {
                 min="1"
                 placeholder="850"
                 className="w-full border border-slate-200 rounded-xl pl-7 pr-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
-                value={newVehicle.rent || ''}
-                onChange={e => setNewVehicle({...newVehicle, rent: parseInt(e.target.value) || ''})}
+                value={newVehicle.dailyRent || ''}
+                onChange={e => setNewVehicle({...newVehicle, dailyRent: parseInt(e.target.value) || ''})}
               />
             </div>
           </div>
         </div>
-        {newVehicle.rent > 0 && (
+        {newVehicle.dailyRent > 0 && (
           <p className="text-xs text-indigo-600 font-semibold -mt-1">
-            Driver will pay ₹{Number(newVehicle.rent).toLocaleString('en-IN')} per {rentType === 'DAILY' ? 'day' : rentType === 'WEEKLY' ? 'week' : 'month'}
+            Driver will pay ₹{Number(newVehicle.dailyRent).toLocaleString('en-IN')} per {rentType === 'DAILY' ? 'day' : rentType === 'WEEKLY' ? 'week' : 'month'}
           </p>
         )}
-        {(!newVehicle.rent || newVehicle.rent <= 0) && (
-          <p className="text-xs text-rose-500 font-semibold -mt-1">⚠ Rent cannot be ₹0 or free</p>
+        {(!newVehicle.dailyRent || newVehicle.dailyRent <= 0) && (
+          <p className="text-xs text-rose-500 font-semibold -mt-1">Rent cannot be ₹0 or free</p>
         )}
 
         {/* Insurance + Fitness */}

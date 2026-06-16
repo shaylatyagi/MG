@@ -5,7 +5,7 @@
  * All payment, ledger, and transaction API calls in one place.
  */
 
-const API = 'https://mg-qw5s.onrender.com';
+const API = process.env.API_BASE_URL || 'http://localhost:5000';
 
 const headers = (token) => ({
   'Content-Type': 'application/json',

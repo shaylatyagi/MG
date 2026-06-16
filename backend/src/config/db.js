@@ -6,11 +6,19 @@ console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
 
 let pool;
 
+// Pool limits — Neon free tier allows max 5 connections; keep max=4 to leave headroom.
+const POOL_CONFIG = {
+  max: parseInt(process.env.DB_POOL_MAX || '4'),
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+};
+
 if (process.env.DATABASE_URL) {
   console.log('✅ Using DATABASE_URL');
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ...POOL_CONFIG,
   });
 } else {
   console.log('⚠️ Using individual PG variables');
@@ -21,6 +29,7 @@ if (process.env.DATABASE_URL) {
     password: process.env.PGPASSWORD || process.env.DB_PASSWORD,
     database: process.env.PGDATABASE || process.env.DB_NAME,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ...POOL_CONFIG,
   });
 }
 
@@ -73,4 +82,12 @@ pool.connect()
     console.error('❌ Database connection FAILED:', err.message);
   });
 
+module.exports = pool;    `).then(() => console.log('sos_alerts columns OK'))
+      .catch(e  => console.warn('sos_alerts migration skipped:', e.message));
+  })
+  .catch(err => {
+    console.error('Database connection FAILED:', err.message);
+  });
+
 module.exports = pool;
+.exports = pool;

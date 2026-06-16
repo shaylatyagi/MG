@@ -26,8 +26,7 @@ const verifyWebhookSignature = (req) => {
 };
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/db');
-const { verifyToken } = require('../middleware/auth.middleware');
-const { requirePermission } = require('../middleware/auth');
+const { verifyToken, requirePermission } = require('../middleware/auth.middleware');
 const { logAudit } = require('../utils/audit');
 // ─── ASSIGNMENT HISTORY HELPER ───────────────────────────────────────
 const logAssignment = async (driverId, vehicleId, ownerId, dailyRent, rentType) => {
@@ -3195,36 +3194,58 @@ router.get('/owner/attendance', async (req, res) => {
     );
 
     // Build per-driver attendance
+    // firstAssignedDay: attendance % counts from when driver was first assigned that month.
+    // e.g. driver assigned on the 20th of a 30-day month => 11 eligible days, not 30.
+    const today = new Date();
+    const isCurrentMonth = targetMonth === today.toISOString().slice(0, 7);
+
     const attendanceMap = {};
     driversRes.rows.forEach(d => {
-      attendanceMap[d.id] = { driverId: d.id, name: d.full_name, code: d.driver_code, presentDays: new Set() };
+      attendanceMap[d.id] = {
+        driverId: d.id, name: d.full_name, code: d.driver_code,
+        presentDays: new Set(),
+        firstAssignedDay: null,
+      };
     });
 
     histRes.rows.forEach(h => {
       const start = new Date(Math.max(new Date(h.assigned_at), monthStart));
       const end   = new Date(Math.min(h.unassigned_at ? new Date(h.unassigned_at) : monthEnd, monthEnd));
+      const entry = attendanceMap[h.driver_id];
+      if (!entry) return;
+      // Track earliest assignment day-of-month
+      const startDay = start.getDate();
+      if (entry.firstAssignedDay === null || startDay < entry.firstAssignedDay) {
+        entry.firstAssignedDay = startDay;
+      }
       let cur = new Date(start);
       cur.setHours(0, 0, 0, 0);
       while (cur <= end) {
         const dayNum = cur.getDate();
-        if (dayNum >= 1 && dayNum <= daysInMonth) {
-          attendanceMap[h.driver_id]?.presentDays.add(dayNum);
-        }
+        if (dayNum >= 1 && dayNum <= daysInMonth) entry.presentDays.add(dayNum);
         cur.setDate(cur.getDate() + 1);
       }
     });
 
-    const drivers = Object.values(attendanceMap).map(d => ({
-      driverId: d.driverId,
-      name: d.name,
-      code: d.code,
-      presentDays: Array.from(d.presentDays).sort((a, b) => a - b),
-      totalPresent: d.presentDays.size,
-      totalAbsent: daysInMonth - d.presentDays.size,
-      attendancePct: Math.round((d.presentDays.size / daysInMonth) * 100)
-    }));
+    const drivers = Object.values(attendanceMap).map(d => {
+      const firstDay = d.firstAssignedDay || 1;
+      const lastDay = isCurrentMonth ? today.getDate() : daysInMonth;
+      const eligibleDays = Math.max(1, lastDay - firstDay + 1);
+      return {
+        driverId: d.driverId,
+        name: d.name,
+        code: d.code,
+        presentDays: Array.from(d.presentDays).sort((a, b) => a - b),
+        totalPresent: d.presentDays.size,
+        totalAbsent: eligibleDays - d.presentDays.size,
+        eligibleDays,
+        firstAssignedDay: firstDay,
+        attendancePct: Math.min(100, Math.round((d.presentDays.size / eligibleDays) * 100)),
+      };
+    });
 
     res.json({ month: targetMonth, daysInMonth, drivers });
+
   } catch (err) {
     console.error('Attendance error:', err);
     res.status(500).json({ error: err.message });
@@ -3342,4 +3363,4 @@ router.get('/manager/profile', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Upgrade to premium (admin manually upgrades, or payment webhook)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+// Upgrade to premium (admin manually upgrades, or payment webhook)                                                                                                                                                                                                                                                                                                                                                       

@@ -585,13 +585,13 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
 
     const veh = await pool.query(
-      'SELECT id, vehicle_number FROM vehicles WHERE id = $1 AND owner_id = $2',
+      'SELECT id, reg_number FROM public.vehicles WHERE id = $1 AND owner_id = $2',
       [req.params.id, owner.id]
     );
     if (!veh.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });
 
     await pool.query(
-      'UPDATE vehicles SET daily_rent = $1, updated_at = NOW() WHERE id = $2',
+      'UPDATE public.vehicles SET daily_rent = $1 WHERE id = $2',
       [rent, req.params.id]
     );
     res.json({ success: true, message: `Rent updated to ₹${rent}/day`, daily_rent: rent });

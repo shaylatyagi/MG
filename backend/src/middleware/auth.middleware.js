@@ -64,4 +64,23 @@ const requireRole = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, verifyAdmin, requireRole };
+// Generate a signed JWT — includes full payload (id, role, owner_id, phone, permissions, session_token)
+const generateToken = (payload) =>
+  jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+// Permission guard for owner/manager shared routes — use AFTER verifyToken
+// OWNER: always allowed. MANAGER: must have perm === true in JWT permissions object.
+const requirePermission = (perm) => (req, res, next) => {
+  const { role, permissions } = req.user || {};
+  if (role === 'OWNER' || role === 'admin') return next();
+  if (role === 'MANAGER') {
+    const perms = typeof permissions === 'string'
+      ? JSON.parse(permissions)
+      : (permissions || {});
+    if (perms[perm]) return next();
+    return next(new ApiError(403, `Permission denied: ${perm}`, 'FORBIDDEN'));
+  }
+  return next(new ApiError(403, 'Access denied', 'FORBIDDEN'));
+};
+
+module.exports = { verifyToken, verifyAdmin, requireRole, generateToken, requirePermission };
