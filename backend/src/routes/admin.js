@@ -593,6 +593,23 @@ router.patch('/companies/:id/payment-mode', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PATCH /api/admin/companies/:id/onboarding-status — admin approves or rejects merchant profile
+router.patch('/companies/:id/onboarding-status', async (req, res) => {
+  try {
+    const { status } = req.body; // 'APPROVED' or 'REJECTED'
+    const VALID = ['APPROVED', 'REJECTED', 'PENDING', 'SUBMITTED'];
+    if (!VALID.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+    const r = await pool.query(
+      `UPDATE public.companies SET onboarding_status=$1 WHERE id=$2 RETURNING id, name, onboarding_status`,
+      [status, req.params.id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ error: 'Company not found' });
+    logAudit('COMPANY_ONBOARDING_STATUS_CHANGED', 'company', req.params.id,
+      req.headers['x-admin-phone'] || 'admin', { status });
+    res.json({ success: true, company: r.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ─── ADMIN ADD DRIVER ─────────────────────────────────────────────────────────
 router.post('/drivers', async (req, res) => {
   try {

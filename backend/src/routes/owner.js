@@ -834,5 +834,66 @@ router.put('/update-profile', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
+// PATCH /api/owner/merchant-profile — owner fills in business details, saved to their company row
+router.patch('/merchant-profile', async (req, res) => {
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ error: 'Owner not found' });
+    if (!owner.company_id) return res.status(400).json({ error: 'Owner is not linked to a company' });
+
+    const {
+      legal_entity_type, business_category, gst_number, pan_number,
+      cin_llpin, annual_turnover, website, city, state, pincode,
+      contact_person, contact_email
+    } = req.body;
+
+    await pool.query(
+      `UPDATE public.companies SET
+        legal_entity_type = COALESCE($1, legal_entity_type),
+        business_category = COALESCE($2, business_category),
+        gst_number        = COALESCE($3, gst_number),
+        pan_number        = COALESCE($4, pan_number),
+        cin_llpin         = COALESCE($5, cin_llpin),
+        annual_turnover   = COALESCE($6, annual_turnover),
+        website           = COALESCE($7, website),
+        city              = COALESCE($8, city),
+        state             = COALESCE($9, state),
+        pincode           = COALESCE($10, pincode),
+        contact_person    = COALESCE($11, contact_person),
+        contact_email     = COALESCE($12, contact_email),
+        onboarding_status = CASE WHEN onboarding_status = 'PENDING' THEN 'SUBMITTED' ELSE onboarding_status END
+       WHERE id = $13`,
+      [
+        legal_entity_type || null, business_category || null, gst_number || null,
+        pan_number || null, cin_llpin || null, annual_turnover || null,
+        website || null, city || null, state || null, pincode || null,
+        contact_person || null, contact_email || null,
+        owner.company_id
+      ]
+    );
+    res.json({ success: true, message: 'Merchant profile updated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/owner/merchant-profile — fetch current company merchant profile
+router.get('/merchant-profile', async (req, res) => {
+  try {
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ error: 'Owner not found' });
+    if (!owner.company_id) return res.json({ success: true, profile: null });
+
+    const r = await pool.query(
+      `SELECT legal_entity_type, business_category, gst_number, pan_number,
+              cin_llpin, annual_turnover, website, city, state, pincode,
+              contact_person, contact_email, onboarding_status
+       FROM public.companies WHERE id = $1`,
+      [owner.company_id]
+    );
+    res.json({ success: true, profile: r.rows[0] || null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/companies/:id/onboarding-status — admin approves/rejects merchant profile
+// (kept in admin.js but referenced here for completeness)
 
 module.exports = router;

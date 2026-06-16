@@ -1292,6 +1292,43 @@ const ProfileTab = () => {
   const [payModeSaving, setPayModeSaving] = useState(false);
   const [payModeMsg, setPayModeMsg] = useState('');
 
+  // Merchant profile state
+  const [mpLoading, setMpLoading] = useState(false);
+  const [mpSaving, setMpSaving] = useState(false);
+  const [mpMsg, setMpMsg] = useState('');
+  const [mp, setMp] = useState({
+    legal_entity_type: '', business_category: '', gst_number: '',
+    pan_number: '', cin_llpin: '', annual_turnover: '',
+    website: '', city: '', state: '', pincode: '',
+    contact_person: '', contact_email: '', onboarding_status: '',
+  });
+
+  useEffect(() => {
+    setMpLoading(true);
+    fetch(`${API}/api/owner/merchant-profile`, {
+      headers: { Authorization: `Bearer ${token()}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (d.profile) setMp(p => ({ ...p, ...d.profile })); })
+      .catch(() => {})
+      .finally(() => setMpLoading(false));
+  }, []);
+
+  const saveMerchantProfile = async () => {
+    setMpSaving(true); setMpMsg('');
+    try {
+      const res = await fetch(`${API}/api/owner/merchant-profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify(mp),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      setMpMsg('✓ Saved — admin will review');
+    } catch (e) { setMpMsg('Error: ' + e.message); }
+    finally { setMpSaving(false); }
+  };
+
   const savePayMode = async () => {
     setPayModeSaving(true); setPayModeMsg('');
     try {
@@ -1378,11 +1415,62 @@ const ProfileTab = () => {
       </div>
     </div>
 
-    <button
-      onClick={() => alert('Profile editing coming soon! Contact admin at admin@mobilitygrid.com to update your details.')}
-      className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
-      <Edit2 size={14} /> Edit Profile
-    </button>
+    {/* Merchant / Business Profile */}
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-black text-slate-700">🏢 Business / Merchant Profile</p>
+        {mp.onboarding_status && (
+          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+            mp.onboarding_status === 'APPROVED'  ? 'bg-emerald-100 text-emerald-700' :
+            mp.onboarding_status === 'REJECTED'  ? 'bg-red-100 text-red-700' :
+            mp.onboarding_status === 'SUBMITTED' ? 'bg-amber-100 text-amber-700' :
+            'bg-slate-100 text-slate-500'
+          }`}>{mp.onboarding_status}</span>
+        )}
+      </div>
+      <p className="text-[10px] text-slate-400 mb-3">Admin will verify these details before activation.</p>
+
+      {mpLoading ? (
+        <p className="text-xs text-slate-400 text-center py-2">Loading…</p>
+      ) : (
+        <div className="space-y-2.5">
+          {[
+            { key: 'business_category', label: 'Business Category', placeholder: 'e.g. E-Bike Rental, EV Fleet' },
+            { key: 'legal_entity_type', label: 'Legal Entity Type', placeholder: 'e.g. Proprietorship, LLP, Pvt Ltd' },
+            { key: 'gst_number',        label: 'GSTIN',             placeholder: '15-digit GST number' },
+            { key: 'pan_number',        label: 'PAN',               placeholder: '10-char PAN' },
+            { key: 'cin_llpin',         label: 'CIN / LLPIN',       placeholder: 'Optional' },
+            { key: 'annual_turnover',   label: 'Annual Turnover',   placeholder: 'e.g. ₹10 Lakh / year' },
+            { key: 'website',           label: 'Website',           placeholder: 'https://...' },
+            { key: 'city',              label: 'City',              placeholder: 'City' },
+            { key: 'state',             label: 'State',             placeholder: 'State' },
+            { key: 'pincode',           label: 'Pincode',           placeholder: '6 digits' },
+            { key: 'contact_person',    label: 'Contact Person',    placeholder: 'Name' },
+            { key: 'contact_email',     label: 'Contact Email',     placeholder: 'email@company.com' },
+          ].map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">{label}</label>
+              <input
+                value={mp[key] || ''}
+                onChange={e => setMp(p => ({ ...p, [key]: e.target.value }))}
+                placeholder={placeholder}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50 focus:outline-none focus:border-blue-400"
+              />
+            </div>
+          ))}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={saveMerchantProfile}
+              disabled={mpSaving}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl disabled:opacity-50"
+            >
+              {mpSaving ? 'Saving…' : 'Save & Submit'}
+            </button>
+            {mpMsg && <span className={`text-[10px] ${mpMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{mpMsg}</span>}
+          </div>
+        </div>
+      )}
+    </div>
 
     <button onClick={logout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2 border border-red-100">
       <LogOut size={14} /> Logout

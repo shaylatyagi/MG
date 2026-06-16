@@ -1,3 +1,4 @@
+import { vehicleTypeLabel } from '../../constants/vehicleTypes';
 import React, { useState, useEffect, useCallback, useRef, Component } from 'react';
 import { toast, ToastContainer } from '../../components/Toast';
 import ThemeToggle from '../../components/ThemeToggle';
@@ -1057,6 +1058,24 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
   const [branchDrivers, setBranchDrivers] = useState([]);
   const [branchVehicles, setBranchVehicles] = useState([]);
   const [branchDetailLoading, setBranchDetailLoading] = useState(false);
+  // Merchant profile
+  const [obStatus, setObStatus] = useState(company.onboarding_status || '');
+  const [obSaving, setObSaving] = useState(false);
+  const [obMsg, setObMsg] = useState('');
+
+  const updateOnboardingStatus = async (newStatus) => {
+    setObSaving(true); setObMsg('');
+    try {
+      await api(`/api/admin/companies/${company.id}/onboarding-status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      setObStatus(newStatus);
+      setObMsg(`✓ Status set to ${newStatus}`);
+    } catch (e) { setObMsg('Error: ' + e.message); }
+    finally { setObSaving(false); }
+  };
 
   useEffect(() => {
     api(`/api/admin/companies/${company.id}/owners`)
@@ -1161,7 +1180,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
     }
       onClose={onClose} onBack={onBack} breadcrumbs={breadcrumbs} wide>
       <div className="flex gap-1 border-b dark:border-gray-700 mb-4 -mt-2">
-        {[['owners','Owners'],['docs','Documents'],['branches','Branches'],['settings', pmRequests.length > 0 ? 'Settings 🔴' : 'Settings']].map(([k,label]) => (
+        {[['owners','Owners'],['docs','Documents'],['branches','Branches'],['merchant', company.onboarding_status === 'SUBMITTED' ? 'Merchant 🔴' : 'Merchant'],['settings', pmRequests.length > 0 ? 'Settings 🔴' : 'Settings']].map(([k,label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition ${tab===k ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
             {label}
@@ -1274,7 +1293,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                           {branchVehicles.map(v => (
                             <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                               <td className="px-3 py-2 font-medium text-gray-800 dark:text-gray-100">{v.reg_number}</td>
-                              <td className="px-3 py-2 text-gray-500">{v.vehicle_type}</td>
+                              <td className="px-3 py-2 text-gray-500">{vehicleTypeLabel(v.vehicle_type)}</td>
                               <td className="px-3 py-2 text-gray-500">{v.driver_name || '—'}</td>
                               <td className="px-3 py-2"><Badge status={v.status || 'ACTIVE'} /></td>
                             </tr>
@@ -1374,6 +1393,66 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'merchant' && (
+        <div className="space-y-4 max-w-lg">
+          {/* Onboarding status banner */}
+          <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${
+            obStatus === 'APPROVED'  ? 'bg-emerald-50 border border-emerald-200' :
+            obStatus === 'REJECTED'  ? 'bg-red-50 border border-red-200' :
+            obStatus === 'SUBMITTED' ? 'bg-amber-50 border border-amber-200' :
+            'bg-gray-50 border border-gray-200'
+          }`}>
+            <div>
+              <p className="text-xs font-semibold text-gray-700">Merchant Onboarding Status</p>
+              <p className={`text-sm font-black mt-0.5 ${
+                obStatus === 'APPROVED'  ? 'text-emerald-700' :
+                obStatus === 'REJECTED'  ? 'text-red-700' :
+                obStatus === 'SUBMITTED' ? 'text-amber-700' : 'text-gray-500'
+              }`}>{obStatus || 'PENDING'}</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => updateOnboardingStatus('APPROVED')} disabled={obSaving || obStatus === 'APPROVED'}
+                className="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold disabled:opacity-40">
+                ✓ Approve
+              </button>
+              <button onClick={() => updateOnboardingStatus('REJECTED')} disabled={obSaving || obStatus === 'REJECTED'}
+                className="text-xs px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-semibold border border-red-200 disabled:opacity-40">
+                ✗ Reject
+              </button>
+            </div>
+          </div>
+          {obMsg && <p className={`text-xs ${obMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{obMsg}</p>}
+
+          {/* Merchant profile fields */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+            {[
+              { label: 'Business Category',  value: company.business_category },
+              { label: 'Legal Entity Type',  value: company.legal_entity_type },
+              { label: 'GSTIN',              value: company.gst_number },
+              { label: 'PAN',                value: company.pan_number },
+              { label: 'CIN / LLPIN',        value: company.cin_llpin },
+              { label: 'Annual Turnover',    value: company.annual_turnover },
+              { label: 'Website',            value: company.website,   link: true },
+              { label: 'City',               value: company.city },
+              { label: 'State',              value: company.state },
+              { label: 'Pincode',            value: company.pincode },
+              { label: 'Contact Person',     value: company.contact_person },
+              { label: 'Contact Email',      value: company.contact_email },
+            ].map(({ label, value, link }) => (
+              <div key={label} className="px-4 py-3 flex items-center justify-between">
+                <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
+                {value
+                  ? link
+                    ? <a href={value} target="_blank" rel="noreferrer" className="text-xs font-semibold text-indigo-600 hover:underline">{value}</a>
+                    : <span className="text-xs font-semibold text-gray-800 dark:text-gray-100">{value}</span>
+                  : <span className="text-xs text-gray-300 dark:text-gray-600 italic">—</span>
+                }
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
