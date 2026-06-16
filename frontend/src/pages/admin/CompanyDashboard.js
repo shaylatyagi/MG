@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Component } from 'react';
+import { toast, ToastContainer } from '../../../components/Toast';
 import ThemeToggle from '../../components/ThemeToggle';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
@@ -282,8 +283,8 @@ function DocumentsSection({ userType, userId }) {
                         try {
                           const r = await api(`/api/admin/user-docs/${d.id}/view`);
                           if (r.view_url) window.open(r.view_url, '_blank');
-                          else alert('No file stored for this document');
-                        } catch { alert('Could not load document URL'); }
+                          else toast.warn('No file stored for this document');
+                        } catch { toast.error('Could not load document URL'); }
                       }}
                       className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full font-medium hover:bg-indigo-100">
                       👁 View
@@ -1012,8 +1013,8 @@ function CompanyDocsSection({ companyId }) {
                           try {
                             const r = await api(`/api/admin/user-docs/${d.id}/view`);
                             if (r.view_url) window.open(r.view_url, '_blank');
-                            else alert('No file stored for this document');
-                          } catch { alert('Could not load document URL'); }
+                            else toast.warn('No file stored for this document');
+                          } catch { toast.error('Could not load document URL'); }
                         }}
                         className="text-xs text-indigo-600 hover:underline">👁 View</button>
                       {d.status !== 'APPROVED' && (
@@ -1081,7 +1082,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
     try {
       await api(`/api/admin/payment-mode-requests/${id}/approve`, { method: 'PATCH' });
       setPmRequests(prev => prev.filter(r => r.id !== id));
-    } catch(e) { alert(e.message); } finally { setPmLoading(false); }
+    } catch(e) { toast.error(e.message); } finally { setPmLoading(false); }
   };
 
   const rejectPmRequest = async (id) => {
@@ -1089,7 +1090,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
     try {
       await api(`/api/admin/payment-mode-requests/${id}/reject`, { method: 'PATCH' });
       setPmRequests(prev => prev.filter(r => r.id !== id));
-    } catch(e) { alert(e.message); } finally { setPmLoading(false); }
+    } catch(e) { toast.error(e.message); } finally { setPmLoading(false); }
   };
 
   const createBranch = async (e) => {
@@ -1105,7 +1106,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
       setNewBranch({ name: '', city: '', state: '' });
       setAddingBranch(false);
       loadBranches();
-    } catch (err) { alert(err.message); } finally { setBranchSaving(false); }
+    } catch (err) { toast.error(err.message); } finally { setBranchSaving(false); }
   };
 
   const deleteBranch = async (branchId) => {
@@ -1114,7 +1115,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
       await api(`/api/admin/companies/${company.id}/branches/${branchId}`, { method: 'DELETE' });
       loadBranches();
       if (selBranch?.id === branchId) setSelBranch(null);
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast.error(err.message); }
   };
 
   const viewBranch = async (branch) => {
@@ -1486,7 +1487,7 @@ function Companies() {
       await api(`/api/admin/companies/${renaming.id}/name`, { method: 'PATCH', body: JSON.stringify({ name: renameVal.trim() }) });
       setRenaming(null);
       load();
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast.error(err.message); }
     finally { setRenameSaving(false); }
   };
 
@@ -1984,7 +1985,7 @@ function AllOwners() {
     setEditPhoneVal(o.mobile_number || '');
   };
   const savePhone = async () => {
-    if (!/^\d{10}$/.test(editPhoneVal.trim())) { alert('10-digit number daalo'); return; }
+    if (!/^\d{10}$/.test(editPhoneVal.trim())) { toast.warn('10-digit number daalo'); return; }
     const cur = owners.find(o => o.id === editPhone.id)?.mobile_number;
     if (editPhoneVal.trim() === cur) { setEditPhone(null); return; }
     setEditPhoneSaving(true);
@@ -1994,7 +1995,7 @@ function AllOwners() {
       });
       setOwners(prev => prev.map(o => o.id === editPhone.id ? { ...o, mobile_number: editPhoneVal.trim() } : o));
       setEditPhone(null);
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast.error(err.message); }
     finally { setEditPhoneSaving(false); }
   };
 
@@ -3080,5 +3081,6 @@ export default function AdminPanel() {
     <ErrorBoundary>
       <AdminPanelInner />
     </ErrorBoundary>
+    <ToastContainer />
   );
 }

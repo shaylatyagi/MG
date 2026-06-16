@@ -3,7 +3,7 @@
  * backend/src/services/payyantra.service.js
  */
 
-const BASE_URL = process.env.PAYYANTRA_BASE_URL;
+const BASE_URL = process.env.PAYYANTRA_BASE_URL || 'https://payin-api.payyantra.com';
 const CLIENT_ID = process.env.PAYYANTRA_CLIENT_ID;
 const CLIENT_SECRET = process.env.PAYYANTRA_CLIENT_SECRET;
 
@@ -33,7 +33,7 @@ const createOrder = async ({ amount, customerName, customerPhone, customerEmail,
       customerPhone,
       customerEmail: customerEmail || 'driver@mobilitygrid.com',
       orderId,
-      returnUrl: `https://mg-sandy.vercel.app/driver?status=success&orderId=${orderId}`,
+      returnUrl: `https://mobilitygrid.in/driver?status=success&orderId=${orderId}`,
       notifyUrl: 'https://mg-qw5s.onrender.com/api/payment/webhook'
     })
   });

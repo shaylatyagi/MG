@@ -10,6 +10,14 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Chatbot from '../components/Chatbot';
+import { toast, ToastContainer } from '../components/Toast';
+import { SkeletonDashboard } from '../components/Skeleton';
+import Onboarding, { useOnboarding } from '../components/Onboarding';
+import AnimatedNumber from '../components/AnimatedNumber';
+import OfflineBanner from '../components/OfflineBanner';
+import LoadingButton from '../components/LoadingButton';
+import PullToRefresh from '../components/PullToRefresh';
+import EmptyState from '../components/EmptyState';
 import DocumentSection from '../components/DocumentSection';
 
 const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
@@ -95,6 +103,7 @@ export default function DriverPWA() {
   const [sosMsg, setSosMsg] = useState('');
   const [sosSent, setSosSent] = useState(false);
   const [showOwnerChat, setShowOwnerChat] = useState(false);
+  const { showTour, dismissTour } = useOnboarding('driver');
   const [showAddFunds, setShowAddFunds] = useState(false);
   const [addFundsAmt, setAddFundsAmt] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -350,8 +359,8 @@ export default function DriverPWA() {
         try { const qrUrl = new URL(qrLink); const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent")); if (intentLink?.startsWith('upi://')) { window.location.href = intentLink; return; } } catch {}
       }
       const url = d?.checkoutUrl || d?.data?.checkoutUrl || d?.intentURL || d?.data?.intentURL;
-      if (url) { window.location.href = url; } else { alert('Payment error: ' + (d?.message || 'No URL')); setShowPaying(false); }
-    } catch (e) { if (!payAbortRef.current) alert('Network error: ' + e.message); setShowPaying(false); }
+      if (url) { window.location.href = url; } else { toast.error('Payment error: ' + (d?.message || 'No URL')); setShowPaying(false); }
+    } catch (e) { if (!payAbortRef.current) toast.error('Network error: ' + e.message); setShowPaying(false); }
   };
 
   const addFloat = () => { setAddFundsAmt(''); setShowAddFunds(true); };
@@ -369,8 +378,8 @@ export default function DriverPWA() {
       });
       const d = await r.json();
       const url = d?.checkoutUrl || d?.data?.checkoutUrl || d?.intentURL || d?.data?.intentURL;
-      if (url) { window.location.href = url; } else { alert('Payment gateway error.'); setShowPaying(false); }
-    } catch { alert('Network error.'); setShowPaying(false); }
+      if (url) { window.location.href = url; } else { toast.error('Payment gateway error.'); setShowPaying(false); }
+    } catch { toast.error('Network error.'); setShowPaying(false); }
   };
 
   const sendSOS = async () => {
@@ -517,31 +526,31 @@ export default function DriverPWA() {
   };
 
   const kycVerifyPAN = async () => {
-    if (!kycState.pan.value || kycState.pan.value.length !== 10) return alert('Enter valid PAN');
+    if (!kycState.pan.value || kycState.pan.value.length !== 10) return toast.error('Enter valid PAN');
     const r = await kycCall('verify-pan', { pan_number: kycState.pan.value.toUpperCase() }, 'pan');
-    if (r.verified) { setKycState(s => ({ ...s, pan: { ...s.pan, status: 'verified', verifiedName: r.name } })); alert(`✅ PAN Verified: ${r.name}`); }
-    else { setKycState(s => ({ ...s, pan: { ...s.pan, status: 'failed' } })); alert(r.message || '❌ Failed'); }
+    if (r.verified) { setKycState(s => ({ ...s, pan: { ...s.pan, status: 'verified', verifiedName: r.name } })); toast.success(`PAN Verified: ${r.name}`); }
+    else { setKycState(s => ({ ...s, pan: { ...s.pan, status: 'failed' } })); toast.error(r.message || 'Verification failed'); }
   };
   const kycAadhaarInit = async () => {
-    if (kycState.aadhaar.value.length !== 12) return alert('Enter 12-digit Aadhaar');
+    if (kycState.aadhaar.value.length !== 12) return toast.error('Enter 12-digit Aadhaar');
     const r = await kycCall('aadhaar-initiate', { aadhaar_number: kycState.aadhaar.value }, 'aadhaar');
-    if (r.success) { setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, reqId: r.requestId, showOtp: true } })); } else alert(r.message || 'Failed');
+    if (r.success) { setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, reqId: r.requestId, showOtp: true } })); } else toast.error(r.message || 'Failed');
   };
   const kycAadhaarVerify = async () => {
-    if (!kycState.aadhaar.otp) return alert('Enter OTP');
+    if (!kycState.aadhaar.otp) return toast.error('Enter OTP');
     const r = await kycCall('aadhaar-verify', { request_id: kycState.aadhaar.reqId, otp: kycState.aadhaar.otp }, 'aadhaar');
     setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, status: r.verified ? 'verified' : 'failed', showOtp: false } }));
-    alert(r.verified ? '✅ Verified' : '❌ Invalid OTP');
+    r.verified ? toast.success('Aadhaar Verified ✓') : toast.error('Invalid OTP');
   };
   const kycVerifyDL = async () => {
     const r = await kycCall('verify-dl', { dl_number: kycState.dl.value, dob: kycState.dl.dob }, 'dl');
     setKycState(s => ({ ...s, dl: { ...s.dl, status: r.verified ? 'verified' : 'failed' } }));
-    alert(r.verified ? '✅ DL Verified' : '❌ Failed');
+    r.verified ? toast.success('DL Verified ✓') : toast.error('DL verification failed');
   };
   const kycVerifyBank = async () => {
     const r = await kycCall('verify-bank', { account_number: kycState.bank.acc, ifsc: kycState.bank.ifsc }, 'bank');
     setKycState(s => ({ ...s, bank: { ...s.bank, status: r.verified ? 'verified' : 'failed' } }));
-    alert(r.verified ? `✅ Bank Verified` : '❌ Failed');
+    r.verified ? toast.success('Bank account verified ✓') : toast.error('Bank verification failed');
   };
 
   const statusBadge = (s) => {
@@ -723,13 +732,13 @@ export default function DriverPWA() {
           </div>
           <p style={{fontSize:36,fontWeight:900,color:'white',fontFamily:'monospace',letterSpacing:'-0.02em',lineHeight:1,marginBottom:16}}>
             <span style={{fontSize:20,opacity:.5,marginRight:2}}>₹</span>
-            {showBalance ? wallet.toLocaleString('en-IN') : '••••'}
+            {showBalance ? <AnimatedNumber value={wallet} decimals={0} /> : '••••'}
           </p>
           <button onClick={addFloat} style={{width:'100%',background:'rgba(99,102,241,0.85)',border:'none',borderRadius:14,padding:'11px',color:'white',fontSize:13,fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,backdropFilter:'blur(8px)'}}>
             <PlusCircle size={14}/> {t.addFloat2}
           </button>
           <button
-            onClick={() => alert('Payout request sent! Your fleet owner will process it within 24 hours.')}
+            onClick={() => toast.error('Payout request sent! Your fleet owner will process it within 24 hours.')}
             style={{width:'100%',background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:14,padding:'9px',color:'rgba(255,255,255,0.7)',fontSize:12,fontWeight:700,cursor:'pointer',marginTop:8,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
             <ArrowUpCircle size={13}/> {t.requestPayout2}
           </button>
@@ -761,7 +770,7 @@ export default function DriverPWA() {
               <p className="p-6 text-center text-[11px] text-slate-400">{t.noTxLabel}</p>
             ) : displayed.map((p, i) => (
               <div key={i} onClick={() => { setSelTxn(p); setShowReceipt(true); }}
-                className="px-4 py-3 flex items-center gap-3 press-card hover:bg-slate-50/50">
+                className="px-4 py-3 flex items-center gap-3 press-card card-enter hover:bg-slate-50/50">
                 {/* Status icon */}
                 <div style={{
                   width:38,height:38,borderRadius:12,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
@@ -937,9 +946,9 @@ export default function DriverPWA() {
           setUploadDone(`✅ ${docType} submitted for admin review!`);
           setTimeout(() => setUploadDone(''), 4000);
         } else {
-          alert('Upload failed: ' + (data.message || ''));
+          toast.error('Upload failed: ' + (data.message || ''));
         }
-      } catch { alert('Upload failed — network error'); }
+      } catch { toast.error('Upload failed — network error'); }
       finally { setUploading(false); }
     };
 
@@ -1089,6 +1098,9 @@ export default function DriverPWA() {
       </div>
       <div className="h-2 bg-indigo-100 rounded-full overflow-hidden">
         <div className="h-full bg-indigo-500 rounded-full transition-all" style={{width: `${(done/total)*100}%`}} />
+      <ToastContainer />
+      {showTour && <Onboarding role="driver" onDone={dismissTour} />}
+      <OfflineBanner />
       </div>
     </div>
   );
@@ -1468,6 +1480,7 @@ export default function DriverPWA() {
         )}
 
         {/* Content */}
+        <PullToRefresh onRefresh={() => fetchAll(true)}>
         <div className="flex-1 overflow-y-auto px-4 pt-4 bg-slate-50">
           {loading ? (
             <div className="space-y-3 pt-1">
@@ -1495,14 +1508,15 @@ export default function DriverPWA() {
               </div>
             </div>
           ) : (
-            <>
+            <div key={tab} className="tab-fade">
               {tab === 'home' && <HomeTab/>}
               {tab === 'wallet' && <WalletTab/>}
               {tab === 'stations' && <StationsTab/>}
               {tab === 'account' && <AccountTab/>}
-            </>
+            </div>
           )}
         </div>
+        </PullToRefresh>
 
         {/* Emergency bar */}
         <div className="shrink-0 px-4 py-2 flex items-center justify-between" style={{ background:'#0f172a', borderTop:'1px solid #1e293b' }}>
@@ -1800,12 +1814,13 @@ export default function DriverPWA() {
                 </button>
               ))}
             </div>
-            <button
+            <LoadingButton
               onClick={submitAddFunds}
               disabled={!addFundsAmt || isNaN(addFundsAmt) || Number(addFundsAmt) <= 0}
+              loadingText="Opening payment..."
               style={{width:'100%',padding:'14px',background:(!addFundsAmt||isNaN(addFundsAmt)||Number(addFundsAmt)<=0)?'#c7d2fe':'#4f46e5',color:'#fff',border:'none',borderRadius:14,fontSize:15,fontWeight:800,cursor:(!addFundsAmt||isNaN(addFundsAmt)||Number(addFundsAmt)<=0)?'not-allowed':'pointer',marginBottom:10,fontFamily:'inherit'}}>
               Proceed to Pay
-            </button>
+            </LoadingButton>
             <button onClick={() => setShowAddFunds(false)}
               style={{width:'100%',padding:'12px',background:'transparent',color:'#94a3b8',border:'none',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>
               Cancel

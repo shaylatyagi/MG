@@ -1,6 +1,14 @@
 // frontend/src/pages/OwnerDashboard.js
 // Complete with ALL buttons - Notification Bell, Logout, Chat, Search
 
+import { toast, ToastContainer } from '../components/Toast';
+import { SkeletonDashboard } from '../components/Skeleton';
+import Onboarding, { useOnboarding } from '../components/Onboarding';
+import AnimatedNumber from '../components/AnimatedNumber';
+import OfflineBanner from '../components/OfflineBanner';
+import LoadingButton from '../components/LoadingButton';
+import PullToRefresh from '../components/PullToRefresh';
+import EmptyState from '../components/EmptyState';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -54,7 +62,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch(e) { alert('Download failed: ' + e.message); }
+    } catch(e) { toast.error('Download failed: ' + e.message); }
   };
 
   const fetchLedger = () => {
@@ -70,7 +78,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   }, []);
 
   const addEntry = async () => {
-    if (!entryAmount || parseFloat(entryAmount) <= 0) return alert('Amount daalen');
+    if (!entryAmount || parseFloat(entryAmount) <= 0) return toast.warn('Amount daalen');
     const res = await fetch(`${API}/api/payment/owner/ledger-entry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenVal}` },
@@ -84,11 +92,11 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
     });
     const d = await res.json();
     if (d.success) {
-      alert('✅ Entry recorded!');
+      toast.success('Entry recorded!');
       setShowEntryModal(false);
       setEntryAmount(''); setEntryDesc('');
       fetchLedger();
-    } else alert(d.error || 'Failed');
+    } else toast.error(d.error || 'Failed');
   };
 
   return (
@@ -199,6 +207,9 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   return (
     <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 mb-3 text-center">
       <span className="text-xs font-black text-emerald-700">✅ Account Settled</span>
+    <ToastContainer />
+      {showTour && <Onboarding role="owner" onDone={dismissTour} />}
+      <OfflineBanner />
     </div>
   );
 })()}
@@ -373,6 +384,7 @@ const [assignMode, setAssignMode] = useState('driver'); // 'driver' or 'vehicle'
 const [availableVehiclesForDriver, setAvailableVehiclesForDriver] = useState([]);
 const [availableDriversForVehicle, setAvailableDriversForVehicle] = useState([]);
   const navigate = useNavigate();
+  const { showTour, dismissTour } = useOnboarding('owner');
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState('');
@@ -388,6 +400,10 @@ const [availableDriversForVehicle, setAvailableDriversForVehicle] = useState([])
   });
   const [trendData, setTrendData] = useState([]);
   const [overdueDrivers, setOverdueDrivers] = useState([]);
+  const [payLinkDriver, setPayLinkDriver]   = useState(null);   // driver selected for payment link
+  const [payLinkAmt, setPayLinkAmt]         = useState('');
+  const [payLinkLoading, setPayLinkLoading] = useState(false);
+  const [payLinkResult, setPayLinkResult]   = useState(null);   // { url, copied }
   const [showOverdue, setShowOverdue] = useState(false);
   const [remindingAll, setRemindingAll] = useState(false);
   // Add these with other useState declarations
@@ -571,8 +587,8 @@ const DriverDetailsModal = () => {
       const data = await r.json();
       const agDoc = data.docs?.find(d => d.doc_type === 'AGREEMENT');
       if (agDoc?.view_url) { setAgreementViewUrl(agDoc.view_url); window.open(agDoc.view_url, '_blank'); }
-      else alert('Document not found or expired. Try re-uploading.');
-    } catch { alert('Could not fetch document URL'); }
+      else toast.error('Document not found or expired. Try re-uploading.');
+    } catch { toast.error('Could not fetch document URL'); }
     finally { setFetchingAgreement(false); }
   };
 
@@ -869,10 +885,10 @@ const DriverDetailsModal = () => {
                   setSelectedDriverDetails(prev => ({ ...prev, agreement_uploaded: true }));
                   fetchAllData();
                 } else {
-                  alert(data.message || 'Upload failed');
+                  toast.error(data.message || 'Upload failed');
                 }
               } catch {
-                alert('Upload failed — network error');
+                toast.error('Upload failed — network error');
               } finally {
                 setUploadingAgreement(false);
               }
@@ -1039,18 +1055,18 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
     console.log('Assignment response:', data);
     
     if (data.success) {
-      alert(`✅ Vehicle assigned to ${data.driverName} with ${rentType} rent of ₹${customRent}`);
+      toast.success('Vehicle assigned to ${data.driverName} with ${rentType} rent of ₹${customRent}');
       setShowVehicleDetailModal(false);
       setSelectedVehicleDetails(null);
       // Refresh all data
       await fetchAllData();
       await fetchUnassignedData();
     } else {
-      alert(data.error || 'Assignment failed');
+      toast.error(data.error || 'Assignment failed');
     }
   } catch (err) {
     console.error('Assign error:', err);
-    alert('Network error: ' + err.message);
+    toast.error('Network error: ' + err.message);
   } finally {
     setAssigning(false);
   }
@@ -1058,7 +1074,7 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
 // Updated addVehicle function with driver assignment
 const addVehicle = async () => {
   if (!newVehicle.number || !newVehicle.model) {
-    alert('Please fill vehicle number and model');
+    toast.warn('Please fill vehicle number and model');
     return;
   }
   
@@ -1082,23 +1098,23 @@ const addVehicle = async () => {
     const data = await response.json();
     
     if (response.ok && data.success) {
-      alert('✅ Vehicle added successfully!');
+      toast.success('Vehicle added successfully!');
       setShowAddVehicle(false);
       setNewVehicle({ number: '', model: '', type: 'EV', rent: 850 });
       setSelectedDriverId('');
       fetchAllData(); // Refresh vehicles list
     } else {
-      alert(data.message || 'Failed to add vehicle');
+      toast.error(data.message || 'Failed to add vehicle');
     }
   } catch (error) {
     console.error('Add vehicle error:', error);
-    alert('Network error: ' + error.message);
+    toast.error('Network error: ' + error.message);
   }
 };
 // Add this function
 const handleAssignVehicle = async () => {
   if (!selectedDriverForAssign || !selectedVehicleForAssign) {
-    alert('Please select both driver and vehicle');
+    toast.warn('Please select both driver and vehicle');
     return;
   }
   
@@ -1120,7 +1136,7 @@ const handleAssignVehicle = async () => {
     const data = await response.json();
     
     if (data.success) {
-      alert(`✅ Successfully assigned ${selectedDriverForAssign.full_name} to vehicle`);
+      toast.success('Successfully assigned ${selectedDriverForAssign.full_name} to vehicle');
       setShowAssignModal(false);
       setSelectedDriverForAssign(null);
       setSelectedVehicleForAssign(null);
@@ -1128,11 +1144,11 @@ const handleAssignVehicle = async () => {
       fetchAllData();
       fetchUnassignedData();
     } else {
-      alert(data.error || 'Assignment failed');
+      toast.error(data.error || 'Assignment failed');
     }
   } catch (err) {
     console.error('Assign error:', err);
-    alert('Network error');
+    toast.error('Network error');
   } finally {
     setAssigning(false);
   }
@@ -1584,7 +1600,7 @@ const handleVehicleBulkFile = (e) => {
 };
 const importBulkVehicles = async () => {
   const valid = bulkVehicles.filter(v => v._errors.length === 0);
-  if (!valid.length) return alert('Koi valid vehicle nahi');
+  if (!valid.length) return toast.warn('Koi valid vehicle nahi');
   setBulkLoading(true);
   try {
     const res = await fetch(`${API}/api/payment/owner/bulk-upload-vehicles`, {
@@ -1599,9 +1615,9 @@ const importBulkVehicles = async () => {
     setBulkResult(data);
     if (data.imported > 0) {
       fetchAllData();
-      alert(`✅ ${data.imported} vehicles import ho gaye!`);
+      toast.success('${data.imported} vehicles import ho gaye!');
     }
-  } catch(err) { alert('Network error: ' + err.message); }
+  } catch(err) { toast.error('Network error: ' + err.message); }
   finally { setBulkLoading(false); }
 };
 const handleBulkFile = (e) => {
@@ -1635,7 +1651,7 @@ const updateBulkRow = (index, field, value) => {
 };
 const importBulkDrivers = async () => {
   const valid = bulkDrivers.filter(d => d._errors.length === 0);
-  if (!valid.length) return alert('Koi valid driver nahi — pehle errors fix karo');
+  if (!valid.length) return toast.warn('Koi valid driver nahi — pehle errors fix karo');
   setBulkLoading(true);
   try {
     const res = await fetch(`${API}/api/payment/owner/bulk-upload`, {
@@ -1651,17 +1667,17 @@ const importBulkDrivers = async () => {
     setBulkResult(data);
     if (data.imported > 0) {
       fetchAllData();
-      alert(`✅ ${data.imported} drivers import ho gaye!`);
+      toast.success('${data.imported} drivers import ho gaye!');
     }
     if (data.failed > 0) {
       console.log('Failed:', data.failures);
     }
-  } catch(err) { alert('Network error: ' + err.message); }
+  } catch(err) { toast.error('Network error: ' + err.message); }
   finally { setBulkLoading(false); }
 };
 const addMultipleDrivers = async () => {
   const toAdd = multipleDrivers.filter(d => d.name && d.phone && !d._saved);
-  if (!toAdd.length) return alert('Koi driver fill nahi kiya');
+  if (!toAdd.length) return toast.warn('Koi driver fill nahi kiya');
   setBulkLoading(true);
   let added = 0;
   for (let i = 0; i < multipleDrivers.length; i++) {
@@ -1699,8 +1715,8 @@ const saveRules = async () => {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
       body: JSON.stringify({ ownerId: ownerId(), isEnabled: incentiveRules.is_enabled, rules: incentiveRules.rules })
     });
-    alert('✅ Rules saved!');
-  } catch { alert('Network error'); }
+    toast.success('Rules saved!');
+  } catch { toast.error('Network error'); }
   setSavingRules(false);
 };
 const addRule = () => setIncentiveRules(prev => ({
@@ -1727,15 +1743,15 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   };
   const addDriver = async () => {
     if (!newDriver.name || !newDriver.phone) {
-      alert('Please fill name and phone');
+      toast.warn('Please fill name and phone');
       return;
     }
     if (!/^[A-Za-z\s]+$/.test(newDriver.name)) {
-      alert('❌ Name cannot contain numbers!');
+      toast.error('Name cannot contain numbers!');
       return;
     }
     if (!/^\d{10}$/.test(newDriver.phone)) {
-      alert('❌ Phone must be 10 digits');
+      toast.error('Phone must be 10 digits');
       return;
     }
     try {
@@ -1765,17 +1781,17 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           fd.append('driverId', data.driver.id);
           fetch(`${API}/api/uploads/agreement`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).catch(()=>{});
         }
-        alert('✅ Driver added successfully!');
+        toast.success('Driver added successfully!');
         setShowAddDriver(false);
         setNewDriver({ name: '', phone: '', email: '', vehicleId: '', securityDeposit: 0, dob: '', emergencyName: '', emergencyPhone: '', licenseNumber: '', licenseExpiry: '', address: '' });
         setAgreementFile(null);
         fetchAllData();
       } else {
-        alert(data.message || 'Failed to add driver');
+        toast.error(data.message || 'Failed to add driver');
       }
     } catch (error) {
       console.error('Add driver error:', error);
-      alert('Network error');
+      toast.error('Network error');
     }
   };
 
@@ -2056,13 +2072,13 @@ const removeRule = (i) => setIncentiveRules(prev => ({
     });
     const data = await res.json();
     if (data.success) {
-      alert('✅ Driver removed from vehicle');
+      toast.success('Driver removed from vehicle');
       setShowVehicleDetailModal(false);
       setSelectedVehicleDetails(null);
       fetchAllData();
       fetchUnassignedData();
-    } else alert(data.error || 'Failed');
-  } catch (err) { alert('Network error'); }
+    } else toast.error(data.error || 'Failed');
+  } catch (err) { toast.error('Network error'); }
 };
 const DriversTab = () => {
   const [localSearch, setLocalSearch] = useState('');
@@ -2115,7 +2131,7 @@ const DriversTab = () => {
   };
   const handleAssignFromDriversTab = async () => {
     if (!selectedDriverForAssignInTab || !selectedVehicleForAssign) {
-      alert('Please select both driver and vehicle');
+      toast.warn('Please select both driver and vehicle');
       return;
     }
     
@@ -2169,11 +2185,11 @@ const DriversTab = () => {
         fetchUnassignedData();
         setShowInspectionModal(true);
       } else {
-        alert(data.error || 'Assignment failed');
+        toast.error(data.error || 'Assignment failed');
       }
     } catch (err) {
       console.error('Assign error:', err);
-      alert('Network error');
+      toast.error('Network error');
     } finally {
       setAssigning(false);
     }
@@ -2304,7 +2320,7 @@ const DriversTab = () => {
 
             return (
               <div key={i}
-                className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm press-card relative"
+                className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm press-card card-enter relative"
                 style={{borderLeft: `3px solid ${!hasVehicle ? '#cbd5e1' : parseFloat(driver.pending||0)>0 ? '#f59e0b' : '#22c55e'}`}}
                 onClick={() => { setSelectedDriverDetails(driver); setShowDriverDetailsModal(true); }}
               >
@@ -2506,7 +2522,7 @@ useEffect(() => {
 }, [selectedVehicleDetails?.id]);
 
 const addDamage = async () => {
-  if (!damageForm.amount) return alert('Amount required');
+  if (!damageForm.amount) return toast.warn('Amount required');
   const res = await fetch(`${API}/api/payment/owner/damage-record`, {
     method: 'POST',
     headers: { 'Content-Type':'application/json', Authorization:`Bearer ${token()}` },
@@ -2522,7 +2538,7 @@ const addDamage = async () => {
   });
   const d = await res.json();
   if (d.success) {
-    alert('✅ Damage recorded!');
+    toast.success('Damage recorded!');
     setShowDamageForm(false);
     setDamageForm({ type:'ACCIDENT', amount:'', desc:'', recovery:'LEDGER' });
     // Refresh damages
@@ -2840,8 +2856,8 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
                 </select>
                 <button type="button"
                   onClick={e=>{e.stopPropagation();
-                    if(!selectedDriverForAssign)return alert('Select a driver');
-                    if(!customRentAmount||customRentAmount<=0)return alert('Enter valid rent');
+                    if(!selectedDriverForAssign)return toast.warn('Select a driver');
+                    if(!customRentAmount||customRentAmount<=0)return toast.warn('Enter valid rent');
                     assignDriverToVehicleWithRent(vehicle.id,selectedDriverForAssign.id,selectedRentType,parseFloat(customRentAmount));}}
                   disabled={!selectedDriverForAssign||assigning}
                   className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-black disabled:opacity-50">
@@ -2930,7 +2946,7 @@ const VehiclesTab = () => {
         return (
           <div key={i}
             onClick={() => { setSelectedVehicleDetails(vehicle); fetchUnassignedDriversList(); setShowVehicleDetailModal(true); }}
-            className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm press-card relative"
+            className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm press-card card-enter relative"
           >
             {/* Top row: icon + reg/model + rent */}
             <div className="flex items-center gap-3">
@@ -3060,11 +3076,11 @@ const PaymentsTab = () => {
         });
       }
       doc.save(`MG_Report_${new Date().toISOString().slice(0,10)}.pdf`);
-    } catch(e) { alert('PDF generation failed. Please try again.'); console.error(e); }
+    } catch(e) { toast.error('PDF generation failed. Please try again.'); console.error(e); }
   };
 
   const downloadExcelLocked = () => {
-    alert('Excel export is a Premium feature. Upgrade your plan to unlock it.');
+    toast.info('Excel export is a Premium feature.');
   };
   const [showAllTx, setShowAllTx] = useState(false);
   const displayedTx = showAllTx ? liveTx : liveTx.slice(0, 5);
@@ -3134,11 +3150,11 @@ const PaymentsTab = () => {
           const oId = ownerId();
           if (!oId) return;
           const res = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()).catch(() => []);
-          if (!Array.isArray(res) || res.length === 0) { alert('✅ Sab drivers ne aaj pay kar diya!'); return; }
+          if (!Array.isArray(res) || res.length === 0) { toast.success('Sab drivers ne aaj pay kar diya!'); return; }
           const confirm = window.confirm(`${res.length} drivers ne aaj abhi tak pay nahi kiya.\nSabko reminder bhejein?`);
           if (!confirm) return;
           await fetch(`${API}/api/payment/owner/remind-overdue?ownerId=${oId}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } }).catch(() => {});
-          alert(`🔔 Reminder bhej diya ${res.length} drivers ko!`);
+          toast.info('Reminder bhej diya ${res.length} drivers ko!');
         }}
         className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl shadow-sm"
       >
@@ -3464,7 +3480,7 @@ const ProfileTab = () => {
                 body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || '', purpose: 'PREMIUM_MANAGER' })
               }).then(r => r.json());
               const url = r?.checkoutUrl || r?.data?.checkoutUrl;
-              if (url) window.location.href = url; else alert('Contact support to upgrade.');
+              if (url) window.location.href = url; else toast.info('Contact support to upgrade.');
             }}
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl text-sm transition">
             🚀 Unlock — ₹499/month
@@ -3551,7 +3567,7 @@ const ProfileTab = () => {
                       body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || '', purpose: 'PREMIUM_MANAGER' })
                     }).then(r => r.json());
                     const url = r?.checkoutUrl || r?.data?.checkoutUrl;
-                    if (url) window.location.href = url; else alert('Contact support to upgrade.');
+                    if (url) window.location.href = url; else toast.info('Contact support to upgrade.');
                   }}
                   className="w-full bg-white text-indigo-600 font-black py-2.5 rounded-xl text-sm hover:bg-indigo-50 transition">
                   🚀 Unlock Now — ₹499/month
@@ -3643,7 +3659,7 @@ const ProfileTab = () => {
               <button onClick={() => setShowAddManager(false)}
                 className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>
               <button onClick={async () => {
-                if (!newManager.name || newManager.phone.length !== 10) return alert('Enter valid name and 10-digit phone');
+                if (!newManager.name || newManager.phone.length !== 10) return toast.warn('Enter valid name and 10-digit phone');
                 const r = await fetch(`${API}/api/payment/owner/managers/add`, {
                   method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${token()}`},
                   body: JSON.stringify({ownerId:ownerId(), fullName:newManager.name, mobileNumber:newManager.phone, permissions:newManager.permissions})
@@ -3651,8 +3667,8 @@ const ProfileTab = () => {
                 if (r.success) {
                   setManagers(p=>[r.manager,...p]); setShowAddManager(false);
                   setNewManager({name:'',phone:'',permissions:{assign_vehicles:true,record_cash:true,view_financials:true,chat_drivers:true,add_drivers:false,remove_drivers:false,add_vehicles:false,bulk_import:false,upload_documents:false}});
-                  alert(`✅ ${newManager.name} added as manager!`);
-                } else alert(r.error || 'Failed');
+                  toast.success('${newManager.name} added as manager!');
+                } else toast.error(r.error || 'Failed');
               }} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-black hover:bg-indigo-700 transition">
                 Add Manager
               </button>
@@ -4223,6 +4239,7 @@ const ProfileTab = () => {
         )}
 
         {/* Main Content */}
+        <PullToRefresh onRefresh={() => fetchAllData()}>
         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28">
           {loading ? (
             <div className="space-y-3 pt-1">
@@ -4254,7 +4271,7 @@ const ProfileTab = () => {
               ))}
             </div>
           ) : (
-            <>
+            <div key={activeTab} className="tab-fade">
               {activeTab === 'home' && <HomeTab />}
               {activeTab === 'drivers' && <DriversTab />}
               {activeTab === 'vehicles' && <VehiclesTab />}
@@ -4271,9 +4288,10 @@ const ProfileTab = () => {
               )}
               {activeTab === 'profile' && <ProfileTab />}
               {activeTab === 'track' && <TrackFleetTab />}
-            </>
+            </div>
           )}
         </div>
+        </PullToRefresh>
 
         {/* Bottom Navigation */}
         <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto z-50" style={{padding:'0 12px 10px'}}>
@@ -4554,8 +4572,8 @@ const ProfileTab = () => {
             <div className="flex gap-3 pt-2">
               <button onClick={() => setShowAddDriver(false)}
                 className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
-              <button onClick={addDriver}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black">Add</button>
+              <LoadingButton onClick={addDriver} loadingText="Adding..."
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black">Add</LoadingButton>
             </div>
           </div>
         )}
@@ -4669,7 +4687,7 @@ const ProfileTab = () => {
                   method: 'POST', headers: { Authorization: `Bearer ${token()}` }
                 }).catch(() => {});
                 setRemindingAll(false);
-                alert(`✅ Reminder bhej diya ${overdueDrivers.length} drivers ko`);
+                toast.success('Reminder bhej diya ${overdueDrivers.length} drivers ko');
               }}
               className="text-[10px] font-black bg-indigo-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">
               {remindingAll ? 'Sending…' : '🔔 Remind All'}
@@ -4686,23 +4704,138 @@ const ProfileTab = () => {
             <p className="text-[10px] text-slate-400 mt-1">No outstanding dues today</p>
           </div>
         ) : overdueDrivers.map((d, i) => (
-          <div key={i} className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-500 font-black text-sm border border-red-100">
-                {(d.full_name||'D').charAt(0)}
+          <div key={i} className="px-4 py-3 border-b border-slate-50 last:border-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-500 font-black text-sm border border-red-100">
+                  {(d.full_name||'D').charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-black text-slate-800">{d.full_name}</p>
+                  <p className="text-[9px] text-slate-400">{d.vehicle_number || 'No vehicle'} · {d.mobile_number}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-black text-slate-800">{d.full_name}</p>
-                <p className="text-[9px] text-slate-400">{d.vehicle_number || 'No vehicle'} · {d.mobile_number}</p>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <p className="text-sm font-black text-red-600">₹{parseFloat(d.daily_rent||0).toLocaleString('en-IN')}</p>
+                  <p className="text-[9px] text-slate-400">due</p>
+                </div>
+                <button
+                  onClick={() => { setPayLinkDriver(d); setPayLinkAmt(String(parseFloat(d.daily_rent||0))); setPayLinkResult(null); }}
+                  className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 text-sm border border-indigo-100"
+                  title="Send Payment Link"
+                >🔗</button>
               </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-black text-red-600">₹{parseFloat(d.daily_rent||0).toLocaleString('en-IN')}</p>
-              <p className="text-[9px] text-slate-400">due</p>
             </div>
           </div>
         ))}
       </div>
+    </div>
+  </div>
+)}
+
+
+{/* ── Payment Link Modal ──────────────────────────────────────────── */}
+{payLinkDriver && (
+  <div className="absolute inset-0 z-[1100] flex items-end justify-center" style={{background:'rgba(0,0,0,0.5)'}}
+    onClick={() => { setPayLinkDriver(null); setPayLinkResult(null); }}>
+    <div className="bg-white rounded-t-3xl w-full max-w-md p-5 pb-8" onClick={e => e.stopPropagation()}>
+      {!payLinkResult ? (
+        <>
+          <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
+          <p className="font-black text-slate-800 text-sm mb-4">🔗 Payment Link</p>
+
+          {/* Driver info — readonly */}
+          <div className="bg-slate-50 rounded-2xl p-3 mb-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center font-black text-indigo-600">
+              {(payLinkDriver.full_name||'D').charAt(0)}
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-800">{payLinkDriver.full_name}</p>
+              <p className="text-[10px] text-slate-400">{payLinkDriver.mobile_number} · {payLinkDriver.vehicle_number || 'No vehicle'}</p>
+            </div>
+          </div>
+
+          {/* Editable amount */}
+          <div className="mb-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Amount (₹)</p>
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+              <span className="text-slate-400 font-black">₹</span>
+              <input
+                type="number"
+                value={payLinkAmt}
+                onChange={e => setPayLinkAmt(e.target.value)}
+                className="flex-1 bg-transparent text-lg font-black text-slate-800 outline-none"
+                style={{fontSize:20}}
+              />
+            </div>
+            <p className="text-[9px] text-slate-400 mt-1">Default: driver's daily rent. Edit if needed.</p>
+          </div>
+
+          <LoadingButton
+            onClick={async () => {
+              if (!payLinkAmt || parseFloat(payLinkAmt) <= 0) { toast.warn('Amount enter karo'); return; }
+              setPayLinkLoading(true);
+              try {
+                const res = await fetch(`${API}/api/payment-links`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                  body: JSON.stringify({
+                    driver_name: payLinkDriver.full_name,
+                    driver_phone: payLinkDriver.mobile_number,
+                    amount: parseFloat(payLinkAmt),
+                    description: `Rent due — ${payLinkDriver.vehicle_number || payLinkDriver.driver_code}`
+                  })
+                });
+                const data = await res.json();
+                if (data.success && data.link) {
+                  setPayLinkResult({ url: data.link.url || data.link.payment_url || data.link.link });
+                } else {
+                  toast.error(data.message || 'Link generate nahi hua');
+                }
+              } catch { toast.error('Network error'); }
+              finally { setPayLinkLoading(false); }
+            }}
+            loadingText="Generating..."
+            className="w-full py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black"
+          >
+            Generate Link
+          </LoadingButton>
+
+          <button onClick={() => { setPayLinkDriver(null); setPayLinkResult(null); }}
+            className="w-full py-2.5 mt-2 text-slate-400 text-sm font-black">Cancel</button>
+        </>
+      ) : (
+        <>
+          <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
+          <div className="text-center mb-5">
+            <div className="text-4xl mb-2">✅</div>
+            <p className="font-black text-slate-800">Link Ready!</p>
+            <p className="text-[10px] text-slate-400 mt-1">For {payLinkDriver.full_name} · ₹{parseFloat(payLinkAmt).toLocaleString('en-IN')}</p>
+          </div>
+
+          {/* Link display */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+            <p className="flex-1 text-[10px] text-slate-600 font-mono truncate">{payLinkResult.url || 'Link generated'}</p>
+          </div>
+
+          <button
+            onClick={() => {
+              if (payLinkResult.url) {
+                navigator.clipboard.writeText(payLinkResult.url)
+                  .then(() => toast.success('Link copied!'))
+                  .catch(() => toast.error('Copy failed'));
+              }
+            }}
+            className="w-full py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black mb-2"
+          >
+            📋 Copy Link
+          </button>
+
+          <button onClick={() => { setPayLinkDriver(null); setPayLinkResult(null); }}
+            className="w-full py-2.5 text-slate-400 text-sm font-black">Done</button>
+        </>
+      )}
     </div>
   </div>
 )}
@@ -4852,8 +4985,8 @@ const ProfileTab = () => {
             <button onClick={() => { setShowCashModal(false); setCashAmount(''); setCashDriver(null); }} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
             <button
               onClick={() => {
-                if (!cashDriver) return alert('Select a driver first');
-                if (!cashAmount || parseFloat(cashAmount) <= 0) return alert('Enter valid amount');
+                if (!cashDriver) return toast.warn('Select a driver first');
+                if (!cashAmount || parseFloat(cashAmount) <= 0) return toast.warn('Enter valid amount');
                 setCashConfirm(true);
               }}
               className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-black"
@@ -4887,7 +5020,7 @@ const ProfileTab = () => {
           </div>
           <div className="flex gap-3">
             <button onClick={() => setCashConfirm(false)} className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">← Edit</button>
-            <button
+            <LoadingButton
               onTouchStart={()=>{try{navigator.vibrate&&navigator.vibrate([50,30,100])}catch{}}}
               onClick={async () => {
                 try {
@@ -4903,17 +5036,18 @@ const ProfileTab = () => {
                   });
                   const d = await res.json();
                   if (d.success) {
-                    alert(`✅ ₹${cashAmount} cash payment recorded for ${cashDriver.full_name}`);
+                    toast.success(`₹${cashAmount} cash recorded for ${cashDriver.full_name}`);
                     setShowCashModal(false);
                     setCashAmount('');
                     setCashConfirm(false);
-                  } else alert(d.message || 'Failed');
-                } catch { alert('Network error'); }
+                  } else toast.error(d.message || 'Failed');
+                } catch { toast.error('Network error'); }
               }}
+              loadingText="Recording..."
               className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-sm font-black active:scale-[0.96] transition-transform"
             >
               ✅ Yes, Record
-            </button>
+            </LoadingButton>
           </div>
         </>
       )}
@@ -5270,8 +5404,8 @@ const ProfileTab = () => {
                   if (d.success) {
                     setOwner(prev => ({ ...prev, full_name: editName.trim(), name: editName.trim(), email: editEmail.trim() }));
                     setShowEditProfile(false);
-                  } else { alert(d.message || 'Update failed'); }
-                } catch { alert('Network error'); }
+                  } else { toast.error(d.message || 'Update failed'); }
+                } catch { toast.error('Network error'); }
                 finally { setEditSaving(false); }
               }}
               className="flex-1 py-3 bg-indigo-600 text-white font-black rounded-2xl text-sm disabled:opacity-60">
@@ -5453,7 +5587,7 @@ const ProfileTab = () => {
                       }
                       setShowInspectionModal(false);
                     } catch(e) {
-                      alert('Upload failed: ' + e.message);
+                      toast.error('Upload failed: ' + e.message);
                     } finally {
                       setInspectionUploading(false);
                     }
