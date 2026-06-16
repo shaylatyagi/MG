@@ -3078,9 +3078,11 @@ function AdminPanelInner() {
 
 export default function AdminPanel() {
   return (
-    <ErrorBoundary>
-      <AdminPanelInner />
-    </ErrorBoundary>
-    <ToastContainer />
+    <>
+      <ErrorBoundary>
+        <AdminPanelInner />
+      </ErrorBoundary>
+      <ToastContainer />
+    </>
   );
 }

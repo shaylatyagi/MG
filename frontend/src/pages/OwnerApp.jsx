@@ -207,9 +207,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   return (
     <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 mb-3 text-center">
       <span className="text-xs font-black text-emerald-700">✅ Account Settled</span>
-    <ToastContainer />
-      {showTour && <Onboarding role="owner" onDone={dismissTour} />}
-      <OfflineBanner />
+
     </div>
   );
 })()}
@@ -3974,6 +3972,9 @@ const ProfileTab = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-start justify-center">
+      <ToastContainer />
+      <OfflineBanner />
+      {showTour && <Onboarding role="owner" onDone={dismissTour} />}
       <div className="w-full bg-slate-50 flex flex-col relative overflow-hidden" style={{maxWidth:412, height:'100dvh'}}>
         {/* Status bar */}
         <div className="bg-indigo-700 text-white text-[11px] px-4 py-1.5 flex justify-between items-center">

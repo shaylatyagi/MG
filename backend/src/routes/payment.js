@@ -1601,7 +1601,7 @@ router.post('/create-order', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Amount and phone required' });
     }
 
-    const BASE = process.env.PAYYANTRA_BASE_URL || 'https://payin-api-uat.payyantra.com';
+    const BASE = process.env.PAYYANTRA_BASE_URL || 'https://payin-api.payyantra.com';
     
     // ✅ DEBUG LOG — Render mein dikheга
     console.log('🔑 Using PayYantra BASE:', BASE);
@@ -1659,7 +1659,7 @@ router.post('/create-order', async (req, res) => {
         customerPhone: customerPhone,
         customerEmail: customerEmail || 'driver@mobilitygrid.com',
         orderId: orderId,
-        returnUrl: `https://mg-sandy.vercel.app/driver?status=success&orderId=${orderId}`,
+        returnUrl: `https://mobilitygrid.in/driver?status=success&orderId=${orderId}`,
         notifyUrl: 'https://mg-qw5s.onrender.com/api/payment/webhook'
       })
     });
