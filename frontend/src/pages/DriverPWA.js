@@ -1990,4 +1990,75 @@ export default function DriverPWA() {
             <button onClick={dismissNotifNudge} style={{
               width: '100%', padding: '11px', borderRadius: '12px',
               background: 'transparent', color: '#94a3b8', border: 'none',
-              fontSize: '13px', cursor: 'pointer', fontFa
+              fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Add Funds Modal */}
+      {showAddFunds && (
+        <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.55)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'28px 20px 40px',width:'100%',maxWidth:480,boxShadow:'0 -8px 32px rgba(0,0,0,0.18)'}}>
+            <h3 style={{fontSize:17,fontWeight:900,color:'#0f172a',marginBottom:4}}>Add Funds to Wallet</h3>
+            <p style={{fontSize:12,color:'#64748b',marginBottom:20}}>Enter the amount you want to add</p>
+            <div style={{position:'relative',marginBottom:16}}>
+              <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:18,color:'#64748b',fontWeight:700}}>&#8377;</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={addFundsAmt}
+                onChange={e => setAddFundsAmt(e.target.value)}
+                autoFocus
+                style={{width:'100%',boxSizing:'border-box',paddingLeft:34,paddingRight:14,paddingTop:14,paddingBottom:14,fontSize:24,fontWeight:900,color:'#0f172a',border:'2px solid #e2e8f0',borderRadius:14,outline:'none',fontFamily:'inherit'}}
+                onFocus={e => e.target.style.borderColor='#4f46e5'}
+                onBlur={e => e.target.style.borderColor='#e2e8f0'}
+              />
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              {[100,500,1000].map(amt => (
+                <button key={amt} onClick={() => setAddFundsAmt(String(amt))}
+                  style={{flex:1,padding:'8px 0',background:'#f1f5f9',border:'none',borderRadius:10,fontSize:13,fontWeight:700,color:'#334155',cursor:'pointer'}}>
+                  +&#8377;{amt}
+                </button>
+              ))}
+            </div>
+            <LoadingButton
+              onClick={submitAddFunds}
+              disabled={!addFundsAmt || isNaN(addFundsAmt) || Number(addFundsAmt) <= 0}
+              loadingText="Opening payment..."
+              style={{width:'100%',padding:'14px',background:(!addFundsAmt||isNaN(addFundsAmt)||Number(addFundsAmt)<=0)?'#c7d2fe':'#4f46e5',color:'#fff',border:'none',borderRadius:14,fontSize:15,fontWeight:800,cursor:(!addFundsAmt||isNaN(addFundsAmt)||Number(addFundsAmt)<=0)?'not-allowed':'pointer',marginBottom:10,fontFamily:'inherit'}}>
+              Proceed to Pay
+            </LoadingButton>
+            <button onClick={() => setShowAddFunds(false)}
+              style={{width:'100%',padding:'12px',background:'transparent',color:'#94a3b8',border:'none',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Logout confirm */}}
+      {showLogoutConfirm && (
+        <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+              <LogOut size={20} className="text-red-500" />
+            </div>
+            <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
+            <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
+              <button onClick={logout}
+                className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </div>
+  );
+}
