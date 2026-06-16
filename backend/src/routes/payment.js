@@ -1669,10 +1669,21 @@ router.post('/create-order', async (req, res) => {
     // DEBUG: log full order response
     console.log('📦 Order API response:', JSON.stringify(orderData, null, 2));
 
-    // ✅ FIX 2: Agar PayYantra se response nahi aaya toh error do, mock mat banao
-    const intentURL   = orderData?.intentURL   || orderData?.data?.intentURL;
-    const checkoutUrl = orderData?.checkoutUrl || orderData?.data?.checkoutUrl;
-    const upiQrLink   = orderData?.data?.upiQrLink;
+    // Extract URLs from PayYantra response
+    const checkoutUrl = orderData?.data?.checkoutUrl || orderData?.checkoutUrl;
+    const upiQrLink   = orderData?.data?.upiQrLink   || orderData?.upiQrLink;
+
+    // Extract UPI intent — PayYantra encodes it inside upiQrLink as ?intent=upi://...
+    let intentURL = orderData?.data?.intentURL || orderData?.intentURL;
+    if (!intentURL && upiQrLink) {
+      try {
+        const qrUrl = new URL(upiQrLink);
+        const extracted = decodeURIComponent(qrUrl.searchParams.get('intent') || '');
+        if (extracted.startsWith('upi://')) intentURL = extracted;
+      } catch (_) {}
+    }
+    console.log('💳 intentURL:', intentURL ? intentURL.substring(0, 80) + '...' : 'none');
+    console.log('💳 checkoutUrl:', checkoutUrl ? 'present' : 'none');
     const pgTxnId     = orderData?.data?.transactionId || orderData?.transactionId;
 
     if (!intentURL && !checkoutUrl && !upiQrLink) {
