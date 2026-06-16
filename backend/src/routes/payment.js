@@ -555,10 +555,10 @@ router.get('/driver/telemetry', async (req, res) => {
   }
 });
 // Add damage record
-router.post('/owner/damage-record', async (req, res) => {
+router.post('/owner/damage-record', verifyToken, async (req, res) => {
   try {
-    const { vehicleId, driverId, ownerId, damageType, description, amount, recoveryMethod } = req.body;
-    
+    const { vehicleId, driverId, damageType, description, amount, recoveryMethod } = req.body;
+    const ownerId = req.user.id;
     await pool.query(
       `INSERT INTO public.damage_records 
         (vehicle_id, driver_id, owner_id, damage_type, description, damage_amount, recovery_method)
@@ -582,7 +582,7 @@ router.post('/owner/damage-record', async (req, res) => {
 });
 
 // Get damage history for vehicle
-router.get('/owner/damage-records/:vehicleId', async (req, res) => {
+router.get('/owner/damage-records/:vehicleId', verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT dr.*, d.full_name as driver_name
@@ -599,7 +599,7 @@ router.get('/owner/damage-records/:vehicleId', async (req, res) => {
 });
 
 // Update damage status
-router.put('/owner/damage-record/:id/resolve', async (req, res) => {
+router.put('/owner/damage-record/:id/resolve', verifyToken, async (req, res) => {
   try {
     await pool.query(
       `UPDATE public.damage_records SET status='RESOLVED' WHERE id=$1`,
@@ -610,7 +610,7 @@ router.put('/owner/damage-record/:id/resolve', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-router.post('/owner/vehicles', async (req, res) => {
+router.post('/owner/vehicles', verifyToken, async (req, res) => {
   try {
     
     const { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id,
@@ -731,7 +731,7 @@ RULES: Respond in same language as user (Hindi/English/Hinglish). Max 3 lines. U
     res.json({ reply: 'Service unavailable.' });
   }
 });
-router.post('/owner/ledger-entry', async (req, res) => {
+router.post('/owner/ledger-entry', verifyToken, async (req, res) => {
   try {
     const { driverId, ownerId, entryType, amount, description } = req.body;
 
@@ -799,7 +799,7 @@ res.json({ success: true, message: 'Entry recorded' });
     res.status(500).json({ error: err.message });
   }
 });
-router.get('/owner/driver-ledger', async (req, res) => {
+router.get('/owner/driver-ledger', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
 
@@ -857,7 +857,7 @@ router.get('/owner/driver-ledger', async (req, res) => {
   }
 });
 // WAL-07: CSV download for driver ledger
-router.get('/owner/driver-ledger/csv', async (req, res) => {
+router.get('/owner/driver-ledger/csv', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
 
@@ -951,7 +951,7 @@ router.post('/owner/notify-unpaid', verifyToken, async (req, res) => {
 });
 
 // GET /owner/overdue-drivers?ownerId=X — drivers who haven't paid today
-router.get('/owner/overdue-drivers', async (req, res) => {
+router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
@@ -986,10 +986,9 @@ router.get('/owner/overdue-drivers', async (req, res) => {
 });
 
 // POST /owner/remind-overdue?ownerId=X — send in-app notification to all overdue drivers
-router.post('/owner/remind-overdue', async (req, res) => {
+router.post('/owner/remind-overdue', verifyToken, async (req, res) => {
   try {
-    const { ownerId } = req.query;
-    if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
+    const ownerId = req.user.id;
     const overdue = await pool.query(
       `SELECT d.id, d.full_name FROM public.drivers d
        WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
@@ -1129,11 +1128,9 @@ router.get('/owner/ledger', async (req, res) => {
     });
   } catch(err) { res.json({ received: 0, outstanding: 0 }); }
 });
-router.get('/owner/by-phone', async (req, res) => {
+router.get('/owner/by-phone', verifyToken, async (req, res) => {
   try {
     const { phone } = req.query;
-    console.log('🔍 /owner/by-phone called for phone:', phone);
-    
     if (!phone) {
       return res.status(400).json({ error: 'Phone number required' });
     }
@@ -1145,14 +1142,10 @@ router.get('/owner/by-phone', async (req, res) => {
       [phone]
     );
     
-    console.log('📊 Query result rows:', result.rows.length);
-    
     if (result.rows.length === 0) {
-      console.log('❌ Owner not found for phone:', phone);
       return res.status(404).json({ error: 'Owner not found' });
     }
     
-    console.log('✅ Owner found:', result.rows[0]);
     res.json(result.rows[0]);
     
   } catch (err) {
@@ -1246,7 +1239,7 @@ router.get('/owner/vehicles', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch vehicles', error: err.message });
   }
 });
-router.post('/owner/add-driver', async (req, res) => {
+router.post('/owner/add-driver', verifyToken, async (req, res) => {
   try {
     const { full_name, mobile_number, date_of_birth, emergency_contact_name,
         emergency_contact_number, driving_license_number,
@@ -1261,8 +1254,8 @@ router.post('/owner/add-driver', async (req, res) => {
     if (!/^\d{10}$/.test(mobile_number))
       return res.status(400).json({ success: false, message: '❌ Phone must be 10 digits' });
 
-    // Resolve owner_code from owner_id (sent by frontend) or JWT
-    const resolvedOwnerId = owner_id || req.user?.id;
+    // Always use JWT identity — never trust client-supplied owner_id
+    const resolvedOwnerId = req.user.id;
     if (!resolvedOwnerId)
       return res.status(400).json({ success: false, message: 'Owner ID required' });
 
@@ -1299,7 +1292,7 @@ router.post('/owner/add-driver', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to add driver: ' + err.message });
   }
 });
-router.get('/owner/transactions', async (req, res) => {
+router.get('/owner/transactions', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     // ownerId is numeric owner id — look up owner_code for matching
@@ -1369,9 +1362,9 @@ router.get('/owners/list', async (req, res) => {
     res.json({ owners: [] });
   }
 });
-router.get('/owner/drivers/list', async (req, res) => {
+router.get('/owner/drivers/list', verifyToken, async (req, res) => {
   try {
-    const { ownerId } = req.query;
+    const ownerId = req.user.id;
     const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50', 10)));
     const offset = (page - 1) * limit;
@@ -1450,7 +1443,7 @@ router.get('/owner/plan', async (req, res) => {
 // ============================================
 // VEHICLE OPERATIONAL STATUS UPDATE
 // ============================================
-router.put('/owner/vehicles/:vehicleId/status', async (req, res) => {
+router.put('/owner/vehicles/:vehicleId/status', verifyToken, async (req, res) => {
   try {
     const { vehicleId } = req.params;
     const { status } = req.body;
@@ -1471,7 +1464,7 @@ router.put('/owner/vehicles/:vehicleId/status', async (req, res) => {
 // ============================================
 // OWNER STATS
 // ============================================
-router.get('/owner/stats', async (req, res) => {
+router.get('/owner/stats', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
@@ -2107,10 +2100,8 @@ if (driverUser.rows.length === 0) {
     // ============================================
     await pool.query(
   `INSERT INTO public.notifications (driver_id, user_type, title, message, metadata, created_at)
-   VALUES ($1, 'DRIVER', '✅ Payment Successful', 
-           'Your payment of ₹${amount} has been received successfully.',
-           $2, NOW())`,
-  [driverUserId, JSON.stringify({ amount, status: 'SUCCESS', type: 'payment' })]
+   VALUES ($1, 'DRIVER', '✅ Payment Successful', $3, $2, NOW())`,
+  [driverUserId, JSON.stringify({ amount, status: 'SUCCESS', type: 'payment' }), `Your payment of ₹${amount} has been received successfully.`]
 );
     
     console.log(`📢 Notification sent to DRIVER ${driverPhone}`);
@@ -2357,7 +2348,7 @@ router.put('/owner/sos-dismiss/:id', verifyToken, async (req, res) => {
     res.json({ success: true });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
-router.get('/owner/notifications', async (req, res) => {
+router.get('/owner/notifications', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
@@ -2386,7 +2377,7 @@ AND n.driver_id IN (
     res.json([]);
   }
 });
-router.post('/owner/bulk-upload-vehicles', async (req, res) => {
+router.post('/owner/bulk-upload-vehicles', verifyToken, async (req, res) => {
   try {
     const { vehicles, ownerId } = req.body;
     if (!vehicles?.length) return res.status(400).json({ success: false, message: 'No data' });
@@ -2433,7 +2424,7 @@ router.post('/owner/bulk-upload-vehicles', async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-router.post('/owner/bulk-upload', async (req, res) => {
+router.post('/owner/bulk-upload', verifyToken, async (req, res) => {
   try {
     const { drivers, ownerId, ownerCode } = req.body;
     if (!drivers?.length) return res.status(400).json({ success: false, message: 'No data' });
@@ -2892,7 +2883,7 @@ router.get('/verify-by-reference/:orderId', verifyToken, async (req, res) => {
 
 
 // SYNC ALL MISSING DATA (One-Time Backfill)
-router.post('/sync-all-orders', async (req, res) => {
+router.post('/sync-all-orders', verifyToken, async (req, res) => {
 
   console.log('Starting full sync for missing payment modes...');
 
@@ -3257,7 +3248,7 @@ const isPremium = async (ownerId) => {
 // ─── MANAGERS ────────────────────────────────────────────────────────────────
 
 // Get managers list
-router.get('/owner/managers', async (req, res) => {
+router.get('/owner/managers', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     if (!await isPremium(ownerId)) {
@@ -3272,9 +3263,10 @@ router.get('/owner/managers', async (req, res) => {
 });
 
 // Add manager
-router.post('/owner/managers/add', async (req, res) => {
+router.post('/owner/managers/add', verifyToken, async (req, res) => {
   try {
-    const { ownerId, fullName, mobileNumber, permissions } = req.body;
+    const { fullName, mobileNumber, permissions } = req.body;
+    const ownerId = req.user.id;
     if (!await isPremium(ownerId)) {
       return res.status(403).json({ error: 'PREMIUM_REQUIRED' });
     }
@@ -3305,9 +3297,10 @@ router.post('/owner/managers/add', async (req, res) => {
 });
 
 // Update manager permissions
-router.put('/owner/managers/:managerId/permissions', async (req, res) => {
+router.put('/owner/managers/:managerId/permissions', verifyToken, async (req, res) => {
   try {
-    const { ownerId, permissions } = req.body;
+    const { permissions } = req.body;
+    const ownerId = req.user.id;
     if (!await isPremium(ownerId)) {
       return res.status(403).json({ error: 'PREMIUM_REQUIRED' });
     }
@@ -3320,9 +3313,9 @@ router.put('/owner/managers/:managerId/permissions', async (req, res) => {
 });
 
 // Remove manager
-router.delete('/owner/managers/:managerId', async (req, res) => {
+router.delete('/owner/managers/:managerId', verifyToken, async (req, res) => {
   try {
-    const { ownerId } = req.query;
+    const ownerId = req.user.id;
     await pool.query(
       `UPDATE public.managers SET status='REMOVED' WHERE id=$1 AND owner_id=$2`,
       [req.params.managerId, ownerId]
@@ -3347,4 +3340,4 @@ router.get('/manager/profile', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Upgrade to premium (admin manually upgrades, or payment webhook)
+// Upgrade to premium (admin manually upgrades, or payment webhook)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            

@@ -7,6 +7,14 @@ const crypto   = require('crypto');
 const { generateToken, verifyToken } = require('../middleware/auth');
 const nodemailer = require('nodemailer');
 
+// C-2: safe table lookup — NEVER interpolate user-supplied role directly into SQL
+const ROLE_TABLE = { DRIVER: 'drivers', OWNER: 'owners' };
+const safeTable = (role) => {
+  const t = ROLE_TABLE[role?.toUpperCase?.()];
+  if (!t) throw new Error(`Invalid role: ${role}`);
+  return t;
+};
+
 // OTP rate limiting — { phone: { attempts: N, lockedUntil: ms } }
 const otpAttempts = new Map();
 const MAX_ATTEMPTS  = 3;
@@ -171,7 +179,7 @@ router.post('/verify-otp', async (req, res) => {
     }
     // Single-device login: generate new session token, invalidate old sessions
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    const table = user.role === 'DRIVER' ? 'drivers' : 'owners';
+    const table = safeTable(user.role);
     await pool.query(`UPDATE public.${table} SET session_token=$1 WHERE id=$2`, [sessionToken, user.id]);
     const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null, session_token: sessionToken });
     res.json({
@@ -310,7 +318,7 @@ const ORIGIN    = IS_PROD ? 'https://www.mobilitygrid.in' : 'http://localhost:30
 router.post('/passkey/register-options', verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
-    const table = role === 'DRIVER' ? 'drivers' : 'owners';
+    const table = safeTable(role);
     const userRes = await pool.query(
       'SELECT id, full_name, mobile_number FROM public.' + table + ' WHERE id=$1', [userId]
     );
@@ -359,7 +367,7 @@ router.post('/passkey/register-options', verifyToken, async (req, res) => {
 router.post('/passkey/register-verify', verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
-    const table = role === 'DRIVER' ? 'drivers' : 'owners';
+    const table = safeTable(role);
     const userRes = await pool.query(
       'SELECT mobile_number FROM public.' + table + ' WHERE id=$1', [userId]
     );
@@ -586,7 +594,7 @@ router.post('/login-pin', async (req, res) => {
     var valid = await bcrypt.compare(pin, user.pin_hash);
     if (!valid) return res.status(401).json({ success: false, message: 'Incorrect PIN' });
 
-    var table = role === 'DRIVER' ? 'drivers' : 'owners';
+    const table = safeTable(role);
     var sessionToken = require('crypto').randomBytes(32).toString('hex');
     await pool.query('UPDATE public.' + table + ' SET session_token=$1 WHERE id=$2', [sessionToken, user.id]);
 
@@ -623,7 +631,7 @@ router.post('/set-pin', verifyToken, async (req, res) => {
   try {
     var userId = req.user.id;
     var role   = req.user.role;
-    var table  = role === 'DRIVER' ? 'drivers' : 'owners';
+    const table = safeTable(role);
 
     var userRes = await pool.query('SELECT pin_hash, pin_must_change FROM public.' + table + ' WHERE id=$1', [userId]);
     var user = userRes.rows[0];
@@ -659,7 +667,7 @@ router.post('/forgot-pin', async (req, res) => {
     return res.status(400).json({ success: false, message: 'phone_number and role required' });
 
   try {
-    var table = role === 'DRIVER' ? 'drivers' : 'owners';
+    const table = safeTable(role);
     var userRes = await pool.query(
       'SELECT id, email, pin_otp_used FROM public.' + table + ' WHERE mobile_number=$1 LIMIT 1', [phone]
     );
@@ -749,7 +757,7 @@ router.post('/reset-pin', async (req, res) => {
       await pool.query('DELETE FROM otps WHERE phone_number=$1', [phone]);
     }
 
-    var table  = role === 'DRIVER' ? 'drivers' : 'owners';
+    const table = safeTable(role);
     var pinHash = await bcrypt.hash(newPin, 10);
     var upd = await pool.query(
       'UPDATE public.' + table + ' SET pin_hash=$1, pin_set_at=NOW(), pin_must_change=false WHERE mobile_number=$2 RETURNING id',
@@ -783,23 +791,6 @@ router.post('/waitlist', async (req, res) => {
   }
 });
 
-// POST /api/auth/waitlist — Landing page interest form
-router.post('/waitlist', async (req, res) => {
-  var { name, phone, company, role, fleet, city, type } = req.body;
-  if (!name || !phone) return res.status(400).json({ success: false, message: 'name and phone required' });
-  try {
-    await pool.query(
-      'INSERT INTO public.waitlist_leads (name, phone, company, role, fleet, city, type) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [name, phone, company || null, role || null, fleet || null, city || null, type || null]
-    );
-    res.json({ success: true });
-  } catch (err) {
-    console.error('waitlist error:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-module.exports = router;
 
 // ── OWNER SELF-SIGNUP ─────────────────────────────────────────────────────
 // Step 1: POST /api/auth/owner-signup — collect details, send OTP
@@ -927,3 +918,5 @@ router.post('/owner-signup/verify', async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+module.exports = router;

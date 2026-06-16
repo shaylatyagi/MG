@@ -17,10 +17,113 @@ import AnimatedNumber from '../components/AnimatedNumber';
 import OfflineBanner from '../components/OfflineBanner';
 import LoadingButton from '../components/LoadingButton';
 import PullToRefresh from '../components/PullToRefresh';
+import { vehicleTypeLabel } from '../constants/vehicleTypes';
 import EmptyState from '../components/EmptyState';
 import DocumentSection from '../components/DocumentSection';
 
 const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
+
+// ── QR Pay Modal — polls for payment success every 5s, times out after 5min ──
+function QRPayModal({ qr, apiBase, token, onSuccess, onClose }) {
+  const [status, setStatus] = React.useState('pending'); // pending | success | failed | timeout
+  const [secsLeft, setSecsLeft] = React.useState(300); // 5-min timeout
+
+  React.useEffect(() => {
+    if (!qr.orderId) return; // no orderId — polling not possible, user closes manually
+
+    let stopped = false;
+    const pollInterval = setInterval(async () => {
+      try {
+        const r = await fetch(`${apiBase}/api/payment/order/${qr.orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await r.json();
+        const txStatus = d?.transaction_status || d?.status || d?.data?.transaction_status;
+        if (txStatus === 'SUCCESS') { stopped = true; clearInterval(pollInterval); clearInterval(countdown); setStatus('success'); setTimeout(onSuccess, 1200); }
+        else if (txStatus === 'FAILED') { stopped = true; clearInterval(pollInterval); clearInterval(countdown); setStatus('failed'); }
+      } catch {}
+    }, 5000);
+
+    const countdown = setInterval(() => {
+      setSecsLeft(s => {
+        if (s <= 1) {
+          if (!stopped) { clearInterval(pollInterval); setStatus('timeout'); }
+          clearInterval(countdown);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+
+    return () => { clearInterval(pollInterval); clearInterval(countdown); };
+  }, [qr.orderId, apiBase, token, onSuccess]);
+
+  const mins = Math.floor(secsLeft / 60);
+  const secs = secsLeft % 60;
+
+  return (
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl">
+        {status === 'success' ? (
+          <>
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <CheckCircle size={24} className="text-emerald-600" />
+            </div>
+            <h3 className="font-black text-emerald-700 text-base mb-1">Payment Successful!</h3>
+            <p className="text-xs text-slate-400">Your balance will update shortly.</p>
+          </>
+        ) : status === 'failed' ? (
+          <>
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <X size={24} className="text-red-500" />
+            </div>
+            <h3 className="font-black text-red-600 text-base mb-1">Payment Failed</h3>
+            <p className="text-xs text-slate-400 mb-4">The transaction was declined. Please try again.</p>
+            <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm">Close</button>
+          </>
+        ) : status === 'timeout' ? (
+          <>
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Clock size={24} className="text-amber-600" />
+            </div>
+            <h3 className="font-black text-amber-700 text-base mb-1">Session Expired</h3>
+            <p className="text-xs text-slate-400 mb-4">QR code expired. Please initiate payment again.</p>
+            <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm">Close</button>
+          </>
+        ) : (
+          <>
+            <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span style={{color:'white',fontSize:16}}>₹</span>
+            </div>
+            <h3 className="font-black text-slate-800 text-base mb-1">Scan to Pay</h3>
+            <p className="text-xs text-slate-500 mb-4">Open any UPI app and scan this QR code</p>
+            {qr.qrLink ? (
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qr.intentURL || qr.qrLink)}`}
+                alt="UPI QR Code"
+                className="mx-auto rounded-xl border border-slate-100"
+                style={{width:200,height:200}}
+              />
+            ) : (
+              <div className="bg-slate-100 rounded-xl p-4 text-xs text-slate-500 break-all">{qr.intentURL}</div>
+            )}
+            <p className="text-xs text-slate-400 mt-3">
+              Amount: <span className="font-bold text-slate-700">₹{Number(qr.amount).toLocaleString('en-IN')}</span>
+            </p>
+            {qr.orderId && (
+              <p className="text-[10px] text-slate-300 mt-1 mb-3 font-mono">
+                Expires in {mins}:{String(secs).padStart(2,'0')} · checking every 5s
+              </p>
+            )}
+            <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm mt-2">
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function DriverPWA() {
   const navigate = useNavigate();
@@ -91,6 +194,9 @@ export default function DriverPWA() {
   const [showChatbot, setShowChatbot] = useState(false);
   const [showSOS, setShowSOS] = useState(false);
   const [showPaying, setShowPaying] = useState(false);
+  const [showQR, setShowQR] = useState(null); // { qrLink, intentURL, amount }
+  const [attendance, setAttendance] = useState(null);
+  const [attendanceMonth, setAttendanceMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [paymentSuccess, setPaymentSuccess] = useState(null); // { amount, timestamp }
   const [earnings, setEarnings] = useState({ earnings: [], today_total: 0, month_total: 0 });
   const [showAddEarning, setShowAddEarning] = useState(false);
@@ -188,18 +294,21 @@ export default function DriverPWA() {
     return () => clearInterval(interval);
   }, [user]);
 
-  const fetchChat = async () => {
+  // L-5 fix: wrap in useCallback so setInterval always calls the current closure
+  const fetchChat = useCallback(async () => {
     const ph = phone(); if (!ph) return;
-    const res = await fetch(`${API}/api/payment/chat/messages?driverPhone=${ph}&ownerId=${ownerIdVal()}`, { headers: { Authorization: `Bearer ${tk()}` } });
-    if (res.ok) { const data = await res.json(); setChatMsgs(data); }
-  };
+    try {
+      const res = await fetch(`${API}/api/payment/chat/messages?driverPhone=${ph}&ownerId=${ownerIdVal()}`, { headers: { Authorization: `Bearer ${tk()}` } });
+      if (res.ok) { const data = await res.json(); setChatMsgs(data); }
+    } catch (_) {}
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;
     fetchChat();
     const interval = setInterval(fetchChat, 60000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, fetchChat]);
 
   const sendChatMessage = async () => {
     if (!chatInput.trim()) return;
@@ -239,7 +348,7 @@ export default function DriverPWA() {
         const d = p.vehicle_number ? parseFloat(p.total_outstanding || p.current_dues || 0) : 0;
         setDues(d); setPayAmt(d > 0 ? d : 0);
         setTelemetry({ vehicleNumber: p.vehicle_number || '', vehicleModel: p.vehicle_model || '', dailyRent: parseFloat(p.vehicle_daily_rent || 0), dailyDepositRecovery: parseFloat(p.daily_deposit_recovery || 0) });
-        if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, dailyRent: p.vehicle_daily_rent, status: 'Assigned', assignedSince: p.assigned_since });
+        if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, type: p.vehicle_type, dailyRent: p.vehicle_daily_rent, status: 'Assigned', assignedSince: p.assigned_since });
         if (p.owner_name) setFleetOwner(p.owner_name);
         if (p.company_name) setFleetCompany(p.company_name);
       }
@@ -257,7 +366,12 @@ export default function DriverPWA() {
     finally { setLoading(false); }
   }, [user]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchAll(false);
+    fetchAttendance(new Date().toISOString().slice(0,7));
+    return () => controller.abort();
+  }, [fetchAll]);
 
   // GPS ping — silent, every 30s, only when assigned vehicle
   useEffect(() => {
@@ -354,12 +468,17 @@ export default function DriverPWA() {
       });
       const d = await r.json();
       if (payAbortRef.current) return; // user cancelled mid-request
+      const intentURL = d?.intentURL || d?.data?.intentURL;
       const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
-      if (qrLink) {
-        try { const qrUrl = new URL(qrLink); const intentLink = decodeURIComponent(qrUrl.searchParams.get("intent")); if (intentLink?.startsWith('upi://')) { window.location.href = intentLink; return; } } catch {}
+      const orderId = d?.orderId || d?.data?.orderId || d?.order_id;
+      const isAndroid = /android/i.test(navigator.userAgent);
+      if (isAndroid && intentURL) { window.location.href = intentURL; return; }
+      if (qrLink || intentURL) {
+        setShowPaying(false);
+        setShowQR({ qrLink, intentURL, amount: payAmt || dues || 0, orderId });
+        return;
       }
-      const url = d?.intentURL || d?.data?.intentURL || d?.checkoutUrl || d?.data?.checkoutUrl;
-      if (url) { window.location.href = url; } else { toast.error('Payment error: ' + (d?.message || 'No URL')); setShowPaying(false); }
+      toast.error('Payment error: ' + (d?.message || 'No URL')); setShowPaying(false);
     } catch (e) { if (!payAbortRef.current) toast.error('Network error: ' + e.message); setShowPaying(false); }
   };
 
@@ -377,9 +496,28 @@ export default function DriverPWA() {
         body: JSON.stringify({ amount: Number(amt), customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || '', purpose: 'WALLET' })
       });
       const d = await r.json();
-      const url = d?.intentURL || d?.data?.intentURL || d?.checkoutUrl || d?.data?.checkoutUrl;
-      if (url) { window.location.href = url; } else { toast.error('Payment gateway error.'); setShowPaying(false); }
+      const intentURL = d?.intentURL || d?.data?.intentURL;
+      const qrLink = d?.upiQrLink || d?.data?.upiQrLink;
+      const orderId = d?.orderId || d?.data?.orderId || d?.order_id;
+      const isAndroid = /android/i.test(navigator.userAgent);
+      if (isAndroid && intentURL) { window.location.href = intentURL; return; }
+      if (qrLink || intentURL) {
+        setShowPaying(false);
+        setShowQR({ qrLink, intentURL, amount: addFundsAmt, orderId });
+        return;
+      }
+      toast.error('Payment gateway error.'); setShowPaying(false);
     } catch { toast.error('Network error.'); setShowPaying(false); }
+  };
+
+  const fetchAttendance = async (month) => {
+    const ph = phone();
+    if (!ph) return;
+    try {
+      const r = await fetch(`${API}/api/payment/driver/my-attendance?phone=${ph}&month=${month || attendanceMonth}`, { headers: { Authorization: `Bearer ${tk()}` } });
+      const d = await r.json();
+      if (d.success) setAttendance(d);
+    } catch {}
   };
 
   const sendSOS = async () => {
@@ -645,7 +783,7 @@ export default function DriverPWA() {
             </div>
             <div>
               <p className="text-sm font-black text-slate-800">{assignedVehicle.number}</p>
-              <p className="text-[9px] text-slate-400">{assignedVehicle.model}</p>
+              <p className="text-[9px] text-slate-400">{vehicleTypeLabel(assignedVehicle.type)}{assignedVehicle.model ? ` · ${assignedVehicle.model}` : ''}</p>
             </div>
           </div>
           <div className="text-right">
@@ -674,6 +812,68 @@ export default function DriverPWA() {
           </div>
         </div>
       ) : null}
+
+      {/* Attendance card */}
+      {attendance && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+              <span>📅</span> Attendance — {new Date(attendanceMonth + '-01').toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+            </h3>
+            <input
+              type="month"
+              value={attendanceMonth}
+              max={new Date().toISOString().slice(0,7)}
+              onChange={e => { setAttendanceMonth(e.target.value); fetchAttendance(e.target.value); }}
+              className="text-[10px] text-slate-400 border-none bg-transparent outline-none font-mono"
+              style={{width:90}}
+            />
+          </div>
+          <div className="px-4 py-3">
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <div className="bg-indigo-50 rounded-xl p-2.5 text-center">
+                <p className="text-lg font-black text-indigo-700">{attendance.daysPresent}</p>
+                <p className="text-[9px] text-indigo-400 font-bold uppercase tracking-wide">Present</p>
+              </div>
+              <div className="bg-rose-50 rounded-xl p-2.5 text-center">
+                <p className="text-lg font-black text-rose-600">{attendance.daysElapsed - attendance.daysPresent}</p>
+                <p className="text-[9px] text-rose-400 font-bold uppercase tracking-wide">Absent</p>
+              </div>
+              <div className={`rounded-xl p-2.5 text-center ${attendance.attendancePct >= 80 ? 'bg-emerald-50' : attendance.attendancePct >= 50 ? 'bg-amber-50' : 'bg-rose-50'}`}>
+                <p className={`text-lg font-black ${attendance.attendancePct >= 80 ? 'text-emerald-700' : attendance.attendancePct >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{attendance.attendancePct}%</p>
+                <p className={`text-[9px] font-bold uppercase tracking-wide ${attendance.attendancePct >= 80 ? 'text-emerald-400' : attendance.attendancePct >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>Rate</p>
+              </div>
+            </div>
+            {/* Mini dot calendar */}
+            <div className="flex flex-wrap gap-1">
+              {Array.from({ length: attendance.daysInMonth }, (_, i) => {
+                const day = i + 1;
+                const present = attendance.logs?.some(l => l.day === day);
+                const today = new Date();
+                const isToday = new Date(attendanceMonth + '-01').getMonth() === today.getMonth()
+                  && new Date(attendanceMonth + '-01').getFullYear() === today.getFullYear()
+                  && day === today.getDate();
+                const future = new Date(attendanceMonth + '-' + String(day).padStart(2,'0')) > today;
+                return (
+                  <div key={day} title={`Day ${day}`} style={{
+                    width: 22, height: 22, borderRadius: 6, fontSize: 9, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: future ? '#f1f5f9' : present ? '#4f46e5' : '#fee2e2',
+                    color: future ? '#94a3b8' : present ? 'white' : '#dc2626',
+                    border: isToday ? '2px solid #4f46e5' : '2px solid transparent',
+                  }}>{day}</div>
+                );
+              })}
+            </div>
+            {attendance.todayPresent !== undefined && (
+              <p className="text-[10px] mt-2 font-bold" style={{color: attendance.todayPresent ? '#059669' : '#dc2626'}}>
+                {attendance.todayPresent ? '✓ You're marked present today' : '✗ Not marked present today — open the app daily to mark attendance'}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Recent transactions */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -1595,6 +1795,17 @@ export default function DriverPWA() {
           </div>
         )}
 
+        {/* QR Code modal — shown on desktop/iOS when UPI deep link won't work */}
+        {showQR && (
+          <QRPayModal
+            qr={showQR}
+            apiBase={API}
+            token={tk()}
+            onSuccess={() => { setShowQR(null); toast.success('Payment successful!'); fetchAll(); }}
+            onClose={() => setShowQR(null)}
+          />
+        )}
+
         {/* Paying overlay */}
         {showPaying && (
           <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-[100] flex items-center justify-center">
@@ -1779,75 +1990,4 @@ export default function DriverPWA() {
             <button onClick={dismissNotifNudge} style={{
               width: '100%', padding: '11px', borderRadius: '12px',
               background: 'transparent', color: '#94a3b8', border: 'none',
-              fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit',
-            }}>
-              Not now
-            </button>
-          </div>
-        </div>
-      )}
-      {/* Add Funds Modal */}
-      {showAddFunds && (
-        <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.55)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <div style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'28px 20px 40px',width:'100%',maxWidth:480,boxShadow:'0 -8px 32px rgba(0,0,0,0.18)'}}>
-            <h3 style={{fontSize:17,fontWeight:900,color:'#0f172a',marginBottom:4}}>Add Funds to Wallet</h3>
-            <p style={{fontSize:12,color:'#64748b',marginBottom:20}}>Enter the amount you want to add</p>
-            <div style={{position:'relative',marginBottom:16}}>
-              <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:18,color:'#64748b',fontWeight:700}}>&#8377;</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                placeholder="0"
-                value={addFundsAmt}
-                onChange={e => setAddFundsAmt(e.target.value)}
-                autoFocus
-                style={{width:'100%',boxSizing:'border-box',paddingLeft:34,paddingRight:14,paddingTop:14,paddingBottom:14,fontSize:24,fontWeight:900,color:'#0f172a',border:'2px solid #e2e8f0',borderRadius:14,outline:'none',fontFamily:'inherit'}}
-                onFocus={e => e.target.style.borderColor='#4f46e5'}
-                onBlur={e => e.target.style.borderColor='#e2e8f0'}
-              />
-            </div>
-            <div style={{display:'flex',gap:8,marginBottom:12}}>
-              {[100,500,1000].map(amt => (
-                <button key={amt} onClick={() => setAddFundsAmt(String(amt))}
-                  style={{flex:1,padding:'8px 0',background:'#f1f5f9',border:'none',borderRadius:10,fontSize:13,fontWeight:700,color:'#334155',cursor:'pointer'}}>
-                  +&#8377;{amt}
-                </button>
-              ))}
-            </div>
-            <LoadingButton
-              onClick={submitAddFunds}
-              disabled={!addFundsAmt || isNaN(addFundsAmt) || Number(addFundsAmt) <= 0}
-              loadingText="Opening payment..."
-              style={{width:'100%',padding:'14px',background:(!addFundsAmt||isNaN(addFundsAmt)||Number(addFundsAmt)<=0)?'#c7d2fe':'#4f46e5',color:'#fff',border:'none',borderRadius:14,fontSize:15,fontWeight:800,cursor:(!addFundsAmt||isNaN(addFundsAmt)||Number(addFundsAmt)<=0)?'not-allowed':'pointer',marginBottom:10,fontFamily:'inherit'}}>
-              Proceed to Pay
-            </LoadingButton>
-            <button onClick={() => setShowAddFunds(false)}
-              style={{width:'100%',padding:'12px',background:'transparent',color:'#94a3b8',border:'none',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Logout confirm */}}
-      {showLogoutConfirm && (
-        <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
-              <LogOut size={20} className="text-red-500" />
-            </div>
-            <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
-            <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
-              <button onClick={logout}
-                className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
-            </div>
-          </div>
-        </div>
-      )}
-      </div>
-    </div>
-  );
-}
+              fontSize: '13px', cursor: 'pointer', fontFa

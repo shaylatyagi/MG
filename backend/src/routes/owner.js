@@ -824,11 +824,12 @@ router.get('/driver-locations', async (req, res) => {
 // PUT /api/owner/update-profile
 router.put('/update-profile', async (req, res) => {
   try {
-    const { ownerId, full_name, email } = req.body;
-    if (!ownerId || !full_name) return res.status(400).json({ success: false, message: 'ownerId and full_name required' });
+    const { full_name, email } = req.body;
+    if (!full_name) return res.status(400).json({ success: false, message: 'full_name required' });
+    // C-4 fix: always use req.user.id — never trust ownerId from body
     await pool.query(
       `UPDATE public.owners SET full_name=$1, email=$2 WHERE id=$3`,
-      [full_name, email || null, ownerId]
+      [full_name, email || null, req.user.id]
     );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
