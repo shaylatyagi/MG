@@ -5,7 +5,7 @@ const jwt      = require('jsonwebtoken');
 const bcrypt   = require('bcrypt');
 const crypto   = require('crypto');
 const { generateToken, verifyToken } = require('../middleware/auth');
-const twilio   = require('twilio');
+const nodemailer = require('nodemailer');
 
 // OTP rate limiting — { phone: { attempts: N, lockedUntil: ms } }
 const otpAttempts = new Map();
@@ -29,17 +29,25 @@ const recordFail = (phone) => {
 };
 const clearAttempts = (phone) => otpAttempts.delete(phone);
 
-const sendSMS = async (phone, otp) => {
+// Send admin OTP via email (free — uses same Brevo SMTP as forgot-pin)
+const sendAdminOtpEmail = async (otp) => {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) { console.warn('[OTP] ADMIN_EMAIL not set — OTP not sent via email'); return false; }
   try {
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    await client.messages.create({
-      body: `Your MobilityGrid OTP is ${otp}. Valid 10 mins. Do not share.`,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to:   `+91${phone}`,
+    const transporter = nodemailer.createTransport({
+      host: 'smtp-relay.brevo.com', port: 587, secure: false,
+      auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS },
+    });
+    await transporter.sendMail({
+      from: '"MobilityGrid" <' + (process.env.BREVO_USER || 'noreply@mobilitygrid.in') + '>',
+      to:   adminEmail,
+      subject: 'MobilityGrid Admin Login OTP',
+      text: `Your admin login OTP is: ${otp}\n\nValid for 10 minutes. Do not share.`,
+      html: `<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid Admin</h2><p>Your login OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">${otp}</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes. Do not share this OTP.</p></div>`,
     });
     return true;
   } catch (err) {
-    console.error('Twilio error:', err.message);
+    console.error('[OTP] Email send error:', err.message);
     return false;
   }
 };
@@ -230,7 +238,7 @@ router.post('/admin-send-otp', async (req, res) => {
       [phone_number, otpHash]
     );
     if (process.env.NODE_ENV !== 'production') console.log('[ADMIN OTP]', phone_number, otp);
-    await sendSMS(phone_number, otp);
+    await sendAdminOtpEmail(otp);
     const showOtp = process.env.NODE_ENV !== 'production' || process.env.DEV_BYPASS_OTP === 'true';
     res.json({ success: true, message: 'OTP sent to admin phone', ...(showOtp && { otp }) });
   } catch (err) {
