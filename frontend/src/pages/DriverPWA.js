@@ -95,6 +95,8 @@ export default function DriverPWA() {
   const [sosMsg, setSosMsg] = useState('');
   const [sosSent, setSosSent] = useState(false);
   const [showOwnerChat, setShowOwnerChat] = useState(false);
+  const [showAddFunds, setShowAddFunds] = useState(false);
+  const [addFundsAmt, setAddFundsAmt] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   // Passkey one-time nudge
   const [showPasskeyNudge, setShowPasskeyNudge] = useState(false);
@@ -248,6 +250,27 @@ export default function DriverPWA() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // Load KYC status from backend on mount
+  useEffect(() => {
+    const ph = phone();
+    if (!ph) return;
+    fetch(`${API}/api/kyc/status?phone=${ph}`, { headers: { Authorization: `Bearer ${tk()}` } })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.status) {
+          setKycState(s => ({
+            aadhaar: { ...s.aadhaar, status: d.status.aadhaar || 'pending', value: d.values?.aadhaar || s.aadhaar.value },
+            pan:     { ...s.pan,     status: d.status.pan     || 'pending', value: d.values?.pan     || s.pan.value },
+            dl:      { ...s.dl,      status: d.status.dl      || 'pending', value: d.values?.dl      || s.dl.value },
+            bank:    { ...s.bank,    status: d.status.bank    || 'pending',
+                       acc: d.values?.bank_acc  || s.bank.acc,
+                       ifsc: d.values?.bank_ifsc || s.bank.ifsc },
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line
+
   // GPS ping — silent, every 30s, only when assigned vehicle
   useEffect(() => {
     if (!user) return;
@@ -352,8 +375,12 @@ export default function DriverPWA() {
     } catch (e) { if (!payAbortRef.current) alert('Network error: ' + e.message); setShowPaying(false); }
   };
 
-  const addFloat = async () => {
-    const amt = prompt("Enter amount (₹):"); if (!amt || isNaN(amt) || Number(amt) <= 0) return;
+  const addFloat = () => { setAddFundsAmt(''); setShowAddFunds(true); };
+
+  const submitAddFunds = async () => {
+    const amt = addFundsAmt;
+    if (!amt || isNaN(amt) || Number(amt) <= 0) return;
+    setShowAddFunds(false);
     setShowPaying(true);
     try {
       const u = JSON.parse(localStorage.getItem('user') || '{}');
@@ -1762,25 +1789,19 @@ export default function DriverPWA() {
           </div>
         </div>
       )}
-      {/* Logout confirm */}
-      {showLogoutConfirm && (
-        <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
-              <LogOut size={20} className="text-red-500" />
-            </div>
-            <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
-            <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black text-slate-700">Cancel</button>
-              <button onClick={logout}
-                className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-black">Yes, Logout</button>
-            </div>
-          </div>
-        </div>
-      )}
-      </div>
-    </div>
-  );
-}
+      {/* Add Funds Modal */}
+      {showAddFunds && (
+        <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.55)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <div style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'28px 20px 40px',width:'100%',maxWidth:480,boxShadow:'0 -8px 32px rgba(0,0,0,0.18)'}}>
+            <h3 style={{fontSize:17,fontWeight:900,color:'#0f172a',marginBottom:4}}>Add Funds to Wallet</h3>
+            <p style={{fontSize:12,color:'#64748b',marginBottom:20}}>Enter the amount you want to add</p>
+            <div style={{position:'relative',marginBottom:16}}>
+              <span style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:18,color:'#64748b',fontWeight:700}}>₹</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={addFundsAmt}
+                onChange={e => setAddFundsAmt(e.target.value)}
+                autoFocus
+                styl

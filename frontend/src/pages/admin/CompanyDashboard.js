@@ -613,7 +613,9 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
       )}
 
       {tab === 'docs' && (
-        <DocumentsSection userType="DRIVER" userId={vehicleId} />
+        v.driver_id
+          ? <DocumentsSection userType="DRIVER" userId={v.driver_id} />
+          : <p className="text-gray-400 italic text-sm py-6 text-center">No driver currently assigned to this vehicle.</p>
       )}
     </Modal>
   );
@@ -3073,15 +3075,4 @@ function AdminPanelInner() {
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-export default function AdminPanel() {
-  return (
-    <ErrorBoundary>
-      <AdminPanelInner />
-    </ErrorBoundary>
-  );
-}
+   

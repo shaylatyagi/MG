@@ -488,6 +488,45 @@ Return ONLY valid JSON. Example: {"account_number":"123456789012","ifsc":"SBIN00
 });
 
 
+// ─────────────────────────────────────────────────────────────────────
+// GET /api/kyc/status?phone=xxx
+// Returns verified status for each KYC field
+// ─────────────────────────────────────────────────────────────────────
+router.get('/status', async (req, res) => {
+  const { phone } = req.query;
+  if (!phone) return res.status(400).json({ success: false, message: 'phone required' });
+  try {
+    const r = await pool.query(
+      `SELECT d.aadhaar_last4, d.pan_number, d.driving_license_number,
+              d.bank_account_number, d.bank_ifsc
+       FROM public.drivers d
+       WHERE d.mobile_number = $1`,
+      [phone]
+    );
+    if (!r.rows[0]) return res.json({ success: true, status: {} });
+    const row = r.rows[0];
+    res.json({
+      success: true,
+      status: {
+        aadhaar: row.aadhaar_last4 ? 'verified' : 'pending',
+        pan:     row.pan_number    ? 'verified' : 'pending',
+        dl:      row.driving_license_number ? 'verified' : 'pending',
+        bank:    (row.bank_account_number || row.bank_ifsc) ? 'verified' : 'pending',
+      },
+      values: {
+        aadhaar: row.aadhaar_last4 || '',
+        pan:     row.pan_number    || '',
+        dl:      row.driving_license_number || '',
+        bank_acc: row.bank_account_number || '',
+        bank_ifsc: row.bank_ifsc || '',
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
 module.exports = router;
 
 // =====================================================================

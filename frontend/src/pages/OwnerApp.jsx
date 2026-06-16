@@ -983,12 +983,13 @@ const DriverDetailsModal = () => {
 // Fetch available drivers for selected vehicle
 const fetchAvailableDrivers = async (vehicleId) => {
   try {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API}/api/assignment/available/drivers?vehicleId=${vehicleId}&ownerId=${ownerId()}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const tok = localStorage.getItem('token');
+    const url = vehicleId
+      ? `${API}/api/assignment/available/drivers?vehicleId=${vehicleId}&ownerId=${ownerId()}`
+      : `${API}/api/assignment/unassigned/drivers?ownerId=${ownerId()}`;
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
     const data = await response.json();
-    if (data.success) setAvailableDriversForVehicle(data.data);
+    if (data.success) setAvailableDriversForVehicle(data.data || data.drivers || []);
   } catch (err) {
     console.error(err);
   }
@@ -997,7 +998,7 @@ const fetchAvailableDrivers = async (vehicleId) => {
 // Call this when opening Add Vehicle modal
 const openAddVehicleModal = () => {
   setShowAddVehicle(true);
-  fetchAvailableDrivers();
+  fetchAvailableDrivers(); // no vehicleId — fetches unassigned drivers for owner
   setSelectedDriverId('');
   setNewVehicle({ number: '', model: '', rent: '' });
 };
@@ -1278,16 +1279,10 @@ useEffect(() => {
         });
         const data = await res.json();
         if (Array.isArray(data)) {
-          setNotifications(mergedData);
           const ownerReadIds2 = JSON.parse(localStorage.getItem('mg_owner_read_notif_ids') || '[]');
           const mergedData = data.map(x => ownerReadIds2.includes(x.id) ? { ...x, is_read: true } : x);
-          const newUnread = mergedData.filter(n => !n.is_read).length;
-          if (newUnread > unreadCount) {
-            // New notification arrived
-            setUnreadCount(newUnread);
-          } else {
-            setUnreadCount(newUnread);
-          }
+          setNotifications(mergedData);
+          setUnreadCount(mergedData.filter(n => !n.is_read).length);
         }
       } catch (err) {
         console.log('Polling error:', err);
