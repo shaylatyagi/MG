@@ -1666,6 +1666,9 @@ router.post('/create-order', async (req, res) => {
 //linkbasedpayments-chat in notifications-
     const orderData = await orderRes.json();
 
+    // DEBUG: log full order response
+    console.log('📦 Order API response:', JSON.stringify(orderData, null, 2));
+
     // ✅ FIX 2: Agar PayYantra se response nahi aaya toh error do, mock mat banao
     const intentURL   = orderData?.intentURL   || orderData?.data?.intentURL;
     const checkoutUrl = orderData?.checkoutUrl || orderData?.data?.checkoutUrl;
