@@ -2402,7 +2402,7 @@ const DriversTab = () => {
                     {hasVehicle && assignedVehicle && (
                       <button
                         onClick={() => {
-                          setChangeRentDriver({ driverId: driver.id, vehicleId: assignedVehicle.vehicle_id, vehicleNumber: assignedVehicle.vehicle_number, currentRent: assignedVehicle.daily_rent });
+                          setChangeRentDriver({ driverId: driver.id, vehicleId: assignedVehicle.id, vehicleNumber: assignedVehicle.vehicle_number, currentRent: assignedVehicle.daily_rent });
                           setChangeRentAmt(String(assignedVehicle.daily_rent || ''));
                           setShowChangeRent(true);
                         }}
