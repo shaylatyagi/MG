@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Component } from 'react';
-import { toast, ToastContainer } from '../../../components/Toast';
+import { toast, ToastContainer } from '../../components/Toast';
 import ThemeToggle from '../../components/ThemeToggle';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
