@@ -3077,18 +3077,6 @@ function AdminPanelInner() {
 
 export default function AdminPanel() {
   return (
-     fontWeight: 600, color: '#fff'
-              }}>Sign Out</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function AdminPanel() {
-  return (
     <ErrorBoundary>
       <AdminPanelInner />
     </ErrorBoundary>

@@ -1814,7 +1814,7 @@ export default function DriverPWA() {
         </div>
       )}
 
-      {/* Logout confirm */}
+      {/* Logout confirm */}}
       {showLogoutConfirm && (
         <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
@@ -1822,9 +1822,6 @@ export default function DriverPWA() {
               <LogOut size={20} className="text-red-500" />
             </div>
             <h3 className="text-base font-black text-slate-900 mb-1">Logout?</h3>
-            <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
-            <div className="flex gap-3">
-              <button onClick={() => setSh900 mb-1">Logout?</h3>
             <p className="text-sm text-slate-500 mb-5">Are you sure you want to sign out?</p>
             <div className="flex gap-3">
               <button onClick={() => setShowLogoutConfirm(false)}
