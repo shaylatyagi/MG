@@ -162,6 +162,28 @@ router.post('/companies', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── ALL OWNERS (lightweight list, no N+1) ───────────────────────────────────
+router.get('/owners', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT o.id, o.full_name, o.mobile_number, o.email, o.owner_code,
+             o.company_id, c.name AS company_name,
+             COUNT(DISTINCT d.id)::int AS total_drivers,
+             COUNT(DISTINCT v.id)::int AS total_vehicles
+      FROM public.owners o
+      LEFT JOIN public.companies c ON c.id = o.company_id
+      LEFT JOIN public.drivers d ON d.owner_code = o.owner_code
+      LEFT JOIN public.vehicles v ON v.owner_id = o.id
+      GROUP BY o.id, o.full_name, o.mobile_number, o.email, o.owner_code, o.company_id, c.name
+      ORDER BY o.full_name
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('GET /admin/owners error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── OWNERS BY COMPANY (full data) ────────────────────────────────────────────
 router.get('/companies/:companyId/owners', async (req, res) => {
   try {
