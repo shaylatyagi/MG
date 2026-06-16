@@ -618,7 +618,14 @@ router.post('/owner/vehicles', async (req, res) => {
     console.log('Add Vehicle:', { owner_id, vehicle_number, vehicle_model, daily_rent, driver_id });
     
     if (!owner_id || !vehicle_number) {
-      return res.status(400).json({ success: false, message: 'Vehicle number and owner ID required' });
+      return res.status(400).json({ success: false, message: 'Vehicle number aur owner ID required' });
+    }
+    if (!vehicle_type) {
+      return res.status(400).json({ success: false, message: 'Vehicle type required' });
+    }
+    const rent = parseFloat(daily_rent);
+    if (!daily_rent || isNaN(rent) || rent <= 0) {
+      return res.status(400).json({ success: false, message: 'Rent amount required — ₹0 ya free allowed nahi' });
     }
     
     // Check if vehicle exists
@@ -637,7 +644,7 @@ router.post('/owner/vehicles', async (req, res) => {
      vehicle_type, insurance_expiry, fitness_expiry, chassis_number, created_at)
    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
    RETURNING id, vehicle_number`,
-  [vehicle_number, vehicle_model||'Standard', daily_rent||850, 
+  [vehicle_number, vehicle_model||'Standard', rent, 
    parseInt(owner_id), driver_id||null, 
    driver_id?'ASSIGNED':'AVAILABLE',
    vehicle_type||null,
@@ -1602,12 +1609,7 @@ router.post('/create-order', async (req, res) => {
     }
 
     const BASE = process.env.PAYYANTRA_BASE_URL || 'https://payin-api.payyantra.com';
-    
-    // ✅ DEBUG LOG — Render mein dikheга
-    console.log('🔑 Using PayYantra BASE:', BASE);
-    console.log('🔑 CLIENT_ID:', process.env.PAYYANTRA_CLIENT_ID ? '✅' : '❌ MISSING');
 
-    // ✅ FIX: json() ki jagah text() use karo pehle
     const tokenRes = await fetch(`${BASE}/api/auth/token`, {
       method: 'POST',
       headers: {
@@ -1618,8 +1620,7 @@ router.post('/create-order', async (req, res) => {
     });
 
     const tokenText = await tokenRes.text();
-    console.log('📡 Token API status:', tokenRes.status);
-    console.log('📡 Token API response:', tokenText);
+    if (tokenRes.status !== 200) console.error('PayYantra token error:', tokenRes.status, tokenText.substring(0,200));
 
     let tokenData;
     try {
@@ -1666,9 +1667,6 @@ router.post('/create-order', async (req, res) => {
 //linkbasedpayments-chat in notifications-
     const orderData = await orderRes.json();
 
-    // DEBUG: log full order response
-    console.log('📦 Order API response:', JSON.stringify(orderData, null, 2));
-
     // Extract URLs from PayYantra response
     const checkoutUrl = orderData?.data?.checkoutUrl || orderData?.checkoutUrl;
     const upiQrLink   = orderData?.data?.upiQrLink   || orderData?.upiQrLink;
@@ -1682,16 +1680,11 @@ router.post('/create-order', async (req, res) => {
         if (extracted.startsWith('upi://')) intentURL = extracted;
       } catch (_) {}
     }
-    console.log('💳 intentURL:', intentURL ? intentURL.substring(0, 80) + '...' : 'none');
-    console.log('💳 checkoutUrl:', checkoutUrl ? 'present' : 'none');
-    const pgTxnId     = orderData?.data?.transactionId || orderData?.transactionId;
+    const pgTxnId = orderData?.data?.transactionId || orderData?.transactionId;
 
     if (!intentURL && !checkoutUrl && !upiQrLink) {
-      return res.status(500).json({ 
-        success: false, 
-        message: 'PayYantra se koi URL nahi aaya',
-        raw: orderData   // ← yahan se exactly dekh kya aa raha hai
-      });
+      console.error('PayYantra no URL — raw response:', JSON.stringify(orderData));
+      return res.status(500).json({ success: false, message: 'PayYantra se koi URL nahi aaya' });
     }
 
     // ✅ Driver ka owner_code lookup karo taaki owner dashboard me dike
@@ -1724,16 +1717,16 @@ router.post('/create-order', async (req, res) => {
        driverOwnerCode, driverFullName]
     );
 
-    // Response mein ye sab fields return karo
-res.json({
-  success: true,
-  checkoutUrl: orderData?.data?.checkoutUrl || orderData?.checkoutUrl,
-  intentURL: orderData?.data?.intentURL || orderData?.intentURL,
-  upiQrLink: orderData?.data?.upiQrLink,
-  orderId,
-  transactionId: pgTxnId,
-  data: orderData.data
-});
+    // intentURL is already correctly extracted above via decodeURIComponent(upiQrLink ?intent=)
+    // DO NOT re-read from orderData here — it won't have it as a separate field
+    res.json({
+      success: true,
+      checkoutUrl,
+      intentURL,   // ← the properly extracted upi:// deep link
+      upiQrLink,
+      orderId,
+      transactionId: pgTxnId,
+    });
 
   } catch (err) {
     console.error('Create order error:', err);
@@ -2264,7 +2257,7 @@ router.get('/driver/profile', verifyToken, async (req, res) => {
      d.id, d.full_name as name, d.mobile_number as phone,
      d.driver_code, d.wallet_balance, d.status, d.advance_balance,
      d.security_deposit, d.owner_code,
-     v.id as vehicle_id, v.vehicle_number, v.vehicle_model,
+     v.id as vehicle_id, v.vehicle_number, v.vehicle_model, v.vehicle_type,
      v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,
      v.created_at as assigned_since,
      o.full_name as owner_name,
@@ -2296,7 +2289,7 @@ router.get('/driver/profile', verifyToken, async (req, res) => {
       const totalPaid = parseFloat(totalPaidRes.rows[0].total);
 
       const assignedSince = p.assigned_since ? new Date(p.assigned_since) : new Date();
-      const daysDiff = Math.max(1, Math.floor((new Date()-assignedSince)/(1000*60*60*24)));
+      const daysDiff = Math.max(0, Math.floor((new Date()-assignedSince)/(1000*60*60*24)));
 
       const securityDeposit = parseFloat(p.security_deposit || 0);
       dailyDepositRecovery = securityDeposit > 0 ? Math.round(securityDeposit/100) : 0;
@@ -3127,6 +3120,49 @@ router.post('/owner/driver-incentive-rule', verifyToken, async (req, res) => {
 
 
 // ─── DRIVER ATTENDANCE (from vehicle assignment history) ─────────────────────
+// Driver's own monthly attendance
+router.get('/driver/my-attendance', verifyToken, async (req, res) => {
+  try {
+    const { phone, month } = req.query; // month = 'YYYY-MM'
+    const dr = await pool.query(`SELECT id FROM public.drivers WHERE mobile_number = $1`, [phone]);
+    if (!dr.rows[0]) return res.json({ success: false });
+    const driverId = dr.rows[0].id;
+
+    const target = month || new Date().toISOString().slice(0, 7);
+    const monthStart = new Date(`${target}-01T00:00:00Z`);
+    const monthEnd = new Date(monthStart);
+    monthEnd.setMonth(monthEnd.getMonth() + 1);
+    const daysInMonth = new Date(monthEnd - 1).getDate();
+
+    const logs = await pool.query(
+      `SELECT log_date, login_time, logout_time, active_minutes
+       FROM public.driver_daily_log
+       WHERE driver_id = $1 AND log_date >= $2 AND log_date < $3
+       ORDER BY log_date`,
+      [driverId, monthStart.toISOString(), monthEnd.toISOString()]
+    );
+
+    const presentDays = new Set(logs.rows.map(r => new Date(r.log_date).getDate()));
+    const today = new Date();
+    const isCurrentMonth = target === today.toISOString().slice(0, 7);
+    const daysElapsed = isCurrentMonth ? today.getDate() : daysInMonth;
+
+    res.json({
+      success: true,
+      month: target,
+      daysInMonth,
+      daysElapsed,
+      daysPresent: presentDays.size,
+      attendancePct: daysElapsed > 0 ? Math.round((presentDays.size / daysElapsed) * 100) : 0,
+      todayPresent: isCurrentMonth && presentDays.has(today.getDate()),
+      logs: logs.rows.map(r => ({ day: new Date(r.log_date).getDate(), minutes: r.active_minutes || 0 }))
+    });
+  } catch (err) {
+    console.error('Driver attendance error:', err);
+    res.status(500).json({ success: false });
+  }
+});
+
 router.get('/owner/attendance', async (req, res) => {
   try {
     const { ownerId, month } = req.query;
