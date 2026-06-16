@@ -545,20 +545,21 @@ export default function Login() {
             Forgot PIN?
           </button>
         </div>
-        {/* Biometric button if passkey registered */}
+        {/* PIN button — always primary / top */}
+        <button onClick={loginWithPin} disabled={!canLogin}
+          style={!canLogin ? btnDisabled : btnPrimary}>
+          {loading ? 'Logging in…' : 'Login with PIN'}
+          {!loading && <ArrowRight size={14} />}
+        </button>
+        {/* Biometric button — secondary, below PIN */}
         {hasPasskey && (
           <button onClick={loginWithPasskey} disabled={biometricLoading}
-            style={{ ...btnPrimary, background: biometricLoading ? '#f1f5f9' : '#0f172a',
-              color: biometricLoading ? '#94a3b8' : '#fff', marginBottom: '10px' }}>
+            style={{ ...btnOutline, background: biometricLoading ? '#f8fafc' : 'transparent',
+              color: biometricLoading ? '#94a3b8' : '#0f172a', marginTop: '10px' }}>
             <span style={{ fontSize: '18px' }}>{biometricLoading ? '⏳' : '🔐'}</span>
             {biometricLoading ? 'Checking…' : 'Use Face ID / Fingerprint'}
           </button>
         )}
-        <button onClick={loginWithPin} disabled={!canLogin}
-          style={!canLogin ? btnDisabled : (hasPasskey ? btnOutline : btnPrimary)}>
-          {loading ? 'Logging in…' : (hasPasskey ? 'Use PIN instead' : 'Login')}
-          {!loading && <ArrowRight size={14} />}
-        </button>
         {showEnrollSheet && <EnrollSheet />}
         {/* New here? — Owner only */}
         {selectedRole && selectedRole.type === 'owner' && (
