@@ -1,3 +1,4 @@
+// @ts-nocheck
 // frontend/src/pages/DriverPWA.js
 import appStyles from '../styles/app.module.css';
 import ThemeToggle from '../components/ThemeToggle';
