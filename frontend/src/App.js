@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime:   5 * 60 * 1000,  // 5 min — don't refetch too aggressively
+      staleTime:   5 * 60 * 1000,
       retry:       1,
       refetchOnWindowFocus: false,
     },
@@ -14,7 +14,6 @@ const queryClient = new QueryClient({
 });
 
 // ── Auth Context ──────────────────────────────────────────────────────────────
-// Single source of truth for auth state — no raw localStorage reads in components.
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -82,7 +81,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// ── Lazy-loaded pages (code splitting — each page is its own JS chunk) ────────
+// ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 const LandingPage     = lazy(() => import('./pages/LandingPage'));
 const Login           = lazy(() => import('./pages/Login'));
 const OwnerApp        = lazy(() => import('./pages/OwnerApp.jsx'));
@@ -105,11 +104,11 @@ const PageLoader = () => (
       borderRadius: 'var(--radius-full)',
       animation: 'spin 0.7s linear infinite',
     }} />
-    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <style>{"@keyframes spin { to { transform: rotate(360deg); } }"}</style>
   </div>
 );
 
-// ── PrivateRoute — uses auth context, not raw localStorage ────────────────────
+// ── PrivateRoute ──────────────────────────────────────────────────────────────
 function PrivateRoute({ children, adminOnly }) {
   const { token, adminToken } = useAuth();
   if (!token && !adminToken) return <Navigate to="/login" replace />;
@@ -124,17 +123,28 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <Router>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              {/* Public */}
-              <Route path="/"                element={<LandingPage />} />
-              <Route path="/login"           element={<Login />} />
-              <Route path="/partner"         element={<PartnerHub />} />
-              <Route path="/partners"        element={<PartnersPage />} />
-              <Route path="/partners/:slug"  element={<PartnersPage />} />
-              <Route path="/payment-result"  element={<PaymentResult />} />
-              <Route path="/pay/:token"      element={<PaymentLinkPage />} />
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/"                element={<LandingPage />} />
+                <Route path="/login"           element={<Login />} />
+                <Route path="/partner"         element={<PartnerHub />} />
+                <Route path="/partners"        element={<PartnersPage />} />
+                <Route path="/partners/:slug"  element={<PartnersPage />} />
+                <Route path="/payment-result"  element={<PaymentResult />} />
+                <Route path="/pay/:token"      element={<PaymentLinkPage />} />
+                <Route path="/owner/*"   element={<PrivateRoute><OwnerApp /></PrivateRoute>} />
+                <Route path="/driver/*"  element={<PrivateRoute><DriverPWA /></PrivateRoute>} />
+                <Route path="/profile"   element={<PrivateRoute><Profile /></PrivateRoute>} />
+                <Route path="/manager/*" element={<PrivateRoute><ManagerApp /></PrivateRoute>} />
+                <Route path="/admin/*"   element={<PrivateRoute adminOnly><AdminPanel /></PrivateRoute>} />
+                <Route path="*"          element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </Router>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+}
 
-              {/* Protected */}
-              <Route path="/owner/*"           element={<PrivateRoute><OwnerApp /></PrivateRoute>} />
-              <Route path=
+export default App;
