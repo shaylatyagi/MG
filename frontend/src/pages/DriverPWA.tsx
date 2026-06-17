@@ -246,6 +246,14 @@ export default function DriverPWA() {
     } catch { return null; }
   };
 
+  // Switch PWA manifest to driver version when this page mounts
+  useEffect(() => {
+    const el = document.getElementById('mg-manifest');
+    if (el) el.setAttribute('href', '/driver-manifest.json');
+    const tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.setAttribute('content', '#16a34a');
+  }, []);
+
   useEffect(() => {
     const tick = () => {
       const n = new Date(); const h = n.getHours(), m = String(n.getMinutes()).padStart(2, '0');
@@ -256,7 +264,16 @@ export default function DriverPWA() {
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem('user') || '{}');
     setUser(u);
-    if (!u?.id) setLoading(false);
+    if (!u?.id) { setLoading(false); return; }
+    // Mark attendance: call activity/login so driver_daily_log gets an entry for today
+    const ph = u.mobile_number || u.phone_number || u.phone;
+    if (ph) {
+      fetch(`${API}/api/payment/driver/activity/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+        body: JSON.stringify({ driverPhone: ph }),
+      }).catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -1724,7 +1741,7 @@ export default function DriverPWA() {
         <div className="shrink-0 px-4 py-2 flex items-center justify-between" style={{ background:'var(--color-text)', borderTop:'1px solid var(--color-gray-800)' }}>
           <button onClick={() => { setShowOwnerChat(true); fetchChat(); }}
             className="flex items-center gap-1.5 text-[10px] font-black transition active:scale-[0.96]"
-            style={{color:'rgba(255,255,255,0.4)',border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',borderRadius:8,padding:'6px 12px'}}>
+            style={{color:'#fff',border:'1px solid rgba(255,255,255,0.35)',background:'rgba(255,255,255,0.12)',borderRadius:8,padding:'6px 12px'}}>
             <MessageCircle size={11}/> Owner Chat
           </button>
           <span className="text-[9px] font-black uppercase tracking-widest" style={{color:'rgba(255,255,255,0.25)'}}>{t.emergency}</span>

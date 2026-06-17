@@ -385,7 +385,7 @@ const [assignMode, setAssignMode] = useState('driver'); // 'driver' or 'vehicle'
 const [availableVehiclesForDriver, setAvailableVehiclesForDriver] = useState([]);
 const [availableDriversForVehicle, setAvailableDriversForVehicle] = useState([]);
   const navigate = useNavigate();
-  const { showTour, dismissTour } = useOnboarding('owner');
+  const { showTour, dismissTour } = useOnboarding('owner_' + (getUser()?.id || 'x'));
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
   const [time, setTime] = useState('');
@@ -1211,15 +1211,16 @@ const oId = u.id;
 if (!oId) { navigate('/login'); return; }
     
     
-    const [vehiclesRes, driversRes, statsRes, notifRes, ledgerRes] = await Promise.all([
+    const [vehiclesRes, driversRes, statsRes, notifRes, ledgerRes, ownerStatsRes] = await Promise.all([
   fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
   fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}&limit=200`, { headers: H }),
   fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
   fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H }),
-  fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H })
+  fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H }),
+  fetch(`${API}/api/owner/stats`, { headers: H })
 ]);
     // Session expired on another device → redirect to login
-    if ([vehiclesRes, driversRes, statsRes, notifRes, ledgerRes].some(r => r.status === 401)) {
+    if ([vehiclesRes, driversRes, statsRes, notifRes, ledgerRes, ownerStatsRes].some(r => r.status === 401)) {
       localStorage.clear();
       navigate('/login');
       return;
@@ -1249,11 +1250,18 @@ if (!oId) { navigate('/login'); return; }
 );
   }
 
+  let ownerOutstanding = totalPending;
+  if (ownerStatsRes && ownerStatsRes.ok) {
+    const ownerStatsData = await ownerStatsRes.json();
+    if (ownerStatsData.success && ownerStatsData.data?.outstanding > 0) {
+      ownerOutstanding = ownerStatsData.data.outstanding;
+    }
+  }
   setStats({
     totalVehicles: data.total_vehicles || 0,
     totalDrivers: data.total_drivers || 0,
     todayCollection: data.earnings_month || 0,
-    pendingDues: totalPending  // ← real data
+    pendingDues: ownerOutstanding
   });
 }
     
@@ -1292,10 +1300,22 @@ setOwner({
 useEffect(() => {
   const fetchLedger = async () => {
     try {
-      const res = await fetch(`${API}/api/payment/owner/ledger?period=${horizon}&ownerId=${ownerId()}`, {
-        headers: { Authorization: `Bearer ${token()}` }
-      });
-      const d = await res.json();
+      const [ledgerRes2, statsRes2] = await Promise.all([
+        fetch(`${API}/api/payment/owner/ledger?period=${horizon}&ownerId=${ownerId()}`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        }),
+        fetch(`${API}/api/owner/stats`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        })
+      ]);
+      const d = await ledgerRes2.json();
+      // Use actual rent-based outstanding from owner stats
+      if (statsRes2.ok) {
+        const s = await statsRes2.json();
+        if (s.success && s.data?.outstanding >= 0) {
+          d.outstanding = s.data.outstanding;
+        }
+      }
       setLedger(d);
     } catch {}
   };
@@ -4648,7 +4668,7 @@ const ProfileTab = () => {
               </div>
             </div>
             <input placeholder="License Number"
-              className="w-full border rounded-xl p-3 text-sm uppercase font-mono"
+              className="w-full border rounded-xl p-3 text-sm font-mono"
               value={newDriver.licenseNumber}
               onChange={e => setNewDriver({...newDriver, licenseNumber: e.target.value.toUpperCase()})}/>
             <div className="grid grid-cols-2 gap-2">

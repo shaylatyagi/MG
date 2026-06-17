@@ -819,9 +819,23 @@ router.post('/waitlist', async (req, res) => {
   var { name, phone, company, role, fleet, city, type } = req.body;
   if (!name || !phone) return res.status(400).json({ success: false, message: 'name and phone required' });
   try {
+    // Ensure columns exist (safe to run repeatedly)
+    await pool.query(`
+      ALTER TABLE public.waitlist_leads
+        ADD COLUMN IF NOT EXISTS ip_address TEXT,
+        ADD COLUMN IF NOT EXISTS user_agent TEXT,
+        ADD COLUMN IF NOT EXISTS source_url TEXT
+    `).catch(() => {});
+
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+    const ua = req.headers['user-agent'] || null;
+    const src = req.headers['referer'] || req.headers['origin'] || null;
+
     await pool.query(
-      'INSERT INTO public.waitlist_leads (name, phone, company, role, fleet, city, type) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-      [name, phone, company || null, role || null, fleet || null, city || null, type || null]
+      `INSERT INTO public.waitlist_leads
+         (name, phone, company, role, fleet, city, type, ip_address, user_agent, source_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [name, phone, company||null, role||null, fleet||null, city||null, type||null, ip||null, ua||null, src||null]
     );
     res.json({ success: true });
   } catch (err) {
