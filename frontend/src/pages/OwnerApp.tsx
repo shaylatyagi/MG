@@ -5728,5 +5728,4 @@ const ProfileTab = () => {
     </div>
   );
 }
-
-export default OwnerAp
+export default OwnerApp;
