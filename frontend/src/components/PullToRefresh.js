@@ -12,7 +12,7 @@ const MAX_PULL  = 90;   // max visual stretch
  *
  * onRefresh must return a Promise. The spinner shows until it resolves.
  */
-export default function PullToRefresh({ onRefresh, children, disabled = false }) {
+export default function PullToRefresh({ onRefresh, children = null, disabled = false }) {
   const [pullY, setPullY] = useState(0);      // current drag distance (px)
   const [loading, setLoading] = useState(false);
   const startY = useRef(null);
