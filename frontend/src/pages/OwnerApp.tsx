@@ -13,6 +13,7 @@ import LoadingButton from '../components/LoadingButton';
 import PullToRefresh from '../components/PullToRefresh';
 import EmptyState from '../components/EmptyState';
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { 
@@ -1253,27 +1254,23 @@ const fetchAllData = useCallback(async () => {
         totalPending = ledgerData.reduce((sum, d) => sum + (parseFloat(d.pending) || 0), 0);
       }
 
-      // 🔥 REAL-TIME pending dues from overdue API (primary)
-      let pendingDues = 0;
-      try {
-        const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: H });
-        if (overdueRes.ok) {
-          const overdueData = await overdueRes.json();
-          pendingDues = overdueData.reduce((sum, d) => sum + parseFloat(d.balance || 0), 0);
-        } else {
-          // fallback – use ledger
-          let ownerOutstanding = totalPending;
-          if (ownerStatsRes && ownerStatsRes.ok) {
-            const ownerStatsData = await ownerStatsRes.json();
-            if (ownerStatsData.success && ownerStatsData.data?.outstanding > 0) {
-              ownerOutstanding = ownerStatsData.data.outstanding;
-            }
-          }
-          pendingDues = ownerOutstanding;
+      // Today's outstanding — owner/stats (daily rent − today's collection)
+      let pendingDues = totalPending;
+      if (ownerStatsRes.ok) {
+        const ownerStatsData = await ownerStatsRes.json();
+        if (ownerStatsData.success && ownerStatsData.data?.outstanding >= 0) {
+          pendingDues = ownerStatsData.data.outstanding;
         }
-      } catch (e) {
-        console.error('Overdue fetch failed:', e);
-        pendingDues = totalPending; // final fallback
+      } else {
+        try {
+          const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: H });
+          if (overdueRes.ok) {
+            const overdueData = await overdueRes.json();
+            pendingDues = overdueData.reduce((sum, d) => sum + parseFloat(d.balance || 0), 0);
+          }
+        } catch (e) {
+          console.error('Overdue fetch failed:', e);
+        }
       }
 
       setStats({
@@ -1333,32 +1330,24 @@ useEffect(() => {
       ]);
       const d = await ledgerRes2.json();
       
-      // 🔥 REAL-TIME OUTSTANDING from overdue API (same as popup)
-      try {
-        const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${ownerId()}`, {
-          headers: { Authorization: `Bearer ${token()}` }
-        });
-        if (overdueRes.ok) {
-          const overdueData = await overdueRes.json();
-          const totalOutstanding = overdueData.reduce((sum, item) => sum + parseFloat(item.balance || 0), 0);
-          d.outstanding = totalOutstanding;
-        } else {
-          // fallback: agar overdue fail ho, toh stats se lelo
-          if (statsRes2.ok) {
-            const s = await statsRes2.json();
-            if (s.success && s.data?.outstanding >= 0) {
-              d.outstanding = s.data.outstanding;
-            }
-          }
+      // Today's outstanding — owner/stats primary (matches "Calculated for Today")
+      if (statsRes2.ok) {
+        const s = await statsRes2.json();
+        if (s.success && s.data?.outstanding >= 0) {
+          d.outstanding = s.data.outstanding;
         }
-      } catch (e) {
-        console.error('Overdue fetch for ledger failed:', e);
-        // final fallback: stats
-        if (statsRes2.ok) {
-          const s = await statsRes2.json();
-          if (s.success && s.data?.outstanding >= 0) {
-            d.outstanding = s.data.outstanding;
+      }
+      if (d.outstanding == null || d.outstanding === undefined) {
+        try {
+          const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${ownerId()}`, {
+            headers: { Authorization: `Bearer ${token()}` }
+          });
+          if (overdueRes.ok) {
+            const overdueData = await overdueRes.json();
+            d.outstanding = overdueData.reduce((sum, item) => sum + parseFloat(item.balance || 0), 0);
           }
+        } catch (e) {
+          console.error('Overdue fetch for ledger failed:', e);
         }
       }
       
@@ -3988,9 +3977,21 @@ const TrackFleetTab = () => {
     return () => clearInterval(id);
   }, [fetchLocations]);
 
+  React.useEffect(() => {
+    const resizeMap = () => {
+      if (mapInstanceRef.current && window.google?.maps) {
+        window.google.maps.event.trigger(mapInstanceRef.current, 'resize');
+        if (drivers.length) placeMarkers(mapInstanceRef.current, drivers);
+      }
+    };
+    const t1 = setTimeout(resizeMap, 100);
+    const t2 = setTimeout(resizeMap, 500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [drivers, placeMarkers]);
+
   // ─── RENDER ──────────────────────────────────────────────────────────
   return (
-  <div className="fixed inset-0 z-[9999] bg-slate-900" style={{ height: '100vh', width: '100vw' }}>
+  <div className="fixed inset-0 z-[9999] bg-slate-900" style={{ height: '100dvh', width: '100vw' }}>
     {/* Top bar */}
     <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-3 pb-2 bg-gradient-to-b from-black/50 to-transparent">
       <button onClick={() => setActiveTab('home')}
@@ -4401,13 +4402,13 @@ const TrackFleetTab = () => {
                 </div>
               )}
               {activeTab === 'profile' && <ProfileTab />}
-              {activeTab === 'track' && <TrackFleetTab />}
             </div>
           )}
         </div>
         </PullToRefresh>
 
         {/* Bottom Navigation */}
+        {activeTab !== 'track' && (
         <div className="fixed bottom-0 left-0 right-0 max-w-[412px] mx-auto z-50" style={{padding:'0 12px 10px'}}>
           <div className={appStyles.bottomNavBar}>
             {[
@@ -4431,6 +4432,7 @@ const TrackFleetTab = () => {
             })}
           </div>
         </div>
+        )}
         {showChatbot && (
           <Chatbot 
   userRole="OWNER"
@@ -5802,6 +5804,7 @@ const TrackFleetTab = () => {
           </div>
         </div>
       )}
+    {activeTab === 'track' && createPortal(<TrackFleetTab />, document.body)}
     </div>
   );
 }

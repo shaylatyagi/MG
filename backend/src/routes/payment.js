@@ -954,50 +954,58 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
 
+    // Today's outstanding only: current daily_rent minus payments recorded today
     const result = await pool.query(`
-      WITH driver_data AS (
-        SELECT 
-          d.id,
-          d.full_name,
-          d.mobile_number,
-          d.driver_code,
-          v.vehicle_number,
-          v.daily_rent,
-          COALESCE(
-            (SELECT assigned_at FROM driver_vehicle_history 
-             WHERE driver_id = d.id AND unassigned_at IS NULL 
-             ORDER BY assigned_at DESC LIMIT 1),
-            v.created_at
-          ) AS assigned_date,
-          COALESCE((
-            SELECT SUM(amount) FROM driver_ledger 
-            WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')
-          ), 0) AS total_charged,
-          COALESCE((
-            SELECT SUM(amount) FROM driver_ledger 
-            WHERE driver_id = d.id AND entry_type IN ('PAYMENT', 'CASH_PAYMENT', 'ADVANCE_CREDIT', 'INCENTIVE', 'REFUND')
-          ), 0) AS total_paid
-        FROM drivers d
-        JOIN vehicles v ON v.driver_id = d.id
-        WHERE d.owner_code = (SELECT owner_code FROM owners WHERE id = $1)
-          AND d.status = 'ACTIVE'
-          AND v.daily_rent > 0
-      )
-      SELECT 
-        id, full_name, mobile_number, driver_code,
-        vehicle_number, daily_rent,
-        CASE 
-          WHEN total_charged = 0 AND assigned_date IS NOT NULL 
-            THEN GREATEST(0, (EXTRACT(DAY FROM (NOW() - assigned_date))::INTEGER * daily_rent) - total_paid)
-          ELSE GREATEST(0, total_charged - total_paid)
-        END AS balance
-      FROM driver_data
-      WHERE 
-        CASE 
-          WHEN total_charged = 0 AND assigned_date IS NOT NULL 
-            THEN (EXTRACT(DAY FROM (NOW() - assigned_date))::INTEGER * daily_rent) - total_paid
-          ELSE total_charged - total_paid
-        END > 0
+      SELECT
+        d.id,
+        d.full_name,
+        d.mobile_number,
+        d.driver_code,
+        v.vehicle_number,
+        v.daily_rent,
+        GREATEST(0,
+          COALESCE(v.daily_rent, 0)::numeric
+          - COALESCE((
+              SELECT SUM(mo.order_amount)
+              FROM public.ms_orders mo
+              WHERE mo.payer_mobile = d.mobile_number
+                AND mo.transaction_status = 'SUCCESS'
+                AND DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+                  = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
+            ), 0)
+          - COALESCE((
+              SELECT SUM(dl.amount)
+              FROM public.driver_ledger dl
+              WHERE dl.driver_id = d.id
+                AND dl.entry_type IN ('CASH_PAYMENT', 'PAYMENT')
+                AND DATE(dl.created_at AT TIME ZONE 'Asia/Kolkata')
+                  = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
+            ), 0)
+        ) AS balance
+      FROM public.drivers d
+      JOIN public.vehicles v ON v.driver_id = d.id
+      WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+        AND d.status = 'ACTIVE'
+        AND COALESCE(v.daily_rent, 0) > 0
+        AND GREATEST(0,
+          COALESCE(v.daily_rent, 0)::numeric
+          - COALESCE((
+              SELECT SUM(mo.order_amount)
+              FROM public.ms_orders mo
+              WHERE mo.payer_mobile = d.mobile_number
+                AND mo.transaction_status = 'SUCCESS'
+                AND DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
+                  = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
+            ), 0)
+          - COALESCE((
+              SELECT SUM(dl.amount)
+              FROM public.driver_ledger dl
+              WHERE dl.driver_id = d.id
+                AND dl.entry_type IN ('CASH_PAYMENT', 'PAYMENT')
+                AND DATE(dl.created_at AT TIME ZONE 'Asia/Kolkata')
+                  = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
+            ), 0)
+        ) > 0
       ORDER BY balance DESC, full_name;
     `, [parseInt(ownerId)]);
 
