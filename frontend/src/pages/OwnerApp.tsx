@@ -1253,6 +1253,7 @@ if (!oId) { navigate('/login'); return; }
 );
   }
   // 🔥 Real-time pending dues from overdue API
+// Real-time pending dues from overdue API (which now uses ledger)
 let pendingDues = 0;
 try {
   const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: H });
@@ -3993,7 +3994,7 @@ const ProfileTab = () => {
             ))}
           </div>
         ) : (
-          <div ref={mapRef} className="flex-1 w-full" style={{ height: '500px', minHeight: '500px', width: '100%' }} />
+          <div ref={mapRef} className="w-full" style={{ height: 'calc(100vh - 200px)', minHeight: '400px' }} />
         )}
 
         {/* Bottom driver info sheet — slides up on pin tap */}
