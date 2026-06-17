@@ -90,14 +90,15 @@ router.get('/stats', async (req, res) => {
     const activeContracts = parseInt(contracts.rows[0].count);
 
     // Outstanding = sum of active assigned drivers' daily_rent - today's online collection
+    // Check both owner_id (FK) and owner_code (text code) to handle all assignment methods
     const rentSum = await pool.query(
       `SELECT COALESCE(SUM(v.daily_rent), 0) AS total
        FROM public.vehicles v
        JOIN public.drivers d ON d.id = v.driver_id
-       WHERE d.owner_id = $1
+       WHERE (d.owner_id = $1 OR d.owner_code = $2)
          AND d.status = 'ACTIVE'
          AND v.driver_id IS NOT NULL`,
-      [oid]
+      [oid, owner.owner_code]
     );
     const outstanding = Math.max(
       0,
@@ -607,7 +608,7 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
     // Notify the driver currently assigned to this vehicle
     try {
       const driverRes = await pool.query(
-        `SELECT d.id, d.full_name FROM public.drivers d
+        `SELECT d.id, d.name AS full_name FROM public.drivers d
          WHERE d.id = (SELECT driver_id FROM public.vehicles WHERE id = $1)
            AND d.deleted_at IS NULL`,
         [req.params.id]
@@ -865,13 +866,13 @@ router.get('/driver-locations', async (req, res) => {
     const owner = await getOwner(req.user.id);
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
     const r = await pool.query(
-      `SELECT d.id, d.full_name, d.last_lat, d.last_lng, d.last_location_at,
+      `SELECT d.id, d.name AS full_name, d.last_lat, d.last_lng, d.last_location_at,
               v.vehicle_number, v.vehicle_type
        FROM public.drivers d
        LEFT JOIN public.vehicles v ON v.driver_id = d.id
-       WHERE d.owner_code = $1 AND d.last_lat IS NOT NULL
+       WHERE (d.owner_id = $2 OR d.owner_code = $1) AND d.last_lat IS NOT NULL
        ORDER BY d.last_location_at DESC`,
-      [owner.owner_code]
+      [owner.owner_code, owner.id]
     );
     res.json({ success: true, drivers: r.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }

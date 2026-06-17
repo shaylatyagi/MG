@@ -2114,7 +2114,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
                 </div>
               ))}
             </div>
-          ) : !attendanceData || attendanceData.drivers?.length === 0 ? (
+          ) : !attendanceData?.drivers?.length ? (
             <div className="p-6 text-center text-xs text-slate-400">No data for this month</div>
           ) : (
             <div className="overflow-x-auto">
