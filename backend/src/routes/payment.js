@@ -3126,24 +3126,44 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
     monthEnd.setMonth(monthEnd.getMonth() + 1);
     const daysInMonth = new Date(monthEnd - 1).getDate();
 
+    // Get vehicle assignment date for this driver (use latest assignment)
+    const assignRes = await pool.query(
+      `SELECT assigned_at FROM public.driver_vehicle_history
+       WHERE driver_id = $1 AND unassigned_at IS NULL
+       ORDER BY assigned_at DESC LIMIT 1`,
+      [driverId]
+    );
+    const assignedAt = assignRes.rows[0]?.assigned_at ? new Date(assignRes.rows[0].assigned_at) : null;
+
+    // Effective start = max(monthStart, assignedAt) — only count days since assignment
+    const effectiveStart = assignedAt && assignedAt > monthStart ? assignedAt : monthStart;
+
     const logs = await pool.query(
       `SELECT log_date, login_time, logout_time, active_minutes
        FROM public.driver_daily_log
        WHERE driver_id = $1 AND log_date >= $2 AND log_date < $3
        ORDER BY log_date`,
-      [driverId, monthStart.toISOString(), monthEnd.toISOString()]
+      [driverId, effectiveStart.toISOString(), monthEnd.toISOString()]
     );
 
     const presentDays = new Set(logs.rows.map(r => new Date(r.log_date).getDate()));
     const today = new Date();
     const isCurrentMonth = target === today.toISOString().slice(0, 7);
-    const daysElapsed = isCurrentMonth ? today.getDate() : daysInMonth;
+    // daysElapsed counts from effectiveStart, not month start
+    let daysElapsed;
+    if (isCurrentMonth) {
+      daysElapsed = Math.floor((today - effectiveStart) / 86400000) + 1;
+      daysElapsed = Math.max(1, Math.min(daysElapsed, today.getDate()));
+    } else {
+      daysElapsed = daysInMonth;
+    }
 
     res.json({
       success: true,
       month: target,
       daysInMonth,
       daysElapsed,
+      assignedFrom: assignedAt ? assignedAt.toISOString().slice(0, 10) : null,
       daysPresent: presentDays.size,
       attendancePct: daysElapsed > 0 ? Math.round((presentDays.size / daysElapsed) * 100) : 0,
       todayPresent: isCurrentMonth && presentDays.has(today.getDate()),

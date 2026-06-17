@@ -600,6 +600,29 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
       'UPDATE public.vehicles SET daily_rent = $1 WHERE id = $2',
       [rent, req.params.id]
     );
+
+    // Notify the driver currently assigned to this vehicle
+    try {
+      const driverRes = await pool.query(
+        `SELECT d.id, d.full_name FROM public.drivers d
+         WHERE d.id = (SELECT driver_id FROM public.vehicles WHERE id = $1)
+           AND d.deleted_at IS NULL`,
+        [req.params.id]
+      );
+      if (driverRes.rows[0]) {
+        const vNum = veh.rows[0].vehicle_number;
+        await pool.query(
+          `INSERT INTO public.notifications (user_id, user_type, title, message, created_at)
+           VALUES ($1, 'DRIVER', $2, $3, NOW())`,
+          [
+            driverRes.rows[0].id,
+            `💰 Daily Rent Updated — ${vNum}`,
+            `Your daily rent has been updated to ₹${rent}/day effective today.`,
+          ]
+        );
+      }
+    } catch (_) {} // non-critical
+
     res.json({ success: true, message: `Rent updated to ₹${rent}/day`, daily_rent: rent });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });

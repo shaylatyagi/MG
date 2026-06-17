@@ -2692,7 +2692,11 @@ function LeadsSection() {
   const fmtUTC = (ts) => {
     if (!ts) return '—';
     const d = new Date(ts);
-    return d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    // IST = UTC + 5:30
+    const ist = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+    const istStr = ist.toISOString().replace('T', ' ').slice(0, 19) + ' IST';
+    const utcStr = d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    return `${istStr} (${utcStr})`;
   };
 
   const parseBrowser = (ua) => {
@@ -3181,35 +3185,25 @@ function AdminPanelInner() {
           <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 320, padding: 24, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
             <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
               <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
             </div>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '0 0 4px' }}>Sign out?</h3>
-            <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 20px' }}>You'll need to sign in again to access the console.</p>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setShowLogoutConfirm(false)} style={{
-                flex: 1, padding: '10px', background: '#f3f4f6', borderRadius: 10,
-                border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151'
-              }}>Cancel</button>
-              <button onClick={doLogout} style={{
-                flex: 1, padding: '10px', background: '#ef4444', borderRadius: 10,
-                border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff'
-              }}>Sign Out</button>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Sign Out?</h3>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Are you sure you want to sign out of the admin console?</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowLogoutConfirm(false)}
+                style={{ flex: 1, padding: '10px 0', background: '#f1f5f9', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.href = '/login'; }}
+                style={{ flex: 1, padding: '10px 0', background: '#ef4444', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                Sign Out
+              </button>
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-export default function AdminPanel() {
-  return (
-    <>
-      <ErrorBoundary>
-        <AdminPanelInner />
-      </ErrorBoundary>
-      <ToastContainer />
-    </>
   );
 }

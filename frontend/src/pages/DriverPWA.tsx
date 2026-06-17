@@ -211,7 +211,9 @@ export default function DriverPWA() {
   const [sosMsg, setSosMsg] = useState('');
   const [sosSent, setSosSent] = useState(false);
   const [showOwnerChat, setShowOwnerChat] = useState(false);
-  const { showTour, dismissTour } = useOnboarding('driver');
+  const { showTour, dismissTour } = useOnboarding(
+    'driver_' + (JSON.parse(localStorage.getItem('user') || '{}')?.id || 'x')
+  );
   const [showAddFunds, setShowAddFunds] = useState(false);
   const [addFundsAmt, setAddFundsAmt] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
