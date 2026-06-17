@@ -1,6 +1,6 @@
 // backend/src/routes/owner.js
 // Owner API — spec-compliant (DevSpec §13.3–13.6)
-// Schema: drivers(name,phone_number), vehicles(reg_number,type,rent_type,daily_rent)
+// Schema: drivers(full_name,phone_number), vehicles(reg_number,type,rent_type,daily_rent)
 const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/db');
@@ -52,16 +52,26 @@ router.get('/stats', async (req, res) => {
 
     const oid = owner.id;
 
+    const ocode = owner.owner_code;
     const [vehicles, drivers, contracts, pendingKyc, today, month, total] = await Promise.all([
-      pool.query('SELECT COUNT(*) FROM vehicles WHERE owner_id = $1', [oid]),
-      pool.query('SELECT COUNT(*) FROM drivers WHERE owner_id = $1 AND deleted_at IS NULL', [oid]),
+      // vehicles owned directly OR assigned to drivers who belong to this owner
       pool.query(
-        'SELECT COUNT(*) FROM driver_vehicle_history WHERE owner_id = $1 AND unassigned_at IS NULL',
-        [oid]
+        `SELECT COUNT(*) FROM vehicles v WHERE v.owner_id = $1
+         OR v.driver_id IN (SELECT id FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL)`,
+        [oid, ocode]
       ),
       pool.query(
-        "SELECT COUNT(*) FROM drivers WHERE owner_id = $1 AND kyc_status IN ('PENDING','PARTIAL') AND deleted_at IS NULL",
-        [oid]
+        'SELECT COUNT(*) FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL',
+        [oid, ocode]
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM driver_vehicle_history WHERE owner_id=$1
+         OR driver_id IN (SELECT id FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL)`,
+        [oid, ocode]
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND kyc_status IN ('PENDING','PARTIAL') AND deleted_at IS NULL`,
+        [oid, ocode]
       ),
       pool.query(
         `SELECT COALESCE(SUM(amount),0) AS total
@@ -140,7 +150,7 @@ router.get('/vehicles', async (req, res) => {
       `SELECT v.id, v.vehicle_number, v.vehicle_type, v.status, v.daily_rent, v.rent_type,
               v.created_at,
               d.id   AS driver_id,
-              d.name AS driver_name,
+              d.full_name AS driver_name,
               d.phone_number AS driver_phone,
               d.kyc_status   AS driver_kyc_status
        FROM vehicles v
@@ -194,12 +204,12 @@ router.get('/drivers', async (req, res) => {
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
 
     const { q, status, page = 1, limit = 50 } = req.query;
-    const params = [owner.id];
-    const conditions = ['d.owner_id = $1', 'd.deleted_at IS NULL'];
+    const params = [owner.id, owner.owner_code];
+    const conditions = ['(d.owner_id = $1 OR d.owner_code = $2)', 'd.deleted_at IS NULL'];
 
     if (q) {
       params.push(`%${q.trim()}%`);
-      conditions.push(`(d.name ILIKE $${params.length} OR d.phone_number ILIKE $${params.length})`);
+      conditions.push(`(d.full_name ILIKE $${params.length} OR d.phone_number ILIKE $${params.length})`);
     }
     if (status) {
       params.push(status.toUpperCase());
@@ -210,7 +220,7 @@ router.get('/drivers', async (req, res) => {
     params.push(parseInt(limit), offset);
 
     const result = await pool.query(
-      `SELECT d.id, d.name, d.phone_number, d.status, d.kyc_status,
+      `SELECT d.id, d.full_name AS name, d.phone_number, d.status, d.kyc_status,
               d.wallet_balance, d.created_at, d.agreement_uploaded,
               v.id         AS vehicle_id,
               v.vehicle_number AS vehicle_reg,
@@ -262,7 +272,7 @@ router.post('/drivers', validate(AddDriverSchema), async (req, res) => {
       return res.status(409).json({ success: false, message: 'Driver with this phone already exists' });
 
     const result = await pool.query(
-      `INSERT INTO drivers (owner_id, company_id, name, phone_number, emergency_contact,
+      `INSERT INTO drivers (owner_id, company_id, full_name, phone_number, emergency_contact,
                             wallet_balance, status, kyc_status, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5, 0,'ACTIVE','PENDING',NOW(),NOW()) RETURNING *`,
       [owner.id, owner.company_id, name.trim(), phone_number,
@@ -497,7 +507,7 @@ router.post('/drivers/bulk-import', csvUpload.single('file'), async (req, res) =
 
       try {
         await pool.query(
-          `INSERT INTO drivers (owner_id, company_id, name, phone_number, emergency_contact,
+          `INSERT INTO drivers (owner_id, company_id, full_name, phone_number, emergency_contact,
                                 wallet_balance, status, kyc_status, created_at, updated_at)
            VALUES ($1,$2,$3,$4,$5, 0,'ACTIVE','PENDING',NOW(),NOW())`,
           [owner.id, owner.company_id, name, phone, ec]
@@ -608,7 +618,7 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
     // Notify the driver currently assigned to this vehicle
     try {
       const driverRes = await pool.query(
-        `SELECT d.id, d.name AS full_name FROM public.drivers d
+        `SELECT d.id, d.full_name FROM public.drivers d
          WHERE d.id = (SELECT driver_id FROM public.vehicles WHERE id = $1)
            AND d.deleted_at IS NULL`,
         [req.params.id]
@@ -768,7 +778,7 @@ router.get('/sos', async (req, res) => {
 
     const result = await pool.query(
       `SELECT s.id, s.driver_id, s.lat, s.lng, s.created_at,
-              d.name AS driver_name, d.phone_number
+              d.full_name AS driver_name, d.phone_number
        FROM sos_alerts s
        JOIN drivers d ON d.id = s.driver_id
        WHERE s.owner_id = $1 AND s.resolved_at IS NULL
@@ -866,7 +876,7 @@ router.get('/driver-locations', async (req, res) => {
     const owner = await getOwner(req.user.id);
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
     const r = await pool.query(
-      `SELECT d.id, d.name AS full_name, d.last_lat, d.last_lng, d.last_location_at,
+      `SELECT d.id, d.full_name, d.last_lat, d.last_lng, d.last_location_at,
               v.vehicle_number, v.vehicle_type
        FROM public.drivers d
        LEFT JOIN public.vehicles v ON v.driver_id = d.id

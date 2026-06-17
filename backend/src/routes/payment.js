@@ -3121,11 +3121,18 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
     monthEnd.setMonth(monthEnd.getMonth() + 1);
     const daysInMonth = new Date(monthEnd - 1).getDate();
 
-    // Get vehicle assignment date for this driver (use latest assignment)
+    // Get vehicle assignment date — prefer driver_vehicle_history, fall back to vehicles.created_at
+    // (history table may be empty if vehicle was assigned directly in DB without going through API)
     const assignRes = await pool.query(
-      `SELECT assigned_at FROM public.driver_vehicle_history
-       WHERE driver_id = $1 AND unassigned_at IS NULL
-       ORDER BY assigned_at DESC LIMIT 1`,
+      `SELECT COALESCE(
+         (SELECT dvh.assigned_at FROM public.driver_vehicle_history dvh
+          WHERE dvh.driver_id = $1 AND dvh.unassigned_at IS NULL
+          ORDER BY dvh.assigned_at DESC LIMIT 1),
+         v.created_at
+       ) AS assigned_at
+       FROM public.vehicles v
+       WHERE v.driver_id = $1
+       LIMIT 1`,
       [driverId]
     );
     const assignedAt = assignRes.rows[0]?.assigned_at ? new Date(assignRes.rows[0].assigned_at) : null;
@@ -3199,10 +3206,16 @@ router.get('/owner/attendance', async (req, res) => {
     if (!ownerRes.rows[0]) return res.status(404).json({ error: 'Owner not found' });
     const ownerCode = ownerRes.rows[0].owner_code;
 
-    // Get all drivers for this owner
+    // Get all drivers for this owner (owner_code OR owner_id match)
+    const ownerIdRes = await pool.query('SELECT id FROM public.owners WHERE owner_code=$1 LIMIT 1', [ownerCode]);
+    const ownerIdVal = ownerIdRes.rows[0]?.id || null;
     const driversRes = await pool.query(
-      `SELECT id, full_name, driver_code FROM public.drivers WHERE owner_code=$1 ORDER BY full_name`,
-      [ownerCode]
+      `SELECT id, COALESCE(full_name, name) AS full_name, driver_code
+       FROM public.drivers
+       WHERE (owner_code=$1 OR (owner_id IS NOT NULL AND owner_id=$2))
+         AND deleted_at IS NULL
+       ORDER BY COALESCE(full_name, name)`,
+      [ownerCode, ownerIdVal]
     );
 
     const driverIds = driversRes.rows.map(d => d.id);
