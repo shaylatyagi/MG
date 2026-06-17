@@ -2245,13 +2245,18 @@ router.get('/driver/profile', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized' });
 
     const result = await pool.query(
-  `SELECT 
+  `SELECT
      d.id, d.full_name as name, d.mobile_number as phone,
      d.driver_code, d.wallet_balance, d.status, d.advance_balance,
      d.security_deposit, d.owner_code,
      v.id as vehicle_id, v.vehicle_number, v.vehicle_model, v.vehicle_type,
      v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,
-     v.created_at as assigned_since,
+     COALESCE(
+       (SELECT assigned_at FROM public.driver_vehicle_history dvh
+        WHERE dvh.driver_id = d.id AND dvh.unassigned_at IS NULL
+        ORDER BY dvh.assigned_at DESC LIMIT 1),
+       v.created_at
+     ) as assigned_since,
      o.full_name as owner_name,
      COALESCE(c.name, '') as company_name,
      COALESCE(c.city, '') as company_city
@@ -2273,29 +2278,19 @@ router.get('/driver/profile', verifyToken, async (req, res) => {
 
     if (p.vehicle_number && p.vehicle_daily_rent) {
       const dailyRent = parseFloat(p.vehicle_daily_rent);
-      
-      const totalPaidRes = await pool.query(
-        `SELECT COALESCE(SUM(order_amount),0) as total FROM public.ms_orders
-         WHERE payer_mobile=$1 AND transaction_status='SUCCESS'`, [phone]
-      );
-      const totalPaid = parseFloat(totalPaidRes.rows[0].total);
-
-      const assignedSince = p.assigned_since ? new Date(p.assigned_since) : new Date();
-      const daysDiff = Math.max(0, Math.floor((new Date()-assignedSince)/(1000*60*60*24)));
 
       const securityDeposit = parseFloat(p.security_deposit || 0);
       dailyDepositRecovery = securityDeposit > 0 ? Math.round(securityDeposit/100) : 0;
       effectiveDailyCharge = dailyRent + dailyDepositRecovery;
-      const totalCharged = daysDiff * effectiveDailyCharge;
-      const advance = parseFloat(p.advance_balance || 0);
-      total_outstanding = Math.max(0, totalCharged - totalPaid - advance);
 
+      // Outstanding = today's effective charge minus what was paid today
       const todayPaidRes = await pool.query(
         `SELECT COALESCE(SUM(order_amount),0) as total FROM public.ms_orders
          WHERE payer_mobile=$1 AND transaction_status='SUCCESS' AND DATE(order_completion_date)=CURRENT_DATE`,
         [phone]
       );
       amount_paid_today = parseFloat(todayPaidRes.rows[0].total);
+      total_outstanding = Math.max(0, effectiveDailyCharge - amount_paid_today);
     }
 
     res.json({
@@ -3365,6 +3360,72 @@ router.delete('/owner/managers/:managerId', verifyToken, async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Driver attendance for a given month
+router.get('/driver/my-attendance', verifyToken, async (req, res) => {
+  try {
+    const { phone, month } = req.query; // month = "2026-06"
+    if (!phone || !month) return res.status(400).json({ message: 'phone and month required' });
+    if (req.user.role === 'DRIVER' && req.user.mobile_number && req.user.mobile_number !== phone)
+      return res.status(403).json({ error: 'Not authorized' });
+
+    // Get driver id
+    const dr = await pool.query(`SELECT id FROM public.drivers WHERE mobile_number=$1`, [phone]);
+    if (!dr.rows[0]) return res.status(404).json({ message: 'Driver not found' });
+    const driverId = dr.rows[0].id;
+
+    // Get assignment date for this month (most recent active assignment)
+    const asgn = await pool.query(
+      `SELECT assigned_at FROM public.driver_vehicle_history
+       WHERE driver_id=$1 AND (unassigned_at IS NULL OR DATE_TRUNC('month', assigned_at) <= $2::date)
+       ORDER BY assigned_at DESC LIMIT 1`,
+      [driverId, month + '-01']
+    );
+    const assignedAt = asgn.rows[0]?.assigned_at ? new Date(asgn.rows[0].assigned_at) : null;
+
+    const monthStart = new Date(month + '-01T00:00:00.000Z');
+    const now = new Date();
+    const isCurrentMonth = now.toISOString().slice(0, 7) === month;
+    const monthEnd = isCurrentMonth ? now : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+
+    // Effective start = max(monthStart, assignedAt)
+    const effectiveStart = assignedAt && assignedAt > monthStart ? assignedAt : monthStart;
+
+    const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+    const daysElapsed = Math.max(1, Math.ceil((monthEnd - effectiveStart) / (1000 * 60 * 60 * 24)) + (isCurrentMonth ? 0 : 1));
+
+    // Get log entries for this month
+    const logs = await pool.query(
+      `SELECT EXTRACT(DAY FROM log_date)::INTEGER as day, log_date
+       FROM public.driver_daily_log
+       WHERE driver_id=$1 AND DATE_TRUNC('month', log_date) = $2::date
+       ORDER BY log_date`,
+      [driverId, month + '-01']
+    );
+
+    const daysPresent = logs.rows.length;
+    const todayPresent = logs.rows.some(l => {
+      const d = new Date(l.log_date);
+      const t = new Date();
+      return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+    });
+    const attendancePct = daysElapsed > 0 ? Math.round((daysPresent / daysElapsed) * 100) : 0;
+
+    res.json({
+      month,
+      daysPresent,
+      daysElapsed,
+      daysInMonth,
+      attendancePct,
+      todayPresent,
+      assignedFrom: assignedAt ? assignedAt.toISOString().slice(0, 10) : null,
+      logs: logs.rows.map(l => ({ day: l.day })),
+    });
+  } catch (err) {
+    console.error('Attendance error:', err);
+    res.status(500).json({ message: 'Failed' });
+  }
 });
 
 // Manager login check
