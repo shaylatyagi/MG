@@ -515,7 +515,7 @@ export default function Login() {
         </div>
         {/* PIN button — always primary / top */}
         <button onClick={loginWithPin} disabled={!canLogin}
-          className={styles.btnPrimary} disabled={!canLogin}>
+          className={styles.btnPrimary}>
           {loading ? 'Logging in…' : 'Login with PIN'}
           {!loading && <ArrowRight size={14} />}
         </button>
