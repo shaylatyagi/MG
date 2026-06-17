@@ -1369,7 +1369,6 @@ useEffect(() => {
   };
   fetchLedger();
 }, [horizon]);
-}
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
@@ -5805,5 +5804,6 @@ const TrackFleetTab = () => {
 
     </div>
   );
+}
 }
 export default OwnerDashboard;
