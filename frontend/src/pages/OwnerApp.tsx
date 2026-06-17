@@ -272,7 +272,7 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
     </div>
   );
 };
-export default function OwnerDashboard() {
+function OwnerDashboard() {
   const [activeSOS, setActiveSOS] = useState(null); // current SOS alert
 const [showSOSAlert, setShowSOSAlert] = useState(false);
 const [lastSOS, setLastSOS] = useState(null);
@@ -5730,3 +5730,4 @@ const ProfileTab = () => {
 }
 
 export default OwnerApp;
+               
