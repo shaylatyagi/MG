@@ -293,7 +293,7 @@ useEffect(() => {
           setActiveSOS(latest);
           setShowSOSAlert(true);
           setSeenSosIds(prev => new Set([...prev, latest.id]));
-          if (window.__mgPlaySOSAlarm) window.__mgPlaySOSAlarm();
+          if ((window as any).__mgPlaySOSAlarm) (window as any).__mgPlaySOSAlarm();
         }
       }
     } catch(e) {}
@@ -1454,7 +1454,7 @@ return () => clearInterval(interval);
       } catch(e) { console.warn('SOS audio failed:', e); }
     }
     // Expose globally so SOS alerts in-app can also trigger it
-    window.__mgPlaySOSAlarm = playSOSAlarm;
+    (window as any).__mgPlaySOSAlarm = playSOSAlarm;
     function onSWMessage(e) {
       if (e.data && e.data.type === 'SOS_ALARM') playSOSAlarm();
     }
@@ -4995,7 +4995,7 @@ const ProfileTab = () => {
     {/* Action buttons */}
     <div className="p-6 space-y-3">
       <button
-        onClick={() => { if (window.__mgPlaySOSAlarm) window.__mgPlaySOSAlarm(); }}
+        onClick={() => { if ((window as any).__mgPlaySOSAlarm) (window as any).__mgPlaySOSAlarm(); }}
         className="w-full py-3 rounded-2xl font-bold text-sm"
         style={{ background: 'rgba(255,255,255,0.2)', color: 'var(--color-text-inverse)', border: '2px solid rgba(255,255,255,0.4)' }}
       >
