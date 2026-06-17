@@ -1204,85 +1204,87 @@ const submitChangeRent = async () => {
   } catch { toast.error('Network error'); }
   setChangeRentLoading(false);
 };
-
 const fetchAllData = useCallback(async () => {
   setLoading(true);
   try {
     const H = { Authorization: `Bearer ${token()}` };
     const u = getUser();
-const oId = u.id;
-if (!oId) { navigate('/login'); return; }
-    
-    
+    const oId = u.id;
+    if (!oId) { navigate('/login'); return; }
+
     const [vehiclesRes, driversRes, statsRes, notifRes, ledgerRes, ownerStatsRes] = await Promise.all([
-  fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
-  fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}&limit=200`, { headers: H }),
-  fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
-  fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H }),
-  fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H }),
-  fetch(`${API}/api/owner/stats`, { headers: H })
-]);
-    // Session expired on another device → redirect to login
+      fetch(`${API}/api/payment/owner/vehicles?ownerId=${oId}`, { headers: H }),
+      fetch(`${API}/api/payment/owner/drivers/list?ownerId=${oId}&limit=200`, { headers: H }),
+      fetch(`${API}/api/payment/owner/stats?ownerId=${oId}`, { headers: H }),
+      fetch(`${API}/api/payment/owner/notifications?ownerId=${oId}`, { headers: H }),
+      fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${oId}`, { headers: H }),
+      fetch(`${API}/api/owner/stats`, { headers: H })
+    ]);
+
+    // Session expired check
     if ([vehiclesRes, driversRes, statsRes, notifRes, ledgerRes, ownerStatsRes].some(r => r.status === 401)) {
-      ['token','user','mg_admin_token'].forEach(k => localStorage.removeItem(k));
+      ['token', 'user', 'mg_admin_token'].forEach(k => localStorage.removeItem(k));
       navigate('/login');
       return;
     }
-    if (vehiclesRes.ok) {
-  const vehiclesData = await vehiclesRes.json();
-  const vehiclesList = Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData.vehicles || vehiclesData.data || []);
-  setVehicles(vehiclesList);
-}
-    
-    if (driversRes.ok) {
-  const data = await driversRes.json();
-  // Handle both array and object response
-  const driversList = Array.isArray(data) ? data : (data.drivers || []);
-  setDrivers(driversList);
-}
-    
-    if (statsRes.ok) {
-  const data = await statsRes.json();
-  
-  // Pending dues ledger se calculate karo
-  let totalPending = 0;
-  if (ledgerRes.ok) {
-    const ledgerData = await ledgerRes.json();
-    totalPending = ledgerData.reduce((sum, d) => 
-  sum + (parseFloat(d.pending) || 0), 0
-);
-  }
-// 🔥 Real-time pending dues from overdue API (which uses ledger + fallback)
-let pendingDues = 0;
-try {
-  const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: H });
-  if (overdueRes.ok) {
-    const overdueData = await overdueRes.json();
-    pendingDues = overdueData.reduce((sum, d) => sum + parseFloat(d.balance || 0), 0);
-  } else {
-    // fallback: old stats approach
-    let ownerOutstanding = totalPending;
-    if (ownerStatsRes && ownerStatsRes.ok) {
-      const ownerStatsData = await ownerStatsRes.json();
-      if (ownerStatsData.success && ownerStatsData.data?.outstanding > 0) {
-        ownerOutstanding = ownerStatsData.data.outstanding;
-      }
-    }
-    pendingDues = ownerOutstanding;
-  }
-} catch (e) {
-  console.error('Overdue fetch failed:', e);
-  // final fallback
-  pendingDues = totalPending;
-}
 
-setStats({
-  totalVehicles: data.total_vehicles || 0,
-  totalDrivers: data.total_drivers || 0,
-  todayCollection: data.earnings_month || 0,
-  pendingDues: pendingDues  // ✅ real-time
-});
-    
+    // Vehicles
+    if (vehiclesRes.ok) {
+      const vehiclesData = await vehiclesRes.json();
+      const vehiclesList = Array.isArray(vehiclesData) ? vehiclesData : (vehiclesData.vehicles || vehiclesData.data || []);
+      setVehicles(vehiclesList);
+    }
+
+    // Drivers
+    if (driversRes.ok) {
+      const data = await driversRes.json();
+      const driversList = Array.isArray(data) ? data : (data.drivers || []);
+      setDrivers(driversList);
+    }
+
+    // Stats – totalVehicles, totalDrivers, todayCollection
+    if (statsRes.ok) {
+      const data = await statsRes.json();
+      
+      // Pending dues – from ledger (fallback)
+      let totalPending = 0;
+      if (ledgerRes.ok) {
+        const ledgerData = await ledgerRes.json();
+        totalPending = ledgerData.reduce((sum, d) => sum + (parseFloat(d.pending) || 0), 0);
+      }
+
+      // 🔥 REAL-TIME pending dues from overdue API (primary)
+      let pendingDues = 0;
+      try {
+        const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: H });
+        if (overdueRes.ok) {
+          const overdueData = await overdueRes.json();
+          pendingDues = overdueData.reduce((sum, d) => sum + parseFloat(d.balance || 0), 0);
+        } else {
+          // fallback – use ledger
+          let ownerOutstanding = totalPending;
+          if (ownerStatsRes && ownerStatsRes.ok) {
+            const ownerStatsData = await ownerStatsRes.json();
+            if (ownerStatsData.success && ownerStatsData.data?.outstanding > 0) {
+              ownerOutstanding = ownerStatsData.data.outstanding;
+            }
+          }
+          pendingDues = ownerOutstanding;
+        }
+      } catch (e) {
+        console.error('Overdue fetch failed:', e);
+        pendingDues = totalPending; // final fallback
+      }
+
+      setStats({
+        totalVehicles: data.total_vehicles || 0,
+        totalDrivers: data.total_drivers || 0,
+        todayCollection: data.earnings_month || 0,
+        pendingDues: pendingDues
+      });
+    }
+
+    // Notifications
     if (notifRes.ok) {
       const notifs = await notifRes.json();
       const ownerReadIds = JSON.parse(localStorage.getItem('mg_owner_read_notif_ids') || '[]');
@@ -1290,17 +1292,20 @@ setStats({
       setNotifications(mergedNotifs);
       setUnreadCount(mergedNotifs.filter(n => !n.is_read).length);
     }
-setOwner({
-  id: u.id,
-  full_name: u.full_name || u.name,
-  mobile_number: u.mobile_number || u.phone_number,
-  owner_code: u.owner_code,
-  email: u.email,
-  business_name: u.business_name,
-  address: u.address,
-  status: u.status || 'ACTIVE'
-});
-    // Fetch real profile from DB (company name, city, email)
+
+    // Owner profile
+    setOwner({
+      id: u.id,
+      full_name: u.full_name || u.name,
+      mobile_number: u.mobile_number || u.phone_number,
+      owner_code: u.owner_code,
+      email: u.email,
+      business_name: u.business_name,
+      address: u.address,
+      status: u.status || 'ACTIVE'
+    });
+
+    // Fetch real profile from DB
     try {
       const meRes = await fetch(`${API}/api/owner/me`, { headers: H });
       const meData = await meRes.json();
