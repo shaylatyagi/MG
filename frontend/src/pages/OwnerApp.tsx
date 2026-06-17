@@ -1332,19 +1332,44 @@ useEffect(() => {
         })
       ]);
       const d = await ledgerRes2.json();
-      // Use actual rent-based outstanding from owner stats
-      if (statsRes2.ok) {
-        const s = await statsRes2.json();
-        if (s.success && s.data?.outstanding >= 0) {
-          d.outstanding = s.data.outstanding;
+      
+      // 🔥 REAL-TIME OUTSTANDING from overdue API (same as popup)
+      try {
+        const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${ownerId()}`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        });
+        if (overdueRes.ok) {
+          const overdueData = await overdueRes.json();
+          const totalOutstanding = overdueData.reduce((sum, item) => sum + parseFloat(item.balance || 0), 0);
+          d.outstanding = totalOutstanding;
+        } else {
+          // fallback: agar overdue fail ho, toh stats se lelo
+          if (statsRes2.ok) {
+            const s = await statsRes2.json();
+            if (s.success && s.data?.outstanding >= 0) {
+              d.outstanding = s.data.outstanding;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Overdue fetch for ledger failed:', e);
+        // final fallback: stats
+        if (statsRes2.ok) {
+          const s = await statsRes2.json();
+          if (s.success && s.data?.outstanding >= 0) {
+            d.outstanding = s.data.outstanding;
+          }
         }
       }
+      
       setLedger(d);
-    } catch {}
+    } catch (err) {
+      console.error('Ledger fetch error:', err);
+    }
   };
   fetchLedger();
 }, [horizon]);
-
+}
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
@@ -3966,90 +3991,97 @@ const TrackFleetTab = () => {
 
   // ─── RENDER ──────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-900 flex flex-col">
-      {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-3 pb-2 bg-gradient-to-b from-black/50 to-transparent">
-        <button onClick={() => setActiveTab('home')}
-          className="bg-white/90 backdrop-blur text-slate-800 font-black text-xs px-3 py-1.5 rounded-full shadow flex items-center gap-1">
-          ← Back
-        </button>
-        <div className="bg-white/90 backdrop-blur rounded-full px-3 py-1.5 shadow">
-          <span className="text-xs font-black text-slate-800">
-            {loading ? 'Loading…' : apiError ? '⚠️ Error' : `${drivers.length} driver${drivers.length !== 1 ? 's' : ''} live`}
-          </span>
-        </div>
-        <button onClick={fetchLocations}
-          className="bg-white/90 backdrop-blur text-indigo-600 font-black text-xs px-3 py-1.5 rounded-full shadow">
-          ↻
-        </button>
+  <div className="fixed inset-0 z-[9999] bg-slate-900" style={{ height: '100vh', width: '100vw' }}>
+    {/* Top bar */}
+    <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-3 pb-2 bg-gradient-to-b from-black/50 to-transparent">
+      <button onClick={() => setActiveTab('home')}
+        className="bg-white/90 backdrop-blur text-slate-800 font-black text-xs px-3 py-1.5 rounded-full shadow flex items-center gap-1">
+        ← Back
+      </button>
+      <div className="bg-white/90 backdrop-blur rounded-full px-3 py-1.5 shadow">
+        <span className="text-xs font-black text-slate-800">
+          {loading ? 'Loading…' : apiError ? '⚠️ Error' : `${drivers.length} driver${drivers.length !== 1 ? 's' : ''} live`}
+        </span>
       </div>
+      <button onClick={fetchLocations}
+        className="bg-white/90 backdrop-blur text-indigo-600 font-black text-xs px-3 py-1.5 rounded-full shadow">
+        ↻
+      </button>
+    </div>
 
-      {/* Map */}
-      {apiError ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
-          <span className="text-4xl">⚠️</span>
+    {/* Map container – absolute top-0 left-0 right-0 bottom-0 */}
+    {apiError ? (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center">
+          <span className="text-4xl block mb-4">⚠️</span>
           <span className="text-white font-black">{apiError}</span>
-          <button onClick={fetchLocations} className="bg-indigo-600 text-white font-black px-6 py-2 rounded-xl">Retry</button>
+          <button onClick={fetchLocations} className="mt-4 bg-indigo-600 text-white font-black px-6 py-2 rounded-xl">Retry</button>
         </div>
-      ) : !mapsKey ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
-          <span className="text-4xl">🗺️</span>
+      </div>
+    ) : !mapsKey ? (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center">
+          <span className="text-4xl block mb-4">🗺️</span>
           <span className="text-white font-black text-sm">{drivers.length} driver{drivers.length !== 1 ? 's' : ''} online</span>
           {drivers.map(d => (
             <button key={d.id} onClick={() => setSelectedDriver(d)}
-              className="bg-white/10 text-white text-xs font-black px-4 py-2 rounded-xl w-full max-w-xs">
+              className="mt-2 bg-white/10 text-white text-xs font-black px-4 py-2 rounded-xl w-full max-w-xs block mx-auto">
               {(d.full_name||'Driver')[0]} {d.full_name} — {timeAgo(d.last_location_at)}
             </button>
           ))}
         </div>
-      ) : (
-        <div ref={mapRef} className="w-full flex-1" style={{ minHeight: '500px', height: '100%' }} />
-      )}
+      </div>
+    ) : (
+      <div 
+        ref={mapRef} 
+        className="absolute inset-0"
+        style={{ height: '100%', width: '100%' }}
+      />
+    )}
 
-      {/* Bottom sheet */}
-      {selectedDriver && (
-        <div className="absolute bottom-0 left-0 right-0 z-[200] bg-white rounded-t-3xl p-5 shadow-2xl pb-24"
-             onClick={e => e.stopPropagation()}>
-          <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"/>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-2xl font-black text-white shadow-md">
-              {(selectedDriver.full_name||'D')[0].toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <div className="text-base font-black text-slate-800">{selectedDriver.full_name}</div>
-              <div className="text-xs text-slate-400 font-semibold mt-0.5">
-                {selectedDriver.vehicle_type || 'Vehicle'}{selectedDriver.vehicle_number ? ' · ' + selectedDriver.vehicle_number : ''}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"/>
-                <span className="text-[11px] text-green-600 font-black">Active · {timeAgo(selectedDriver.last_location_at)}</span>
-              </div>
-            </div>
-            <button onClick={() => setSelectedDriver(null)}
-              className="text-slate-400 text-xl font-black leading-none">×</button>
+    {/* Bottom sheet */}
+    {selectedDriver && (
+      <div className="absolute bottom-0 left-0 right-0 z-[200] bg-white rounded-t-3xl p-5 shadow-2xl pb-24"
+           onClick={e => e.stopPropagation()}>
+        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"/>
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-2xl font-black text-white shadow-md">
+            {(selectedDriver.full_name||'D')[0].toUpperCase()}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedDriver.last_lat},${selectedDriver.last_lng}`}
-               target="_blank" rel="noreferrer"
-               className="flex items-center justify-center gap-2 bg-indigo-600 text-white font-black py-3 rounded-2xl text-sm">
-              🧭 Directions
-            </a>
-            <button
-              onClick={() => {
-                setSelectedDriver(null);
-                const d = selectedDriver;
-                const driver = drivers.find(dr => dr.id === d.id);
-                if (driver) openChatWithDriver(driver);
-              }}
-              className="flex items-center justify-center gap-2 bg-slate-100 text-slate-700 font-black py-3 rounded-2xl text-sm">
-              💬 Message
-            </button>
+          <div className="flex-1">
+            <div className="text-base font-black text-slate-800">{selectedDriver.full_name}</div>
+            <div className="text-xs text-slate-400 font-semibold mt-0.5">
+              {selectedDriver.vehicle_type || 'Vehicle'}{selectedDriver.vehicle_number ? ' · ' + selectedDriver.vehicle_number : ''}
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"/>
+              <span className="text-[11px] text-green-600 font-black">Active · {timeAgo(selectedDriver.last_location_at)}</span>
+            </div>
           </div>
+          <button onClick={() => setSelectedDriver(null)}
+            className="text-slate-400 text-xl font-black leading-none">×</button>
         </div>
-      )}
-    </div>
-  );
-};
+        <div className="grid grid-cols-2 gap-2">
+          <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedDriver.last_lat},${selectedDriver.last_lng}`}
+             target="_blank" rel="noreferrer"
+             className="flex items-center justify-center gap-2 bg-indigo-600 text-white font-black py-3 rounded-2xl text-sm">
+            🧭 Directions
+          </a>
+          <button
+            onClick={() => {
+              setSelectedDriver(null);
+              const d = selectedDriver;
+              const driver = drivers.find(dr => dr.id === d.id);
+              if (driver) openChatWithDriver(driver);
+            }}
+            className="flex items-center justify-center gap-2 bg-slate-100 text-slate-700 font-black py-3 rounded-2xl text-sm">
+            💬 Message
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-start justify-center">
