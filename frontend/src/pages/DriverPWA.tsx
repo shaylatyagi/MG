@@ -525,7 +525,7 @@ export default function DriverPWA() {
     setSosSent(true);
     let locationUrl = '';
     try {
-      const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 }));
+      const pos = await new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 }));
       locationUrl = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
     } catch {}
     try {
