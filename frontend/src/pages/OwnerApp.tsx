@@ -5714,4 +5714,19 @@ const ProfileTab = () => {
                 {/* Close/Done button after report shown */}
                 {inspectionReport && (
                   <button onClick={() => { setShowInspectionModal(false); setInspectionReport(null); }}
-                  
+                                      className="w-full py-3 rounded-2xl bg-slate-100 text-slate-700 font-bold text-sm"
+                  >
+                    ✓ Done
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+export default OwnerApp;

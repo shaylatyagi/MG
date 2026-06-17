@@ -2041,7 +2041,7 @@ export default function DriverPWA() {
         </div>
       )}
 
-      {/* Logout confirm */}}
+      {/* Logout confirm */}
       {showLogoutConfirm && (
         <div className="absolute inset-0 bg-black/50 z-[300] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-xs p-6 text-center">
