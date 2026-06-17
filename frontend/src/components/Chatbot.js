@@ -4,7 +4,7 @@ import { Mic, MicOff, X, Send, Loader, Wallet, CreditCard, Truck, Users, IndianR
 
 const API = 'https://mg-qw5s.onrender.com';
 
-export default function Chatbot({ userRole, userId, userPhone, token, onClose, onMessagesUpdate, persistedMessages = null }) {
+export default function Chatbot({ userRole, userId = null, userPhone, token, onClose, onMessagesUpdate, persistedMessages = null }) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [messages, setMessages] = useState(() => {
