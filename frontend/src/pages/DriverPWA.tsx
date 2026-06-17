@@ -1743,7 +1743,7 @@ export default function DriverPWA() {
         <div className="shrink-0 px-4 py-2 flex items-center justify-between" style={{ background:'var(--color-text)', borderTop:'1px solid var(--color-gray-800)' }}>
           <button onClick={() => { setShowOwnerChat(true); fetchChat(); }}
             className="flex items-center gap-1.5 text-[10px] font-black transition active:scale-[0.96]"
-            style={{color:'#fff',border:'1px solid rgba(255,255,255,0.35)',background:'rgba(255,255,255,0.12)',borderRadius:8,padding:'6px 12px'}}>
+            style={{color:'#fff',background:'#6366f1',borderRadius:8,padding:'6px 12px',border:'none'}}>
             <MessageCircle size={11}/> Owner Chat
           </button>
           <span className="text-[9px] font-black uppercase tracking-widest" style={{color:'rgba(255,255,255,0.25)'}}>{t.emergency}</span>

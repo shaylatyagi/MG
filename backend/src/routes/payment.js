@@ -3201,9 +3201,14 @@ router.get('/owner/attendance', async (req, res) => {
     const today = new Date();
     const isCurrentMonth = targetMonth === today.toISOString().slice(0, 7);
 
-    // Get actual login days from driver_daily_log
+    // Get actual present days from driver_activity (ping-based) OR driver_daily_log (login-based)
     const logsRes = await pool.query(
-      `SELECT driver_id, EXTRACT(DAY FROM log_date)::INTEGER as day
+      `SELECT driver_id, EXTRACT(DAY FROM activity_date)::INTEGER as day
+       FROM public.driver_activity
+       WHERE driver_id = ANY($1::int[])
+         AND DATE_TRUNC('month', activity_date) = $2::date
+       UNION
+       SELECT driver_id, EXTRACT(DAY FROM log_date)::INTEGER as day
        FROM public.driver_daily_log
        WHERE driver_id = ANY($1::int[])
          AND DATE_TRUNC('month', log_date) = $2::date`,
@@ -3383,9 +3388,13 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
     const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
     const daysElapsed = Math.max(1, Math.ceil((monthEnd - effectiveStart) / (1000 * 60 * 60 * 24)) + (isCurrentMonth ? 0 : 1));
 
-    // Get log entries for this month
+    // Get present days from driver_activity (ping-based) OR driver_daily_log (login-based)
     const logs = await pool.query(
-      `SELECT EXTRACT(DAY FROM log_date)::INTEGER as day, log_date
+      `SELECT EXTRACT(DAY FROM activity_date)::INTEGER as day, activity_date as log_date
+       FROM public.driver_activity
+       WHERE driver_id=$1 AND DATE_TRUNC('month', activity_date) = $2::date
+       UNION
+       SELECT EXTRACT(DAY FROM log_date)::INTEGER as day, log_date
        FROM public.driver_daily_log
        WHERE driver_id=$1 AND DATE_TRUNC('month', log_date) = $2::date
        ORDER BY log_date`,
