@@ -3225,14 +3225,19 @@ router.get('/owner/attendance', async (req, res) => {
       [driverIds, targetMonth + '-01']
     );
 
-    // Get assignment dates to know eligible start per driver
+    // Get assignment dates: prefer driver_vehicle_history, fall back to vehicles.created_at
+    // This handles cases where vehicle was assigned without creating a history record
     const asgnRes = await pool.query(
-      `SELECT DISTINCT ON (driver_id) driver_id, assigned_at
-       FROM public.driver_vehicle_history
-       WHERE driver_id = ANY($1::int[])
-         AND assigned_at <= $2
-       ORDER BY driver_id, assigned_at ASC`,
-      [driverIds, monthEnd.toISOString()]
+      `SELECT v.driver_id,
+              COALESCE(
+                (SELECT dvh.assigned_at FROM public.driver_vehicle_history dvh
+                 WHERE dvh.driver_id = v.driver_id AND dvh.unassigned_at IS NULL
+                 ORDER BY dvh.assigned_at DESC LIMIT 1),
+                v.created_at
+              ) AS assigned_at
+       FROM public.vehicles v
+       WHERE v.driver_id = ANY($1::int[])`,
+      [driverIds]
     );
     const asgnMap = {};
     asgnRes.rows.forEach(r => { asgnMap[r.driver_id] = new Date(r.assigned_at); });
