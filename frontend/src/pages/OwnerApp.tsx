@@ -7,7 +7,7 @@ import { VEHICLE_TYPE_GROUPS, DEFAULT_VEHICLE_TYPE, vehicleTypeLabel } from '../
 import { toast, ToastContainer } from '../components/Toast';
 import { SkeletonDashboard } from '../components/Skeleton';
 import Onboarding, { useOnboarding } from '../components/Onboarding';
-import AnimatedNumber from '../components/AnimatedNumber';
+import AnimatedNumber from '../components/AnimatedNumber'; 
 import OfflineBanner from '../components/OfflineBanner';
 import LoadingButton from '../components/LoadingButton';
 import PullToRefresh from '../components/PullToRefresh';
