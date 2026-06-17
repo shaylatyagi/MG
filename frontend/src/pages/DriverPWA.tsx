@@ -562,7 +562,7 @@ export default function DriverPWA() {
   useEffect(() => {
     function playSOSAlarm() {
       try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         function beep(freq, startAt, dur) {
           var osc = ctx.createOscillator();
           var gain = ctx.createGain();

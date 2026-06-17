@@ -1411,7 +1411,7 @@ return () => clearInterval(interval);
     function unlockAudio() {
       if (sosAudioCtxRef.current) return;
       try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         sosAudioCtxRef.current = ctx;
         // Play a silent 1-sample buffer — this "unlocks" audio on mobile Chrome/Safari
         var buf = ctx.createBuffer(1, 1, 22050);
@@ -1433,7 +1433,7 @@ return () => clearInterval(interval);
   useEffect(() => {
     function playSOSAlarm() {
       try {
-        var ctx = sosAudioCtxRef.current || new (window.AudioContext || window.webkitAudioContext)();
+        var ctx = sosAudioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
         sosAudioCtxRef.current = ctx;
         ctx.resume().then(function() {
           function beep(freq, startAt, dur) {
