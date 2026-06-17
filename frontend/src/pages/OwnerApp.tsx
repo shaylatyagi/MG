@@ -273,6 +273,16 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
     </div>
   );
 };
+// Module-level helpers — must be outside component to avoid TDZ with const declarations
+const token = () => localStorage.getItem('token');
+const getUser = () => {
+  try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+  catch { return {}; }
+};
+const ownerId = () => getUser().id;
+const ownerPhone = () => getUser().mobile_number || getUser().phone_number;
+const ownerCode = () => getUser().owner_code;
+
 function OwnerDashboard() {
   const [activeSOS, setActiveSOS] = useState(null); // current SOS alert
 const [showSOSAlert, setShowSOSAlert] = useState(false);
@@ -521,14 +531,7 @@ const [changeRentLoading, setChangeRentLoading] = useState(false);
     const id = setInterval(tick, 60000);//every 5 minutes
     return () => clearInterval(id);
   }, []);
-  const token = () => localStorage.getItem('token');
-const getUser = () => {
-  try { return JSON.parse(localStorage.getItem('user') || '{}'); } 
-  catch { return {}; }
-};
-const ownerId = () => getUser().id;
-const ownerPhone = () => getUser().mobile_number || getUser().phone_number;
-const ownerCode = () => getUser().owner_code;
+  // token/getUser/ownerId/ownerPhone/ownerCode are module-level (above OwnerDashboard)
   const fetchUnassignedDriversList = async () => {
   try {
     const token = localStorage.getItem('token');
