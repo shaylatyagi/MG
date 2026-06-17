@@ -4081,6 +4081,7 @@ const TrackFleetTab = () => {
     )}
   </div>
 );
+};
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-start justify-center">
@@ -5803,6 +5804,5 @@ const TrackFleetTab = () => {
       )}
     </div>
   );
-}
 }
 export default OwnerDashboard;
