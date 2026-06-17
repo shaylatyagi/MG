@@ -3,15 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-size='18' font-family='Arial,sans-serif' font-weight='bold' fill='white'>M</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#4f46e5" id="mg-theme-color" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#4f46e5" />
     <meta name="description" content="MobilityGrid — Fleet Operating System for India" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MobilityGrid" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" id="mg-manifest" />
-
     <script>
       // Switch manifest based on role (driver gets green manifest)
       (function() {
@@ -25,62 +24,34 @@
         if (isDriver) {
           var el = document.getElementById('mg-manifest');
           if (el) el.setAttribute('href', '/driver-manifest.json');
-          var tc = document.getElementById('mg-theme-color');
+          var tc = document.querySelector('meta[name="theme-color"]');
           if (tc) tc.setAttribute('content', '#16a34a');
         }
       })();
     </script>
-
-    <!-- ✅ Preconnect + preload for Google Fonts (render‑blocking hatao) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap"
-    />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap"
-      />
-    </noscript>
-
-    <!-- ✅ Critical CSS inline (skeleton + basic layout) -->
-    <style>
-      /* Minimal critical CSS for above‑the‑fold content */
-      body {
-        margin: 0;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
-        background: #f1f5f9;
-        color: #0f172a;
-      }
-      #root {
-        min-height: 100vh;
-      }
-      .skeleton {
-        background: #e2e8f0;
-        border-radius: 12px;
-        animation: pulse 1.5s ease-in-out infinite;
-      }
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
-      /* Dark mode support for critical elements */
-      .dark body { background: #0f172a; }
-    </style>
-
-    <!-- ✅ Remove Tailwind CDN – production CSS already imported in index.js -->
-    <!-- ✅ All other scripts should be deferred in the React build -->
-
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
     <title>MobilityGrid</title>
+    <script>
+      // Enable Tailwind dark mode via class strategy
+      tailwind = window.tailwind || {};
+      window.tailwindConfig = { darkMode: 'class' };
+      // Apply saved theme before page renders (no flash)
+      (function() {
+        try {
+          if (localStorage.getItem('mg_theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+      // Apply dark mode config after Tailwind loads
+      if (window.tailwind && window.tailwind.config) {
+        tailwind.config = { darkMode: 'class' };
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
