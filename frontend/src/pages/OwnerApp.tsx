@@ -3991,7 +3991,7 @@ const ProfileTab = () => {
             ))}
           </div>
         ) : (
-          <div ref={mapRef} className="flex-1 w-full" />
+          <div ref={mapRef} className="flex-1 w-full" style={{ minHeight: '400px', height: '100%' }} />
         )}
 
         {/* Bottom driver info sheet — slides up on pin tap */}

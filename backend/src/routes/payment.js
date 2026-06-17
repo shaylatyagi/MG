@@ -949,8 +949,6 @@ router.post('/owner/notify-unpaid', verifyToken, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
-// GET /owner/overdue-drivers?ownerId=X — drivers who haven't paid today
 router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
@@ -959,26 +957,36 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
       `SELECT d.id, d.full_name, d.mobile_number, d.driver_code,
               v.vehicle_number, v.daily_rent,
               COALESCE((
-                SELECT SUM(amount) FROM public.driver_ledger
-                WHERE driver_id = d.id AND entry_type IN ('DAILY_RENT','DAMAGE_CHARGE','PENALTY')
-              ) - (
-                SELECT SUM(amount) FROM public.driver_ledger
-                WHERE driver_id = d.id AND entry_type IN ('PAYMENT','CASH_PAYMENT','ADVANCE_CREDIT','INCENTIVE','REFUND')
-              ), 0) * -1 AS balance
+                SELECT SUM(order_amount) FROM public.ms_orders
+                WHERE payer_mobile = d.mobile_number
+                  AND transaction_status = 'SUCCESS'
+                  AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+              ), 0) AS paid_today,
+              v.daily_rent - COALESCE((
+                SELECT SUM(order_amount) FROM public.ms_orders
+                WHERE payer_mobile = d.mobile_number
+                  AND transaction_status = 'SUCCESS'
+                  AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+              ), 0) AS balance
        FROM public.drivers d
        JOIN public.vehicles v ON v.driver_id = d.id AND v.daily_rent > 0
        WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
          AND d.status = 'ACTIVE'
-         AND d.id NOT IN (
-           SELECT DISTINCT dr.id FROM public.drivers dr
-           JOIN public.ms_orders mo ON mo.payer_mobile = dr.mobile_number
-           WHERE mo.transaction_status = 'SUCCESS'
-             AND DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
-         )
+         AND v.daily_rent - COALESCE((
+           SELECT SUM(order_amount) FROM public.ms_orders
+           WHERE payer_mobile = d.mobile_number
+             AND transaction_status = 'SUCCESS'
+             AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+         ), 0) > 0
        ORDER BY d.full_name`,
       [parseInt(ownerId)]
     );
-    res.json(result.rows);
+    // Convert balance to number and ensure positive
+    const rows = result.rows.map(r => ({
+      ...r,
+      balance: Math.max(0, parseFloat(r.balance || 0))
+    }));
+    res.json(rows);
   } catch (err) {
     console.error('overdue-drivers error:', err);
     res.json([]);
@@ -3210,13 +3218,13 @@ router.get('/owner/attendance', async (req, res) => {
     const ownerIdRes = await pool.query('SELECT id FROM public.owners WHERE owner_code=$1 LIMIT 1', [ownerCode]);
     const ownerIdVal = ownerIdRes.rows[0]?.id || null;
     const driversRes = await pool.query(
-      `SELECT id, COALESCE(full_name, name) AS full_name, driver_code
-       FROM public.drivers
-       WHERE (owner_code=$1 OR (owner_id IS NOT NULL AND owner_id=$2))
-         AND deleted_at IS NULL
-       ORDER BY COALESCE(full_name, name)`,
-      [ownerCode, ownerIdVal]
-    );
+  `SELECT id, full_name, driver_code
+   FROM public.drivers
+   WHERE (owner_code=$1 OR (owner_id IS NOT NULL AND owner_id=$2))
+     AND deleted_at IS NULL
+   ORDER BY full_name`,
+  [ownerCode, ownerIdVal]
+);
 
     const driverIds = driversRes.rows.map(d => d.id);
     if (driverIds.length === 0) return res.json({ month: targetMonth, daysInMonth, drivers: [] });
