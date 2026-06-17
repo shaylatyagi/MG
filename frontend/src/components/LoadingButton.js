@@ -16,7 +16,7 @@ import React, { useState } from 'react';
  */
 export default function LoadingButton({
   onClick,
-  children,
+  children = null,
   loadingText,
   className = '',
   style = {},
