@@ -974,7 +974,7 @@ const DriverDetailsModal = () => {
                   {new Date(h.assigned_at).toLocaleDateString('en-IN')} → {h.unassigned_at ? new Date(h.unassigned_at).toLocaleDateString('en-IN') : 'Present'}
                 </p>
                 <p className="text-[10px] text-slate-400">
-                  {Math.floor((new Date(h.unassigned_at||Date.now()) - new Date(h.assigned_at)) / 86400000)} days · ₹{h.daily_rent}/day
+                  {Math.floor((new Date(h.unassigned_at||Date.now()).getTime() - new Date(h.assigned_at).getTime()) / 86400000)} days · ₹{h.daily_rent}/day
                 </p>
               </div>
               {!h.unassigned_at && <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Current</span>}
@@ -2847,10 +2847,10 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
                                 {new Date(h.assigned_at).toLocaleDateString('en-IN')} → {h.unassigned_at ? new Date(h.unassigned_at).toLocaleDateString('en-IN') : 'Present'}
                               </p>
                               <p className="text-[10px] text-slate-500 mt-0.5">
-                                {Math.floor((new Date(h.unassigned_at||Date.now()) - new Date(h.assigned_at)) / 86400000)} days · ₹{h.daily_rent}/day ({h.rent_type})
+                                {Math.floor((new Date(h.unassigned_at||Date.now()).getTime() - new Date(h.assigned_at).getTime()) / 86400000)} days · ₹{h.daily_rent}/day ({h.rent_type})
                               </p>
                               <p className="text-[10px] font-black text-emerald-600">
-                                Total: ₹{(Math.floor((new Date(h.unassigned_at||Date.now()) - new Date(h.assigned_at)) / 86400000) * parseFloat(h.daily_rent||0)).toLocaleString('en-IN')}
+                                Total: ₹{(Math.floor((new Date(h.unassigned_at||Date.now()).getTime() - new Date(h.assigned_at).getTime()) / 86400000) * parseFloat(h.daily_rent||0)).toLocaleString('en-IN')}
                               </p>
                             </div>
                             {!h.unassigned_at && <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Current</span>}
@@ -2929,7 +2929,7 @@ const VehiclesTab = () => {
     .sort((a,b) => (a.driver_id ? 1 : -1) - (b.driver_id ? 1 : -1));
   const expiringVehicles = vehicles.filter(v => {
     if (!v.insurance_expiry) return false;
-    const days = Math.floor((new Date(v.insurance_expiry) - new Date()) / 86400000);
+    const days = Math.floor((new Date(v.insurance_expiry).getTime() - new Date().getTime()) / 86400000);
     return days <= 30;
   });
   return (
@@ -3802,7 +3802,7 @@ const ProfileTab = () => {
 
     const timeAgo = (ts) => {
       if (!ts) return 'Unknown';
-      const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
+      const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
       if (diff < 60) return diff + 's ago';
       if (diff < 3600) return Math.floor(diff/60) + 'm ago';
       return Math.floor(diff/3600) + 'h ago';
@@ -5729,4 +5729,4 @@ const ProfileTab = () => {
   );
 }
 
-export default OwnerApp;
+export default OwnerAp

@@ -745,7 +745,7 @@ export default function DriverPWA() {
           {assignedVehicle?.assignedSince && (() => {
             const since = new Date(assignedVehicle.assignedSince);
             const now = new Date();
-            const daysPassed = Math.max(0, Math.floor((now - since) / 86400000));
+            const daysPassed = Math.max(0, Math.floor((now.getTime() - since.getTime()) / 86400000));
             const cycleDay = (daysPassed % 30) || 30;
             const pct = Math.min(100, Math.round((cycleDay / 30) * 100));
             return (
