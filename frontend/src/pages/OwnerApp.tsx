@@ -1252,20 +1252,22 @@ if (!oId) { navigate('/login'); return; }
   sum + (parseFloat(d.pending) || 0), 0
 );
   }
-
-  let ownerOutstanding = totalPending;
-  if (ownerStatsRes && ownerStatsRes.ok) {
-    const ownerStatsData = await ownerStatsRes.json();
-    if (ownerStatsData.success && ownerStatsData.data?.outstanding > 0) {
-      ownerOutstanding = ownerStatsData.data.outstanding;
-    }
+  // 🔥 Real-time pending dues from overdue API
+let pendingDues = 0;
+try {
+  const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: H });
+  if (overdueRes.ok) {
+    const overdueData = await overdueRes.json();
+    pendingDues = overdueData.reduce((sum, d) => sum + parseFloat(d.balance || 0), 0);
   }
-  setStats({
-    totalVehicles: data.total_vehicles || 0,
-    totalDrivers: data.total_drivers || 0,
-    todayCollection: data.earnings_month || 0,
-    pendingDues: ownerOutstanding
-  });
+} catch (e) { console.error('Overdue fetch failed:', e); }
+
+setStats({
+  totalVehicles: data.total_vehicles || 0,
+  totalDrivers: data.total_drivers || 0,
+  todayCollection: data.earnings_month || 0,
+  pendingDues: pendingDues   // ✅ ye real-time outstanding dikhayega
+});
 }
     
     if (notifRes.ok) {
@@ -3991,7 +3993,7 @@ const ProfileTab = () => {
             ))}
           </div>
         ) : (
-          <div ref={mapRef} className="flex-1 w-full" style={{ minHeight: '500px', height: '100%' }} />
+          <div ref={mapRef} className="flex-1 w-full" style={{ height: '500px', minHeight: '500px', width: '100%' }} />
         )}
 
         {/* Bottom driver info sheet — slides up on pin tap */}

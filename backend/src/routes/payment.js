@@ -953,40 +953,47 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
-    const result = await pool.query(
-      `SELECT d.id, d.full_name, d.mobile_number, d.driver_code,
-              v.vehicle_number, v.daily_rent,
-              COALESCE((
-                SELECT SUM(order_amount) FROM public.ms_orders
-                WHERE payer_mobile = d.mobile_number
-                  AND transaction_status = 'SUCCESS'
-                  AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
-              ), 0) AS paid_today,
-              v.daily_rent - COALESCE((
-                SELECT SUM(order_amount) FROM public.ms_orders
-                WHERE payer_mobile = d.mobile_number
-                  AND transaction_status = 'SUCCESS'
-                  AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
-              ), 0) AS balance
-       FROM public.drivers d
-       JOIN public.vehicles v ON v.driver_id = d.id AND v.daily_rent > 0
-       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-         AND d.status = 'ACTIVE'
-         AND v.daily_rent - COALESCE((
-           SELECT SUM(order_amount) FROM public.ms_orders
-           WHERE payer_mobile = d.mobile_number
-             AND transaction_status = 'SUCCESS'
-             AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
-         ), 0) > 0
-       ORDER BY d.full_name`,
-      [parseInt(ownerId)]
-    );
-    // Convert balance to number and ensure positive
-    const rows = result.rows.map(r => ({
-      ...r,
-      balance: Math.max(0, parseFloat(r.balance || 0))
-    }));
-    res.json(rows);
+
+    const result = await pool.query(`
+      WITH driver_rent AS (
+        SELECT 
+          d.id,
+          d.full_name,
+          d.mobile_number,
+          d.driver_code,
+          v.vehicle_number,
+          v.daily_rent,
+          COALESCE(
+            (SELECT assigned_at FROM driver_vehicle_history 
+             WHERE driver_id = d.id AND unassigned_at IS NULL 
+             ORDER BY assigned_at DESC LIMIT 1),
+            v.created_at
+          ) AS assigned_date,
+          COALESCE((
+            SELECT SUM(order_amount) FROM ms_orders 
+            WHERE payer_mobile = d.mobile_number 
+              AND transaction_status = 'SUCCESS'
+          ), 0) AS total_paid
+        FROM drivers d
+        JOIN vehicles v ON v.driver_id = d.id
+        WHERE d.owner_code = (SELECT owner_code FROM owners WHERE id = $1)
+          AND d.status = 'ACTIVE'
+          AND v.daily_rent > 0
+      )
+      SELECT 
+        id, full_name, mobile_number, driver_code,
+        vehicle_number, daily_rent,
+        GREATEST(0, 
+          (EXTRACT(DAY FROM (NOW() - assigned_date))::INTEGER * daily_rent) - total_paid
+        ) AS balance
+      FROM driver_rent
+      WHERE GREATEST(0, 
+          (EXTRACT(DAY FROM (NOW() - assigned_date))::INTEGER * daily_rent) - total_paid
+      ) > 0
+      ORDER BY full_name;
+    `, [parseInt(ownerId)]);
+
+    res.json(result.rows);
   } catch (err) {
     console.error('overdue-drivers error:', err);
     res.json([]);
