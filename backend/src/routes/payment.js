@@ -955,42 +955,53 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
     if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
 
     const result = await pool.query(`
+      WITH driver_data AS (
+        SELECT 
+          d.id,
+          d.full_name,
+          d.mobile_number,
+          d.driver_code,
+          v.vehicle_number,
+          v.daily_rent,
+          COALESCE(
+            (SELECT assigned_at FROM driver_vehicle_history 
+             WHERE driver_id = d.id AND unassigned_at IS NULL 
+             ORDER BY assigned_at DESC LIMIT 1),
+            v.created_at
+          ) AS assigned_date,
+          COALESCE((
+            SELECT SUM(amount) FROM driver_ledger 
+            WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')
+          ), 0) AS total_charged,
+          COALESCE((
+            SELECT SUM(amount) FROM driver_ledger 
+            WHERE driver_id = d.id AND entry_type IN ('PAYMENT', 'CASH_PAYMENT', 'ADVANCE_CREDIT', 'INCENTIVE', 'REFUND')
+          ), 0) AS total_paid
+        FROM drivers d
+        JOIN vehicles v ON v.driver_id = d.id
+        WHERE d.owner_code = (SELECT owner_code FROM owners WHERE id = $1)
+          AND d.status = 'ACTIVE'
+          AND v.daily_rent > 0
+      )
       SELECT 
-        d.id,
-        d.full_name,
-        d.mobile_number,
-        d.driver_code,
-        v.vehicle_number,
-        v.daily_rent AS current_daily_rent,
-        -- Total charged (RENT_CHARGE + DAMAGE_CHARGE + PENALTY) from ledger
-        COALESCE((
-          SELECT SUM(amount) FROM public.driver_ledger 
-          WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')
-        ), 0) AS total_charged,
-        -- Total paid (all credit entries) from ledger
-        COALESCE((
-          SELECT SUM(amount) FROM public.driver_ledger 
-          WHERE driver_id = d.id AND entry_type IN ('PAYMENT', 'CASH_PAYMENT', 'ADVANCE_CREDIT', 'INCENTIVE', 'REFUND')
-        ), 0) AS total_paid
-      FROM public.drivers d
-      JOIN public.vehicles v ON v.driver_id = d.id AND v.daily_rent > 0
-      WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-        AND d.status = 'ACTIVE'
-      ORDER BY d.full_name
+        id, full_name, mobile_number, driver_code,
+        vehicle_number, daily_rent,
+        CASE 
+          WHEN total_charged = 0 AND assigned_date IS NOT NULL 
+            THEN GREATEST(0, (EXTRACT(DAY FROM (NOW() - assigned_date))::INTEGER * daily_rent) - total_paid)
+          ELSE GREATEST(0, total_charged - total_paid)
+        END AS balance
+      FROM driver_data
+      WHERE 
+        CASE 
+          WHEN total_charged = 0 AND assigned_date IS NOT NULL 
+            THEN (EXTRACT(DAY FROM (NOW() - assigned_date))::INTEGER * daily_rent) - total_paid
+          ELSE total_charged - total_paid
+        END > 0
+      ORDER BY balance DESC, full_name;
     `, [parseInt(ownerId)]);
 
-    // Calculate balance = total_charged - total_paid, and filter > 0
-    const overdue = result.rows
-      .map(r => {
-        const balance = parseFloat(r.total_charged) - parseFloat(r.total_paid);
-        return {
-          ...r,
-          balance: Math.max(0, balance) // don't show negative
-        };
-      })
-      .filter(r => r.balance > 0);
-
-    res.json(overdue);
+    res.json(result.rows);
   } catch (err) {
     console.error('overdue-drivers error:', err);
     res.json([]);
