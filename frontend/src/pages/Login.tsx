@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../App';
 import { Truck, Building2, Shield, Phone, ArrowRight, Lock, Eye, EyeOff } from 'lucide-react';
 import styles from './Login.module.css';
 
@@ -48,6 +49,7 @@ const Shell: React.FC<ShellProps> = ({ children, showBack, onBack, title, subtit
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login: authLogin } = useAuth();
   const [step, setStep]                   = useState('select-role');
   const [selectedRole, setSelectedRole]   = useState(null);
   const [loading, setLoading]             = useState(false);
@@ -152,8 +154,7 @@ export default function Login() {
         return;
       }
     } catch {}
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
+    authLogin(token, user);
     navigate(path);
   };
 
@@ -177,8 +178,7 @@ export default function Login() {
       });
       var verData = await verRes.json();
       if (verData.success) {
-        localStorage.setItem('token', verData.token);
-        localStorage.setItem('user', JSON.stringify(verData.user));
+        authLogin(verData.token, verData.user);
         navigate(path);
       } else { setError(verData.message || 'Biometric login failed'); }
     } catch (e) {
@@ -194,8 +194,7 @@ export default function Login() {
     setEnrolling(true);
     var ref = pendingNav.current;
     try {
-      localStorage.setItem('token', ref.token);
-      localStorage.setItem('user', JSON.stringify(ref.user));
+      authLogin(ref.token, ref.user);
       var optRes = await fetch(API + '/api/auth/passkey/register-options', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ref.token },
@@ -218,8 +217,7 @@ export default function Login() {
   const skipEnroll = function() {
     if (!pendingNav.current) return;
     var ref = pendingNav.current;
-    localStorage.setItem('token', ref.token);
-    localStorage.setItem('user', JSON.stringify(ref.user));
+    authLogin(ref.token, ref.user);
     setShowEnrollSheet(false);
     navigate(ref.path);
   };
@@ -330,7 +328,7 @@ export default function Login() {
       });
       var data = await res.json();
       if (data.success) {
-        localStorage.setItem('mg_admin_token', data.token);
+        authLogin(data.token, null, true);
         navigate('/admin');
       } else { setError(data.message || 'Invalid credentials'); }
     } catch { setError('Network error'); }
@@ -363,8 +361,7 @@ export default function Login() {
       });
       var data = await res.json();
       if (data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        authLogin(data.token, data.user);
         setPendingToken(data.token);
         setPendingUser(data.user);
         setPendingPath('/owner/dashboard');
@@ -815,5 +812,33 @@ export default function Login() {
     );
   }
 
-  return null;
+  // ── Select role (default) ────────────────────────────────────────────────
+  return (
+    <Shell>
+      <div style={{ marginBottom: 'var(--space-5)' }}>
+        <h2 className={styles.cardTitle}>Sign in</h2>
+        <p className={styles.cardSubtitle} style={{ margin: 0 }}>Select your role to continue</p>
+      </div>
+      <div className={styles.roleGrid}>
+        {roles.map(function(role) {
+          return (
+            <button key={role.type} onClick={function() { handleRoleSelect(role); }}
+              className={styles.roleBtn}
+            >
+              <div className={styles.roleIcon}>{role.icon}</div>
+              <div style={{ flex: 1 }}>
+                <p className={styles.roleName}>{role.name}</p>
+                <p className={styles.roleHint}>
+                  {role.type === 'driver' ? 'Access your wallet & payments' :
+                   role.type === 'owner'  ? 'Manage your fleet & drivers' : 'Platform administration'}
+                </p>
+              </div>
+              <ArrowRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+            </button>
+          );
+        })}
+      </div>
+      {showEnrollSheet && <EnrollSheet />}
+    </Shell>
+  );
 }

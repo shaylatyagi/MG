@@ -5729,4 +5729,4 @@ const ProfileTab = () => {
     </div>
   );
 }
-export default OwnerApp;
+export default OwnerDashboard;
