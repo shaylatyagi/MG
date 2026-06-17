@@ -2136,18 +2136,28 @@ const removeRule = (i) => setIncentiveRules(prev => ({
                         <div>{d.name}</div>
                         <div className="font-normal text-slate-400">{d.code}</div>
                       </td>
-                      {Array.from({length: attendanceData.daysInMonth}, (_, j) => {
-                        const day = j + 1;
-                        const present = d.presentDays.includes(day);
-                        return (
-                          <td key={day} className="px-1 py-2 text-center">
-                            <span className={`inline-block w-4 h-4 rounded-full ${present ? 'bg-emerald-400' : day < (d.firstAssignedDay || 1) ? 'bg-slate-50' : 'bg-slate-100'}`}
-                              title={day < (d.firstAssignedDay || 1) ? 'Before assignment' : present ? 'Present' : 'Absent'} />
-                          </td>
-                        );
-                      })}
-                      <td className="px-3 py-2 text-center font-black text-emerald-600">{d.totalPresent}/{d.eligibleDays ?? attendanceData.daysInMonth}</td>
-                      <td className="px-3 py-2 text-center font-black" style={{color: d.attendancePct >= 80 ? 'var(--color-success-dark)' : d.attendancePct >= 50 ? 'var(--color-accent-dark)' : 'var(--color-danger-dark)'}}>{d.attendancePct}%</td>
+                      {d.noVehicle ? (
+                        <td colSpan={attendanceData.daysInMonth + 2} className="px-3 py-2 text-center text-slate-400 text-xs italic">
+                          No vehicle assigned
+                        </td>
+                      ) : (
+                        <>
+                          {Array.from({length: attendanceData.daysInMonth}, (_, j) => {
+                            const day = j + 1;
+                            const present = d.presentDays.includes(day);
+                            const beforeAssignment = d.firstAssignedDay && day < d.firstAssignedDay;
+                            return (
+                              <td key={day} className="px-1 py-2 text-center">
+                                <span className={`inline-block w-4 h-4 rounded-full ${present ? 'bg-emerald-400' : beforeAssignment ? 'bg-slate-50' : 'bg-slate-100'}`}
+                                  title={beforeAssignment ? 'Before assignment' : present ? 'Present' : 'Absent'}
+                                  style={{opacity: beforeAssignment ? 0.3 : 1}} />
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-2 text-center font-black text-emerald-600">{d.totalPresent}/{d.eligibleDays}</td>
+                          <td className="px-3 py-2 text-center font-black" style={{color: d.attendancePct >= 80 ? 'var(--color-success-dark)' : d.attendancePct >= 50 ? 'var(--color-accent-dark)' : 'var(--color-danger-dark)'}}>{d.attendancePct}%</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

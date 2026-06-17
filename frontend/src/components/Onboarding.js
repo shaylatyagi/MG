@@ -161,6 +161,14 @@ export function useOnboarding(role) {
 
   useEffect(() => {
     try {
+      // Never show for existing users — check created_at from login response
+      // If user was registered more than 1 hour ago, they are not new
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (user.created_at) {
+        const ageMs = Date.now() - new Date(user.created_at).getTime();
+        if (ageMs > 60 * 60 * 1000) return; // existing user — skip intro
+      }
+      // New user or no created_at: fall back to localStorage key
       if (!localStorage.getItem(key)) setShowTour(true);
     } catch (_) {}
   }, [key]);

@@ -3133,15 +3133,25 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
     // Effective start = max(monthStart, assignedAt) — only count days since assignment
     const effectiveStart = assignedAt && assignedAt > monthStart ? assignedAt : monthStart;
 
+    // UNION: driver_activity (ping-based, has historical data) + driver_daily_log (login-based)
+    const effectiveStartDate = effectiveStart.toISOString().slice(0, 10);
     const logs = await pool.query(
-      `SELECT log_date, login_time, logout_time, active_minutes
+      `SELECT EXTRACT(DAY FROM activity_date)::INTEGER as day, activity_date::date as log_date
+       FROM public.driver_activity
+       WHERE driver_id = $1
+         AND activity_date >= $3::date
+         AND DATE_TRUNC('month', activity_date) = $2::date
+       UNION
+       SELECT EXTRACT(DAY FROM log_date)::INTEGER as day, log_date
        FROM public.driver_daily_log
-       WHERE driver_id = $1 AND log_date >= $2 AND log_date < $3
+       WHERE driver_id = $1
+         AND log_date >= $3::date
+         AND DATE_TRUNC('month', log_date) = $2::date
        ORDER BY log_date`,
-      [driverId, effectiveStart.toISOString(), monthEnd.toISOString()]
+      [driverId, target + '-01', effectiveStartDate]
     );
 
-    const presentDays = new Set(logs.rows.map(r => new Date(r.log_date).getDate()));
+    const presentDays = new Set(logs.rows.map(r => Number(r.day)));
     const today = new Date();
     const isCurrentMonth = target === today.toISOString().slice(0, 7);
     // daysElapsed counts from effectiveStart, not month start
@@ -3162,7 +3172,7 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
       daysPresent: presentDays.size,
       attendancePct: daysElapsed > 0 ? Math.round((presentDays.size / daysElapsed) * 100) : 0,
       todayPresent: isCurrentMonth && presentDays.has(today.getDate()),
-      logs: logs.rows.map(r => ({ day: new Date(r.log_date).getDate(), minutes: r.active_minutes || 0 }))
+      logs: Array.from(presentDays).sort((a, b) => a - b).map(day => ({ day, minutes: 0 }))
     });
   } catch (err) {
     console.error('Driver attendance error:', err);
@@ -3237,7 +3247,16 @@ router.get('/owner/attendance', async (req, res) => {
 
     const drivers = Object.values(attendanceMap).map(d => {
       const assignedAt = asgnMap[d.driverId];
-      const effectiveStart = assignedAt && assignedAt > monthStart ? assignedAt : monthStart;
+      // No vehicle assignment → skip (eligibleDays = 0, no attendance to track)
+      if (!assignedAt) {
+        return {
+          driverId: d.driverId, name: d.name, code: d.code,
+          presentDays: [], totalPresent: 0, totalAbsent: 0,
+          eligibleDays: 0, firstAssignedDay: null, attendancePct: 0,
+          noVehicle: true,
+        };
+      }
+      const effectiveStart = assignedAt > monthStart ? assignedAt : monthStart;
       const firstDay = effectiveStart.getDate();
       const lastDay = isCurrentMonth ? today.getDate() : daysInMonth;
       const eligibleDays = Math.max(1, lastDay - firstDay + 1);

@@ -227,7 +227,8 @@ router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
         id: user.id, full_name: user.full_name, mobile_number: user.mobile_number,
         role: user.role, owner_id: user.owner_id || null,
         owner_code: user.owner_code || null,
-        driver_code: user.driver_code || null, status: user.status
+        driver_code: user.driver_code || null, status: user.status,
+        created_at: user.created_at || null
       }
     });
   } catch (err) {

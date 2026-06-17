@@ -868,24 +868,38 @@ export default function DriverPWA() {
             </div>
             {/* Mini dot calendar */}
             <div className="flex flex-wrap gap-1">
-              {Array.from({ length: attendance.daysInMonth }, (_, i) => {
-                const day = i + 1;
-                const present = attendance.logs?.some(l => l.day === day);
-                const today = new Date();
-                const isToday = new Date(attendanceMonth + '-01').getMonth() === today.getMonth()
-                  && new Date(attendanceMonth + '-01').getFullYear() === today.getFullYear()
-                  && day === today.getDate();
-                const future = new Date(attendanceMonth + '-' + String(day).padStart(2,'0')) > today;
-                return (
-                  <div key={day} title={`Day ${day}`} style={{
-                    width: 22, height: 22, borderRadius: 6, fontSize: 9, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: future ? 'var(--color-gray-100)' : present ? 'var(--color-primary)' : 'var(--color-danger-50)',
-                    color: future ? 'var(--color-text-muted)' : present ? 'white' : 'var(--color-danger-dark)',
-                    border: isToday ? '2px solid var(--color-primary)' : '2px solid transparent',
-                  }}>{day}</div>
-                );
-              })}
+              {(() => {
+                // Compute assignment day for this calendar month
+                const calDate = new Date(attendanceMonth + '-01');
+                let assignedFromDay = 1;
+                if (attendance.assignedFrom) {
+                  const af = new Date(attendance.assignedFrom + 'T00:00:00');
+                  if (af.getFullYear() === calDate.getFullYear() && af.getMonth() === calDate.getMonth()) {
+                    assignedFromDay = af.getDate();
+                  }
+                }
+                return Array.from({ length: attendance.daysInMonth }, (_, i) => {
+                  const day = i + 1;
+                  const present = attendance.logs?.some(l => l.day === day);
+                  const today = new Date();
+                  const isToday = calDate.getMonth() === today.getMonth()
+                    && calDate.getFullYear() === today.getFullYear()
+                    && day === today.getDate();
+                  const future = new Date(attendanceMonth + '-' + String(day).padStart(2,'0')) > today;
+                  const beforeAssignment = day < assignedFromDay;
+                  const inactive = future || beforeAssignment;
+                  return (
+                    <div key={day} title={beforeAssignment ? 'Before vehicle assignment' : `Day ${day}`} style={{
+                      width: 22, height: 22, borderRadius: 6, fontSize: 9, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: inactive ? 'var(--color-gray-100)' : present ? 'var(--color-primary)' : 'var(--color-danger-50)',
+                      color: inactive ? 'var(--color-text-muted)' : present ? 'white' : 'var(--color-danger-dark)',
+                      border: isToday ? '2px solid var(--color-primary)' : '2px solid transparent',
+                      opacity: beforeAssignment ? 0.4 : 1,
+                    }}>{day}</div>
+                  );
+                });
+              })()}
             </div>
             {attendance.todayPresent !== undefined && (
               <p className="text-[10px] mt-2 font-bold" style={{color: attendance.todayPresent ? 'var(--color-success-dark)' : 'var(--color-danger-dark)'}}>

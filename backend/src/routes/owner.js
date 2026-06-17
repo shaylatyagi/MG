@@ -89,11 +89,15 @@ router.get('/stats', async (req, res) => {
     const totalDrivers  = parseInt(drivers.rows[0].count);
     const activeContracts = parseInt(contracts.rows[0].count);
 
-    // Outstanding = active drivers * their daily rent - today's collection
+    // Outstanding = sum of active drivers' daily_rent - today's online collection
+    // Use vehicles table (reliable daily_rent source) via drivers.owner_code
     const rentSum = await pool.query(
-      `SELECT COALESCE(SUM(dvh.rent_amount),0) AS total
-       FROM driver_vehicle_history dvh
-       WHERE dvh.owner_id = $1 AND dvh.unassigned_at IS NULL`,
+      `SELECT COALESCE(SUM(v.daily_rent), 0) AS total
+       FROM public.vehicles v
+       JOIN public.drivers d ON d.id = v.driver_id
+       WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+         AND d.status = 'ACTIVE'
+         AND v.driver_id IS NOT NULL`,
       [oid]
     );
     const outstanding = Math.max(
