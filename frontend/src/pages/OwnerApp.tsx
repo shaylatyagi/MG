@@ -1886,7 +1886,7 @@ const removeRule = (i) => setIncentiveRules(prev => ({
             {trend && (
               <div style={{display:'flex',alignItems:'center',gap:3,marginTop:5}}>
                 <ArrowDownRight size={9} color="var(--color-accent)"/>
-                <span style={{fontSize:9,color:'var(--color-accent)',fontWeight:600}}>needs attention</span>
+                <span style={{fontSize:9,color:'var(--color-accent)',fontWeight:600}}>Needs Attention</span>
               </div>
             )}
           </div>
@@ -2482,7 +2482,7 @@ const DriversTab = () => {
           onChange={(e) => setDriverRentAmount(e.target.value)}
           onClick={(e) => e.stopPropagation()}
           className="w-full border rounded-xl p-3 text-sm"
-          placeholder="Enter rent amount"
+          placeholder="Enter Rent Amount"
         />
       </div>
       
@@ -2881,7 +2881,7 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
                   </div>
                 </div>
                 <input type="number" defaultValue={customRentAmount} onBlur={e=>setCustomRentAmount(e.target.value)}
-                  className="w-full border rounded-xl p-3 text-sm mb-4" placeholder="Enter rent amount"/>
+                  className="w-full border rounded-xl p-3 text-sm mb-4" placeholder="Enter Rent Amount"/>
                 <select className="w-full border rounded-xl p-3 text-sm bg-white mb-4"
                   value={selectedDriverForAssign?.id||''}
                   onChange={e=>{const d=availableUnassignedDrivers.find(d=>d.id===parseInt(e.target.value));setSelectedDriverForAssign(d);}}>
@@ -2944,7 +2944,7 @@ const VehiclesTab = () => {
     {/* Search Bar */}
     <div className="relative">
       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-      <input type="text" placeholder="Search by vehicle no, model or driver..."
+      <input type="text" placeholder="Search By Vehicle No, Model Or Driver..."
         value={vehicleSearch}
         onChange={e => setVehicleSearch(e.target.value)}
         className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500"/>
@@ -4386,7 +4386,7 @@ const ProfileTab = () => {
               </div>
               <div className="p-3 border-t flex gap-2">
                 <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessageToDriver()}
-                  placeholder="Type message..." className="flex-1 border rounded-xl px-3 py-2 text-sm" />
+                  placeholder="Type Message..." className="flex-1 border rounded-xl px-3 py-2 text-sm" />
                 <button onClick={sendMessageToDriver} className="bg-indigo-600 text-white p-2 rounded-xl"><Send size={16} /></button>
               </div>
             </div>
@@ -4618,11 +4618,11 @@ const ProfileTab = () => {
         {/* ── SINGLE MODE ── */}
         {addDriverMode === 'single' && (
           <div className="space-y-3">
-            <input placeholder="Full Name (Letters only)"
+            <input placeholder="Full Name (Letters Only)"
               className="w-full border rounded-xl p-3 text-sm"
               value={newDriver.name}
               onChange={e => setNewDriver({...newDriver, name: e.target.value})}/>
-            <input placeholder="Phone Number (10 digits)"
+            <input placeholder="Phone Number (10 Digits)"
               className="w-full border rounded-xl p-3 text-sm"
               value={newDriver.phone}
               onChange={e => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g,'').slice(0,10)})}/>
@@ -5079,7 +5079,7 @@ const ProfileTab = () => {
           }
           <input
             type="number"
-            placeholder="Enter amount (₹)"
+            placeholder="Enter Amount (₹)"
             value={cashAmount}
             onChange={e => setCashAmount(e.target.value)}
             className="w-full border rounded-xl p-3 mb-4 text-sm font-mono"

@@ -591,7 +591,7 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
 
     const veh = await pool.query(
-      'SELECT id, reg_number FROM public.vehicles WHERE id = $1 AND owner_id = $2',
+      'SELECT id, vehicle_number FROM public.vehicles WHERE id = $1 AND owner_id = $2',
       [req.params.id, owner.id]
     );
     if (!veh.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });

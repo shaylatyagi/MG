@@ -1031,7 +1031,7 @@ export default function DriverPWA() {
 
           {showAddEarning && (
             <div className="px-4 py-3 bg-emerald-50/50 border-b border-emerald-100 space-y-2">
-              <input type="number" placeholder="Amount earned (₹)" value={earningAmt} onChange={e => setEarningAmt(e.target.value)}
+              <input type="number" placeholder="Amount Earned (₹)" value={earningAmt} onChange={e => setEarningAmt(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-black text-slate-800 bg-white" />
               <input type="text" placeholder="Note (e.g. 12 trips, good day)" value={earningNote} onChange={e => setEarningNote(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-600 bg-white" />
@@ -1785,7 +1785,7 @@ export default function DriverPWA() {
                   <h3 className="font-black text-slate-800 mb-1">Emergency Alert</h3>
                   <p className="text-xs text-slate-400 mb-4">Immediately notifies your fleet owner</p>
                   <textarea value={sosMsg} onChange={e => setSosMsg(e.target.value)}
-                    placeholder="Describe the situation..."
+                    placeholder="Describe The Situation..."
                     rows={3} className="w-full border border-slate-200 rounded-xl p-3 text-sm mb-4 focus:outline-none focus:border-indigo-500 bg-slate-50 resize-none"/>
                   <div className="flex gap-2">
                     <button onClick={() => setShowSOS(false)} className="flex-1 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-600">Cancel</button>

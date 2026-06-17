@@ -475,7 +475,7 @@ export default function Login() {
           </label>
           <div className={styles.inputWrap}>
             <Phone size={15} className={styles.inputIcon} />
-            <input type="tel" value={phone} autoFocus placeholder="10-digit mobile number"
+            <input type="tel" value={phone} autoFocus placeholder="10-Digit Mobile Number"
               className={styles.input}
               onChange={function(e) { setPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); }}
               onKeyDown={function(e) { if (e.key === 'Enter' && canLogin) loginWithPin(); }}
@@ -489,7 +489,7 @@ export default function Login() {
           </label>
           <div className={styles.inputWrap}>
             <Lock size={15} className={styles.inputIcon} />
-            <input type={showPin ? 'text' : 'password'} value={pin} placeholder="4–6 digit PIN"
+            <input type={showPin ? 'text' : 'password'} value={pin} placeholder="4–6 Digit PIN"
               maxLength={6} inputMode="numeric"
               className={styles.input}
               onChange={function(e) { setPin(e.target.value.replace(/\D/g, '').slice(0, 6)); }}
@@ -554,7 +554,7 @@ export default function Login() {
           </label>
           <div className={styles.inputWrap}>
             <Lock size={15} className={styles.inputIcon} />
-            <input type="password" value={changePin} placeholder="Enter new PIN"
+            <input type="password" value={changePin} placeholder="Enter New PIN"
               maxLength={6} inputMode="numeric" autoFocus
               className={styles.inputOtp}
               onChange={function(e) { setChangePin(e.target.value.replace(/\D/g, '').slice(0, 6)); }}
@@ -567,7 +567,7 @@ export default function Login() {
           </label>
           <div className={styles.inputWrap}>
             <Lock size={15} className={styles.inputIcon} />
-            <input type="password" value={changePinConfirm} placeholder="Repeat new PIN"
+            <input type="password" value={changePinConfirm} placeholder="Repeat New PIN"
               maxLength={6} inputMode="numeric"
               className={styles.inputOtp}
               onChange={function(e) { setChangePinConfirm(e.target.value.replace(/\D/g, '').slice(0, 6)); }}
@@ -623,7 +623,7 @@ export default function Login() {
           </label>
           <div className={styles.inputWrap}>
             <Phone size={15} className={styles.inputIcon} />
-            <input type="tel" value={phone} autoFocus placeholder="10-digit mobile number"
+            <input type="tel" value={phone} autoFocus placeholder="10-Digit Mobile Number"
               className={styles.input}
               onChange={function(e) { setPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); }}
               onKeyDown={function(e) { if (e.key === 'Enter' && phone.length === 10 && !loading) sendForgotOtp(); }}
@@ -709,7 +709,7 @@ export default function Login() {
           <label className={styles.label}>Mobile Number *</label>
           <div className={styles.inputWrap}>
             <Phone size={15} className={styles.inputIcon} />
-            <input type="tel" value={signupPhone} placeholder="10-digit mobile number" className={styles.input} inputMode="numeric"
+            <input type="tel" value={signupPhone} placeholder="10-Digit Mobile Number" className={styles.input} inputMode="numeric"
               onChange={function(e) { setSignupPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); }} />
           </div>
         </div>
@@ -755,7 +755,7 @@ export default function Login() {
         </p>
         <div style={{ marginBottom: '20px' }}>
           <label className={styles.label}>OTP Code</label>
-          <input type="text" value={signupOtp} autoFocus placeholder="6-digit code" className={styles.inputOtp}
+          <input type="text" value={signupOtp} autoFocus placeholder="6-Digit Code" className={styles.inputOtp}
             maxLength={6} inputMode="numeric"
             onChange={function(e) { setSignupOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); }}
             onKeyDown={function(e) { if (e.key === 'Enter' && canVerify) verifySignupOtp(); }} />
@@ -783,7 +783,7 @@ export default function Login() {
           <label className={styles.label}>Admin Phone</label>
           <div className={styles.inputWrap}>
             <Phone size={15} className={styles.inputIcon} />
-            <input type="tel" value={adminPhone} autoFocus placeholder="10-digit mobile number"
+            <input type="tel" value={adminPhone} autoFocus placeholder="10-Digit Mobile Number"
               className={styles.input}
               onChange={function(e) { setAdminPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); }}
               onKeyDown={function(e) { if (e.key === 'Enter' && adminReady && !loading) loginAdmin(); }}
