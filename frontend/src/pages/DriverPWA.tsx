@@ -672,7 +672,7 @@ export default function DriverPWA() {
         body: JSON.stringify({ driverPhone: phone() })
       });
     } catch {}
-    localStorage.clear(); navigate('/login');
+    ['token','user','mg_admin_token'].forEach(k => localStorage.removeItem(k)); navigate('/login');
   };
 
   const kycCall = async (endpoint, body, docKey) => {

@@ -1224,7 +1224,7 @@ if (!oId) { navigate('/login'); return; }
 ]);
     // Session expired on another device → redirect to login
     if ([vehiclesRes, driversRes, statsRes, notifRes, ledgerRes, ownerStatsRes].some(r => r.status === 401)) {
-      localStorage.clear();
+      ['token','user','mg_admin_token'].forEach(k => localStorage.removeItem(k));
       navigate('/login');
       return;
     }
@@ -1537,7 +1537,7 @@ return () => clearInterval(interval);
   };
 
   const logout = () => {
-    localStorage.clear();
+    ['token','user','mg_admin_token'].forEach(k => localStorage.removeItem(k));
     navigate('/login');
   };
   const confirmLogout = () => setShowLogoutConfirm(true);

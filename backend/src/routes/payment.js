@@ -3195,64 +3195,52 @@ router.get('/owner/attendance', async (req, res) => {
       [ownerCode]
     );
 
-    // Get all assignment history for these drivers in this month
     const driverIds = driversRes.rows.map(d => d.id);
     if (driverIds.length === 0) return res.json({ month: targetMonth, daysInMonth, drivers: [] });
 
-    const histRes = await pool.query(
-      `SELECT driver_id, assigned_at, unassigned_at
-       FROM public.driver_vehicle_history
-       WHERE driver_id = ANY($1::int[])
-         AND assigned_at <= $3
-         AND (unassigned_at >= $2 OR unassigned_at IS NULL)`,
-      [driverIds, monthStart.toISOString(), monthEnd.toISOString()]
-    );
-
-    // Build per-driver attendance
-    // firstAssignedDay: attendance % counts from when driver was first assigned that month.
-    // e.g. driver assigned on the 20th of a 30-day month => 11 eligible days, not 30.
     const today = new Date();
     const isCurrentMonth = targetMonth === today.toISOString().slice(0, 7);
 
+    // Get actual login days from driver_daily_log
+    const logsRes = await pool.query(
+      `SELECT driver_id, EXTRACT(DAY FROM log_date)::INTEGER as day
+       FROM public.driver_daily_log
+       WHERE driver_id = ANY($1::int[])
+         AND DATE_TRUNC('month', log_date) = $2::date`,
+      [driverIds, targetMonth + '-01']
+    );
+
+    // Get assignment dates to know eligible start per driver
+    const asgnRes = await pool.query(
+      `SELECT DISTINCT ON (driver_id) driver_id, assigned_at
+       FROM public.driver_vehicle_history
+       WHERE driver_id = ANY($1::int[])
+         AND assigned_at <= $2
+       ORDER BY driver_id, assigned_at ASC`,
+      [driverIds, monthEnd.toISOString()]
+    );
+    const asgnMap = {};
+    asgnRes.rows.forEach(r => { asgnMap[r.driver_id] = new Date(r.assigned_at); });
+
     const attendanceMap = {};
     driversRes.rows.forEach(d => {
-      attendanceMap[d.id] = {
-        driverId: d.id, name: d.full_name, code: d.driver_code,
-        presentDays: new Set(),
-        firstAssignedDay: null,
-      };
+      attendanceMap[d.id] = { driverId: d.id, name: d.full_name, code: d.driver_code, presentDays: new Set() };
     });
-
-    histRes.rows.forEach(h => {
-      const start = new Date(Math.max(new Date(h.assigned_at), monthStart));
-      const end   = new Date(Math.min(h.unassigned_at ? new Date(h.unassigned_at) : monthEnd, monthEnd));
-      const entry = attendanceMap[h.driver_id];
-      if (!entry) return;
-      // Track earliest assignment day-of-month
-      const startDay = start.getDate();
-      if (entry.firstAssignedDay === null || startDay < entry.firstAssignedDay) {
-        entry.firstAssignedDay = startDay;
-      }
-      let cur = new Date(start);
-      cur.setHours(0, 0, 0, 0);
-      while (cur <= end) {
-        const dayNum = cur.getDate();
-        if (dayNum >= 1 && dayNum <= daysInMonth) entry.presentDays.add(dayNum);
-        cur.setDate(cur.getDate() + 1);
-      }
+    logsRes.rows.forEach(l => {
+      if (attendanceMap[l.driver_id]) attendanceMap[l.driver_id].presentDays.add(l.day);
     });
 
     const drivers = Object.values(attendanceMap).map(d => {
-      const firstDay = d.firstAssignedDay || 1;
+      const assignedAt = asgnMap[d.driverId];
+      const effectiveStart = assignedAt && assignedAt > monthStart ? assignedAt : monthStart;
+      const firstDay = effectiveStart.getDate();
       const lastDay = isCurrentMonth ? today.getDate() : daysInMonth;
       const eligibleDays = Math.max(1, lastDay - firstDay + 1);
       return {
-        driverId: d.driverId,
-        name: d.name,
-        code: d.code,
+        driverId: d.driverId, name: d.name, code: d.code,
         presentDays: Array.from(d.presentDays).sort((a, b) => a - b),
         totalPresent: d.presentDays.size,
-        totalAbsent: eligibleDays - d.presentDays.size,
+        totalAbsent: Math.max(0, eligibleDays - d.presentDays.size),
         eligibleDays,
         firstAssignedDay: firstDay,
         attendancePct: Math.min(100, Math.round((d.presentDays.size / eligibleDays) * 100)),
