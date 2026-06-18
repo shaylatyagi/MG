@@ -3207,3 +3207,4 @@ function AdminPanelInner() {
     </div>
   );
 }
+export default AdminPanelInner;
