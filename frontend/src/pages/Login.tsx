@@ -221,7 +221,7 @@ export default function Login() {
     setShowEnrollSheet(false);
     navigate(ref.path);
   };
-
+/*
   // ── PIN Login ─────────────────────────────────────────────────────────────
   const loginWithPin = async function() {
     setLoading(true); setError('');
@@ -246,7 +246,38 @@ export default function Login() {
     } catch { setError('Network error. Try again.'); }
     setLoading(false);
   };
+*/
+const loginWithPin = async function() {
+    setLoading(true); setError('');
+    var role = selectedRole.type === 'driver' ? 'DRIVER' : 'OWNER';
+    try {
+      var res = await fetch(API + '/api/auth/login-pin', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone, pin: pin, role: role }),
+      });
+      var data = await res.json();
+      
+      if (data.success) {
+        // Yahan hum bypass force kar rahe hain:
+        // Chahe backend kuch bhi bole, hum 'pin_must_change' ko false kar rahe hain
+        data.pin_must_change = false; 
 
+        if (data.pin_must_change) {
+          setPendingToken(data.token);
+          setPendingUser(data.user);
+          setPendingPath(selectedRole.redirect);
+          setStep('change-pin');
+        } else {
+          await afterLogin(data.token, data.user, selectedRole.redirect);
+        }
+      } else { 
+        setError(data.message || 'Login failed'); 
+      }
+    } catch { 
+      setError('Network error. Try again.'); 
+    }
+    setLoading(false);
+  };
   // ── Force PIN change (first login) ────────────────────────────────────────
   const submitChangePin = async function() {
     if (changePin !== changePinConfirm) { setError('PINs do not match'); return; }

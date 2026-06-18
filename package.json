@@ -15,5 +15,8 @@
   },
   "devDependencies": {
     "postcss": "^8.5.15"
+  },
+  "dependencies": {
+    "node-cron": "^4.4.1"
   }
 }

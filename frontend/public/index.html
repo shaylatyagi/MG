@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-size='18' font-family='Arial,sans-serif' font-weight='bold' fill='white'>M</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#4f46e5" />
     <meta name="description" content="MobilityGrid — Fleet Operating System for India" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -11,26 +11,36 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MobilityGrid" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" id="mg-manifest" />
-    <script>
-      // Switch manifest based on role (driver gets green manifest)
-      (function() {
-        var path = window.location.pathname + window.location.search;
-        var isDriver = path.includes('role=driver') || path.includes('/driver/');
-        var stored = '';
-        try { stored = localStorage.getItem('user'); } catch(e) {}
-        if (!isDriver && stored) {
-          try { var u = JSON.parse(stored); isDriver = u.role === 'DRIVER'; } catch(e) {}
-        }
-        if (isDriver) {
-          var el = document.getElementById('mg-manifest');
-          if (el) el.setAttribute('href', '/driver-manifest.json');
-          var tc = document.querySelector('meta[name="theme-color"]');
-          if (tc) tc.setAttribute('content', '#16a34a');
-        }
-      })();
-    </script>
+    <script defer>
+  // Switch manifest based on role (driver gets green manifest)
+  (function() {
+    var path = window.location.pathname + window.location.search;
+    var isDriver = path.includes('role=driver') || path.includes('/driver/');
+    var stored = '';
+    try { stored = localStorage.getItem('user'); } catch(e) {}
+    if (!isDriver && stored) {
+      try { var u = JSON.parse(stored); isDriver = u.role === 'DRIVER'; } catch(e) {}
+    }
+    if (isDriver) {
+      var el = document.getElementById('mg-manifest');
+      if (el) el.setAttribute('href', '/driver-manifest.json');
+      var tc = document.querySelector('meta[name="theme-color"]');
+      if (tc) tc.setAttribute('content', '#16a34a');
+    }
+  })();
+</script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link 
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" 
+  rel="stylesheet" 
+  media="print" 
+  onload="this.media='all'" 
+/>
+<noscript>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+</noscript>
     <title>MobilityGrid</title>
     <script>
       // Enable Tailwind dark mode via class strategy
@@ -45,7 +55,7 @@
         } catch(e) {}
       })();
     </script>
-    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms" defer></script>
     <script>
       // Apply dark mode config after Tailwind loads
       if (window.tailwind && window.tailwind.config) {

@@ -1953,7 +1953,30 @@ const removeRule = (i) => setIncentiveRules(prev => ({
       </div>
     );
   };
-
+  const handleRemindAll = async () => {
+  const oId = ownerId();
+  if (!oId) return;
+  const res = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { 
+    headers: { Authorization: `Bearer ${token()}` } 
+  }).then(r => r.json()).catch(() => []);
+  
+  if (res.length === 0) { 
+    toast.success('Sab drivers ne pay kar diya hai!'); 
+    return; 
+  }
+  
+  const confirm = window.confirm(`${res.length} drivers ka rent baaki hai. Sabko reminder bhejein?`);
+  if (!confirm) return;
+  
+  setRemindingAll(true);
+  await fetch(`${API}/api/payment/owner/remind-overdue?ownerId=${oId}`, { 
+    method: 'POST', 
+    headers: { Authorization: `Bearer ${token()}` } 
+  }).catch(() => {});
+  
+  setRemindingAll(false);
+  toast.info(`Reminder bhej diya gaya ${res.length} drivers ko!`);
+};
   // HOME TAB
   const HomeTab = () => {
     const hr = new Date().getHours();
@@ -1962,14 +1985,25 @@ const removeRule = (i) => setIncentiveRules(prev => ({
     const todayStr = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long' });
     return (
     <div className="space-y-4 pb-4 tab-fade">
-
-    {/* Overdue Alert Banner */}
-    {overdueDrivers.length > 0 && (
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span className="text-xs font-black text-amber-800">⏰ {overdueDrivers.length} drivers haven't paid today</span>
-        <button onClick={() => setShowOverdue(true)} className="text-[10px] font-black text-amber-600 underline">View & Remind →</button>
-      </div>
-    )}
+{overdueDrivers.length > 0 && (
+  <div className="relative bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+    <span className="text-xs font-black text-amber-800">⏰ {overdueDrivers.length} drivers haven't paid</span>
+    <button 
+      onClick={() => setShowOverdue(true)} 
+      className="text-[10px] font-black text-amber-600 underline"
+    >
+      View & Remind →
+    </button>
+    
+    {/* Agar aap chahte hain ki 'Remind All' direct yahi dikhe: */}
+    <button 
+      onClick={handleRemindAll}
+      className="ml-2 text-[10px] bg-amber-600 text-white px-2 py-1 rounded-lg font-black"
+    >
+      Remind All
+    </button>
+  </div>
+)}
 
     {/* Greeting */}
     <div className="flex items-center justify-between pt-1">
@@ -2116,89 +2150,138 @@ const removeRule = (i) => setIncentiveRules(prev => ({
         </div>
         <span className="text-slate-300 text-base font-light">›</span>
       </button>
-
-
+      
+      
+      
+      
+      
+      
+      
       {/* Attendance Panel */}
-      <button
-        onClick={() => setShowAttendance(v => !v)}
-        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-black transition ${showAttendance ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'}`}
-      >
-        <span className="flex items-center gap-2">📅 Driver Attendance</span>
-        <span className="text-[10px] font-medium opacity-60">{showAttendance ? 'Hide ▲' : 'Show ▼'}</span>
-      </button>
-      {showAttendance && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 pt-4 pb-2">
-            <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Monthly Attendance</p>
-            <input
-              type="month"
-              value={attendanceMonth}
-              onChange={e => setAttendanceMonth(e.target.value)}
-              className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400"
-            />
+<button
+  onClick={() => setShowAttendance(v => !v)}
+  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-black transition ${showAttendance ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'}`}
+>
+  <span className="flex items-center gap-2">📅 Driver Attendance</span>
+  <span className="text-[10px] font-medium opacity-60">{showAttendance ? 'Hide ▲' : 'Show ▼'}</span>
+</button>
+
+{showAttendance && (
+  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="flex items-center justify-between px-4 pt-4 pb-2">
+      <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Monthly Attendance</p>
+      <input
+        type="month"
+        value={attendanceMonth}
+        onChange={e => setAttendanceMonth(e.target.value)}
+        className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-400"
+      />
+    </div>
+
+    {loadingAttendance ? (
+      <div className="space-y-2 p-2">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="skeleton skeleton-text w-24" />
+            <div className="flex-1 skeleton" style={{height:10,borderRadius:6}} />
+            <div className="skeleton skeleton-text w-8" />
           </div>
-          {loadingAttendance ? (
-            <div className="space-y-2 p-2">
-              {[...Array(4)].map((_,i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="skeleton skeleton-text w-24" />
-                  <div className="flex-1 skeleton" style={{height:10,borderRadius:6}} />
-                  <div className="skeleton skeleton-text w-8" />
-                </div>
-              ))}
+        ))}
+      </div>
+    ) : !attendanceData?.drivers?.length ? (
+      <div className="p-6 text-center text-xs text-slate-400">No data for this month</div>
+    ) : (
+      (() => {
+        const days = attendanceData.daysInMonth || 30;
+        // Fixed widths: driver (100px), day (28px each), present (60px), percent (40px)
+        const totalWidth = 100 + (days * 28) + 60 + 40;
+
+        // Build header items
+        const headerItems = [
+          <div key="driver" style={{ width: 100, padding: '6px 8px', fontWeight: 900, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', textAlign: 'left' }}>Driver</div>
+        ];
+        for (let i = 1; i <= days; i++) {
+          headerItems.push(
+            <div key={`d-${i}`} style={{ width: 28, padding: '6px 4px', textAlign: 'center', fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{i}</div>
+          );
+        }
+        headerItems.push(
+          <div key="present" style={{ width: 60, padding: '6px 8px', textAlign: 'center', fontWeight: 900, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>Present</div>
+        );
+        headerItems.push(
+          <div key="pct" style={{ width: 40, padding: '6px 8px', textAlign: 'center', fontWeight: 900, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>%</div>
+        );
+
+        return (
+          <div style={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', padding: '0 4px 8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', width: totalWidth }}>
+              {/* Header row */}
+              <div style={{ display: 'flex', flexWrap: 'nowrap', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                {headerItems}
+              </div>
+
+              {/* Driver rows */}
+              {attendanceData.drivers.map((d, i) => {
+                const bg = i % 2 === 0 ? 'white' : 'rgba(241,245,249,0.5)';
+                const rowItems = [
+                  <div key="driver" style={{ width: 100, padding: '6px 8px', fontWeight: 900, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', backgroundColor: bg }}>
+                    <span>{d.name}</span>
+                    <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 4 }}>{d.code}</span>
+                  </div>
+                ];
+
+                if (d.noVehicle) {
+                  // Merge all day cells into one
+                  rowItems.push(
+                    <div key="no-vehicle" style={{ width: days * 28 + 60 + 40, padding: '6px 8px', textAlign: 'center', color: 'var(--color-text-muted)', fontStyle: 'italic', backgroundColor: bg }}>
+                      No vehicle assigned
+                    </div>
+                  );
+                } else {
+                  for (let j = 1; j <= days; j++) {
+                    const present = d.presentDays.includes(j);
+                    const beforeAssignment = d.firstAssignedDay && j < d.firstAssignedDay;
+                    rowItems.push(
+                      <div key={`d-${j}`} style={{ width: 28, padding: '6px 4px', textAlign: 'center', backgroundColor: bg }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            backgroundColor: present ? '#34d399' : beforeAssignment ? '#f1f5f9' : '#e2e8f0',
+                            opacity: beforeAssignment ? 0.3 : 1,
+                          }}
+                          title={beforeAssignment ? 'Before assignment' : present ? 'Present' : 'Absent'}
+                        />
+                      </div>
+                    );
+                  }
+                  rowItems.push(
+                    <div key="present" style={{ width: 60, padding: '6px 8px', textAlign: 'center', fontWeight: 900, color: 'var(--color-success-dark)', backgroundColor: bg }}>
+                      {d.totalPresent}/{d.eligibleDays}
+                    </div>
+                  );
+                  rowItems.push(
+                    <div key="pct" style={{ width: 40, padding: '6px 8px', textAlign: 'center', fontWeight: 900, color: d.attendancePct >= 80 ? 'var(--color-success-dark)' : d.attendancePct >= 50 ? 'var(--color-accent-dark)' : 'var(--color-danger-dark)', backgroundColor: bg }}>
+                      {d.attendancePct}%
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={d.driverId} style={{ display: 'flex', flexWrap: 'nowrap' }}>
+                    {rowItems}
+                  </div>
+                );
+              })}
             </div>
-          ) : !attendanceData?.drivers?.length ? (
-            <div className="p-6 text-center text-xs text-slate-400">No data for this month</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[10px]" style={{minWidth: 600}}>
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="text-left px-3 py-2 font-black text-slate-500 sticky left-0 bg-slate-50" style={{minWidth:120}}>Driver</th>
-                    {Array.from({length: attendanceData.daysInMonth}, (_, i) => (
-                      <th key={i+1} className="px-1 py-2 font-semibold text-slate-400 text-center" style={{minWidth:22}}>{i+1}</th>
-                    ))}
-                    <th className="px-3 py-2 font-black text-slate-500 text-center">Present</th>
-                    <th className="px-3 py-2 font-black text-slate-500 text-center">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attendanceData.drivers.map((d, i) => (
-                    <tr key={d.driverId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                      <td className="px-3 py-2 font-black text-slate-700 sticky left-0 bg-inherit" style={{minWidth:120}}>
-                        <div>{d.name}</div>
-                        <div className="font-normal text-slate-400">{d.code}</div>
-                      </td>
-                      {d.noVehicle ? (
-                        <td colSpan={attendanceData.daysInMonth + 2} className="px-3 py-2 text-center text-slate-400 text-xs italic">
-                          No vehicle assigned
-                        </td>
-                      ) : (
-                        <>
-                          {Array.from({length: attendanceData.daysInMonth}, (_, j) => {
-                            const day = j + 1;
-                            const present = d.presentDays.includes(day);
-                            const beforeAssignment = d.firstAssignedDay && day < d.firstAssignedDay;
-                            return (
-                              <td key={day} className="px-1 py-2 text-center">
-                                <span className={`inline-block w-4 h-4 rounded-full ${present ? 'bg-emerald-400' : beforeAssignment ? 'bg-slate-50' : 'bg-slate-100'}`}
-                                  title={beforeAssignment ? 'Before assignment' : present ? 'Present' : 'Absent'}
-                                  style={{opacity: beforeAssignment ? 0.3 : 1}} />
-                              </td>
-                            );
-                          })}
-                          <td className="px-3 py-2 text-center font-black text-emerald-600">{d.totalPresent}/{d.eligibleDays}</td>
-                          <td className="px-3 py-2 text-center font-black" style={{color: d.attendancePct >= 80 ? 'var(--color-success-dark)' : d.attendancePct >= 50 ? 'var(--color-accent-dark)' : 'var(--color-danger-dark)'}}>{d.attendancePct}%</td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()
+    )}
+  </div>
+)}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-50 flex justify-between items-center">
           <p className="text-xs font-semibold text-slate-600">{t.recentDrivers}</p>
@@ -2383,7 +2466,7 @@ const DriversTab = () => {
           <UserPlus size={15}/> {t.addNewDriver}
         </button>
         <button onClick={() => { setShowBulkModal(true); setBulkDrivers([]); setBulkResult(null); setBulkFile(null); }}
-          className="py-2.5 px-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-medium flex items-center gap-1.5 shadow-sm">
+          className="py-2.5 px-3.5 bg-white btorder border-slate-200 text-slate-600 rounded-xl text-xs font-medium flex items-center gap-1.5 shadow-sm">
           <span className="text-sm">📥</span> Import CSV
         </button>
       </div>
@@ -4387,7 +4470,7 @@ const TrackFleetTab = () => {
             </div>
           ) : (
             <div key={activeTab} className="tab-fade">
-              {activeTab === 'home' && <HomeTab />}
+              {activeTab === 'home' && <HomeTab handleRemindAll={handleRemindAll} />}
               {activeTab === 'drivers' && <DriversTab />}
               {activeTab === 'vehicles' && <VehiclesTab />}
               {activeTab === 'payments' && <PaymentsTab />}
@@ -4851,11 +4934,17 @@ const TrackFleetTab = () => {
     </div>
   </div>
 )}
-{/* Overdue Drivers Bottom Sheet */}
 {showOverdue && (
-  <div className="absolute inset-0 z-[999] flex flex-col justify-end" onClick={() => setShowOverdue(false)}>
-    <div className="bg-white rounded-t-3xl shadow-2xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
-      <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-slate-100">
+  <div 
+    className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/50" 
+    onClick={() => setShowOverdue(false)}
+  >
+    <div 
+      className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col" 
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Sticky Header – always visible */}
+      <div className="sticky top-0 bg-white z-10 flex items-center justify-between px-5 pt-4 pb-2 border-b border-slate-100 rounded-t-3xl">
         <div>
           <p className="font-black text-slate-800 text-sm">⏰ Overdue Today</p>
           <p className="text-[10px] text-slate-400">{overdueDrivers.length} drivers haven't paid yet</p>
@@ -4878,7 +4967,9 @@ const TrackFleetTab = () => {
           <button onClick={() => setShowOverdue(false)} className="text-slate-400"><X size={18}/></button>
         </div>
       </div>
-      <div className="overflow-y-auto divide-y divide-slate-50">
+
+      {/* Scrollable driver list */}
+      <div className="overflow-y-auto flex-1 px-2 py-2 divide-y divide-slate-50">
         {overdueDrivers.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-2xl mb-2">✅</p>
@@ -4886,28 +4977,26 @@ const TrackFleetTab = () => {
             <p className="text-[10px] text-slate-400 mt-1">No outstanding dues today</p>
           </div>
         ) : overdueDrivers.map((d, i) => (
-          <div key={i} className="px-4 py-3 border-b border-slate-50 last:border-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-500 font-black text-sm border border-red-100">
-                  {(d.full_name||'D').charAt(0)}
-                </div>
-                <div>
-                  <p className="text-sm font-black text-slate-800">{d.full_name}</p>
-                  <p className="text-[9px] text-slate-400">{d.vehicle_number || 'No vehicle'} · {d.mobile_number}</p>
-                </div>
+          <div key={i} className="px-3 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-red-500 font-black text-sm border border-red-100">
+                {(d.full_name||'D').charAt(0)}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-right">
-                  <p className="text-sm font-black text-red-600">₹{parseFloat(d.daily_rent||0).toLocaleString('en-IN')}</p>
-                  <p className="text-[9px] text-slate-400">due</p>
-                </div>
-                <button
-                  onClick={() => { setPayLinkDriver(d); setPayLinkAmt(String(parseFloat(d.daily_rent||0))); setPayLinkResult(null); }}
-                  className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 text-sm border border-indigo-100"
-                  title="Send Payment Link"
-                >🔗</button>
+              <div>
+                <p className="text-sm font-black text-slate-800">{d.full_name}</p>
+                <p className="text-[9px] text-slate-400">{d.vehicle_number || 'No vehicle'} · {d.mobile_number}</p>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="text-sm font-black text-red-600">₹{parseFloat(d.daily_rent||0).toLocaleString('en-IN')}</p>
+                <p className="text-[9px] text-slate-400">due</p>
+              </div>
+              <button
+                onClick={() => { setPayLinkDriver(d); setPayLinkAmt(String(parseFloat(d.daily_rent||0))); setPayLinkResult(null); }}
+                className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 text-sm border border-indigo-100"
+                title="Send Payment Link"
+              >🔗</button>
             </div>
           </div>
         ))}
@@ -4915,7 +5004,6 @@ const TrackFleetTab = () => {
     </div>
   </div>
 )}
-
 
 {/* ── Payment Link Modal ──────────────────────────────────────────── */}
 {payLinkDriver && (

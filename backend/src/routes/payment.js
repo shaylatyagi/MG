@@ -953,61 +953,27 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
   try {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
-
-    // Today's outstanding only: current daily_rent minus payments recorded today
-    const result = await pool.query(`
-      SELECT
-        d.id,
-        d.full_name,
-        d.mobile_number,
-        d.driver_code,
-        v.vehicle_number,
-        v.daily_rent,
-        GREATEST(0,
-          COALESCE(v.daily_rent, 0)::numeric
-          - COALESCE((
-              SELECT SUM(mo.order_amount)
-              FROM public.ms_orders mo
-              WHERE mo.payer_mobile = d.mobile_number
-                AND mo.transaction_status = 'SUCCESS'
-                AND DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
-                  = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
-            ), 0)
-          - COALESCE((
-              SELECT SUM(dl.amount)
-              FROM public.driver_ledger dl
-              WHERE dl.driver_id = d.id
-                AND dl.entry_type IN ('CASH_PAYMENT', 'PAYMENT')
-                AND DATE(dl.created_at AT TIME ZONE 'Asia/Kolkata')
-                  = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
-            ), 0)
-        ) AS balance
-      FROM public.drivers d
-      JOIN public.vehicles v ON v.driver_id = d.id
-      WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-        AND d.status = 'ACTIVE'
-        AND COALESCE(v.daily_rent, 0) > 0
-        AND GREATEST(0,
-          COALESCE(v.daily_rent, 0)::numeric
-          - COALESCE((
-              SELECT SUM(mo.order_amount)
-              FROM public.ms_orders mo
-              WHERE mo.payer_mobile = d.mobile_number
-                AND mo.transaction_status = 'SUCCESS'
-                AND DATE(mo.order_completion_date AT TIME ZONE 'Asia/Kolkata')
-                  = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
-            ), 0)
-          - COALESCE((
-              SELECT SUM(dl.amount)
-              FROM public.driver_ledger dl
-              WHERE dl.driver_id = d.id
-                AND dl.entry_type IN ('CASH_PAYMENT', 'PAYMENT')
-                AND DATE(dl.created_at AT TIME ZONE 'Asia/Kolkata')
-                  = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
-            ), 0)
-        ) > 0
-      ORDER BY balance DESC, full_name;
-    `, [parseInt(ownerId)]);
+    // Optimized query for total outstanding (Previous Due + Today's Rent - Today's Payment)
+const result = await pool.query(`
+  SELECT
+    d.id,
+    d.full_name,
+    d.mobile_number,
+    d.driver_code,
+    v.vehicle_number,
+    v.daily_rent,
+    -- Calculation: (Total Charges all time) - (Total Paid all time)
+    (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')) 
+    - 
+    (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('CASH_PAYMENT', 'UPI_PAYMENT', 'ADVANCE_CREDIT', 'REFUND'))
+    AS balance
+  FROM public.drivers d
+  JOIN public.vehicles v ON v.driver_id = d.id
+  WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+    AND d.status = 'ACTIVE'
+  HAVING (SELECT balance) > 0
+  ORDER BY balance DESC;
+`, [parseInt(ownerId)]);
 
     res.json(result.rows);
   } catch (err) {
@@ -2300,38 +2266,54 @@ router.get('/driver/profile', verifyToken, async (req, res) => {
 );
     if (!result.rows[0]) return res.status(404).json({ message: 'Driver not found' });
     const p = result.rows[0];
+    // Inside /driver/profile after fetching driver details (p)
+let total_outstanding = 0;
+let amount_paid_today = 0;
+let dailyDepositRecovery = 0;
+let effectiveDailyCharge = 0;
 
-    // ✅ BAHAR declare karo — sab 0 se shuru
-    let amount_paid_today = 0;
-    let total_outstanding = 0;
-    let dailyDepositRecovery = 0;    // ← const tha if block mein, ab let bahar
-    let effectiveDailyCharge = 0;    // ← same
+if (p.vehicle_number && p.vehicle_daily_rent) {
+  const dailyRent = parseFloat(p.vehicle_daily_rent);
+  const securityDeposit = parseFloat(p.security_deposit || 0);
+  dailyDepositRecovery = securityDeposit > 0 ? Math.round(securityDeposit/100) : 0;
+  effectiveDailyCharge = dailyRent + dailyDepositRecovery;
 
-    if (p.vehicle_number && p.vehicle_daily_rent) {
-      const dailyRent = parseFloat(p.vehicle_daily_rent);
+  // Today's paid amount (for display)
+  const todayPaidRes = await pool.query(
+    `SELECT COALESCE(SUM(order_amount),0) as total 
+     FROM public.ms_orders
+     WHERE payer_mobile=$1 
+       AND transaction_status='SUCCESS' 
+       AND DATE(order_completion_date)=CURRENT_DATE`,
+    [phone]
+  );
+  amount_paid_today = parseFloat(todayPaidRes.rows[0].total);
 
-      const securityDeposit = parseFloat(p.security_deposit || 0);
-      dailyDepositRecovery = securityDeposit > 0 ? Math.round(securityDeposit/100) : 0;
-      effectiveDailyCharge = dailyRent + dailyDepositRecovery;
-
-      // Outstanding = today's effective charge minus what was paid today
-      const todayPaidRes = await pool.query(
-        `SELECT COALESCE(SUM(order_amount),0) as total FROM public.ms_orders
-         WHERE payer_mobile=$1 AND transaction_status='SUCCESS' AND DATE(order_completion_date)=CURRENT_DATE`,
-        [phone]
-      );
-      amount_paid_today = parseFloat(todayPaidRes.rows[0].total);
-      total_outstanding = Math.max(0, effectiveDailyCharge - amount_paid_today);
-    }
-
-    res.json({
-      ...p,
-      amount_paid_today,
-      total_outstanding,
-      current_dues: total_outstanding,
-      daily_deposit_recovery: dailyDepositRecovery,
-      effective_daily_charge: effectiveDailyCharge
-    });
+  // ---- NEW: Compute cumulative outstanding from ledger ----
+  const ledgerBal = await pool.query(
+    `SELECT 
+       COALESCE(SUM(CASE 
+         WHEN entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','PENALTY','DEPOSIT_CHARGE') 
+         THEN amount ELSE 0 END), 0) AS total_charged,
+       COALESCE(SUM(CASE 
+         WHEN entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') 
+         THEN amount ELSE 0 END), 0) AS total_paid
+     FROM public.driver_ledger
+     WHERE driver_id = $1`,
+    [p.id]
+  );
+  const charged = parseFloat(ledgerBal.rows[0]?.total_charged || 0);
+  const paid = parseFloat(ledgerBal.rows[0]?.total_paid || 0);
+  total_outstanding = Math.max(0, charged - paid);
+}
+res.json({
+  ...p,
+  amount_paid_today,
+  total_outstanding,          // now cumulative
+  current_dues: total_outstanding, // also cumulative
+  daily_deposit_recovery: dailyDepositRecovery,
+  effective_daily_charge: effectiveDailyCharge
+});
 
   } catch (err) {
     console.error('Driver profile error:', err);
@@ -3099,6 +3081,21 @@ const generateDailyRentEntries = async () => {
     console.error('Daily rent error:', err.message);
   }
 };
+const cron = require('node-cron');
+
+// Schedule daily rent generation at 00:00 (midnight) every day
+cron.schedule('0 0 * * *', async () => {
+  console.log('🔄 Running daily rent generation...');
+  try {
+    await generateDailyRentEntries();
+    console.log('✅ Daily rent generation completed.');
+  } catch (err) {
+    console.error('❌ Cron rent generation error:', err.message);
+  }
+}, {
+  scheduled: true,
+  timezone: "Asia/Kolkata" // adjust to your timezone
+});
 // Manual trigger for testing
 router.post('/admin/generate-daily-rent', verifyToken, async (req, res) => {
   if (req.user.role !== 'admin') {
