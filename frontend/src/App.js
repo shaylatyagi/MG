@@ -77,6 +77,7 @@ function PrivateRoute({ children, adminOnly }) {
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
   return (
+    <main role="main">
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
@@ -102,6 +103,7 @@ function App() {
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
+    </main>
   );
 }
 
