@@ -64,6 +64,7 @@ const { withRls, bypassRls } = require('./middleware/rls.middleware');
 app.use('/api/uploads',      require('./routes/uploads'));
 app.use('/api/auth',         require('./routes/auth'));
 app.use('/api/driver',       require('./routes/driver'));
+const paymentRoutes = require('./routes/payment');
 app.use('/api/payment',      verifyToken, require('./routes/payment'));
 app.use('/api/assignment',   verifyToken, require('./routes/assignment'));
 app.use('/api/payment-links',require('./routes/paymentLinks'));

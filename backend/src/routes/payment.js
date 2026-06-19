@@ -981,7 +981,13 @@ const result = await pool.query(`
     res.json([]);
   }
 });
-
+router.post('/debug-run-rent', async (req, res) => {
+  try {
+    const { generateDailyRentEntries } = require('../services/scheduler.service');
+    await generateDailyRentEntries();
+    res.json({ message: "Success" });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 // POST /owner/remind-overdue?ownerId=X — send in-app notification to all overdue drivers
 router.post('/owner/remind-overdue', verifyToken, async (req, res) => {
   try {

@@ -27,7 +27,7 @@ const generateDailyRentEntries = async () => {
         const { rows: existing } = await pool.query(`
           SELECT id FROM public.driver_ledger
           WHERE driver_id = $1
-            AND entry_type = 'DAILY_RENT'
+            AND entry_type = 'RENT_CHARGE'
             AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
         `, [driver.id]);
 
@@ -48,7 +48,7 @@ const generateDailyRentEntries = async () => {
         await pool.query(`
           INSERT INTO public.driver_ledger
             (driver_id, entry_type, amount, description, balance_after, created_by)
-          VALUES ($1, 'DAILY_RENT', $2, $3, $4, NULL)
+          VALUES ($1, 'RENT_CHARGE', $2, $3, $4, NULL)
         `, [
           driver.id,
           rentAmount,

@@ -39,7 +39,16 @@ app.get('/api/drivers/list', require('./src/middleware/auth.middleware').verifyT
     res.status(500).json({ drivers: [], success: false, error: err.message });
   }
 });
-
+// index.js mein ye add karein
+app.post('/api/debug/test-rent-gen', async (req, res) => {
+  try {
+    const { generateDailyRentEntries } = require('./src/services/scheduler.service');
+    await generateDailyRentEntries();
+    res.json({ message: "Scheduler run successfully! Check your DB/Dashboard now." });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // ── SERVER START ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
