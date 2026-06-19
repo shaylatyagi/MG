@@ -951,27 +951,41 @@ router.post('/owner/notify-unpaid', verifyToken, async (req, res) => {
 });
 router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
   try {
-    // payment.js mein route ke andar
-const { ownerId } = req.query;
-const ownerCheck = await pool.query('SELECT owner_code FROM public.owners WHERE id = $1', [ownerId]);
-const ownerCode = ownerCheck.rows[0]?.owner_code || 'DEFAULT_CODE'; // Fallback added
+    // 1. Get ownerId as integer and ensure it's not an object
+    const ownerId = parseInt(req.query.ownerId); 
+    
+    if (isNaN(ownerId)) {
+      return res.status(400).json({ success: false, message: "Invalid ownerId" });
+    }
+
+    // 2. Fetch ownerCode using the integer ID
+    const ownerCheck = await pool.query('SELECT owner_code FROM public.owners WHERE id = $1', [ownerId]);
+    
+    if (ownerCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Owner not found" });
+    }
+    
+    const ownerCode = ownerCheck.rows[0].owner_code;
+    console.log("DEBUG: Processing overdue for:", ownerCode);
+
+    // 3. Run query using the ownerCode (which is a string)
     const result = await pool.query(`
-  SELECT d.id, d.full_name, v.vehicle_number, v.daily_rent,
-  ( (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')) 
-    - 
-    (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('CASH_PAYMENT', 'UPI_PAYMENT', 'ADVANCE_CREDIT', 'REFUND')) 
-  ) AS balance
-  FROM public.drivers d
-  JOIN public.vehicles v ON v.driver_id = d.id
-  WHERE d.owner_code = $1 AND d.status = 'ACTIVE'
-`, [ownerCode]); // Yahan ownerCode pass karein, ID nahi
-    
-    console.log("DEBUG: Result rows from DB:", result.rows); // <--- YE LINE ADD KAREIN
-    
+      SELECT d.id, d.full_name, v.vehicle_number, v.daily_rent,
+      ( 
+        (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')) 
+        - 
+        (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('CASH_PAYMENT', 'UPI_PAYMENT', 'ADVANCE_CREDIT', 'REFUND')) 
+      ) AS balance
+      FROM public.drivers d
+      JOIN public.vehicles v ON v.driver_id = d.id
+      WHERE d.owner_code = $1 AND d.status = 'ACTIVE'
+    `, [ownerCode]);
+
     res.json(result.rows);
+    
   } catch (err) {
-    console.log("DEBUG: Error:", err);
-    res.json([]);
+    console.error("DEBUG: Error in overdue-drivers:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 router.post('/debug-run-rent', async (req, res) => {
