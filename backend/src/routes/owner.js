@@ -77,14 +77,14 @@ router.get('/stats', async (req, res) => {
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
          WHERE owner_id = $1 AND transaction_status = 'SUCCESS'
-           AND DATE(payment_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
+           AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
         [oid]
       ),
       pool.query(
         `SELECT COALESCE(SUM(amount),0) AS total
          FROM ms_orders
          WHERE owner_id = $1 AND transaction_status = 'SUCCESS'
-           AND DATE_TRUNC('month', payment_date AT TIME ZONE 'Asia/Kolkata')
+           AND DATE_TRUNC('month', order_completion_date AT TIME ZONE 'Asia/Kolkata')
              = DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Kolkata')`,
         [oid]
       ),
