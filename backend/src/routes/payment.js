@@ -955,23 +955,24 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
     if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
     // Optimized query for total outstanding (Previous Due + Today's Rent - Today's Payment)
 const result = await pool.query(`
-  SELECT
-    d.id,
-    d.full_name,
-    d.mobile_number,
-    d.driver_code,
-    v.vehicle_number,
-    v.daily_rent,
-    -- Calculation: (Total Charges all time) - (Total Paid all time)
-    (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')) 
-    - 
-    (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('CASH_PAYMENT', 'UPI_PAYMENT', 'ADVANCE_CREDIT', 'REFUND'))
-    AS balance
-  FROM public.drivers d
-  JOIN public.vehicles v ON v.driver_id = d.id
-  WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-    AND d.status = 'ACTIVE'
-  HAVING (SELECT balance) > 0
+  SELECT * FROM (
+    SELECT
+      d.id,
+      d.full_name,
+      d.mobile_number,
+      d.driver_code,
+      v.vehicle_number,
+      v.daily_rent,
+      ((SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')) 
+       - 
+       (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('CASH_PAYMENT', 'UPI_PAYMENT', 'ADVANCE_CREDIT', 'REFUND'))) 
+      AS balance
+    FROM public.drivers d
+    JOIN public.vehicles v ON v.driver_id = d.id
+    WHERE d.owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+      AND d.status = 'ACTIVE'
+  ) AS subquery
+  WHERE balance > 0
   ORDER BY balance DESC;
 `, [parseInt(ownerId)]);
 
