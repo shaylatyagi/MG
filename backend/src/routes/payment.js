@@ -951,24 +951,14 @@ router.post('/owner/notify-unpaid', verifyToken, async (req, res) => {
 });
 router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
   try {
-    // 1. Get ownerId as integer and ensure it's not an object
-    const ownerId = parseInt(req.query.ownerId); 
-    
-    if (isNaN(ownerId)) {
-      return res.status(400).json({ success: false, message: "Invalid ownerId" });
+    // Get the owner_code directly from the user object in the token
+    // Assuming your JWT contains owner_code. If not, use req.user.id to fetch it.
+    const ownerCode = req.user.owner_code; 
+
+    if (!ownerCode) {
+      return res.status(400).json({ success: false, message: "Owner code missing in token" });
     }
 
-    // 2. Fetch ownerCode using the integer ID
-    const ownerCheck = await pool.query('SELECT owner_code FROM public.owners WHERE id = $1', [ownerId]);
-    
-    if (ownerCheck.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Owner not found" });
-    }
-    
-    const ownerCode = ownerCheck.rows[0].owner_code;
-    console.log("DEBUG: Processing overdue for:", ownerCode);
-
-    // 3. Run query using the ownerCode (which is a string)
     const result = await pool.query(`
       SELECT d.id, d.full_name, v.vehicle_number, v.daily_rent,
       ( 
@@ -982,7 +972,6 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
     `, [ownerCode]);
 
     res.json(result.rows);
-    
   } catch (err) {
     console.error("DEBUG: Error in overdue-drivers:", err);
     res.status(500).json({ success: false, message: err.message });
