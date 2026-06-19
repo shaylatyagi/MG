@@ -17,9 +17,13 @@ router.use(verifyToken);
 
 // Helper: get owner row (id + company_id) from JWT user id
 async function getOwner(userId) {
+  // Safe integer conversion
+  const id = parseInt(userId); 
+  console.log("DEBUG: Querying owner with integer ID:", id); // Ye terminal mein dekho
+  
   const r = await pool.query(
     'SELECT id, company_id, owner_code FROM owners WHERE id = $1',
-    [userId]
+    [id]
   );
   return r.rows[0] || null;
 }
