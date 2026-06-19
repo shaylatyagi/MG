@@ -5,27 +5,35 @@
 const jwt = require('jsonwebtoken');
 const { ApiError } = require('./error.middleware');
 const pool = require('../config/db');
-
-// Verify JWT token (async — also validates single-device session token)
 const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer '))
       throw new ApiError(401, 'No token provided', 'NO_TOKEN');
+    
     const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
-    // Single-device session check: if JWT carries a session_token, verify it matches DB
+    
+    // --- FIX STARTS HERE ---
+    // Force the id to be an integer so queries don't trigger UUID/Syntax errors
+    const normalizedUser = {
+      ...decoded,
+      id: parseInt(decoded.id, 10)
+    };
+    // --- FIX ENDS HERE ---
+
     if (decoded.session_token && decoded.id && decoded.role !== 'admin' && decoded.role !== 'MANAGER') {
       const table = decoded.role === 'DRIVER' ? 'drivers' : 'owners';
       const dbRes = await pool.query(
         `SELECT session_token FROM public.${table} WHERE id=$1`,
-        [decoded.id]
+        [normalizedUser.id] // Use normalized ID
       );
       const stored = dbRes.rows[0]?.session_token;
       if (!stored || stored !== decoded.session_token) {
         throw new ApiError(401, 'Session expired. Please login again.', 'SESSION_EXPIRED');
       }
     }
-    req.user = decoded;
+    
+    req.user = normalizedUser; // Use normalized object
     next();
   } catch (err) {
     if (err instanceof ApiError) return next(err);
