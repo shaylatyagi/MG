@@ -92,7 +92,7 @@ export default function FleetSettings() {
                 <div key={item.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <p style={{ fontSize: '14px', fontWeight: '500', color: '#1A1A1A' }}>{item.label}</p>
-                    <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>{item.sub}</p>
+                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{item.sub}</p>
                   </div>
                   <div
                     onClick={() => setSettings({ ...settings, [item.key]: !settings[item.key] })}

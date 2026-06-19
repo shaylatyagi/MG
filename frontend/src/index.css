@@ -47,7 +47,7 @@ input[type="number"] { font-size: 16px; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
 :root {
   /* Landing page design system */
@@ -62,7 +62,7 @@ input[type="number"] { font-size: 16px; }
   --slate-800:  #1e293b;
   --slate-700:  #334155;
   --slate-600:  #475569;
-  --slate-400:  #94a3b8;
+  --slate-400:  #64748b;
   --slate-200:  #e2e8f0;
   --slate-100:  #f1f5f9;
   --slate-50:   #f8fafc;
@@ -76,7 +76,7 @@ input[type="number"] { font-size: 16px; }
   --bronze-card: #4338ca;
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-muted: #64748b;
   --border: #e2e8f0;
   --success: #22c55e;
   --warning: #f59e0b;
@@ -377,7 +377,7 @@ html.dark .bg-slate-900      { background-color: #020617 !important; }
 html.dark .text-slate-900    { color: #f1f5f9 !important; }
 html.dark .text-slate-800    { color: #e2e8f0 !important; }
 html.dark .text-slate-700    { color: #cbd5e1 !important; }
-html.dark .text-slate-600    { color: #94a3b8 !important; }
+html.dark .text-slate-600    { color: #64748b !important; }
 html.dark .text-slate-500    { color: #64748b !important; }
 html.dark .text-slate-400    { color: #475569 !important; }
 
@@ -599,7 +599,7 @@ html.dark .skeleton-card {
   box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
 }
 .mg-input::placeholder {
-  color: #94a3b8;
+  color: #64748b;
   font-weight: 400;
 }
 .mg-input:disabled {
@@ -700,7 +700,7 @@ html.dark .skeleton-card {
 .section-header-title {
   font-size: 11px;
   font-weight: 800;
-  color: #94a3b8;
+  color: #64748b;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

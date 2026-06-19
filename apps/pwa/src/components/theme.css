@@ -325,7 +325,7 @@ button {
 .chat-empty-state {
   text-align: center;
   margin-top: 60px;
-  color: #9CA3AF;
+  color: #6b7280;
 }
 
 .chat-empty-state .icon {
@@ -530,7 +530,7 @@ button {
 
 .doc-card__pill--empty {
   background: #F3F4F6;
-  color: #9CA3AF;
+  color: #6b7280;
 }
 
 .doc-card__content {

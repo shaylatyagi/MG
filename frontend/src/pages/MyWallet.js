@@ -2,7 +2,7 @@ import { useState, useEffect, createElement } from 'react';
 import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import api from '../api';
-const thStyle = { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' };
+const thStyle = { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' };
 const tdStyle = { padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' };
 export default function MyWallet() {
   const [transactions, setTransactions] = useState([]);
@@ -65,7 +65,7 @@ export default function MyWallet() {
           ),
           createElement('tbody', null, 
             transactions.length === 0 
-              ? createElement('tr', null, createElement('td', { colSpan: 6, style: { padding: '24px', textAlign: 'center', fontSize: '14px', color: '#9CA3AF' } }, 'No transactions found.'))
+              ? createElement('tr', null, createElement('td', { colSpan: 6, style: { padding: '24px', textAlign: 'center', fontSize: '14px', color: '#6b7280' } }, 'No transactions found.'))
               : transactions.map((txn, index) => 
                   createElement('tr', { key: index, style: { borderBottom: '1px solid #E8E0D5' } }, [
                     createElement('td', { style: { ...tdStyle, fontFamily: 'monospace', fontSize: '12px' } }, txn.order_id),

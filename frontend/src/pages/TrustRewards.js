@@ -49,7 +49,7 @@ export default function TrustRewards() {
               { label: 'Active Streak', value: '6 days', sub: '1 more for bonus', color: '#D97706' },
             ].map((card, i) => (
               <div key={i} style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #E8E0D5' }}>
-                <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{card.label}</p>
+                <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{card.label}</p>
                 <p style={{ fontSize: '24px', fontWeight: '700', color: card.color, marginBottom: '4px' }}>{card.value}</p>
                 <p style={{ fontSize: '12px', color: '#6B6B6B' }}>{card.sub}</p>
               </div>
@@ -66,10 +66,10 @@ export default function TrustRewards() {
                     {m.achieved ? '✓' : '🔒'}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: '13px', fontWeight: '600', color: m.achieved ? '#8B5E3C' : '#9CA3AF' }}>{m.label}</p>
+                    <p style={{ fontSize: '13px', fontWeight: '600', color: m.achieved ? '#8B5E3C' : '#6b7280' }}>{m.label}</p>
                     <p style={{ fontSize: '12px', color: '#6B6B6B', marginTop: '2px' }}>{m.reward}</p>
                   </div>
-                  <p style={{ fontSize: '12px', fontWeight: '600', color: m.achieved ? '#8B5E3C' : '#9CA3AF' }}>{m.score} pts</p>
+                  <p style={{ fontSize: '12px', fontWeight: '600', color: m.achieved ? '#8B5E3C' : '#6b7280' }}>{m.score} pts</p>
                 </div>
               ))}
             </div>
@@ -81,7 +81,7 @@ export default function TrustRewards() {
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < history.length - 1 ? '1px solid #F3EDE5' : 'none' }}>
                   <div>
                     <p style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A1A' }}>{item.label}</p>
-                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{item.date}</p>
+                    <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{item.date}</p>
                   </div>
                   <p style={{ fontSize: '14px', fontWeight: '700', color: item.points.startsWith('+') ? '#16A34A' : '#DC2626' }}>{item.points}</p>
                 </div>

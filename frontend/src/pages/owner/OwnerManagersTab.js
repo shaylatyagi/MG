@@ -156,7 +156,7 @@ export default function OwnerManagersTab({ lang }) {
       ) : managers.length === 0 ? (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', textAlign: 'center', border: '1px solid #E8E0D5' }}>
           <p style={{ fontSize: '28px', marginBottom: '8px' }}>👤</p>
-          <p style={{ fontSize: '14px', color: '#9CA3AF' }}>No managers yet. Add one to delegate daily operations.</p>
+          <p style={{ fontSize: '14px', color: '#6b7280' }}>No managers yet. Add one to delegate daily operations.</p>
         </div>
       ) : managers.map(m => (
         <div key={m.id} style={{ backgroundColor: 'white', borderRadius: '12px', padding: '14px 16px', marginBottom: '10px', border: '1px solid #E8E0D5', display: 'flex', alignItems: 'center', gap: '12px' }}>

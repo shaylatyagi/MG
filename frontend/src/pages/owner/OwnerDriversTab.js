@@ -176,7 +176,7 @@ export default function OwnerDriversTab({ lang }) {
                 )}
               </>
           }
-          <button onClick={() => setImportResult(null)} style={{ marginTop: '8px', background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: '12px' }}>Dismiss</button>
+          <button onClick={() => setImportResult(null)} style={{ marginTop: '8px', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '12px' }}>Dismiss</button>
         </div>
       )}
 
@@ -217,7 +217,7 @@ export default function OwnerDriversTab({ lang }) {
       {drivers.length === 0 ? (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', textAlign: 'center', border: '1px solid #E8E0D5' }}>
           <p style={{ fontSize: '32px', marginBottom: '8px' }}>👤</p>
-          <p style={{ fontSize: '14px', color: '#9CA3AF' }}>
+          <p style={{ fontSize: '14px', color: '#6b7280' }}>
             {lang === 'en' ? 'No drivers yet. Add your first driver above.' : 'कोई ड्राइवर नहीं। ऊपर पहला ड्राइवर जोड़ें।'}
           </p>
         </div>
@@ -251,7 +251,7 @@ export default function OwnerDriversTab({ lang }) {
                 { label: 'KYC', value: d.kyc_status || 'PENDING', color: kycStyle.color, bg: kycStyle.bg },
               ].map((s, i) => (
                 <div key={i} style={{ flex: 1, backgroundColor: s.bg || '#FAF7F2', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '10px', color: '#9CA3AF', margin: 0 }}>{s.label}</p>
+                  <p style={{ fontSize: '10px', color: '#6b7280', margin: 0 }}>{s.label}</p>
                   <p style={{ fontSize: '12px', fontWeight: '700', color: s.color, margin: 0 }}>{s.value}</p>
                 </div>
               ))}
@@ -272,7 +272,7 @@ export default function OwnerDriversTab({ lang }) {
 
                 {/* DRV-05: Profile — last payments + assignment history */}
                 {profileLoading[d.id] ? (
-                  <p style={{ fontSize: '11px', color: '#9CA3AF', textAlign: 'center', margin: '8px 0' }}>Loading profile…</p>
+                  <p style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', margin: '8px 0' }}>Loading profile…</p>
                 ) : profile[d.id] && (
                   <>
                     {/* Last payments */}
@@ -304,7 +304,7 @@ export default function OwnerDriversTab({ lang }) {
                               <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A1A1A', margin: 0 }}>{a.reg_number || '—'}</p>
                               <p style={{ fontSize: '11px', color: '#8B5E3C', fontWeight: '600', margin: 0 }}>{fmt(a.rent_amount)}/day</p>
                             </div>
-                            <p style={{ fontSize: '10px', color: '#9CA3AF', margin: '2px 0 0' }}>
+                            <p style={{ fontSize: '10px', color: '#6b7280', margin: '2px 0 0' }}>
                               {new Date(a.assigned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
                               {a.unassigned_at ? ` → ${new Date(a.unassigned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}` : ' → Active'}
                             </p>

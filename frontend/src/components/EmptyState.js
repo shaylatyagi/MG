@@ -65,7 +65,7 @@ export default function EmptyState({ type = 'default', title, subtitle, action, 
         {title || 'Nothing here yet'}
       </p>
       {subtitle && (
-        <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.5, maxWidth: 240 }}>
+        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 20px', lineHeight: 1.5, maxWidth: 240 }}>
           {subtitle}
         </p>
       )}

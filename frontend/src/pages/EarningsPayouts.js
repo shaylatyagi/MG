@@ -3,7 +3,7 @@ import Sidebar from '../components/Sidebar';
 import Chart from '../components/Chart';
 import api from '../api';
 
-const thStyle = { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' };
+const thStyle = { textAlign: 'left', padding: '12px 16px', fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' };
 const tdStyle = { padding: '14px 16px', fontSize: '14px', color: '#1A1A1A' };
 
 export default function EarningsPayouts() {
@@ -68,7 +68,7 @@ export default function EarningsPayouts() {
             { label: 'Total Transactions', value: `${transactions.length}`, sub: 'All time', color: '#1A1A1A' },
           ].map((card, i) => (
             <div key={i} style={{ flex: 1, backgroundColor: 'white', borderRadius: '12px', padding: '20px 24px', border: '1px solid #E8E0D5' }}>
-              <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{card.label}</p>
+              <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>{card.label}</p>
               <p style={{ fontSize: '24px', fontWeight: '700', color: '#1A1A1A', marginBottom: '4px' }}>{card.value}</p>
               <p style={{ fontSize: '12px', color: card.color }}>{card.sub}</p>
             </div>
@@ -98,7 +98,7 @@ export default function EarningsPayouts() {
               <tbody>
                 {filteredTxns.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '24px', textAlign: 'center', fontSize: '14px', color: '#9CA3AF' }}>No rental transactions recorded yet.</td>
+                    <td colSpan={6} style={{ padding: '24px', textAlign: 'center', fontSize: '14px', color: '#6b7280' }}>No rental transactions recorded yet.</td>
                   </tr>
                 ) : filteredTxns.map((txn, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #E8E0D5' }}>

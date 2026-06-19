@@ -107,7 +107,7 @@ export default function OwnerChatTab({ lang }) {
       {threads.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E8E0D5' }}>
           <p style={{ fontSize: '28px', marginBottom: '8px' }}>💬</p>
-          <p style={{ fontSize: '14px', color: '#9CA3AF' }}>No conversations yet. Drivers can message you from the app.</p>
+          <p style={{ fontSize: '14px', color: '#6b7280' }}>No conversations yet. Drivers can message you from the app.</p>
         </div>
       ) : threads.map(t => (
         <div key={t.driver_id} onClick={() => openThread(t.driver_id)}
@@ -118,7 +118,7 @@ export default function OwnerChatTab({ lang }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
               <p style={{ fontSize: '14px', fontWeight: '700', color: '#1A1A1A', margin: 0 }}>{t.driver_name}</p>
-              <p style={{ fontSize: '11px', color: '#9CA3AF', margin: 0, flexShrink: 0, marginLeft: '8px' }}>{fmt(t.last_message_at)}</p>
+              <p style={{ fontSize: '11px', color: '#6b7280', margin: 0, flexShrink: 0, marginLeft: '8px' }}>{fmt(t.last_message_at)}</p>
             </div>
             <p style={{ fontSize: '12px', color: '#6B6B6B', margin: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
               {t.last_sender === 'DRIVER' ? '' : 'You: '}{t.last_message || 'No messages yet'}
@@ -150,7 +150,7 @@ export default function OwnerChatTab({ lang }) {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', paddingBottom: '80px' }}>
         {messages.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '14px', marginTop: '40px' }}>No messages yet.</p>
+          <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '14px', marginTop: '40px' }}>No messages yet.</p>
         ) : messages.map(msg => {
           const isMe = msg.sender_type === 'OWNER';
           return (

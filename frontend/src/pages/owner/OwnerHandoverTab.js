@@ -132,7 +132,7 @@ export default function OwnerHandoverTab({ lang }) {
               style={{ fontSize: '12px', color: '#6B7280', width: '100%' }} />
             {agreementFile && <p style={{ fontSize: '11px', color: '#16A34A', marginTop: '4px', margin: '4px 0 0' }}>✓ {agreementFile.name}</p>}
           </div>
-          <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '12px' }}>{lang === 'en' ? 'Driver logs in via OTP on their phone.' : 'ड्राइवर OTP से लॉगिन करेगा।'}</p>
+          <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>{lang === 'en' ? 'Driver logs in via OTP on their phone.' : 'ड्राइवर OTP से लॉगिन करेगा।'}</p>
           <button type="submit" disabled={loading} style={btn}>{loading ? '…' : (lang === 'en' ? 'Onboard Driver' : 'ड्राइवर ऑनबोर्ड करें')}</button>
         </form>
       )}

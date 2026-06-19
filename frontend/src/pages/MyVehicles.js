@@ -30,23 +30,23 @@ export default function MyVehicles() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF' }}>Driver</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280' }}>Driver</p>
                   <p style={{ fontSize: '12px', fontWeight: '600', color: '#1A1A1A' }}>{v.driver}</p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF' }}>Daily Rent</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280' }}>Daily Rent</p>
                   <p style={{ fontSize: '12px', fontWeight: '600', color: '#1A1A1A' }}>{v.rent}</p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF' }}>Area</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280' }}>Area</p>
                   <p style={{ fontSize: '12px', fontWeight: '600', color: '#1A1A1A' }}>{v.area || 'N/A'}</p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF' }}>Condition</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280' }}>Condition</p>
                   <p style={{ fontSize: '12px', fontWeight: '600', color: v.condition === 'Good' ? '#16A34A' : v.condition === 'Fair' ? '#D97706' : '#DC2626' }}>{v.condition || 'N/A'}</p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF' }}>Today's Payout</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280' }}>Today's Payout</p>
                   <p style={{ fontSize: '12px', fontWeight: '600', color: v.payout === 'Paid' ? '#16A34A' : '#D97706' }}>{v.payout}</p>
                 </div>
               </div>
@@ -71,7 +71,7 @@ export default function MyVehicles() {
                   { label: 'Today\'s Payout', value: selected.payout },
                 ].map((item, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid #F3EDE5' }}>
-                    <p style={{ fontSize: '13px', color: '#9CA3AF' }}>{item.label}</p>
+                    <p style={{ fontSize: '13px', color: '#6b7280' }}>{item.label}</p>
                     <p style={{ fontSize: '13px', fontWeight: '600', color: '#1A1A1A' }}>{item.value}</p>
                   </div>
                 ))}

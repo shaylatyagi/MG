@@ -1976,7 +1976,7 @@ function AllDrivers() {
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div>
           <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:0}}>All Drivers</h2>
-          <p style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{drivers.length} registered · {filtered.length} shown</p>
+          <p style={{fontSize:12,color:'#64748b',marginTop:2}}>{drivers.length} registered · {filtered.length} shown</p>
         </div>
       </div>
 
@@ -1997,13 +1997,13 @@ function AllDrivers() {
             <svg width={20} height={20} fill="none" stroke="#cbd5e1" strokeWidth={2} viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <p style={{fontSize:14,fontWeight:600,color:'#64748b'}}>No drivers found</p>
-          <p style={{fontSize:12,color:'#94a3b8',marginTop:4}}>Try adjusting your search or filters</p>
+          <p style={{fontSize:12,color:'#64748b',marginTop:4}}>Try adjusting your search or filters</p>
         </div>
       ) : (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:12}}>
           {filtered.map(d => {
             const {ch, bg} = av(d.full_name);
-            const kycColor = {VERIFIED:'#059669',REJECTED:'#dc2626',SUBMITTED:'#2563eb',UNDER_REVIEW:'#d97706',PENDING:'#94a3b8'}[d.kyc_status]||'#94a3b8';
+            const kycColor = {VERIFIED:'#059669',REJECTED:'#dc2626',SUBMITTED:'#2563eb',UNDER_REVIEW:'#d97706',PENDING:'#64748b'}[d.kyc_status]||'#64748b';
             const kycBg    = {VERIFIED:'#ecfdf5',REJECTED:'#fef2f2',SUBMITTED:'#eff6ff',UNDER_REVIEW:'#fffbeb',PENDING:'#f8fafc'}[d.kyc_status]||'#f8fafc';
             return (
               <div key={d.id} className="press-card"
@@ -2020,7 +2020,7 @@ function AllDrivers() {
                       <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{d.full_name}</span>
                       <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,background:kycBg,color:kycColor}}>{d.kyc_status||'—'}</span>
                     </div>
-                    <p style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace',marginTop:2}}>{d.mobile_number}</p>
+                    <p style={{fontSize:11,color:'#64748b',fontFamily:'monospace',marginTop:2}}>{d.mobile_number}</p>
                   </div>
                   {/* Arrow */}
                   <svg width={14} height={14} fill="none" stroke="#cbd5e1" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
@@ -2040,15 +2040,15 @@ function AllDrivers() {
                 {/* Revenue row */}
                 <div style={{display:'flex',gap:16,marginTop:10,paddingTop:10,borderTop:'1px solid #f8fafc'}}>
                   <div>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Today</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Today</p>
                     <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(d.paid_today)}</p>
                   </div>
                   <div>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
                     <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(d.total_paid)}</p>
                   </div>
                   <div style={{marginLeft:'auto',textAlign:'right'}}>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Joined</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Joined</p>
                     <p style={{fontSize:11,fontWeight:600,color:'#64748b'}}>{timeSince(d.created_at)}</p>
                   </div>
                 </div>
@@ -2130,7 +2130,7 @@ function AllOwners() {
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div>
           <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:0}}>Fleet Owners</h2>
-          <p style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{owners.length} registered · {filtered.length} shown</p>
+          <p style={{fontSize:12,color:'#64748b',marginTop:2}}>{owners.length} registered · {filtered.length} shown</p>
         </div>
       </div>
 
@@ -2158,9 +2158,9 @@ function AllOwners() {
                   <div style={{flex:1,minWidth:0}}>
                     <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{o.full_name}</span>
                     <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}} onClick={e => e.stopPropagation()}>
-                      <span style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace'}}>{o.mobile_number}</span>
+                      <span style={{fontSize:11,color:'#64748b',fontFamily:'monospace'}}>{o.mobile_number}</span>
                       <button onClick={e => startEditPhone(e, o)}
-                        style={{fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',padding:'0 2px'}}
+                        style={{fontSize:10,color:'#64748b',background:'none',border:'none',cursor:'pointer',padding:'0 2px'}}
                         title="Edit phone">✏️</button>
                     </div>
                     <span style={{fontSize:10,fontWeight:700,color:'#6366f1',background:'#eef2ff',padding:'2px 8px',borderRadius:20,fontFamily:'monospace',display:'inline-block',marginTop:4}}>{o.owner_code}</span>
@@ -2171,19 +2171,19 @@ function AllOwners() {
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginTop:12,paddingTop:12,borderTop:'1px solid #f8fafc'}}>
                   <div style={{textAlign:'center'}}>
                     <p style={{fontSize:16,fontWeight:800,color:'#0f172a'}}>{o.total_drivers||0}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Drivers</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Drivers</p>
                   </div>
                   <div style={{textAlign:'center'}}>
                     <p style={{fontSize:16,fontWeight:800,color:'#0f172a'}}>{o.total_vehicles||0}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Vehicles</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Vehicles</p>
                   </div>
                   <div style={{textAlign:'center'}}>
                     <p style={{fontSize:13,fontWeight:800,color:'#059669',fontFamily:'monospace'}}>{fmt(o.collection_month)}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Month</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Month</p>
                   </div>
                   <div style={{textAlign:'center'}}>
                     <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(o.collection_total)}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
                   </div>
                 </div>
               </div>
@@ -2732,7 +2732,7 @@ function LeadsSection() {
         </button>
       </div>
       {loading ? <p style={{ color: '#64748b' }}>Loading…</p> : leads.length === 0 ? (
-        <p style={{ color: '#94a3b8', textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
+        <p style={{ color: '#64748b', textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -2753,7 +2753,7 @@ function LeadsSection() {
                   <td style={{ padding: '10px 12px', color: '#334155' }}>{l.fleet || '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#334155' }}>{l.city || '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: '12px', whiteSpace: 'nowrap' }}>{fmtUTC(l.submitted_at)}</td>
-                  <td style={{ padding: '10px 12px', color: '#94a3b8', fontFamily: 'monospace', fontSize: '11px' }}>{l.ip_address || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: '11px' }}>{l.ip_address || '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#64748b' }}>{parseBrowser(l.user_agent)}</td>
                 </tr>
               ))}
@@ -3083,7 +3083,7 @@ function AdminPanelInner() {
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#9ca3af', fontSize: 12, fontWeight: 500 }}>Admin</span>
+            <span style={{ color: '#6b7280', fontSize: 12, fontWeight: 500 }}>Admin</span>
             <span style={{ color: '#d1d5db', fontSize: 12 }}>›</span>
             <span style={{ color: '#111827', fontSize: 14, fontWeight: 600 }}>{tabLabel}</span>
           </div>
@@ -3127,7 +3127,7 @@ function AdminPanelInner() {
                   </div>
                   <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
-                      <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
+                      <p style={{ fontSize: 13, color: '#6b7280', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
                     ) : notifications.map(n => (
                       <div key={n.id} style={{
                         padding: '12px 16px', borderBottom: '1px solid #f9fafb',
@@ -3136,7 +3136,7 @@ function AdminPanelInner() {
                         {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginRight: 6, verticalAlign: 'middle' }} />}
                         <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{n.title}</p>
                         <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
-                        <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                        <p style={{ fontSize: 10, color: '#6b7280', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
                       </div>
                     ))}
                   </div>

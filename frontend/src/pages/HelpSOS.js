@@ -135,7 +135,7 @@ export default function HelpSOS() {
             {[{ icon: '📧', label: 'Email', value: 'support@mobilitygrid.in' }, { icon: '📞', label: 'Phone', value: '+91 99999 99999' }, { icon: '🕐', label: 'Support Hours', value: 'Mon-Sat, 9AM-8PM' }].map((item, i) => (
               <div key={i} style={{ backgroundColor: '#FAF7F2', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
                 <p style={{ fontSize: '24px', marginBottom: '8px' }}>{item.icon}</p>
-                <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '4px' }}>{item.label}</p>
+                <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>{item.label}</p>
                 <p style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A1A', margin: 0 }}>{item.value}</p>
               </div>
             ))}
@@ -147,7 +147,7 @@ export default function HelpSOS() {
           <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', margin: 0 }}>📍 Nearby Stations</p>
-              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '2px 0 0' }}>Find EV charging, petrol pumps, hospitals and more near you</p>
+              <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0' }}>Find EV charging, petrol pumps, hospitals and more near you</p>
             </div>
             <button onClick={locateMe} disabled={nearbyLoading}
               style={{ padding: '8px 16px', backgroundColor: nearbyLoc ? '#f0fdf4' : '#4F46E5', color: nearbyLoc ? '#16a34a' : 'white', border: nearbyLoc ? '1px solid #bbf7d0' : 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -163,7 +163,7 @@ export default function HelpSOS() {
             )}
 
             {!nearbyLoc && !nearbyLoading && (
-              <div style={{ textAlign: 'center', padding: '24px', color: '#9CA3AF' }}>
+              <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>
                 <p style={{ fontSize: '32px', marginBottom: '8px' }}>🗺</p>
                 <p style={{ fontSize: '13px' }}>Tap "Get My Location" to find nearby services</p>
               </div>
@@ -171,7 +171,7 @@ export default function HelpSOS() {
 
             {nearbyLoc && (
               <>
-                <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '14px' }}>
+                <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '14px' }}>
                   📍 Your location: {nearbyLoc.lat.toFixed(5)}, {nearbyLoc.lng.toFixed(5)}
                 </p>
 
@@ -188,7 +188,7 @@ export default function HelpSOS() {
                           style={{ display: 'block', padding: '14px 8px', textAlign: 'center', textDecoration: 'none' }}>
                           <p style={{ fontSize: '26px', margin: '0 0 6px' }}>{tile.icon}</p>
                           <p style={{ fontSize: '11px', fontWeight: '600', color: tile.color, margin: 0 }}>{tile.label}</p>
-                          <p style={{ fontSize: '10px', color: '#9CA3AF', margin: '2px 0 0' }}>Open Maps ↗</p>
+                          <p style={{ fontSize: '10px', color: '#6b7280', margin: '2px 0 0' }}>Open Maps ↗</p>
                         </a>
                         {/* Show embed button — only if API key present */}
                         {MAPS_KEY && (
@@ -224,7 +224,7 @@ export default function HelpSOS() {
                 {/* Fallback embed (no key) — basic map of current location */}
                 {!MAPS_KEY && (
                   <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-                    <p style={{ padding: '8px 12px', fontSize: '12px', color: '#9CA3AF', margin: 0, backgroundColor: '#f9fafb' }}>
+                    <p style={{ padding: '8px 12px', fontSize: '12px', color: '#6b7280', margin: 0, backgroundColor: '#f9fafb' }}>
                       📌 Your current location
                     </p>
                     <iframe
@@ -304,7 +304,7 @@ export default function HelpSOS() {
                 <p style={{ fontSize: '52px', marginBottom: '12px' }}>✅</p>
                 <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#16A34A', marginBottom: '8px' }}>SOS Alert Sent!</h2>
                 <p style={{ fontSize: '13px', color: '#6B6B6B', marginBottom: '16px' }}>Your owner and support team have been notified. Stay calm — help is on the way.</p>
-                {alertId && <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '8px' }}>Alert ID: #{alertId}</p>}
+                {alertId && <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>Alert ID: #{alertId}</p>}
                 {mapsLink && (
                   <a href={mapsLink} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginBottom: '16px', fontSize: '12px', color: '#2563EB', textDecoration: 'underline' }}>
                     📍 View your location on Google Maps

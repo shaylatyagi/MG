@@ -378,7 +378,7 @@ function LandingPage() {
                           <span className="mock-td">Ramesh Singh</span>
                           <span className="mock-td">Bank A/C</span>
                           <span className="mock-td"><span className="mock-badge green">Verified</span></span>
-                          <span className="mock-td" style={{ color: '#94a3b8' }}>Done</span>
+                          <span className="mock-td" style={{ color: '#64748b' }}>Done</span>
                         </div>
                       </div>
                     </div>
@@ -415,7 +415,7 @@ function LandingPage() {
                       <div className="om-stat"><div className="om-stat-val" style={{ color: '#dc2626' }}>₹8,400</div><div className="om-stat-lbl">Outstanding</div></div>
                       <div className="om-stat"><div className="om-stat-val green">19 / 23</div><div className="om-stat-lbl">Paid this month</div></div>
                     </div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: '#94a3b8', marginBottom: '10px' }}>Recent Drivers</div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: '#64748b', marginBottom: '10px' }}>Recent Drivers</div>
                     <div className="om-driver-row">
                       <div className="om-avatar">RK</div>
                       <div><div className="om-driver-name">Ravi Kumar</div><div className="om-driver-sub">KA 01 EV 2201</div></div>
@@ -470,7 +470,7 @@ function LandingPage() {
                           <div className="wc-btn">History</div>
                         </div>
                       </div>
-                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', color: '#94a3b8', marginBottom: '8px' }}>My Earnings · June</div>
+                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', color: '#64748b', marginBottom: '8px' }}>My Earnings · June</div>
                       <div className="phone-list-item">
                         <div className="pli-icon">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2"><path d="M12 2v20m5-17H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
@@ -704,7 +704,7 @@ function LandingPage() {
             </div>
           </div>
 
-          <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#94a3b8' }}>
+          <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#64748b' }}>
             ₹25,000 onboarding · First 10 drivers at 50% off for 3 months · No hidden charges
           </p>
         </div>

@@ -12,7 +12,7 @@ export default function VehicleStatus() {
           <div style={{ flex: 2, backgroundColor: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E8E0D5' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
               <div>
-                <p style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Active Vehicle</p>
+                <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Active Vehicle</p>
                 <p style={{ fontSize: '22px', fontWeight: '700', color: '#1A1A1A' }}>UP-14-EA-2201</p>
               </div>
               <span style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', backgroundColor: '#DCFCE7', color: '#16A34A' }}>On Route</span>
@@ -28,7 +28,7 @@ export default function VehicleStatus() {
               ].map((item, i) => (
                 <div key={i} style={{ backgroundColor: '#FAF7F2', borderRadius: '10px', padding: '16px' }}>
                   <p style={{ fontSize: '20px', marginBottom: '8px' }}>{item.icon}</p>
-                  <p style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '4px' }}>{item.label}</p>
+                  <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>{item.label}</p>
                   <p style={{ fontSize: '16px', fontWeight: '700', color: item.color }}>{item.value}</p>
                 </div>
               ))}
@@ -52,7 +52,7 @@ export default function VehicleStatus() {
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 2 ? '1px solid #F3EDE5' : 'none' }}>
                   <div>
                     <p style={{ fontSize: '13px', fontWeight: '500', color: '#1A1A1A' }}>{station.name}</p>
-                    <p style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{station.distance}</p>
+                    <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{station.distance}</p>
                   </div>
                   <span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '500', backgroundColor: station.status === 'Available' ? '#DCFCE7' : '#FEE2E2', color: station.status === 'Available' ? '#16A34A' : '#DC2626' }}>{station.status}</span>
                 </div>

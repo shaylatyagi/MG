@@ -97,7 +97,7 @@ export default function Onboarding({ role = 'driver', onDone }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
           <button onClick={skip} style={{
             background: 'none', border: 'none',
-            color: '#94a3b8', fontSize: 13, fontWeight: 600, padding: '4px 8px',
+            color: '#64748b', fontSize: 13, fontWeight: 600, padding: '4px 8px',
           }}>
             Skip
           </button>

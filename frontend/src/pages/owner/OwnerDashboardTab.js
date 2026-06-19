@@ -157,7 +157,7 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
                       style={{ fontSize: '11px', color: '#16a34a', textDecoration: 'none', fontWeight: 600 }}>
                       💬 WhatsApp
                     </a>
-                    <p style={{ fontSize: '10px', color: '#94a3b8', margin: 0 }}>{fmtTime(s.created_at)}</p>
+                    <p style={{ fontSize: '10px', color: '#64748b', margin: 0 }}>{fmtTime(s.created_at)}</p>
                   </div>
                   {/* Location row */}
                   {s.lat && s.lng ? (
@@ -219,9 +219,9 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '13px' }}>Loading…</div>
+          <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', fontSize: '13px' }}>Loading…</div>
         ) : vehicles.length === 0 ? (
-          <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', padding: '20px 0' }}>
+          <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', padding: '20px 0' }}>
             {L('No vehicles yet. Use the Handover tab to register.', 'कोई वाहन नहीं। हैंडओवर टैब से पंजीकृत करें।')}
           </p>
         ) : vehicles.map((v) => (

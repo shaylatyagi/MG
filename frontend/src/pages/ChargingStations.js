@@ -103,8 +103,8 @@ export default function ChargingStations() {
             <div key={i} style={{ backgroundColor: 'white', borderRadius: '12px', padding: '20px 24px', border: '1px solid #E8E0D5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ fontSize: '15px', fontWeight: '600', color: '#1A1A1A', marginBottom: '4px' }}>{station.name}</p>
-                <p style={{ fontSize: '12px', color: '#9CA3AF' }}>{station.address}</p>
-                <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>{station.distance} {t.km}</p>
+                <p style={{ fontSize: '12px', color: '#6b7280' }}>{station.address}</p>
+                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{station.distance} {t.km}</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', backgroundColor: station.status === 'Available' ? '#DCFCE7' : '#FEE2E2', color: station.status === 'Available' ? '#16A34A' : '#DC2626' }}>
