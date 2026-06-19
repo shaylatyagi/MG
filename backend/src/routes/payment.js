@@ -951,7 +951,10 @@ router.post('/owner/notify-unpaid', verifyToken, async (req, res) => {
 });
 router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
   try {
-    const { ownerId } = req.query;
+    // payment.js mein route ke andar
+const { ownerId } = req.query;
+const ownerCheck = await pool.query('SELECT owner_code FROM public.owners WHERE id = $1', [ownerId]);
+const ownerCode = ownerCheck.rows[0]?.owner_code || 'DEFAULT_CODE'; // Fallback added
     const result = await pool.query(`
   SELECT d.id, d.full_name, v.vehicle_number, v.daily_rent,
   ( (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')) 

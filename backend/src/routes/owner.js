@@ -74,7 +74,7 @@ router.get('/stats', async (req, res) => {
         [oid, ocode]
       ),
       pool.query(
-        `SELECT COALESCE(SUM(amount),0) AS total
+        `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
          WHERE owner_id = $1 AND transaction_status = 'SUCCESS'
            AND DATE(payment_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
