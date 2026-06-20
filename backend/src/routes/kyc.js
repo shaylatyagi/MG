@@ -372,7 +372,7 @@ Return ONLY valid JSON. Example: {"account_number":"123456789012","ifsc":"SBIN00
     const mimeType = file.mimetype.startsWith('image/') ? file.mimetype : 'image/jpeg';
 
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_KEY}`,
       {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
