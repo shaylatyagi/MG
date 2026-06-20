@@ -14,7 +14,6 @@ const queryClient = new QueryClient({
   },
 });
 
-
 // ── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -73,17 +72,22 @@ function PrivateRoute({ children, adminOnly }) {
   if (adminOnly && !adminToken)  return <Navigate to="/login" replace />;
   return children;
 }
-function App() {
-  const host = window.location.hostname;
-  const isPartnersSubdomain = host === 'partners.mobilitygrid.in';
-  const isAdminSubdomain = host === 'admin.mobilitygrid.in';
-  const AdminRoot = () => {
+
+// ── AdminRoot component (MOVED OUTSIDE App) ─────────────────────────────────
+function AdminRoot() {
   const { adminToken } = useAuth();
   if (adminToken) {
     return <AdminPanel />;
   }
   return <Login />;
-};
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+function App() {
+  const host = window.location.hostname;
+  const isPartnersSubdomain = host === 'partners.mobilitygrid.in';
+  const isAdminSubdomain = host === 'admin.mobilitygrid.in';
+
   return (
     <main role="main">
       <ErrorBoundary>
@@ -99,7 +103,9 @@ function App() {
                   </Routes>
                 ) : (
                   <Routes>
+                    {/* Root: conditional based on subdomain */}
                     <Route path="/" element={isAdminSubdomain ? <AdminRoot /> : <LandingPage />} />
+                    
                     <Route path="/login" element={<Login />} />
                     <Route path="/payment-result" element={<PaymentResult />} />
                     <Route path="/pay/:token" element={<PaymentLinkPage />} />
@@ -108,10 +114,7 @@ function App() {
                     <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                     <Route path="/manager/*" element={<PrivateRoute><ManagerApp /></PrivateRoute>} />
                     
-                    {/* 🔥 Admin route exists ONLY on admin.mobilitygrid.in */}
-                    {isAdminSubdomain && (
-                      <Route path="/admin/*" element={<PrivateRoute adminOnly><AdminPanel /></PrivateRoute>} />
-                    )}
+                    {/* No /admin route – dashboard is on root for admin subdomain */}
                     
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
