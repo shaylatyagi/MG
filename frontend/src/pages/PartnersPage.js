@@ -48,7 +48,7 @@ const InfoRow = ({ icon: Icon, label, value, mono }) =>
 
 function PartnerDetail({ slug }) {
   const navigate = useNavigate();
-  onsole.log("Current Slug:", slug);
+  console.log("Current Slug:", slug);
   const p = PARTNER_MAP[slug];
 
   if (!p) return (
