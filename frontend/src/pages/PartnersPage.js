@@ -1,6 +1,3 @@
-// frontend/src/pages/PartnersPage.js
-// /partners        → listing
-// /partners/:slug  → detail
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Phone, FileText, MapPin, Truck, Users, CheckCircle, ExternalLink, Mail } from 'lucide-react';
@@ -68,7 +65,7 @@ function PartnerDetail({ slug }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="sticky top-0 bg-white border-b border-slate-100 z-10 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate('/partners')} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition">
+        <button onClick={() => navigate('/')} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition">
           <ArrowLeft size={18} className="text-slate-600" />
         </button>
         <span className="font-black text-slate-800 text-sm">{p.name}</span>
@@ -150,11 +147,19 @@ function PartnerListing() {
           <button 
   key={p.slug} 
   onClick={(e) => {
-    e.preventDefault();
-    const isSubdomain = window.location.hostname === 'https://partners.mobilitygrid.in';
-    const target = isSubdomain ? `/${p.slug}` : `/partners/${p.slug}`;
-    navigate(target);
-  }}
+  e.preventDefault();
+  
+  // Sahi tarika: hostname mein https:// nahi hota
+  const isSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
+  
+  // Logic: Agar subdomain pe hain toh sirf /slug, nahi toh seedha redirect
+  if (isSubdomain) {
+    navigate(`/${p.slug}`);
+  } else {
+    // Agar main domain pe hain, toh seedha subdomain pe bhej do (Professional approach)
+    window.location.href = `https://partners.mobilitygrid.in/${p.slug}`;
+  }
+}}
             className="w-full bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 text-left hover:border-indigo-300 hover:shadow-sm transition">
             <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${p.gradient} flex items-center justify-center text-white font-black text-sm shrink-0`}>
               {p.avatar}

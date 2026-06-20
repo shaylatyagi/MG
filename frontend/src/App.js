@@ -85,18 +85,16 @@ function App() {
             <Router>
               <Suspense fallback={<PageLoader />}>
                 {isPartnersSubdomain ? (
-                  <Routes>
-                    <Route path="/"           element={<PartnersPage />} />
-                    <Route path="/:slug"      element={<PartnersPage />} />
-                    <Route path="*"           element={<Navigate to="/" replace />} />
-                  </Routes>
+  <Routes>
+    {/* Subdomain par sirf root aur slug chalega */}
+    <Route path="/"           element={<PartnersPage />} />
+    <Route path="/:slug"      element={<PartnersPage />} />
+    <Route path="*"           element={<Navigate to="/" replace />} />
+  </Routes>
                 ) : (
                   <Routes>
                     <Route path="/"               element={<LandingPage />} />
                     <Route path="/login"          element={<Login />} />
-                    <Route path="/partner"        element={<PartnerHub />} />
-                    <Route path="/partners"       element={<PartnersPage />} />
-                    <Route path="/partners/:slug" element={<PartnersPage />} />
                     <Route path="/payment-result" element={<PaymentResult />} />
                     <Route path="/pay/:token"     element={<PaymentLinkPage />} />
                     <Route path="/owner/*"        element={<PrivateRoute><OwnerApp /></PrivateRoute>} />
