@@ -904,7 +904,7 @@ function LandingPage() {
             <div className="footer-col">
               <div className="footer-col-title">Contact</div>
               <ul className="footer-links">
-                <li><a href="mailto:mobilitygrid@gmail.com" className="footer-link">hello@mobilitygrid.in</a></li>
+                <li><a href="mailto:mobilitygrid@gmail.com" className="footer-link">mailto:mobilitygrid@gmail.com</a></li>
                 <li><span className="footer-link">Bengaluru, India</span></li>
                 <li><a href="#signup" className="footer-link">Request a Demo</a></li>
               </ul>

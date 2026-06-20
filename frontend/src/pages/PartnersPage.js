@@ -48,12 +48,17 @@ const InfoRow = ({ icon: Icon, label, value, mono }) =>
 
 function PartnerDetail({ slug }) {
   const navigate = useNavigate();
+  onsole.log("Current Slug:", slug);
   const p = PARTNER_MAP[slug];
 
   if (!p) return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 px-6">
       <p className="font-black text-slate-800 text-lg">Partner not found</p>
-      <button onClick={() => navigate('/partners')} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold">
+      <button 
+  onClick={() => {
+    const isSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
+    navigate(isSubdomain ? '/' : '/partners');
+  }} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold">
         View All Partners
       </button>
     </div>
@@ -125,7 +130,7 @@ function PartnerListing() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
-        <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-slate-500 text-sm mb-4 hover:text-slate-700 transition">
+        <button onClick={() => window.location.href = 'https://mobilitygrid.in'} className="flex items-center gap-1.5 text-slate-500 text-sm mb-4 hover:text-slate-700 transition">
           <ArrowLeft size={15} /> mobilitygrid.in
         </button>
         <div className="flex items-center gap-3">
@@ -168,7 +173,7 @@ function PartnerListing() {
         <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-5 text-center">
           <p className="text-sm font-black text-indigo-800 mb-1">Want to list your fleet?</p>
           <p className="text-xs text-indigo-500 mb-3"> · Get on MobilityGrid partner directory</p>
-          <a href="mailto:hello@mobilitygrid.in"
+          <a href="mailto:mailto:mobilitygrid@gmail.com"
   style={{
     display: 'inline-block',
     padding: '10px 20px',
