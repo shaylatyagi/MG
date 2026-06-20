@@ -543,7 +543,7 @@ router.post('/pay/initiate', verifyToken, async (req, res) => {
 router.get('/company-config', verifyToken, async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT c.id, c.company_name, COALESCE(c.payment_mode, 'BOTH') AS payment_mode
+      SELECT c.id, c.name, COALESCE(c.payment_mode, 'BOTH') AS payment_mode
       FROM public.companies c
       JOIN public.owners o ON o.company_id = c.id
       JOIN public.drivers d ON d.owner_code = o.owner_code

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../api';
 import AppShell from '../../components/AppShell';
-
+const scrollRef = useRef(null);
 const DOC_TYPES = [
   { key: 'aadhaar_front', label: 'Aadhaar Card (Front)', icon: '🪪', required: true },
   { key: 'aadhaar_back',  label: 'Aadhaar Card (Back)',  icon: '🪪', required: true },
@@ -39,31 +39,49 @@ export default function DriverKYCTab() {
   };
 
   useEffect(() => { loadDocs(); }, []);
+// Aisa change karo:
+const handleFile = async (docType, file) => {
+  if (!file) return;
+  setUploads((u) => ({ ...u, [docType]: { stage: 'uploading', msg: 'Processing...' } }));
 
-  const handleFile = async (docType, file) => {
-    if (!file) return;
+  try {
+    // Step 1: OCR Call (Text extract karne ke liye)
+    const ocrFormData = new FormData();
+    ocrFormData.append('document', file);
+    ocrFormData.append('doc_type', docType.toUpperCase());
+    
+    const ocrRes = await api.post('/api/kyc/ocr', ocrFormData);
+    console.log("OCR Result:", ocrRes.data.fields); // Yahan tumhara text hoga
 
-    setUploads((u) => ({ ...u, [docType]: { stage: 'uploading', msg: '' } }));
+    // Step 2: Upload Call (S3 pe save karne ke liye)
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
+    uploadFormData.append('doc_type', docType);
+    await api.post('/api/driver/kyc/upload', uploadFormData);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('doc_type', docType);
-
-    try {
-      await api.post('/api/driver/kyc/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setUploads((u) => ({ ...u, [docType]: { stage: 'done', msg: 'Uploaded! Under review.' } }));
-      // Refresh doc status
-      await loadDocs();
-    } catch (e) {
-      setUploads((u) => ({
+    setUploads((u) => ({ ...u, [docType]: { stage: 'done', msg: 'Uploaded!' } }));
+    await loadDocs();
+  } catch (e) {
+    setUploads((u) => ({
         ...u,
         [docType]: { stage: 'error', msg: e.response?.data?.message || 'Upload failed' },
-      }));
+      }))
+  }
+};
+const verifyPanWithPayYantra = async (panNumber) => {
+  try {
+    // API call karo
+    const res = await api.post('/api/kyc/verify-pan', { pan_number: panNumber });
+    if (res.data.success) {
+      alert("PAN Verified Successfully!");
+      loadDocs(); // UI refresh karne ke liye
+    } else {
+      alert("Verification Failed: " + res.data.message);
     }
-  };
-
+  } catch (e) {
+    alert("Error: " + e.message);
+  }
+};
   const triggerUpload = (docType, capture) => {
     const input = fileRefs.current[docType];
     if (!input) return;
@@ -78,7 +96,7 @@ export default function DriverKYCTab() {
   const allApproved   = doneCount === required.length;
 
   if (loading) return (
-    <div className="flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-3 p-4" ref={scrollRef}>
       {DOC_TYPES.map((_, i) => (
         <div key={i} className="h-20 rounded-2xl bg-gray-100 animate-pulse" />
       ))}
@@ -190,6 +208,15 @@ export default function DriverKYCTab() {
                       {isUploading ? '⏳' : existing?.status === 'rejected' ? '📁 Re-upload File' : '📁 Upload File'}
                     </button>
                   </div>
+                  {doc.key === 'pan' && existing && existing.status !== 'approved' && (
+  <button
+    type="button"
+    onClick={() => verifyPanWithPayYantra(existing.pan_number)} // Yahan pan_number pass hoga
+    className="mt-2 w-full bg-blue-600 text-white py-2 rounded-lg font-bold"
+  >
+    Verify PAN
+  </button>
+)}
                 </>
               )}
 
