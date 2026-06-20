@@ -47,24 +47,23 @@ const InfoRow = ({ icon: Icon, label, value, mono }) =>
   ) : null;
 function PartnerDetail({ slug }) {
   const navigate = useNavigate();
-  // Hum slug ko trim kar rahe hain taaki koi extra space issue na ho
-  const cleanSlug = slug ? slug.trim() : "";
-  const p = PARTNER_MAP[cleanSlug];
+  // Slug ko decode aur clean karein
+  const cleanSlug = slug ? slug.toLowerCase().trim() : "";
+  const p = PARTNERS.find(item => item.slug === cleanSlug);
 
   if (!p) return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 px-6">
-      <p className="font-black text-slate-800 text-lg">Partner '{cleanSlug}' not found</p>
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+      <p className="font-black text-slate-800 text-lg mb-4">Partner details nahi mil rahe.</p>
       <button 
-        onClick={() => {
-            const isSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
-            navigate(isSubdomain ? '/' : '/partners');
-        }} 
-        className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold"
+        onClick={() => window.location.href = 'https://partners.mobilitygrid.in'} 
+        className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold"
       >
-        View All Partners
+        Sabhi Partners dekhein
       </button>
     </div>
   );
+
+  // ... baaki ka return code waisa hi rahega
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -152,7 +151,7 @@ function PartnerListing() {
   key={p.slug} 
   onClick={(e) => {
     e.preventDefault();
-    const isSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
+    const isSubdomain = window.location.hostname === 'https://partners.mobilitygrid.in';
     const target = isSubdomain ? `/${p.slug}` : `/partners/${p.slug}`;
     navigate(target);
   }}
