@@ -15,124 +15,48 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../config/db');
 
-const PROVIDER    = process.env.KYC_PROVIDER     || 'setu';
+const PROVIDER = process.env.KYC_PROVIDER || 'payyantra';
 const SETU_BASE   = process.env.SETU_BASE_URL     || 'https://dg-sandbox.setu.co';
 const SETU_ID     = process.env.SETU_CLIENT_ID;
 const SETU_SECRET = process.env.SETU_CLIENT_SECRET;
 const SETU_PID    = process.env.SETU_PRODUCT_ID;
-
-// ── Provider-agnostic KYC adapter ──────────────────────────────────
+// REPLACE THIS IN kyc.js
 const kycProviders = {
-  setu: {
-
-    // ── Get JWT token from Setu ──
-    getToken: async () => {
-      const res = await fetch(`${SETU_BASE}/auth/token`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ clientID: SETU_ID, secret: SETU_SECRET }),
-      });
-      const data = await res.json();
-      if (!data?.data?.token) throw new Error('Setu token fetch failed: ' + JSON.stringify(data));
-      return data.data.token;
-    },
-
-    // ── PAN Verification ──
-    verifyPAN: async (panNumber) => {
-      const token = await kycProviders.setu.getToken();
-      const res = await fetch(`${SETU_BASE}/api/verify/pan`, {
-        method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json',
-                   'x-product-instance-id': SETU_PID },
-        body:    JSON.stringify({ pan: panNumber }),
+  payyantra: {
+    verifyPAN: async (panNumber, clientRef) => {
+      const res = await fetch('https://secure-api-uat.payyantra.com/api/v1/pans/details', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.PAYYANTRA_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ pan: panNumber, client_ref_num: clientRef, consent: true }),
       });
       const data = await res.json();
       return {
-        verified: res.ok && data?.data?.valid === true,
-        name:     data?.data?.name      || null,
-        status:   data?.data?.panStatus || null,
-        raw:      data,
+        verified: res.ok && data?.data?.verificationStatus === 'SUCCESS',
+        name: data?.data?.result ? `${data.data.result.firstName} ${data.data.result.lastName}` : null,
+        status: data?.data?.verificationStatus,
+        raw: data
       };
     },
-
-    // ── Aadhaar OTP — Step 1: Initiate ──
-    initiateAadhaar: async (aadhaarNumber) => {
-      const token = await kycProviders.setu.getToken();
-      const res = await fetch(`${SETU_BASE}/api/okyc/initiate`, {
-        method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json',
-                   'x-product-instance-id': SETU_PID },
-        body:    JSON.stringify({ aadhaar: aadhaarNumber }),
+    verifyBank: async (accountNumber, ifsc, beneficiaryName, clientRef) => {
+      const res = await fetch('https://secure-api-uat.payyantra.com/api/v1/bank-accounts/verify', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.PAYYANTRA_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ifsc, accountNumber, beneficiaryName, paymentMode: 'IMPSPENNY', client_ref_num: clientRef }),
       });
       const data = await res.json();
       return {
-        success:   res.ok,
-        requestId: data?.data?.requestId || null,
-        message:   data?.message         || 'OTP sent',
-        raw:       data,
+        verified: res.ok && data?.data?.verificationStatus === 'SUCCESS',
+        accountName: data?.data?.result?.beneficiaryName,
+        raw: data
       };
-    },
-
-    // ── Aadhaar OTP — Step 2: Verify ──
-    verifyAadhaar: async (requestId, otp) => {
-      const token = await kycProviders.setu.getToken();
-      const res = await fetch(`${SETU_BASE}/api/okyc/verify`, {
-        method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json',
-                   'x-product-instance-id': SETU_PID },
-        body:    JSON.stringify({ requestId, otp }),
-      });
-      const data = await res.json();
-      return {
-        verified: res.ok && data?.data?.aadhaarData != null,
-        name:     data?.data?.aadhaarData?.name   || null,
-        address:  data?.data?.aadhaarData?.address || null,
-        last4:    data?.data?.maskedAadhaarNumber?.slice(-4) || null,
-        raw:      data,
-      };
-    },
-
-    // ── Driving License Verification ──
-    verifyDL: async (dlNumber, dob) => {
-      const token = await kycProviders.setu.getToken();
-      const res = await fetch(`${SETU_BASE}/api/verify/driving-licence`, {
-        method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json',
-                   'x-product-instance-id': SETU_PID },
-        body:    JSON.stringify({ dlNumber, dateOfBirth: dob }),
-      });
-      const data = await res.json();
-      return {
-        verified: res.ok && data?.data?.status === 'VALID',
-        name:     data?.data?.name          || null,
-        expiry:   data?.data?.validUpto     || null,
-        status:   data?.data?.status        || null,
-        raw:      data,
-      };
-    },
-
-    // ── Bank Account Penny Drop ──
-    verifyBank: async (accountNumber, ifsc) => {
-      const token = await kycProviders.setu.getToken();
-      const res = await fetch(`${SETU_BASE}/api/verify/bank-account`, {
-        method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json',
-                   'x-product-instance-id': SETU_PID },
-        body:    JSON.stringify({ accountNumber, ifsc }),
-      });
-      const data = await res.json();
-      return {
-        verified:     res.ok && data?.data?.accountExists === true,
-        accountName:  data?.data?.accountHolderName || null,
-        bankName:     data?.data?.bankName           || null,
-        raw:          data,
-      };
-    },
-  },
-
-  // ── Future providers can be added here ──
-  // signzy: { verifyPAN: ..., verifyAadhaar: ..., ... },
-  // hyperverge: { ... },
+    }
+  }
 };
 
 const kyc = kycProviders[PROVIDER] || kycProviders.setu;
@@ -161,8 +85,9 @@ router.post('/verify-pan', async (req, res) => {
     const { phone, pan_number } = req.body;
     if (!pan_number || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan_number.toUpperCase()))
       return res.status(400).json({ success: false, message: 'Invalid PAN format (e.g. ABCDE1234F)' });
-
-    const result = await kyc.verifyPAN(pan_number.toUpperCase());
+    const crypto = require('crypto'); // File ke top par ye add karna padega
+const clientRef = crypto.randomUUID();
+const result = await kyc.verifyPAN(pan_number.toUpperCase(), clientRef);
 
     if (phone) await saveKycResult(phone, 'pan', result.verified, pan_number.toUpperCase());
 
