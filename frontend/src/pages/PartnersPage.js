@@ -45,20 +45,22 @@ const InfoRow = ({ icon: Icon, label, value, mono }) =>
       </div>
     </div>
   ) : null;
-
 function PartnerDetail({ slug }) {
   const navigate = useNavigate();
-  console.log("Current Slug:", slug);
-  const p = PARTNER_MAP[slug];
+  // Hum slug ko trim kar rahe hain taaki koi extra space issue na ho
+  const cleanSlug = slug ? slug.trim() : "";
+  const p = PARTNER_MAP[cleanSlug];
 
   if (!p) return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 px-6">
-      <p className="font-black text-slate-800 text-lg">Partner not found</p>
+      <p className="font-black text-slate-800 text-lg">Partner '{cleanSlug}' not found</p>
       <button 
-  onClick={() => {
-    const isSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
-    navigate(isSubdomain ? '/' : '/partners');
-  }} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold">
+        onClick={() => {
+            const isSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
+            navigate(isSubdomain ? '/' : '/partners');
+        }} 
+        className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold"
+      >
         View All Partners
       </button>
     </div>
@@ -148,9 +150,11 @@ function PartnerListing() {
         {PARTNERS.map(p => (
           <button 
   key={p.slug} 
-  onClick={() => {
+  onClick={(e) => {
+    e.preventDefault();
     const isSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
-    navigate(isSubdomain ? `/${p.slug}` : `/partners/${p.slug}`);
+    const target = isSubdomain ? `/${p.slug}` : `/partners/${p.slug}`;
+    navigate(target);
   }}
             className="w-full bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 text-left hover:border-indigo-300 hover:shadow-sm transition">
             <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${p.gradient} flex items-center justify-center text-white font-black text-sm shrink-0`}>
