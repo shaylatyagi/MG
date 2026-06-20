@@ -73,36 +73,47 @@ function PrivateRoute({ children, adminOnly }) {
   if (adminOnly && !adminToken)  return <Navigate to="/login" replace />;
   return children;
 }
-
-// ── App ───────────────────────────────────────────────────────────────────────
+// ── Updated App Component ─────────────────────────────────────────────────────
 function App() {
+  const isPartnersSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
+
   return (
     <main role="main">
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Router>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/"                element={<LandingPage />} />
-                <Route path="/login"           element={<Login />} />
-                <Route path="/partner"         element={<PartnerHub />} />
-                <Route path="/partners"        element={<PartnersPage />} />
-                <Route path="/partners/:slug"  element={<PartnersPage />} />
-                <Route path="/payment-result"  element={<PaymentResult />} />
-                <Route path="/pay/:token"      element={<PaymentLinkPage />} />
-                <Route path="/owner/*"   element={<PrivateRoute><OwnerApp /></PrivateRoute>} />
-                <Route path="/driver/*"  element={<PrivateRoute><DriverPWA /></PrivateRoute>} />
-                <Route path="/profile"   element={<PrivateRoute><Profile /></PrivateRoute>} />
-                <Route path="/manager/*" element={<PrivateRoute><ManagerApp /></PrivateRoute>} />
-                <Route path="/admin/*"   element={<PrivateRoute adminOnly><AdminPanel /></PrivateRoute>} />
-                <Route path="*"          element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-          </Router>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <Router>
+              <Suspense fallback={<PageLoader />}>
+                {isPartnersSubdomain ? (
+                  /* SUBDOMAIN ROUTES: Only show Partner Directory */
+                  <Routes>
+                    <Route path="/"           element={<PartnersPage />} />
+                    <Route path="/:slug"      element={<PartnersPage />} />
+                    <Route path="*"           element={<Navigate to="/" replace />} />
+                  </Routes>
+                ) : (
+                  /* MAIN DOMAIN ROUTES: Show full application */
+                  <Routes>
+                    <Route path="/"               element={<LandingPage />} />
+                    <Route path="/login"          element={<Login />} />
+                    <Route path="/partner"        element={<PartnerHub />} />
+                    <Route path="/partners"       element={<PartnersPage />} />
+                    <Route path="/partners/:slug" element={<PartnersPage />} />
+                    <Route path="/payment-result" element={<PaymentResult />} />
+                    <Route path="/pay/:token"     element={<PaymentLinkPage />} />
+                    <Route path="/owner/*"        element={<PrivateRoute><OwnerApp /></PrivateRoute>} />
+                    <Route path="/driver/*"       element={<PrivateRoute><DriverPWA /></PrivateRoute>} />
+                    <Route path="/profile"        element={<PrivateRoute><Profile /></PrivateRoute>} />
+                    <Route path="/manager/*"      element={<PrivateRoute><ManagerApp /></PrivateRoute>} />
+                    <Route path="/admin/*"        element={<PrivateRoute adminOnly><AdminPanel /></PrivateRoute>} />
+                    <Route path="*"               element={<Navigate to="/" replace />} />
+                  </Routes>
+                )}
+              </Suspense>
+            </Router>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </main>
   );
 }

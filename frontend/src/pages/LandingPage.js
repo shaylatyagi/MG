@@ -105,6 +105,7 @@ function LandingPage() {
             <a href="#product" className="nav-link">Product</a>
             <a href="#how" className="nav-link">How it Works</a>
             <a href="#pricing" className="nav-link">Pricing</a>
+            <a href="https://partners.mobilitygrid.in" className="nav-link">Partners</a>
           </div>
           <div className="nav-actions">
             <a href="#signup" className="btn btn-primary btn-sm">Get Early Access</a>
