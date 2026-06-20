@@ -141,7 +141,12 @@ function PartnerListing() {
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-3">
         {PARTNERS.map(p => (
-          <button key={p.slug} onClick={() => navigate(`/partners/${p.slug}`)}
+          <button 
+  key={p.slug} 
+  onClick={() => {
+    const isSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
+    navigate(isSubdomain ? `/${p.slug}` : `/partners/${p.slug}`);
+  }}
             className="w-full bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 text-left hover:border-indigo-300 hover:shadow-sm transition">
             <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${p.gradient} flex items-center justify-center text-white font-black text-sm shrink-0`}>
               {p.avatar}
@@ -162,11 +167,21 @@ function PartnerListing() {
 
         <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-5 text-center">
           <p className="text-sm font-black text-indigo-800 mb-1">Want to list your fleet?</p>
-          <p className="text-xs text-indigo-500 mb-3">₹25,000 onboarding · Get on MobilityGrid partner directory</p>
+          <p className="text-xs text-indigo-500 mb-3"> · Get on MobilityGrid partner directory</p>
           <a href="mailto:hello@mobilitygrid.in"
-            className="inline-block px-5 py-2.5 bg-indigo-600 text-white text-xs font-black rounded-xl hover:bg-indigo-700 transition">
-            Contact Us
-          </a>
+  style={{
+    display: 'inline-block',
+    padding: '10px 20px',
+    backgroundColor: '#4f46e5',
+    color: '#ffffff',
+    textDecoration: 'none',
+    fontWeight: '900',
+    fontSize: '12px',
+    borderRadius: '12px',
+    pointerEvents: 'auto'
+  }}>
+  Contact Us
+</a>
         </div>
       </div>
     </div>

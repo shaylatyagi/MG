@@ -73,7 +73,7 @@ function PrivateRoute({ children, adminOnly }) {
   if (adminOnly && !adminToken)  return <Navigate to="/login" replace />;
   return children;
 }
-// ── Updated App Component ─────────────────────────────────────────────────────
+// App.js mein Function App ko isse replace karein
 function App() {
   const isPartnersSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
 
@@ -85,14 +85,12 @@ function App() {
             <Router>
               <Suspense fallback={<PageLoader />}>
                 {isPartnersSubdomain ? (
-                  /* SUBDOMAIN ROUTES: Only show Partner Directory */
                   <Routes>
                     <Route path="/"           element={<PartnersPage />} />
                     <Route path="/:slug"      element={<PartnersPage />} />
                     <Route path="*"           element={<Navigate to="/" replace />} />
                   </Routes>
                 ) : (
-                  /* MAIN DOMAIN ROUTES: Show full application */
                   <Routes>
                     <Route path="/"               element={<LandingPage />} />
                     <Route path="/login"          element={<Login />} />

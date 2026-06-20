@@ -662,7 +662,7 @@ function LandingPage() {
                 <li><span className="pf-cross">✗</span> Online payment collection</li>
                 <li><span className="pf-cross">✗</span> Advanced analytics</li>
               </ul>
-              <a href="mailto:hello@mobilitygrid.in" className="pricing-btn pricing-btn-outline">Get Onboarded</a>
+              <a href="mailto:mobilitygrid@gmail.com" className="pricing-btn pricing-btn-outline">Get Onboarded</a>
             </div>
 
             {/* GROWTH */}
@@ -701,12 +701,11 @@ function LandingPage() {
                 <li><span className="pf-check">✓</span> Custom reporting</li>
                 <li><span className="pf-check">✓</span> 24/7 support</li>
               </ul>
-              <a href="mailto:hello@mobilitygrid.in" className="pricing-btn pricing-btn-outline">Contact Us</a>
+              <a href="mailto:mobilitygrid@gmail.com" className="pricing-btn pricing-btn-outline">Contact Us</a>
             </div>
           </div>
 
           <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#64748b' }}>
-            ₹25,000 onboarding · First 10 drivers at 50% off for 3 months · No hidden charges
           </p>
         </div>
       </section>
@@ -905,7 +904,7 @@ function LandingPage() {
             <div className="footer-col">
               <div className="footer-col-title">Contact</div>
               <ul className="footer-links">
-                <li><a href="mailto:hello@mobilitygrid.in" className="footer-link">hello@mobilitygrid.in</a></li>
+                <li><a href="mailto:mobilitygrid@gmail.com" className="footer-link">hello@mobilitygrid.in</a></li>
                 <li><span className="footer-link">Bengaluru, India</span></li>
                 <li><a href="#signup" className="footer-link">Request a Demo</a></li>
               </ul>
