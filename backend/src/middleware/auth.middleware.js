@@ -8,36 +8,31 @@ const pool = require('../config/db');
 const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer '))
-      throw new ApiError(401, 'No token provided', 'NO_TOKEN');
-    
-    const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
-    
-    // --- FIX STARTS HERE ---
-    // Force the id to be an integer so queries don't trigger UUID/Syntax errors
-    const normalizedUser = {
-      ...decoded,
-      id: parseInt(decoded.id, 10)
-    };
-    // --- FIX ENDS HERE ---
-
-    if (decoded.session_token && decoded.id && decoded.role !== 'admin' && decoded.role !== 'MANAGER') {
-      const table = decoded.role === 'DRIVER' ? 'drivers' : 'owners';
-      const dbRes = await pool.query(
-        `SELECT session_token FROM public.${table} WHERE id=$1`,
-        [normalizedUser.id] // Use normalized ID
-      );
-      const stored = dbRes.rows[0]?.session_token;
-      if (!stored || stored !== decoded.session_token) {
-        throw new ApiError(401, 'Session expired. Please login again.', 'SESSION_EXPIRED');
-      }
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
     }
-    
-    req.user = normalizedUser; // Use normalized object
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // CRITICAL: Normalize data before assigning to req.user
+    // If the DB expects an integer ID, force it now.
+    req.user = {
+      id: parseInt(decoded.id, 10), 
+      owner_code: decoded.owner_code || null,
+      role: decoded.role || 'OWNER'
+    };
+
+    // If ID is still NaN, we have a major token issue
+    if (isNaN(req.user.id)) {
+      console.error("DEBUG: Token decoded but ID is missing/invalid:", decoded);
+      return res.status(401).json({ success: false, message: 'Invalid token payload' });
+    }
+
     next();
   } catch (err) {
-    if (err instanceof ApiError) return next(err);
-    next(new ApiError(401, 'Invalid or expired token', 'INVALID_TOKEN'));
+    console.error("DEBUG: JWT Auth Error:", err);
+    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 };
 
