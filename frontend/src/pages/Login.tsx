@@ -87,12 +87,15 @@ export default function Login() {
   const [signupEmail, setSignupEmail]         = useState('');
   const [signupCompany, setSignupCompany]     = useState('');
   const [signupOtp, setSignupOtp]             = useState('');
-
-  const roles = [
+  const isAdminSubdomain = window.location.hostname === 'admin.mobilitygrid.in';
+  const allRoles = [
     { type: 'driver', name: 'Driver',         icon: <Truck size={20} />,    redirect: '/driver/dashboard' },
     { type: 'owner',  name: 'Fleet Owner',    icon: <Building2 size={20} />, redirect: '/owner/dashboard' },
     { type: 'admin',  name: 'Platform Admin', icon: <Shield size={20} />,   redirect: '/admin' },
   ];
+
+  // 3. For the main domain: show Driver & Owner only (hide Admin)
+  const roles = isAdminSubdomain ? allRoles : allRoles.filter(r => r.type !== 'admin');
 
   // ── Auto-select role from URL param (?role=driver or ?role=owner) ──────────
   useEffect(function() {
@@ -113,7 +116,13 @@ export default function Login() {
       }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+useEffect(() => {
+  if (isAdminSubdomain) {
+    setStep('admin-login');
+    const adminRole = allRoles.find(r => r.type === 'admin');
+    if (adminRole) setSelectedRole(adminRole);
+  }
+}, [isAdminSubdomain]);
   // ── Passkey check (silent, on phone change) ───────────────────────────────
   useEffect(function() {
     if (!selectedRole || selectedRole.type === 'admin') return;
@@ -360,7 +369,7 @@ const loginWithPin = async function() {
       var data = await res.json();
       if (data.success) {
         authLogin(data.token, null, true);
-        navigate('/admin');
+        navigate('/');
       } else { setError(data.message || 'Invalid credentials'); }
     } catch { setError('Network error'); }
     setLoading(false);

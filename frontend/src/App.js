@@ -73,10 +73,17 @@ function PrivateRoute({ children, adminOnly }) {
   if (adminOnly && !adminToken)  return <Navigate to="/login" replace />;
   return children;
 }
-// App.js mein Function App ko isse replace karein
 function App() {
-  const isPartnersSubdomain = window.location.hostname === 'partners.mobilitygrid.in';
-
+  const host = window.location.hostname;
+  const isPartnersSubdomain = host === 'partners.mobilitygrid.in';
+  const isAdminSubdomain = host === 'admin.mobilitygrid.in';
+  const AdminRoot = () => {
+  const { adminToken } = useAuth();
+  if (adminToken) {
+    return <AdminPanel />;
+  }
+  return <Login />;
+};
   return (
     <main role="main">
       <ErrorBoundary>
@@ -85,24 +92,28 @@ function App() {
             <Router>
               <Suspense fallback={<PageLoader />}>
                 {isPartnersSubdomain ? (
-  <Routes>
-    {/* Subdomain par sirf root aur slug chalega */}
-    <Route path="/"           element={<PartnersPage />} />
-    <Route path="/:slug"      element={<PartnersPage />} />
-    <Route path="*"           element={<Navigate to="/" replace />} />
-  </Routes>
+                  <Routes>
+                    <Route path="/" element={<PartnersPage />} />
+                    <Route path="/:slug" element={<PartnersPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
                 ) : (
                   <Routes>
-                    <Route path="/"               element={<LandingPage />} />
-                    <Route path="/login"          element={<Login />} />
+                    <Route path="/" element={isAdminSubdomain ? <AdminRoot /> : <LandingPage />} />
+                    <Route path="/login" element={<Login />} />
                     <Route path="/payment-result" element={<PaymentResult />} />
-                    <Route path="/pay/:token"     element={<PaymentLinkPage />} />
-                    <Route path="/owner/*"        element={<PrivateRoute><OwnerApp /></PrivateRoute>} />
-                    <Route path="/driver/*"       element={<PrivateRoute><DriverPWA /></PrivateRoute>} />
-                    <Route path="/profile"        element={<PrivateRoute><Profile /></PrivateRoute>} />
-                    <Route path="/manager/*"      element={<PrivateRoute><ManagerApp /></PrivateRoute>} />
-                    <Route path="/admin/*"        element={<PrivateRoute adminOnly><AdminPanel /></PrivateRoute>} />
-                    <Route path="*"               element={<Navigate to="/" replace />} />
+                    <Route path="/pay/:token" element={<PaymentLinkPage />} />
+                    <Route path="/owner/*" element={<PrivateRoute><OwnerApp /></PrivateRoute>} />
+                    <Route path="/driver/*" element={<PrivateRoute><DriverPWA /></PrivateRoute>} />
+                    <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+                    <Route path="/manager/*" element={<PrivateRoute><ManagerApp /></PrivateRoute>} />
+                    
+                    {/* 🔥 Admin route exists ONLY on admin.mobilitygrid.in */}
+                    {isAdminSubdomain && (
+                      <Route path="/admin/*" element={<PrivateRoute adminOnly><AdminPanel /></PrivateRoute>} />
+                    )}
+                    
+                    <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 )}
               </Suspense>

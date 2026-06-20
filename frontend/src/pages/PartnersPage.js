@@ -16,7 +16,6 @@ const PARTNERS = [
     gst:       '09ABLFR5375B1ZY',
     pan:       'ABLFR5375B',
     cin:       'ACO-8282',
-    website:   'https://www.ev4rent.co.in',
     fleet:     74,
     drivers:   29,
     turnover:  '₹36 Lakh / year',
@@ -47,7 +46,24 @@ function PartnerDetail({ slug }) {
   // Slug ko decode aur clean karein
   const cleanSlug = slug ? slug.toLowerCase().trim() : "";
   const p = PARTNERS.find(item => item.slug === cleanSlug);
+  // PAN Masking Logic
+const maskPan = (pan) => {
+  if (!pan) return 'N/A';
+  return '*****' + pan.slice(-5); // Sirf last 5 digits dikhayega
+};
 
+// Rendering in JSX
+<div className="space-y-4">
+  <p><strong>Organisation:</strong> {p.name}</p>
+  <p><strong>PAN:</strong> {maskPan(p.pan)}</p>
+  
+  {/* Website removal: Simply delete or comment out the website link block below */}
+  {/* 
+  <a href={partner.website} target="_blank" rel="noreferrer">
+     Visit Website
+  </a> 
+  */}
+</div>
   if (!p) return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
       <p className="font-black text-slate-800 text-lg mb-4">Partner details nahi mil rahe.</p>
@@ -63,62 +79,47 @@ function PartnerDetail({ slug }) {
   // ... baaki ka return code waisa hi rahega
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="sticky top-0 bg-white border-b border-slate-100 z-10 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate('/')} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition">
-          <ArrowLeft size={18} className="text-slate-600" />
-        </button>
-        <span className="font-black text-slate-800 text-sm">{p.name}</span>
-        <span className="ml-auto text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">{p.status}</span>
-      </div>
+    <div className="min-h-screen bg-[#F8FAFC]">
+      {/* 1. Header Match: LandingPage jaisa */}
+      <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-slate-200 z-50">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <a href="https://mobilitygrid.in" className="text-xl font-black tracking-tighter text-slate-900">
+            Mobility<span className="text-indigo-600">Grid</span>
+          </a>
+          <a href="https://mobilitygrid.in" className="px-5 py-2 bg-slate-900 text-white rounded-full text-xs font-bold hover:bg-indigo-600 transition">
+            Back to Home
+          </a>
+        </div>
+      </nav>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        <div className={`bg-gradient-to-br ${p.gradient} rounded-2xl p-6 text-white`}>
-          <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-xl font-black mb-4">{p.avatar}</div>
-          <h1 className="text-xl font-black mb-1">{p.name}</h1>
-          <p className="text-white/70 text-sm mb-4">{p.tagline}</p>
-          <div className="flex flex-wrap gap-2">
-            {p.tags.map(tag => (
-              <span key={tag} className="text-xs font-semibold bg-white/15 px-2.5 py-1 rounded-full">{tag}</span>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-white/70 text-xs font-semibold">
-            <CheckCircle size={13} /> Verified Partner · Since {p.since}
-          </div>
+      {/* 2. Content Container */}
+      <main className="pt-32 pb-20 px-6 max-w-3xl mx-auto">
+        <div className="mb-12 text-center">
+          <h1 className="text-5xl font-black text-slate-900 mb-4 tracking-tight">Fleet Partners</h1>
+          <p className="text-slate-500 text-lg">Verified fleets running on our infrastructure</p>
         </div>
 
-        <div className="bg-white rounded-2xl px-4 py-4">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">About</p>
-          <p className="text-sm text-slate-700 leading-relaxed">{p.about}</p>
-        </div>
-
-        <div className="bg-white rounded-2xl divide-y divide-slate-100">
-          <InfoRow icon={Phone}    label="Contact"          value={p.contact} />
-          <InfoRow icon={Phone}    label="Mobile"           value={p.mobile} />
-          <InfoRow icon={Mail}     label="Email"            value={p.email} />
-          <InfoRow icon={FileText} label="Legal Type"       value={p.legalType} />
-          <InfoRow icon={FileText} label="Category"         value={p.category} />
-          <InfoRow icon={FileText} label="GST Number"       value={p.gst}      mono />
-          <InfoRow icon={FileText} label="PAN"              value={p.pan}      mono />
-          <InfoRow icon={FileText} label="CIN / LLPIN"      value={p.cin}      mono />
-          <InfoRow icon={FileText} label="Annual Turnover"  value={p.turnover} />
-          <InfoRow icon={MapPin}   label="Registered Address" value={p.location} />
-          <InfoRow icon={Truck}    label="Fleet Size"       value={p.fleet ? `${p.fleet} vehicles` : null} />
-          <InfoRow icon={Users}    label="Drivers"          value={p.drivers ? `${p.drivers} active riders` : null} />
-          {p.website && (
-            <a href={p.website} target="_blank" rel="noopener noreferrer"
-              className="px-4 py-3.5 flex items-center gap-3 hover:bg-slate-50 transition">
-              <ExternalLink size={15} className="text-slate-400 shrink-0" />
-              <div>
-                <p className="text-xs text-slate-400 font-medium">Website</p>
-                <p className="text-sm font-semibold text-indigo-600">{p.website}</p>
+        <div className="grid gap-6">
+          {PARTNERS.map(p => (
+            <button 
+              key={p.slug} 
+              onClick={() => window.location.href = `https://partners.mobilitygrid.in/${p.slug}`}
+              className="group w-full bg-white border border-slate-200 rounded-3xl p-8 flex items-center gap-6 text-left hover:shadow-xl hover:border-indigo-200 transition-all duration-300"
+            >
+              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-sm ${p.gradient}`}>
+                {p.avatar}
               </div>
-            </a>
-          )}
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-600 transition">{p.name}</h3>
+                <p className="text-slate-500 mt-1">{p.tagline}</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-indigo-50 transition">
+                <ArrowLeft size={18} className="rotate-180 text-slate-400 group-hover:text-indigo-600" />
+              </div>
+            </button>
+          ))}
         </div>
-
-        <p className="text-center text-xs text-slate-400 pb-4">Powered by MobilityGrid</p>
-      </div>
+      </main>
     </div>
   );
 }
@@ -129,7 +130,7 @@ function PartnerListing() {
     <div className="min-h-screen bg-slate-50">
       <div className="bg-white border-b border-slate-100 px-4 py-4">
         <button onClick={() => window.location.href = 'https://mobilitygrid.in'} className="flex items-center gap-1.5 text-slate-500 text-sm mb-4 hover:text-slate-700 transition">
-          <ArrowLeft size={15} /> mobilitygrid.in
+          <ArrowLeft size={15} /> 
         </button>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
@@ -181,7 +182,7 @@ function PartnerListing() {
         <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-5 text-center">
           <p className="text-sm font-black text-indigo-800 mb-1">Want to list your fleet?</p>
           <p className="text-xs text-indigo-500 mb-3"> · Get on MobilityGrid partner directory</p>
-          <a href="mailto:mailto:mobilitygrid@gmail.com"
+          <a href="mailto:mobilitygrid@gmail.com"
   style={{
     display: 'inline-block',
     padding: '10px 20px',

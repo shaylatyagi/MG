@@ -1,3 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 * {
   margin: 0;
   padding: 0;
@@ -19,12 +22,16 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
+  font-display: swap;
 }
 
 /* Minimum tap target size for all interactive elements */
 button, a, [role="button"] {
-  min-height: 36px;
+  min-height: 44px; /* Mobile touch ke liye behtar */
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Prevent tiny unreadable text — labels/badges minimum 11px */
@@ -822,4 +829,8 @@ html.dark .skeleton-card {
   animation: btnSpin 0.65s linear infinite;
   vertical-align: middle;
   margin-right: 6px;
+}
+/* Add to bottom of index.css */
+.card, .stat-card, .mg-btn {
+  contain: content; /* Browser reflow ko limit karta hai */
 }
