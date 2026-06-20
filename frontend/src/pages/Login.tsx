@@ -7,7 +7,7 @@ import styles from './Login.module.css';
 // Types
 interface Role { type: string; name: string; icon: React.ReactNode; redirect: string; }
 
-const API: string = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API: string = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 interface ShellProps {
@@ -817,7 +817,7 @@ const loginWithPin = async function() {
   if (step === 'admin-login') {
     var adminReady = adminPhone.length === 10 && adminPassword.length > 0;
     return (
-      <Shell showBack onBack={handleBack} title="Platform Admin Login">
+      <Shell showBack={!isAdminSubdomain} onBack={handleBack} title="Platform Admin Login">
         <Alert />
         <div style={{ marginBottom: '12px' }}>
           <label className={styles.label}>Admin Phone</label>
