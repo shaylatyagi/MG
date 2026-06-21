@@ -4990,11 +4990,11 @@ const TrackFleetTab = () => {
             </div>
             <div className="flex items-center gap-2">
               <div className="text-right">
-                <p className="text-sm font-black text-red-600">₹{parseFloat(d.daily_rent||0).toLocaleString('en-IN')}</p>
+                <p className="text-sm font-black text-red-600">₹{parseFloat(d.balance||0).toLocaleString('en-IN')}</p>
                 <p className="text-[9px] text-slate-600">due</p>
               </div>
               <button
-                onClick={() => { setPayLinkDriver(d); setPayLinkAmt(String(parseFloat(d.daily_rent||0))); setPayLinkResult(null); }}
+                onClick={() => { setPayLinkDriver(d); setPayLinkAmt(String(parseFloat(d.balance||0))); setPayLinkResult(null); }}
                 className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 text-sm border border-indigo-100"
                 title="Send Payment Link"
               >🔗</button>
