@@ -18,6 +18,7 @@ const ALLOWED_ORIGINS = [
   'https://mg-xi.vercel.app',
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://admin.mobilitygrid.in',
 ];
 
 const app = express();
