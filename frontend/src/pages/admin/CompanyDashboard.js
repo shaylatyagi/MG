@@ -111,17 +111,17 @@ const Badge = ({ status }) => {
 
 const StatCard = ({ label, value, sub, color = 'indigo' }) => {
   const colors = {
-    indigo: 'border-indigo-400 bg-indigo-50',
-    green:  'border-green-400 bg-green-50',
-    blue:   'border-blue-400 bg-blue-50',
-    orange: 'border-orange-400 bg-orange-50',
-    red:    'border-red-400 bg-red-50',
+    indigo: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/50',
+    green:  'border-green-400 bg-green-50 dark:bg-green-950/50',
+    blue:   'border-blue-400 bg-blue-50 dark:bg-blue-950/50',
+    orange: 'border-orange-400 bg-orange-50 dark:bg-orange-950/50',
+    red:    'border-red-400 bg-red-50 dark:bg-red-950/50',
   };
   return (
     <div className={`border-l-4 rounded-lg p-4 shadow-sm ${colors[color] || colors.indigo}`}>
-      <p className="text-xs text-gray-500 dark:text-gray-400  uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-gray-800 dark:text-gray-100  mt-1">{value}</p>
-      {sub && <p className="text-xs text-gray-500 dark:text-gray-400  mt-1">{sub}</p>}
+      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</p>
+      <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sub}</p>}
     </div>
   );
 };
