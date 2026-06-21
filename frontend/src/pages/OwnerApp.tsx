@@ -2076,14 +2076,6 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
           <span className="text-[9px] text-indigo-600 font-black uppercase block mt-1">See who owes →</span>
         </button>
-          </span>
-          <span style={{fontSize:18,fontWeight:900,color:'#1e293b',display:'block'}}>
-            ₹{ledger.outstanding.toLocaleString('en-IN')}
-          </span>
-          <span style={{fontSize:10,fontWeight:600,color:'#6366f1',display:'block',marginTop:2}}>
-            See who owes →
-          </span>
-        </button>
       </div>
       <div className="flex items-center justify-between text-[9px] text-slate-600">
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/>{t.escrow}</span>
