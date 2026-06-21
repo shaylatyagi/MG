@@ -80,7 +80,7 @@ function LandingPage() {
       <nav id="nav" className={navScrolled ? 'scrolled' : ''}>
         <div className="nav-inner">
           <Link to="/" className="nav-logo">
-            <BrandLogo variant="cyan" height={40} alt="MobilityGrid" />
+            <BrandLogo variant="cyan" height={52} alt="MobilityGrid" />
           </Link>
           <div className="nav-links">
             <a href="#vision" className="nav-link">Vision</a>
@@ -862,7 +862,7 @@ function LandingPage() {
           <div className="footer-top">
             <div className="footer-brand">
               <div className="footer-logo">
-                <BrandLogo variant="cyan" height={30} alt="MobilityGrid" />
+                <BrandLogo variant="cyan" height={48} alt="MobilityGrid" />
               </div>
               <p className="footer-tagline">The operating system for India's fleet operations — built for every operator, manager, and driver.</p>
               <div className="footer-badge">

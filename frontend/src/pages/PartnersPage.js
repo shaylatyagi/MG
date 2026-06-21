@@ -31,7 +31,7 @@ function Nav({ onBack, backLabel = 'All Partners' }) {
     }}>
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 68, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="https://mobilitygrid.in" style={{ textDecoration: 'none' }}>
-          <BrandLogo variant="cyan" height={36} alt="MobilityGrid" />
+          <BrandLogo variant="cyan" height={48} alt="MobilityGrid" />
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {onBack && (
