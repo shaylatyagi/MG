@@ -1,7 +1,7 @@
 import { vehicleTypeLabel } from '../../constants/vehicleTypes';
 import React, { useState, useEffect, useCallback, useRef, Component } from 'react';
 import { toast, ToastContainer } from '../../components/Toast';
-import ThemeToggle from '../../components/ThemeToggle';
+import ThemeToggle, { useTheme } from '../../components/ThemeToggle';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -2973,6 +2973,7 @@ function AdminPanelInner() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const { notifications, unread, markAllRead } = useAdminNotifications();
+  const [isDark, toggleDark] = useTheme();
 
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
@@ -2995,7 +2996,7 @@ function AdminPanelInner() {
   const tabLabel = navItems.find(n => n.key === tab)?.label || tab;
 
   return (
-    <div style={{ display:'flex', height:'100vh', background:'#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+    <div style={{ display:'flex', height:'100vh', background: isDark ? '#020617' : '#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside style={{
@@ -3071,15 +3072,16 @@ function AdminPanelInner() {
 
         {/* Header */}
         <header style={{
-          background: '#fff', borderBottom: '1px solid #e5e7eb',
+          background: isDark ? '#0f172a' : '#fff',
+          borderBottom: `1px solid ${isDark ? '#1e293b' : '#e5e7eb'}`,
           padding: '0 24px', height: 56, display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10,
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#9ca3af', fontSize: 12, fontWeight: 500 }}>Admin</span>
-            <span style={{ color: '#d1d5db', fontSize: 12 }}>›</span>
-            <span style={{ color: '#111827', fontSize: 14, fontWeight: 600 }}>{tabLabel}</span>
+            <span style={{ color: isDark ? '#64748b' : '#9ca3af', fontSize: 12, fontWeight: 500 }}>Admin</span>
+            <span style={{ color: isDark ? '#334155' : '#d1d5db', fontSize: 12 }}>›</span>
+            <span style={{ color: isDark ? '#f1f5f9' : '#111827', fontSize: 14, fontWeight: 600 }}>{tabLabel}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -3089,10 +3091,11 @@ function AdminPanelInner() {
             <div style={{ position: 'relative' }}>
               <button onClick={() => { setShowNotifs(v => !v); if (!showNotifs && unread > 0) setTimeout(() => markAllRead(), 2000); }}
                 style={{
-                  width: 36, height: 36, borderRadius: 8, border: '1px solid #e5e7eb',
-                  background: showNotifs ? '#f3f4f6' : '#fff', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#6b7280', position: 'relative', transition: 'all 0.15s'
+                  width: 36, height: 36, borderRadius: 8,
+                  border: `1px solid ${isDark ? '#1e293b' : '#e5e7eb'}`,
+                  background: isDark ? (showNotifs ? '#1e293b' : '#0f172a') : (showNotifs ? '#f3f4f6' : '#fff'),
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: isDark ? '#94a3b8' : '#6b7280', position: 'relative', transition: 'all 0.15s'
                 }}>
                 <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -3112,25 +3115,31 @@ function AdminPanelInner() {
               {showNotifs && (
                 <div style={{
                   position: 'absolute', right: 0, top: 44, width: 320,
-                  background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                  border: '1px solid #e5e7eb', zIndex: 50, overflow: 'hidden'
+                  background: isDark ? '#0f172a' : '#fff',
+                  borderRadius: 12,
+                  boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.12)',
+                  border: `1px solid ${isDark ? '#1e293b' : '#e5e7eb'}`,
+                  zIndex: 50, overflow: 'hidden'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>Notifications</span>
-                    <button onClick={markAllRead} style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Mark all read</button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${isDark ? '#1e293b' : '#f3f4f6'}` }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#f1f5f9' : '#111827' }}>Notifications</span>
+                    <button onClick={markAllRead} style={{ fontSize: 11, color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Mark all read</button>
                   </div>
                   <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
-                      <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
+                      <p style={{ fontSize: 13, color: isDark ? '#475569' : '#9ca3af', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
                     ) : notifications.map(n => (
                       <div key={n.id} style={{
-                        padding: '12px 16px', borderBottom: '1px solid #f9fafb',
-                        background: !n.is_read ? '#fafaff' : '#fff'
+                        padding: '12px 16px',
+                        borderBottom: `1px solid ${isDark ? '#1e293b' : '#f9fafb'}`,
+                        background: isDark
+                          ? (!n.is_read ? '#131f35' : '#0f172a')
+                          : (!n.is_read ? '#fafaff' : '#fff')
                       }}>
                         {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginRight: 6, verticalAlign: 'middle' }} />}
-                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{n.title}</p>
-                        <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
-                        <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#e2e8f0' : '#111827', margin: 0 }}>{n.title}</p>
+                        <p style={{ fontSize: 12, color: isDark ? '#64748b' : '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
+                        <p style={{ fontSize: 10, color: isDark ? '#334155' : '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
                       </div>
                     ))}
                   </div>
@@ -3142,7 +3151,8 @@ function AdminPanelInner() {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '4px 12px 4px 4px', borderRadius: 20,
-              border: '1px solid #e5e7eb', background: '#fff', cursor: 'default'
+              border: `1px solid ${isDark ? '#1e293b' : '#e5e7eb'}`,
+              background: isDark ? '#0f172a' : '#fff', cursor: 'default'
             }}>
               <div style={{
                 width: 26, height: 26, borderRadius: '50%',
@@ -3151,7 +3161,7 @@ function AdminPanelInner() {
               }}>
                 <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SA</span>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#cbd5e1' : '#374151' }}>
                 {(() => { try { const p = JSON.parse(atob((localStorage.getItem('mg_admin_token')||'..').split('.')[1])); return p.phone ? `+91 ••••${String(p.phone).slice(-4)}` : 'Super Admin'; } catch { return 'Super Admin'; } })()}
               </span>
             </div>
@@ -3159,7 +3169,7 @@ function AdminPanelInner() {
         </header>
 
         {/* Content */}
-        <div style={{ padding: 24, flex: 1 }} className='dark:bg-gray-900'>
+        <div style={{ padding: 24, flex: 1, background: isDark ? '#0b1120' : '#f4f6f9' }}>
           {tab === 'dashboard'    && <Dashboard onSetTab={setTab} />}
           {tab === 'companies'    && <Companies />}
           {tab === 'owners'       && <AllOwners />}
