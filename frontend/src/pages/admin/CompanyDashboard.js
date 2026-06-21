@@ -22,7 +22,7 @@ class ErrorBoundary extends Component {
               Retry
             </button>
             <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.href = '/admin'; }}
-              className="mt-2 text-sm text-gray-700 hover:text-gray-600 underline block mx-auto">
+              className="mt-2 text-sm text-gray-400 hover:text-gray-600 underline block mx-auto">
               Logout
             </button>
           </div>
@@ -110,27 +110,18 @@ const Badge = ({ status }) => {
 };
 
 const StatCard = ({ label, value, sub, color = 'indigo' }) => {
-  const dark = document.documentElement.classList.contains('dark');
-  const light = {
-    indigo: { border: '#6366f1', bg: '#eef2ff',  label: '#4338ca', val: '#1e1b4b' },
-    green:  { border: '#22c55e', bg: '#f0fdf4',  label: '#15803d', val: '#14532d' },
-    blue:   { border: '#3b82f6', bg: '#eff6ff',  label: '#1d4ed8', val: '#1e3a5f' },
-    orange: { border: '#f97316', bg: '#fff7ed',  label: '#c2410c', val: '#7c2d12' },
-    red:    { border: '#ef4444', bg: '#fef2f2',  label: '#dc2626', val: '#7f1d1d' },
+  const colors = {
+    indigo: 'border-indigo-400 bg-indigo-50',
+    green:  'border-green-400 bg-green-50',
+    blue:   'border-blue-400 bg-blue-50',
+    orange: 'border-orange-400 bg-orange-50',
+    red:    'border-red-400 bg-red-50',
   };
-  const dk = {
-    indigo: { border: '#6366f1', bg: '#1e1b4b',  label: '#a5b4fc', val: '#e0e7ff' },
-    green:  { border: '#22c55e', bg: '#14532d',  label: '#86efac', val: '#dcfce7' },
-    blue:   { border: '#3b82f6', bg: '#1e3a5f',  label: '#93c5fd', val: '#dbeafe' },
-    orange: { border: '#f97316', bg: '#7c2d12',  label: '#fdba74', val: '#ffedd5' },
-    red:    { border: '#ef4444', bg: '#7f1d1d',  label: '#fca5a5', val: '#fee2e2' },
-  };
-  const s = (dark ? dk[color] : light[color]) || (dark ? dk.indigo : light.indigo);
   return (
-    <div style={{ borderLeft: `4px solid ${s.border}`, background: s.bg, borderRadius: 10, padding: '14px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
-      <p style={{ fontSize: 11, fontWeight: 700, color: s.label, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
-      <p style={{ fontSize: 26, fontWeight: 800, color: s.val, margin: '4px 0 0' }}>{value}</p>
-      {sub && <p style={{ fontSize: 11, color: s.label, marginTop: 3 }}>{sub}</p>}
+    <div className={`border-l-4 rounded-lg p-4 shadow-sm ${colors[color] || colors.indigo}`}>
+      <p className="text-xs text-gray-500  uppercase tracking-wide">{label}</p>
+      <p className="text-2xl font-bold text-gray-800  mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-500  mt-1">{sub}</p>}
     </div>
   );
 };
@@ -144,7 +135,7 @@ const Modal = ({ title, onClose, onBack, breadcrumbs, children, wide }) => (
     <div className={`bg-white  rounded-2xl shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-2xl'} relative`}>
       {/* Breadcrumb trail */}
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <div className="px-6 pt-4 pb-0 flex items-center gap-1 text-xs text-gray-700  flex-wrap">
+        <div className="px-6 pt-4 pb-0 flex items-center gap-1 text-xs text-gray-400  flex-wrap">
           {breadcrumbs.map((crumb, i) => (
             <span key={i} className="flex items-center gap-1">
               {i > 0 && <span className="text-gray-600 ">›</span>}
@@ -165,7 +156,7 @@ const Modal = ({ title, onClose, onBack, breadcrumbs, children, wide }) => (
           <h3 className="font-bold text-gray-800  text-lg">{title}</h3>
         </div>
         <button onClick={onClose} title="Close"
-          className="text-gray-700  hover:text-gray-700 :text-gray-700 text-xl font-bold leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 :bg-gray-100 transition">
+          className="text-gray-400  hover:text-gray-700 :text-gray-700 text-xl font-bold leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 :bg-gray-100 transition">
           ×
         </button>
       </div>
@@ -175,7 +166,7 @@ const Modal = ({ title, onClose, onBack, breadcrumbs, children, wide }) => (
 );
 
 const Spinner = () => (
-  <div className="flex items-center justify-center h-48 text-gray-700 ">
+  <div className="flex items-center justify-center h-48 text-gray-400 ">
     <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full mr-2" />
     Loading…
   </div>
@@ -265,7 +256,7 @@ function DocumentsSection({ userType, userId }) {
 
       {/* Docs list */}
       {loading ? <Spinner /> : docs.length === 0 ? (
-        <p className="text-center text-gray-700  py-6 text-sm">No documents uploaded yet</p>
+        <p className="text-center text-gray-400  py-6 text-sm">No documents uploaded yet</p>
       ) : (
         <table className="w-full text-sm">
           <thead className="bg-gray-50  text-gray-500  text-xs uppercase">
@@ -285,7 +276,7 @@ function DocumentsSection({ userType, userId }) {
                 <td className="px-3 py-2 text-gray-600 max-w-xs truncate" title={d.original_name}>{d.original_name}</td>
                 <td className="px-3 py-2 text-gray-500 ">{fileSize(d.file_size)}</td>
                 <td className="px-3 py-2"><Badge status={d.status} /></td>
-                <td className="px-3 py-2 text-gray-700 ">{timeSince(d.uploaded_at)}</td>
+                <td className="px-3 py-2 text-gray-400 ">{timeSince(d.uploaded_at)}</td>
                 <td className="px-3 py-2">
                   <div className="flex gap-2 flex-wrap">
                     <button
@@ -495,7 +486,7 @@ function Dashboard({ onSetTab }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-800">Platform Dashboard</h2>
+      <h2 className="text-xl font-bold text-gray-800 ">Platform Dashboard</h2>
       {pending > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-sm flex items-center justify-between">
           <span>⚠️ <strong>{pending} KYC verification(s)</strong> pending review</span>
@@ -514,12 +505,12 @@ function Dashboard({ onSetTab }) {
         <StatCard label="Collection This Month" value={fmt(s.collection_month || s.gmv_month)}  color="blue"   />
         <StatCard label="Collection All Time"   value={fmt(s.collection_total || s.gmv_total)}  color="indigo" />
       </div>
-      <div className="bg-white rounded-xl shadow-sm border p-6">
-        <h3 className="font-semibold text-gray-700 mb-4">KYC Status Overview</h3>
+      <div className="bg-white   rounded-xl shadow-sm border p-6">
+        <h3 className="font-semibold text-gray-700  mb-4">KYC Status Overview</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {['VERIFIED','PENDING','SUBMITTED','UNDER_REVIEW','REJECTED'].map(status => (
-            <button key={status} onClick={() => onSetTab && onSetTab('kyc')} className="text-center p-3 bg-gray-50 rounded-lg hover:ring-2 hover:ring-indigo-300 transition cursor-pointer w-full">
-              <p className="text-2xl font-bold text-gray-800">{k[status] || 0}</p>
+            <button key={status} onClick={() => onSetTab && onSetTab('kyc')} className="text-center p-3 bg-gray-50  rounded-lg hover:ring-2 hover:ring-indigo-300 transition cursor-pointer w-full">
+              <p className="text-2xl font-bold text-gray-800 ">{k[status] || 0}</p>
               <Badge status={status} />
             </button>
           ))}
@@ -584,7 +575,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
                   <Row label="Driver KYC"   value={<Badge status={v.driver_kyc} />} />
                   <Row label="Assigned"     value={timeSince(v.current_since)} />
                 </>
-              ) : <p className="text-gray-700  italic text-sm">No driver assigned</p>}
+              ) : <p className="text-gray-400  italic text-sm">No driver assigned</p>}
               <div className="pt-2 border-t">
                 <Row label="Owner"    value={v.owner_name || '—'} />
                 <Row label="Company"  value={v.company_name || '—'} />
@@ -608,7 +599,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {history.length === 0
-              ? <tr><td colSpan={6} className="py-8 text-center text-gray-700 ">No assignment history</td></tr>
+              ? <tr><td colSpan={6} className="py-8 text-center text-gray-400 ">No assignment history</td></tr>
               : history.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50 :bg-gray-100">
                   <td className="px-3 py-2 font-medium text-gray-800 ">{h.driver_name}</td>
@@ -626,7 +617,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
       {tab === 'docs' && (
         v.driver_id
           ? <DocumentsSection userType="DRIVER" userId={v.driver_id} />
-          : <p className="text-gray-700 italic text-sm py-6 text-center">No driver currently assigned to this vehicle.</p>
+          : <p className="text-gray-400 italic text-sm py-6 text-center">No driver currently assigned to this vehicle.</p>
       )}
     </Modal>
   );
@@ -708,13 +699,13 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {transactions.length === 0
-                ? <tr><td colSpan={4} className="py-8 text-center text-gray-700 ">No transactions</td></tr>
+                ? <tr><td colSpan={4} className="py-8 text-center text-gray-400 ">No transactions</td></tr>
                 : transactions.map((t, i) => (
                   <tr key={i} className="hover:bg-gray-50 :bg-gray-100">
                     <td className="px-3 py-2 text-gray-500 ">{fmtDate(t.order_initiation_date)}</td>
                     <td className="px-3 py-2 text-right font-medium text-gray-800 ">{fmt(t.order_amount)}</td>
                     <td className="px-3 py-2"><Badge status={t.transaction_status} /></td>
-                    <td className="px-3 py-2 text-gray-700  text-xs">{t.order_id}</td>
+                    <td className="px-3 py-2 text-gray-400  text-xs">{t.order_id}</td>
                   </tr>
                 ))}
             </tbody>
@@ -736,7 +727,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {vehicle_history.length === 0
-                ? <tr><td colSpan={5} className="py-8 text-center text-gray-700 ">No vehicle history</td></tr>
+                ? <tr><td colSpan={5} className="py-8 text-center text-gray-400 ">No vehicle history</td></tr>
                 : vehicle_history.map(h => (
                   <tr key={h.id} className="hover:bg-gray-50 :bg-gray-100">
                     <td className="px-3 py-2 font-medium text-gray-800 ">{h.vehicle_number} {h.vehicle_model ? `· ${h.vehicle_model}` : ''}</td>
@@ -763,7 +754,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {daily_logs.length === 0
-                ? <tr><td colSpan={3} className="py-8 text-center text-gray-700 ">No daily logs</td></tr>
+                ? <tr><td colSpan={3} className="py-8 text-center text-gray-400 ">No daily logs</td></tr>
                 : daily_logs.map((l, i) => (
                   <tr key={i} className="hover:bg-gray-50 :bg-gray-100">
                     <td className="px-3 py-2 text-gray-500 ">{fmtDate(l.log_date)}</td>
@@ -852,7 +843,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
           </thead>
           <tbody className="divide-y divide-gray-100">
             {drivers.length === 0
-              ? <tr><td colSpan={6} className="py-8 text-center text-gray-700 ">No drivers</td></tr>
+              ? <tr><td colSpan={6} className="py-8 text-center text-gray-400 ">No drivers</td></tr>
               : drivers.map(d => (
                 <tr key={d.id} className="hover:bg-gray-50 :bg-gray-100">
                   <td className="px-3 py-2 font-medium text-gray-800 ">{d.full_name}</td>
@@ -884,7 +875,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
           </thead>
           <tbody className="divide-y divide-gray-100">
             {vehicles.length === 0
-              ? <tr><td colSpan={6} className="py-8 text-center text-gray-700 ">No vehicles</td></tr>
+              ? <tr><td colSpan={6} className="py-8 text-center text-gray-400 ">No vehicles</td></tr>
               : vehicles.map(v => (
                 <tr key={v.id} className="hover:bg-gray-50 :bg-gray-100">
                   <td className="px-3 py-2 font-medium text-gray-800 ">{v.vehicle_number}</td>
@@ -913,7 +904,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
           </thead>
           <tbody className="divide-y divide-gray-100">
             {payments.length === 0
-              ? <tr><td colSpan={3} className="py-8 text-center text-gray-700 ">No payments</td></tr>
+              ? <tr><td colSpan={3} className="py-8 text-center text-gray-400 ">No payments</td></tr>
               : payments.map((p, i) => (
                 <tr key={i} className="hover:bg-gray-50 :bg-gray-100">
                   <td className="px-3 py-2 text-gray-500 ">{fmtDate(p.order_completion_date)}</td>
@@ -993,7 +984,7 @@ function CompanyDocsSection({ companyId }) {
       </div>
 
       {loading ? <Spinner /> : docs.length === 0 ? (
-        <p className="text-center text-gray-700  py-6 text-sm">No documents uploaded yet</p>
+        <p className="text-center text-gray-400  py-6 text-sm">No documents uploaded yet</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1016,7 +1007,7 @@ function CompanyDocsSection({ companyId }) {
                   <td className="px-3 py-2">{d.doc_type?.replace(/_/g,' ')}</td>
                   <td className="px-3 py-2 text-gray-500 text-xs truncate max-w-[140px]">{d.original_name}</td>
                   <td className="px-3 py-2"><Badge status={d.status} /></td>
-                  <td className="px-3 py-2 text-gray-700  text-xs">{timeSince(d.uploaded_at)}</td>
+                  <td className="px-3 py-2 text-gray-400  text-xs">{timeSince(d.uploaded_at)}</td>
                   <td className="px-3 py-2">
                     <div className="flex gap-1 flex-wrap">
                       <button
@@ -1237,7 +1228,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {owners.length === 0
-                  ? <tr><td colSpan={8} className="py-8 text-center text-gray-700 ">No owners found</td></tr>
+                  ? <tr><td colSpan={8} className="py-8 text-center text-gray-400 ">No owners found</td></tr>
                   : owners.map(o => (
                     <tr key={o.id} className="hover:bg-gray-50 :bg-gray-100">
                       <td className="px-3 py-2 font-medium text-gray-800 ">{o.full_name}</td>
@@ -1247,7 +1238,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                           <PlanBadge plan={o.plan || 'FREE'} />
                           <button
                             onClick={e => togglePlan(e, o.id, o.plan || 'FREE')}
-                            className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-700 hover:border-indigo-400 hover:text-indigo-600 transition font-medium">
+                            className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-400 hover:border-indigo-400 hover:text-indigo-600 transition font-medium">
                             {o.plan === 'PAID' ? '↓ FREE' : '↑ PAID'}
                           </button>
                         </div>
@@ -1278,15 +1269,15 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
               <div className="flex items-center gap-2 mb-4">
                 <button onClick={() => setSelBranch(null)}
                   className="text-sm text-indigo-600 hover:underline">← Branches</button>
-                <span className="text-gray-700">/</span>
+                <span className="text-gray-400">/</span>
                 <span className="text-sm font-semibold text-gray-700 ">{selBranch.name}</span>
               </div>
               {branchDetailLoading ? <Spinner /> : (
                 <div className="space-y-4">
                   <div>
-                    <h4 className="text-xs font-bold uppercase text-gray-700  mb-2">Drivers ({branchDrivers.length})</h4>
+                    <h4 className="text-xs font-bold uppercase text-gray-400  mb-2">Drivers ({branchDrivers.length})</h4>
                     {branchDrivers.length === 0 ? (
-                      <p className="text-sm text-gray-700  py-3">No drivers assigned to this branch</p>
+                      <p className="text-sm text-gray-400  py-3">No drivers assigned to this branch</p>
                     ) : (
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50  text-gray-500  text-xs uppercase">
@@ -1312,9 +1303,9 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                     )}
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold uppercase text-gray-700  mb-2">Vehicles ({branchVehicles.length})</h4>
+                    <h4 className="text-xs font-bold uppercase text-gray-400  mb-2">Vehicles ({branchVehicles.length})</h4>
                     {branchVehicles.length === 0 ? (
-                      <p className="text-sm text-gray-700  py-3">No vehicles assigned to this branch</p>
+                      <p className="text-sm text-gray-400  py-3">No vehicles assigned to this branch</p>
                     ) : (
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50  text-gray-500  text-xs uppercase">
@@ -1385,7 +1376,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                 <div className="py-10 text-center">
                   <p className="text-3xl mb-2">🌿</p>
                   <p className="text-sm text-gray-500 ">No branches yet</p>
-                  <p className="text-xs text-gray-700  mt-1">Add branches to organize drivers and vehicles by location</p>
+                  <p className="text-xs text-gray-400  mt-1">Add branches to organize drivers and vehicles by location</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1408,19 +1399,19 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                       <div className="flex flex-wrap gap-4 mt-3">
                         <div className="text-center">
                           <p className="text-lg font-bold text-indigo-600">{b.driver_count || 0}</p>
-                          <p className="text-[10px] text-gray-700 uppercase">Drivers</p>
+                          <p className="text-[10px] text-gray-400 uppercase">Drivers</p>
                         </div>
                         <div className="text-center">
                           <p className="text-lg font-bold text-violet-600">{b.vehicle_count || 0}</p>
-                          <p className="text-[10px] text-gray-700 uppercase">Vehicles</p>
+                          <p className="text-[10px] text-gray-400 uppercase">Vehicles</p>
                         </div>
                         <div className="text-center">
                           <p className="text-sm font-bold text-emerald-600">{fmt(b.collection_today || 0)}</p>
-                          <p className="text-[10px] text-gray-700 uppercase">Today</p>
+                          <p className="text-[10px] text-gray-400 uppercase">Today</p>
                         </div>
                         <div className="text-center">
                           <p className="text-sm font-bold text-blue-600">{fmt(b.collection_month || 0)}</p>
-                          <p className="text-[10px] text-gray-700 uppercase">This Month</p>
+                          <p className="text-[10px] text-gray-400 uppercase">This Month</p>
                         </div>
                       </div>
                     </div>
@@ -1504,7 +1495,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                 <div key={req.id} className="bg-white rounded-lg p-3 border border-amber-100 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-gray-700">{req.owner_name}</p>
-                    <span className="text-[10px] text-gray-700">{new Date(req.created_at).toLocaleDateString('en-IN')}</span>
+                    <span className="text-[10px] text-gray-400">{new Date(req.created_at).toLocaleDateString('en-IN')}</span>
                   </div>
                   <p className="text-xs text-gray-500">
                     <span className="font-medium">{req.current_mode || 'BOTH'}</span>
@@ -1669,7 +1660,7 @@ function Companies() {
                   </td>
                   <td className="px-4 py-3 text-gray-500 ">{c.city || '—'}</td>
                   <td className="px-4 py-3"><Badge status={c.status} /></td>
-                  <td className="px-4 py-3 text-gray-700">{fmtDate(c.created_at)}</td>
+                  <td className="px-4 py-3 text-gray-400">{fmtDate(c.created_at)}</td>
                   <td className="px-4 py-3 flex gap-2" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() =>
@@ -1693,7 +1684,7 @@ function Companies() {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="text-center py-12"><p className="text-gray-700 mb-3">No companies onboarded yet.</p><button onClick={() => setShowAdd(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold">+ Onboard First Company</button></div>}
+          {filtered.length === 0 && <div className="text-center py-12"><p className="text-gray-400 mb-3">No companies onboarded yet.</p><button onClick={() => setShowAdd(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold">+ Onboard First Company</button></div>}
         </div>
       )}
 
@@ -1908,7 +1899,7 @@ function KycReview() {
               ))}
             </tbody>
           </table>
-          {drivers.length === 0 && <p className="text-center text-gray-700 py-8">No drivers</p>}
+          {drivers.length === 0 && <p className="text-center text-gray-400 py-8">No drivers</p>}
         </div>
       )}
 
@@ -1985,7 +1976,7 @@ function AllDrivers() {
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div>
           <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:0}}>All Drivers</h2>
-          <p style={{fontSize:12,color:'#64748b',marginTop:2}}>{drivers.length} registered · {filtered.length} shown</p>
+          <p style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{drivers.length} registered · {filtered.length} shown</p>
         </div>
       </div>
 
@@ -2006,13 +1997,13 @@ function AllDrivers() {
             <svg width={20} height={20} fill="none" stroke="#cbd5e1" strokeWidth={2} viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <p style={{fontSize:14,fontWeight:600,color:'#64748b'}}>No drivers found</p>
-          <p style={{fontSize:12,color:'#64748b',marginTop:4}}>Try adjusting your search or filters</p>
+          <p style={{fontSize:12,color:'#94a3b8',marginTop:4}}>Try adjusting your search or filters</p>
         </div>
       ) : (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:12}}>
           {filtered.map(d => {
             const {ch, bg} = av(d.full_name);
-            const kycColor = {VERIFIED:'#059669',REJECTED:'#dc2626',SUBMITTED:'#2563eb',UNDER_REVIEW:'#d97706',PENDING:'#64748b'}[d.kyc_status]||'#64748b';
+            const kycColor = {VERIFIED:'#059669',REJECTED:'#dc2626',SUBMITTED:'#2563eb',UNDER_REVIEW:'#d97706',PENDING:'#94a3b8'}[d.kyc_status]||'#94a3b8';
             const kycBg    = {VERIFIED:'#ecfdf5',REJECTED:'#fef2f2',SUBMITTED:'#eff6ff',UNDER_REVIEW:'#fffbeb',PENDING:'#f8fafc'}[d.kyc_status]||'#f8fafc';
             return (
               <div key={d.id} className="press-card"
@@ -2029,7 +2020,7 @@ function AllDrivers() {
                       <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{d.full_name}</span>
                       <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,background:kycBg,color:kycColor}}>{d.kyc_status||'—'}</span>
                     </div>
-                    <p style={{fontSize:11,color:'#64748b',fontFamily:'monospace',marginTop:2}}>{d.mobile_number}</p>
+                    <p style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace',marginTop:2}}>{d.mobile_number}</p>
                   </div>
                   {/* Arrow */}
                   <svg width={14} height={14} fill="none" stroke="#cbd5e1" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
@@ -2049,15 +2040,15 @@ function AllDrivers() {
                 {/* Revenue row */}
                 <div style={{display:'flex',gap:16,marginTop:10,paddingTop:10,borderTop:'1px solid #f8fafc'}}>
                   <div>
-                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Today</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Today</p>
                     <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(d.paid_today)}</p>
                   </div>
                   <div>
-                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
                     <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(d.total_paid)}</p>
                   </div>
                   <div style={{marginLeft:'auto',textAlign:'right'}}>
-                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Joined</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Joined</p>
                     <p style={{fontSize:11,fontWeight:600,color:'#64748b'}}>{timeSince(d.created_at)}</p>
                   </div>
                 </div>
@@ -2139,7 +2130,7 @@ function AllOwners() {
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div>
           <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:0}}>Fleet Owners</h2>
-          <p style={{fontSize:12,color:'#64748b',marginTop:2}}>{owners.length} registered · {filtered.length} shown</p>
+          <p style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{owners.length} registered · {filtered.length} shown</p>
         </div>
       </div>
 
@@ -2167,9 +2158,9 @@ function AllOwners() {
                   <div style={{flex:1,minWidth:0}}>
                     <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{o.full_name}</span>
                     <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}} onClick={e => e.stopPropagation()}>
-                      <span style={{fontSize:11,color:'#64748b',fontFamily:'monospace'}}>{o.mobile_number}</span>
+                      <span style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace'}}>{o.mobile_number}</span>
                       <button onClick={e => startEditPhone(e, o)}
-                        style={{fontSize:10,color:'#64748b',background:'none',border:'none',cursor:'pointer',padding:'0 2px'}}
+                        style={{fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',padding:'0 2px'}}
                         title="Edit phone">✏️</button>
                     </div>
                     <span style={{fontSize:10,fontWeight:700,color:'#6366f1',background:'#eef2ff',padding:'2px 8px',borderRadius:20,fontFamily:'monospace',display:'inline-block',marginTop:4}}>{o.owner_code}</span>
@@ -2180,19 +2171,19 @@ function AllOwners() {
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginTop:12,paddingTop:12,borderTop:'1px solid #f8fafc'}}>
                   <div style={{textAlign:'center'}}>
                     <p style={{fontSize:16,fontWeight:800,color:'#0f172a'}}>{o.total_drivers||0}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Drivers</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Drivers</p>
                   </div>
                   <div style={{textAlign:'center'}}>
                     <p style={{fontSize:16,fontWeight:800,color:'#0f172a'}}>{o.total_vehicles||0}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Vehicles</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Vehicles</p>
                   </div>
                   <div style={{textAlign:'center'}}>
                     <p style={{fontSize:13,fontWeight:800,color:'#059669',fontFamily:'monospace'}}>{fmt(o.collection_month)}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Month</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Month</p>
                   </div>
                   <div style={{textAlign:'center'}}>
                     <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(o.collection_total)}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
+                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
                   </div>
                 </div>
               </div>
@@ -2328,12 +2319,12 @@ function Transactions() {
                   <td className="px-4 py-3 text-gray-500 ">{r.owner_name || '—'}</td>
                   <td className="px-4 py-3 text-right font-medium text-gray-800 ">{fmt(r.order_amount)}</td>
                   <td className="px-4 py-3"><Badge status={r.transaction_status} /></td>
-                  <td className="px-4 py-3 text-gray-700  text-xs">{r.order_id || r.pg_transaction_id || '—'}</td>
+                  <td className="px-4 py-3 text-gray-400  text-xs">{r.order_id || r.pg_transaction_id || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {rows.length === 0 && <p className="text-center text-gray-700 py-8">No transactions</p>}
+          {rows.length === 0 && <p className="text-center text-gray-400 py-8">No transactions</p>}
         </div>
       )}
     </div>
@@ -2379,17 +2370,17 @@ function AuditLog() {
                 catch { details = String(l.details || ''); }
                 return (
                   <tr key={l.id} className="hover:bg-gray-50 :bg-gray-100">
-                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{timeSince(l.created_at)}</td>
+                    <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{timeSince(l.created_at)}</td>
                     <td className={`px-4 py-3 font-medium ${actionColors[l.action] || 'text-gray-700 '}`}>{l.action}</td>
                     <td className="px-4 py-3 text-gray-500 ">{l.entity_type} #{l.entity_id}</td>
                     <td className="px-4 py-3 text-gray-500 ">{l.performed_by}</td>
-                    <td className="px-4 py-3 text-gray-700 text-xs max-w-xs truncate">{details}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{details}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          {logs.length === 0 && <p className="text-center text-gray-700 py-8">No audit events yet</p>}
+          {logs.length === 0 && <p className="text-center text-gray-400 py-8">No audit events yet</p>}
         </div>
       )}
     </div>
@@ -2442,19 +2433,19 @@ function ChatViewer() {
                 className={`w-full text-left px-4 py-3 border-b  hover:bg-indigo-50 :bg-gray-100 transition ${selected?.driver_id === t.driver_id ? 'bg-indigo-50  border-l-2 border-l-indigo-500' : ''}`}>
                 <p className="font-medium text-gray-800  text-sm truncate">{t.driver_name}</p>
                 <p className="text-xs text-gray-500 truncate">Owner: {t.owner_name || '—'}</p>
-                <p className="text-xs text-gray-700 mt-0.5 truncate">{t.last_message}</p>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">{t.last_message}</p>
                 <p className="text-xs text-gray-600 mt-0.5">{timeSince(t.last_at)}</p>
               </button>
             ))}
             {!loading && filtered.length === 0 && (
-              <p className="text-center text-gray-700 py-8 text-sm">No conversations</p>
+              <p className="text-center text-gray-400 py-8 text-sm">No conversations</p>
             )}
           </div>
         </div>
 
         <div className="flex-1 bg-white   rounded-xl border shadow-sm overflow-hidden flex flex-col">
           {!selected ? (
-            <div className="flex-1 flex items-center justify-center text-gray-700 text-sm">
+            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
               Select a conversation to view
             </div>
           ) : (
@@ -2468,14 +2459,14 @@ function ChatViewer() {
                   <div key={m.id} className={`flex ${m.sender_type === 'OWNER' ? 'justify-start' : 'justify-end'}`}>
                     <div className={`max-w-xs rounded-xl px-4 py-2 text-sm shadow-sm ${m.sender_type === 'OWNER' ? 'bg-gray-100  text-gray-800 ' : 'bg-indigo-600 text-white'}`}>
                       <p>{m.message}</p>
-                      <p className={`text-xs mt-1 ${m.sender_type === 'OWNER' ? 'text-gray-700' : 'text-indigo-200'}`}>
+                      <p className={`text-xs mt-1 ${m.sender_type === 'OWNER' ? 'text-gray-400' : 'text-indigo-200'}`}>
                         {m.sender_type === 'OWNER' ? m.owner_name : m.driver_name} · {timeSince(m.created_at)}
                       </p>
                     </div>
                   </div>
                 ))}
                 {!msgLoading && messages.length === 0 && (
-                  <p className="text-center text-gray-700 text-sm py-8">No messages</p>
+                  <p className="text-center text-gray-400 text-sm py-8">No messages</p>
                 )}
               </div>
             </>
@@ -2561,7 +2552,7 @@ function DocApprovals() {
       {loading ? (
         <Spinner />
       ) : docs.length === 0 ? (
-        <div className="text-center py-16 text-gray-700 ">
+        <div className="text-center py-16 text-gray-400 ">
           <div className="text-5xl mb-3">✅</div>
           <p className="font-medium">No pending documents</p>
           <p className="text-sm mt-1">All uploads have been reviewed.</p>
@@ -2578,7 +2569,7 @@ function DocApprovals() {
                 {d.mime_type?.startsWith('image/') && d.view_url ? (
                   <img src={d.view_url} alt={d.original_name} className="h-full w-full object-contain" />
                 ) : (
-                  <div className="flex flex-col items-center gap-2 text-gray-700 ">
+                  <div className="flex flex-col items-center gap-2 text-gray-400 ">
                     <span className="text-4xl">📄</span>
                     <span className="text-xs font-medium">Click to View PDF</span>
                   </div>
@@ -2601,15 +2592,15 @@ function DocApprovals() {
                       {d.user_name || '—'} · {d.user_type}
                     </p>
                     {d.company_name && (
-                      <p className="text-xs text-gray-700 ">{d.company_name}</p>
+                      <p className="text-xs text-gray-400 ">{d.company_name}</p>
                     )}
                   </div>
                   <span className="text-xs text-yellow-700 bg-yellow-100   px-2 py-0.5 rounded-full font-medium shrink-0">
                     PENDING
                   </span>
                 </div>
-                <p className="text-[11px] text-gray-700  mb-1 truncate">{d.original_name}</p>
-                <p className="text-[11px] text-gray-700 ">{fileSize(d.file_size)} · {timeSince(d.uploaded_at)}</p>
+                <p className="text-[11px] text-gray-400  mb-1 truncate">{d.original_name}</p>
+                <p className="text-[11px] text-gray-400 ">{fileSize(d.file_size)} · {timeSince(d.uploaded_at)}</p>
 
                 {/* Action buttons */}
                 <div className="flex gap-2 mt-3">
@@ -2741,7 +2732,7 @@ function LeadsSection() {
         </button>
       </div>
       {loading ? <p style={{ color: '#64748b' }}>Loading…</p> : leads.length === 0 ? (
-        <p style={{ color: '#64748b', textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
+        <p style={{ color: '#94a3b8', textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -2762,7 +2753,7 @@ function LeadsSection() {
                   <td style={{ padding: '10px 12px', color: '#334155' }}>{l.fleet || '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#334155' }}>{l.city || '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: '12px', whiteSpace: 'nowrap' }}>{fmtUTC(l.submitted_at)}</td>
-                  <td style={{ padding: '10px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: '11px' }}>{l.ip_address || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: '#94a3b8', fontFamily: 'monospace', fontSize: '11px' }}>{l.ip_address || '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#64748b' }}>{parseBrowser(l.user_agent)}</td>
                 </tr>
               ))}
@@ -2985,20 +2976,6 @@ function PinManagementSection() {
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [tab, setTab]               = useState('dashboard');
-
-  // Admin theme — reads from localStorage, syncs with html.dark class
-  const [isDark, setIsDark] = useState(() => {
-    const stored = localStorage.getItem('theme');
-    return stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  });
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-  }, [isDark]);
-  const toggleAdminTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    localStorage.setItem('theme', next ? 'dark' : 'light');
-  };
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const { notifications, unread, markAllRead } = useAdminNotifications();
@@ -3024,7 +3001,7 @@ function AdminPanelInner() {
   const tabLabel = navItems.find(n => n.key === tab)?.label || tab;
 
   return (
-    <div style={{ display:'flex', height:'100vh', background: isDark ? '#0f172a' : '#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+    <div style={{ display:'flex', height:'100vh', background:'#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside style={{
@@ -3100,33 +3077,28 @@ function AdminPanelInner() {
 
         {/* Header */}
         <header style={{
-          background: isDark ? '#1e293b' : '#fff',
-          borderBottom: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`,
+          background: '#fff', borderBottom: '1px solid #e5e7eb',
           padding: '0 24px', height: 56, display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10,
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: isDark ? '#94a3b8' : '#6b7280', fontSize: 12, fontWeight: 500 }}>Admin</span>
-            <span style={{ color: isDark ? '#475569' : '#d1d5db', fontSize: 12 }}>›</span>
-            <span style={{ color: isDark ? '#f1f5f9' : '#111827', fontSize: 14, fontWeight: 600 }}>{tabLabel}</span>
+            <span style={{ color: '#9ca3af', fontSize: 12, fontWeight: 500 }}>Admin</span>
+            <span style={{ color: '#d1d5db', fontSize: 12 }}>›</span>
+            <span style={{ color: '#111827', fontSize: 14, fontWeight: 600 }}>{tabLabel}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Theme toggle */}
-            <button onClick={toggleAdminTheme} title={isDark ? 'Switch to light' : 'Switch to dark'}
-              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isDark ? '#94a3b8' : '#6b7280', fontSize: 16 }}>
-              {isDark ? '☀️' : '🌙'}
-            </button>
+            <ThemeToggle />
+
             {/* Bell */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => { setShowNotifs(v => !v); if (!showNotifs && unread > 0) setTimeout(() => markAllRead(), 2000); }}
                 style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`,
-                  background: isDark ? (showNotifs ? '#1e293b' : 'transparent') : (showNotifs ? '#f3f4f6' : '#fff'),
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: isDark ? '#94a3b8' : '#6b7280', position: 'relative', transition: 'all 0.15s'
+                  width: 36, height: 36, borderRadius: 8, border: '1px solid #e5e7eb',
+                  background: showNotifs ? '#f3f4f6' : '#fff', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#6b7280', position: 'relative', transition: 'all 0.15s'
                 }}>
                 <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -3146,26 +3118,25 @@ function AdminPanelInner() {
               {showNotifs && (
                 <div style={{
                   position: 'absolute', right: 0, top: 44, width: 320,
-                  background: isDark ? '#1e293b' : '#fff',
-                  borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-                  border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`, zIndex: 50, overflow: 'hidden'
+                  background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                  border: '1px solid #e5e7eb', zIndex: 50, overflow: 'hidden'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${isDark ? '#334155' : '#f3f4f6'}` }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#f1f5f9' : '#111827' }}>Notifications</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>Notifications</span>
                     <button onClick={markAllRead} style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Mark all read</button>
                   </div>
                   <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
-                      <p style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
+                      <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
                     ) : notifications.map(n => (
                       <div key={n.id} style={{
-                        padding: '12px 16px', borderBottom: `1px solid ${isDark ? '#1e293b' : '#f9fafb'}`,
-                        background: !n.is_read ? (isDark ? '#1a2540' : '#fafaff') : (isDark ? '#1e293b' : '#fff')
+                        padding: '12px 16px', borderBottom: '1px solid #f9fafb',
+                        background: !n.is_read ? '#fafaff' : '#fff'
                       }}>
                         {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginRight: 6, verticalAlign: 'middle' }} />}
-                        <p style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#f1f5f9' : '#111827', margin: 0 }}>{n.title}</p>
-                        <p style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
-                        <p style={{ fontSize: 10, color: isDark ? '#64748b' : '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{n.title}</p>
+                        <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
+                        <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
                       </div>
                     ))}
                   </div>
@@ -3177,8 +3148,7 @@ function AdminPanelInner() {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '4px 12px 4px 4px', borderRadius: 20,
-              border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`,
-              background: isDark ? '#1e293b' : '#fff', cursor: 'default'
+              border: '1px solid #e5e7eb', background: '#fff', cursor: 'default'
             }}>
               <div style={{
                 width: 26, height: 26, borderRadius: '50%',
@@ -3187,7 +3157,7 @@ function AdminPanelInner() {
               }}>
                 <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SA</span>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#e2e8f0' : '#374151' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 {(() => { try { const p = JSON.parse(atob((localStorage.getItem('mg_admin_token')||'..').split('.')[1])); return p.phone ? `+91 ••••${String(p.phone).slice(-4)}` : 'Super Admin'; } catch { return 'Super Admin'; } })()}
               </span>
             </div>
@@ -3199,4 +3169,42 @@ function AdminPanelInner() {
           {tab === 'dashboard'    && <Dashboard onSetTab={setTab} />}
           {tab === 'companies'    && <Companies />}
           {tab === 'owners'       && <AllOwners />}
-          {tab === 'drivers'      && <AllDrivers
+          {tab === 'drivers'      && <AllDrivers />}
+          {tab === 'kyc'          && <KycReview />}
+          {tab === 'docs'         && <DocApprovals />}
+          {tab === 'transactions' && <Transactions />}
+          {tab === 'chat'         && <ChatViewer />}
+          {tab === 'audit'        && <AuditLog />}
+          {tab === 'pins'         && <PinManagementSection />}
+          {tab === 'leads'        && <LeadsSection />}
+        </div>
+      </main>
+
+      {showLogoutConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 320, padding: 24, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Sign Out?</h3>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Are you sure you want to sign out of the admin console?</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowLogoutConfirm(false)}
+                style={{ flex: 1, padding: '10px 0', background: '#f1f5f9', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.href = '/login'; }}
+                style={{ flex: 1, padding: '10px 0', background: '#ef4444', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+export default AdminPanelInner;
