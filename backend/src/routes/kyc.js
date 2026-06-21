@@ -180,6 +180,7 @@ const result = await kyc.verifyPAN(pan_number.toUpperCase(), clientRef);
 
 // ─────────────────────────────────────────────────────────────────────
 // POST /api/kyc/aadhaar-initiate
+// Payyantra DigiLocker flow — returns kycUrl for driver to open
 // Body: { name, mobile, email?, redirect_url? }
 // Returns: { success, publicId, kycUrl, sessionCode, message }
 // ─────────────────────────────────────────────────────────────────────

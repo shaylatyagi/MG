@@ -760,7 +760,7 @@ export default function DriverPWA() {
         const data = await res.json();
         if (data.success && data.fields) {
           const f = data.fields;
-          // AADHAAR: DigiLocker flow — no manual number entry needed
+          // AADHAAR: OTP flow handles verification — doc scan only for reference
           if (docType === 'PAN' && f.pan_number) setKycState(s => ({ ...s, pan: { ...s.pan, value: f.pan_number.toUpperCase() } }));
           if (docType === 'DL') {
             if (f.dl_number) setKycState(s => ({ ...s, dl: { ...s.dl, value: f.dl_number } }));
@@ -1348,36 +1348,29 @@ export default function DriverPWA() {
               <span className="text-sm font-black text-slate-800 flex items-center gap-2"><Fingerprint size={14} className="text-indigo-600"/> Aadhaar</span>
               {statusBadge(kycState.aadhaar.status)}
             </div>
-            {kycState.aadhaar.status !== 'verified' && (
-              kycState.aadhaar.polling ? (
-                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-2 text-center">
-                  <p className="text-xs font-black text-indigo-700">⏳ Waiting for DigiLocker...</p>
-                  <p className="text-[10px] text-indigo-500 mt-1">Complete Aadhaar verification in the opened tab</p>
-                  <div className="flex gap-2 justify-center mt-2">
-                    <button onClick={() => kycState.aadhaar.kycUrl && window.open(kycState.aadhaar.kycUrl, '_blank')}
-                      className="text-[10px] font-black text-indigo-600 underline">Reopen link</button>
-                    <span className="text-[10px] text-slate-400">·</span>
-                    <button onClick={() => setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, polling: false } }))}
-                      className="text-[10px] text-slate-500 underline">Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <button onClick={kycAadhaarInit} disabled={kycLoading === 'aadhaar'}
-                  className="w-full bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-black hover:bg-indigo-700 transition mb-2">
-                  {kycLoading === 'aadhaar' ? '...' : '🔗 Verify via DigiLocker'}
+            {kycState.aadhaar.status === 'verified' ? (
+              <p className="text-xs text-green-600 font-bold">✓ Aadhaar verified{kycState.aadhaar.maskedAadhaar ? ` — ${kycState.aadhaar.maskedAadhaar}` : ''}</p>
+            ) : kycState.aadhaar.polling ? (
+              <div className="space-y-2">
+                <p className="text-[10px] text-indigo-600 font-bold">⏳ Waiting for DigiLocker verification…</p>
+                <p className="text-[10px] text-slate-400">Complete the process in the tab that opened. This page will update automatically.</p>
+                <button onClick={() => window.open(kycState.aadhaar.kycUrl, '_blank')}
+                  className="text-[10px] text-indigo-500 underline bg-transparent border-none cursor-pointer p-0">
+                  Reopen DigiLocker →
                 </button>
-              )
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[10px] text-slate-500">Verify via DigiLocker — opens in a new tab. Complete there and return.</p>
+                <button
+                  onClick={kycAadhaarInit}
+                  disabled={kycLoading === 'aadhaar'}
+                  className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-black disabled:opacity-50"
+                >
+                  {kycLoading === 'aadhaar' ? 'Starting…' : 'Verify Aadhaar via DigiLocker'}
+                </button>
+              </div>
             )}
-            <div className="flex gap-2 mt-2">
-              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">
-                <FolderOpen size={11}/> Gallery
-                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => selectForPreview('AADHAAR', e.target.files[0])}/>
-              </label>
-              <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-indigo-50 rounded-xl text-[10px] font-black text-indigo-600 cursor-pointer hover:bg-indigo-100 border border-indigo-200 border-dashed">
-                <Camera size={11}/> Camera
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => selectForPreview('AADHAAR', e.target.files[0])}/>
-              </label>
-            </div>
           </div>
 
           {/* PAN */}

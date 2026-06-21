@@ -12,7 +12,7 @@ const initials = (name = '') =>
   name.split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
 
 // ── Shared Nav ────────────────────────────────────────────────────────────────
-function Nav({ onBack }) {
+function Nav({ onBack, backLabel = 'All Partners' }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
@@ -40,7 +40,7 @@ function Nav({ onBack }) {
               color: '#fff', padding: '8px 18px', borderRadius: 40, fontSize: 13,
               fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <ArrowLeft size={14} /> All Partners
+              <ArrowLeft size={14} /> {backLabel}
             </button>
           )}
           <a href="https://mobilitygrid.in#signup" style={{
@@ -214,7 +214,7 @@ function PartnerListing() {
 
   return (
     <div style={{ minHeight: '100vh', background: PAGE_BG, color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <Nav />
+      <Nav onBack={() => { window.location.href = 'https://mobilitygrid.in'; }} backLabel="MobilityGrid.in" />
 
       {/* Hero strip */}
       <div style={{

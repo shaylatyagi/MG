@@ -123,7 +123,6 @@ router.get('/partner/:slug', async (req, res) => {
        FROM public.owners o
        WHERE o.partner_slug = $1
          AND o.is_public = true
-         AND o.deleted_at IS NULL
        LIMIT 1`,
       [slug]
     );
@@ -139,13 +138,13 @@ router.get('/partner/:slug', async (req, res) => {
       pool.query(
         `SELECT COUNT(*) FROM public.vehicles
          WHERE owner_id = $1 OR driver_id IN (
-           SELECT id FROM public.drivers WHERE owner_code = $2 AND deleted_at IS NULL
+           SELECT id FROM public.drivers WHERE owner_code = $2
          )`,
         [o.id, o.owner_code]
       ),
       pool.query(
         `SELECT COUNT(*) FROM public.drivers
-         WHERE (owner_id = $1 OR owner_code = $2) AND deleted_at IS NULL`,
+         WHERE (owner_id = $1 OR owner_code = $2)`,
         [o.id, o.owner_code]
       ),
     ]);
@@ -200,11 +199,11 @@ router.get('/partners', async (req, res) => {
          o.tagline, o.business_category, o.legal_type,
          o.since_year, o.partner_status, o.owner_code,
          (SELECT COUNT(*) FROM public.drivers
-          WHERE (owner_id=o.id OR owner_code=o.owner_code) AND deleted_at IS NULL) AS driver_count,
+          WHERE (owner_id=o.id OR owner_code=o.owner_code)) AS driver_count,
          (SELECT COUNT(*) FROM public.vehicles
           WHERE owner_id=o.id) AS vehicle_count
        FROM public.owners o
-       WHERE o.is_public = true AND o.deleted_at IS NULL
+       WHERE o.is_public = true
        ORDER BY o.since_year ASC, o.full_name ASC`
     );
 

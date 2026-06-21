@@ -110,18 +110,27 @@ const Badge = ({ status }) => {
 };
 
 const StatCard = ({ label, value, sub, color = 'indigo' }) => {
-  const colors = {
-    indigo: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/40',
-    green:  'border-green-400 bg-green-50 dark:bg-green-900/40',
-    blue:   'border-blue-400 bg-blue-50 dark:bg-blue-900/40',
-    orange: 'border-orange-400 bg-orange-50 dark:bg-orange-900/40',
-    red:    'border-red-400 bg-red-50 dark:bg-red-900/40',
+  const dark = document.documentElement.classList.contains('dark');
+  const light = {
+    indigo: { border: '#6366f1', bg: '#eef2ff',  label: '#4338ca', val: '#1e1b4b' },
+    green:  { border: '#22c55e', bg: '#f0fdf4',  label: '#15803d', val: '#14532d' },
+    blue:   { border: '#3b82f6', bg: '#eff6ff',  label: '#1d4ed8', val: '#1e3a5f' },
+    orange: { border: '#f97316', bg: '#fff7ed',  label: '#c2410c', val: '#7c2d12' },
+    red:    { border: '#ef4444', bg: '#fef2f2',  label: '#dc2626', val: '#7f1d1d' },
   };
+  const dk = {
+    indigo: { border: '#6366f1', bg: '#1e1b4b',  label: '#a5b4fc', val: '#e0e7ff' },
+    green:  { border: '#22c55e', bg: '#14532d',  label: '#86efac', val: '#dcfce7' },
+    blue:   { border: '#3b82f6', bg: '#1e3a5f',  label: '#93c5fd', val: '#dbeafe' },
+    orange: { border: '#f97316', bg: '#7c2d12',  label: '#fdba74', val: '#ffedd5' },
+    red:    { border: '#ef4444', bg: '#7f1d1d',  label: '#fca5a5', val: '#fee2e2' },
+  };
+  const s = (dark ? dk[color] : light[color]) || (dark ? dk.indigo : light.indigo);
   return (
-    <div className={`border-l-4 rounded-lg p-4 shadow-sm ${colors[color] || colors.indigo}`}>
-      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{value}</p>
-      {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sub}</p>}
+    <div style={{ borderLeft: `4px solid ${s.border}`, background: s.bg, borderRadius: 10, padding: '14px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+      <p style={{ fontSize: 11, fontWeight: 700, color: s.label, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+      <p style={{ fontSize: 26, fontWeight: 800, color: s.val, margin: '4px 0 0' }}>{value}</p>
+      {sub && <p style={{ fontSize: 11, color: s.label, marginTop: 3 }}>{sub}</p>}
     </div>
   );
 };
@@ -2976,6 +2985,20 @@ function PinManagementSection() {
 function AdminPanelInner() {
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [tab, setTab]               = useState('dashboard');
+
+  // Admin theme — reads from localStorage, syncs with html.dark class
+  const [isDark, setIsDark] = useState(() => {
+    const stored = localStorage.getItem('theme');
+    return stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark);
+  }, [isDark]);
+  const toggleAdminTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+  };
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const { notifications, unread, markAllRead } = useAdminNotifications();
@@ -3001,7 +3024,7 @@ function AdminPanelInner() {
   const tabLabel = navItems.find(n => n.key === tab)?.label || tab;
 
   return (
-    <div style={{ display:'flex', height:'100vh', background:'#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+    <div style={{ display:'flex', height:'100vh', background: isDark ? '#0f172a' : '#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside style={{
@@ -3077,28 +3100,33 @@ function AdminPanelInner() {
 
         {/* Header */}
         <header style={{
-          background: '#fff', borderBottom: '1px solid #e5e7eb',
+          background: isDark ? '#1e293b' : '#fff',
+          borderBottom: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`,
           padding: '0 24px', height: 56, display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10,
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#6b7280', fontSize: 12, fontWeight: 500 }}>Admin</span>
-            <span style={{ color: '#d1d5db', fontSize: 12 }}>›</span>
-            <span style={{ color: '#111827', fontSize: 14, fontWeight: 600 }}>{tabLabel}</span>
+            <span style={{ color: isDark ? '#94a3b8' : '#6b7280', fontSize: 12, fontWeight: 500 }}>Admin</span>
+            <span style={{ color: isDark ? '#475569' : '#d1d5db', fontSize: 12 }}>›</span>
+            <span style={{ color: isDark ? '#f1f5f9' : '#111827', fontSize: 14, fontWeight: 600 }}>{tabLabel}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ThemeToggle />
-
+            {/* Theme toggle */}
+            <button onClick={toggleAdminTheme} title={isDark ? 'Switch to light' : 'Switch to dark'}
+              style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isDark ? '#94a3b8' : '#6b7280', fontSize: 16 }}>
+              {isDark ? '☀️' : '🌙'}
+            </button>
             {/* Bell */}
             <div style={{ position: 'relative' }}>
               <button onClick={() => { setShowNotifs(v => !v); if (!showNotifs && unread > 0) setTimeout(() => markAllRead(), 2000); }}
                 style={{
-                  width: 36, height: 36, borderRadius: 8, border: '1px solid #e5e7eb',
-                  background: showNotifs ? '#f3f4f6' : '#fff', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#6b7280', position: 'relative', transition: 'all 0.15s'
+                  width: 36, height: 36, borderRadius: 8,
+                  border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`,
+                  background: isDark ? (showNotifs ? '#1e293b' : 'transparent') : (showNotifs ? '#f3f4f6' : '#fff'),
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: isDark ? '#94a3b8' : '#6b7280', position: 'relative', transition: 'all 0.15s'
                 }}>
                 <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -3118,25 +3146,26 @@ function AdminPanelInner() {
               {showNotifs && (
                 <div style={{
                   position: 'absolute', right: 0, top: 44, width: 320,
-                  background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                  border: '1px solid #e5e7eb', zIndex: 50, overflow: 'hidden'
+                  background: isDark ? '#1e293b' : '#fff',
+                  borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+                  border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`, zIndex: 50, overflow: 'hidden'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>Notifications</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${isDark ? '#334155' : '#f3f4f6'}` }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#f1f5f9' : '#111827' }}>Notifications</span>
                     <button onClick={markAllRead} style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Mark all read</button>
                   </div>
                   <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
-                      <p style={{ fontSize: 13, color: '#6b7280', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
+                      <p style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
                     ) : notifications.map(n => (
                       <div key={n.id} style={{
-                        padding: '12px 16px', borderBottom: '1px solid #f9fafb',
-                        background: !n.is_read ? '#fafaff' : '#fff'
+                        padding: '12px 16px', borderBottom: `1px solid ${isDark ? '#1e293b' : '#f9fafb'}`,
+                        background: !n.is_read ? (isDark ? '#1a2540' : '#fafaff') : (isDark ? '#1e293b' : '#fff')
                       }}>
                         {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginRight: 6, verticalAlign: 'middle' }} />}
-                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{n.title}</p>
-                        <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
-                        <p style={{ fontSize: 10, color: '#6b7280', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#f1f5f9' : '#111827', margin: 0 }}>{n.title}</p>
+                        <p style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
+                        <p style={{ fontSize: 10, color: isDark ? '#64748b' : '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
                       </div>
                     ))}
                   </div>
@@ -3148,7 +3177,8 @@ function AdminPanelInner() {
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '4px 12px 4px 4px', borderRadius: 20,
-              border: '1px solid #e5e7eb', background: '#fff', cursor: 'default'
+              border: `1px solid ${isDark ? '#334155' : '#e5e7eb'}`,
+              background: isDark ? '#1e293b' : '#fff', cursor: 'default'
             }}>
               <div style={{
                 width: 26, height: 26, borderRadius: '50%',
@@ -3157,7 +3187,7 @@ function AdminPanelInner() {
               }}>
                 <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SA</span>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#e2e8f0' : '#374151' }}>
                 {(() => { try { const p = JSON.parse(atob((localStorage.getItem('mg_admin_token')||'..').split('.')[1])); return p.phone ? `+91 ••••${String(p.phone).slice(-4)}` : 'Super Admin'; } catch { return 'Super Admin'; } })()}
               </span>
             </div>
@@ -3181,19 +3211,19 @@ function AdminPanelInner() {
       </main>
 
       {showLogoutConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 320, padding: 24, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
-            <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: isDark ? '#1e293b' : '#fff', border: isDark ? '1px solid #334155' : 'none', borderRadius: 16, width: '100%', maxWidth: 320, padding: 24, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: isDark ? '#450a0a' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
               <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
                 <line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
             </div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Sign Out?</h3>
-            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Are you sure you want to sign out of the admin console?</p>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: isDark ? '#f1f5f9' : '#0f172a', margin: '0 0 8px' }}>Sign Out?</h3>
+            <p style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#64748b', margin: '0 0 20px' }}>Are you sure you want to sign out of the admin console?</p>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowLogoutConfirm(false)}
-                style={{ flex: 1, padding: '10px 0', background: '#f1f5f9', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '10px 0', background: isDark ? '#334155' : '#f1f5f9', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: isDark ? '#e2e8f0' : '#475569', cursor: 'pointer' }}>
                 Cancel
               </button>
               <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.href = '/login'; }}

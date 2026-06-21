@@ -103,21 +103,20 @@ router.get('/stats', async (req, res) => {
     const totalDrivers  = parseInt(drivers.rows[0].count);
     const activeContracts = parseInt(contracts.rows[0].count);
 
-    // Outstanding = sum of active assigned drivers' daily_rent - today's online collection
-    // Check both owner_id (FK) and owner_code (text code) to handle all assignment methods
-    const rentSum = await pool.query(
-      `SELECT COALESCE(SUM(v.daily_rent), 0) AS total
-       FROM public.vehicles v
-       JOIN public.drivers d ON d.id = v.driver_id
-       WHERE (d.owner_id = $1 OR d.owner_code = $2)
-         AND d.status = 'ACTIVE'
-         AND v.driver_id IS NOT NULL`,
+    // Outstanding = actual unpaid dues from driver_ledger (RENT_CHARGE - PAYMENT)
+    const outstandingRes = await pool.query(
+      `SELECT COALESCE(SUM(
+         CASE WHEN type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT') THEN amount
+              WHEN type = 'PAYMENT' THEN -amount
+              ELSE 0 END
+       ), 0) AS total
+       FROM public.driver_ledger
+       WHERE driver_id IN (
+         SELECT id FROM public.drivers WHERE owner_id=$1 OR owner_code=$2
+       )`,
       [oid, owner.owner_code]
     );
-    const outstanding = Math.max(
-      0,
-      parseFloat(rentSum.rows[0].total) - parseFloat(today.rows[0].total)
-    );
+    const outstanding = Math.max(0, parseFloat(outstandingRes.rows[0].total));
 
     const efficiency = activeContracts > 0
       ? ((parseFloat(today.rows[0].total) / parseFloat(rentSum.rows[0].total || 1)) * 100).toFixed(1)

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useBranding } from './useBranding';
 
 export interface BrandLogoProps {
@@ -17,10 +17,11 @@ export function BrandLogo({
   alt = 'MobilityGrid',
 }: BrandLogoProps) {
   const { logos } = useBranding();
+  const [imgErr, setImgErr] = useState(false);
   const key = variant === 'cyan' ? 'logo_cyan' : variant === 'white' ? 'logo_white' : 'logo_icon';
   const url = logos[key];
 
-  if (url) {
+  if (url && !imgErr) {
     return (
       <img
         src={url}
@@ -28,10 +29,12 @@ export function BrandLogo({
         height={height}
         style={{ height, width: 'auto', objectFit: 'contain', ...style }}
         className={className}
+        onError={() => setImgErr(true)}
       />
     );
   }
 
+  // Fallback text when no logo uploaded / file not found
   return (
     <span
       style={{
