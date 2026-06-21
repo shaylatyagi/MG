@@ -31,7 +31,7 @@ function Nav({ onBack, backLabel = 'All Partners' }) {
     }}>
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 68, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="https://mobilitygrid.in" style={{ textDecoration: 'none' }}>
-          <BrandLogo variant="cyan" height={48} alt="MobilityGrid" />
+          <BrandLogo variant="cyan" height={64} alt="MobilityGrid" />
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {onBack && (
@@ -249,7 +249,7 @@ function PartnerListing() {
         ) : partners.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', paddingTop: 60, fontSize: 15 }}>No partners listed yet.</p>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(360px, 100%), 1fr))', gap: 20 }}>
             {partners.map(p => (
               <button
                 key={p.partner_slug}
@@ -259,6 +259,7 @@ function PartnerListing() {
                   borderRadius: 20, padding: '28px', textAlign: 'left',
                   cursor: 'pointer', color: '#fff', transition: 'all 0.2s',
                   display: 'flex', flexDirection: 'column', gap: 16,
+                  overflow: 'hidden', width: '100%',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)'; e.currentTarget.style.background = 'rgba(99,102,241,0.06)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.background = CARD_BG; }}
