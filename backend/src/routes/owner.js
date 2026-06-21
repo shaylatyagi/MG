@@ -106,13 +106,13 @@ router.get('/stats', async (req, res) => {
     // Outstanding = actual unpaid dues from driver_ledger (RENT_CHARGE - PAYMENT)
     const outstandingRes = await pool.query(
       `SELECT COALESCE(SUM(
-         CASE WHEN type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT') THEN amount
-              WHEN type = 'PAYMENT' THEN -amount
+         CASE WHEN entry_type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT','DAMAGE_CHARGE') THEN amount
+              WHEN entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REFUND') THEN -amount
               ELSE 0 END
        ), 0) AS total
        FROM public.driver_ledger
        WHERE driver_id IN (
-         SELECT id FROM public.drivers WHERE owner_id=$1 OR owner_code=$2
+         SELECT id FROM public.drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL
        )`,
       [oid, owner.owner_code]
     );

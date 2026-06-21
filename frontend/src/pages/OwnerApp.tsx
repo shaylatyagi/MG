@@ -2071,9 +2071,9 @@ const removeRule = (i) => setIncentiveRules(prev => ({
             fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: { Authorization: `Bearer ${token()}` } })
               .then(r => r.json()).then(d => { setOverdueDrivers(Array.isArray(d) ? d : []); setShowOverdue(true); }).catch(() => {});
           }}>
-          <span className="text-[9px] text-slate-500 font-black uppercase block">{t.outstanding} ›</span>
+          <span className="text-[9px] text-slate-500 font-black uppercase block">{t.outstanding}</span>
           <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
-          <span className="text-[9px] text-indigo-500 font-black block mt-1">See who owes ›</span>
+          <span className="text-[9px] text-indigo-500 font-semibold block mt-1.5">See who owes →</span>
         </button>
       </div>
       <div className="flex items-center justify-between text-[9px] text-slate-600">
