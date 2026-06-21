@@ -63,6 +63,7 @@ const { verifyToken, verifyAdmin } = require('./middleware/auth.middleware');
 const { withRls, bypassRls } = require('./middleware/rls.middleware');
 
 app.use('/api/uploads',      require('./routes/uploads'));
+app.use('/api/config',       require('./routes/config'));   // branding / logos (public)
 app.use('/api/auth',         require('./routes/auth'));
 app.use('/api/driver',       require('./routes/driver'));
 const paymentRoutes = require('./routes/payment');
@@ -135,5 +136,11 @@ app.get('/', (req, res) => res.json({ message: 'MobilityGrid API', version: '1.0
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
+
+// ── Background jobs ───────────────────────────────────────────────────────────
+// Only start cron on the real server, not during test runs
+if (process.env.NODE_ENV !== 'test') {
+  require('./services/cronJobs');
+}
 
 module.exports = app;

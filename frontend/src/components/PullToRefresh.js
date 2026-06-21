@@ -56,7 +56,7 @@ export default function PullToRefresh({ onRefresh, children = null, disabled = f
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      style={{ overflowY: 'auto', height: '100%', position: 'relative' }}
+      style={{ overflowY: 'auto', height: '100%', position: 'relative', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
     >
       {/* Pull indicator */}
       <div style={{

@@ -1310,9 +1310,6 @@ export default function DriverPWA() {
       </div>
       <div className="h-2 bg-indigo-100 rounded-full overflow-hidden">
         <div className="h-full bg-indigo-500 rounded-full transition-all" style={{width: `${(done/total)*100}%`}} />
-      <ToastContainer />
-      {showTour && <Onboarding role="driver" onDone={dismissTour} />}
-      <OfflineBanner />
       </div>
     </div>
   );
@@ -1591,6 +1588,11 @@ export default function DriverPWA() {
   // ── MAIN RENDER ───────────────────────────────────────────────────────────
   return (
     <div className="h-screen w-screen bg-slate-100 flex items-center justify-center overflow-hidden">
+      {/* Global overlays — always rendered regardless of active tab */}
+      <ToastContainer />
+      {showTour && <Onboarding role="driver" onDone={dismissTour} />}
+      <OfflineBanner />
+
       <div className="w-full max-w-[412px] bg-slate-50 h-full sm:max-h-[840px] flex flex-col relative overflow-hidden sm:rounded-[32px] sm:shadow-2xl sm:border sm:border-slate-200">
 
         {/* Status bar */}
@@ -1691,8 +1693,11 @@ export default function DriverPWA() {
         )}
 
         {/* Content */}
+        {/* Single scroll container — PullToRefresh owns overflow-y.
+            Do NOT add overflow-y-auto to the inner div; nested scroll containers
+            cause iOS Safari to reset scroll position on every input keystroke. */}
         <PullToRefresh onRefresh={() => fetchAll(true)}>
-        <div className="flex-1 overflow-y-auto px-4 pt-4 bg-slate-50">
+        <div className="flex-1 px-4 pt-4 pb-4 bg-slate-50">
           {loading ? (
             <div className="space-y-3 pt-1">
               {/* balance card skeleton */}
@@ -2074,4 +2079,3 @@ export default function DriverPWA() {
   );
 }
 
-                                                                                                           

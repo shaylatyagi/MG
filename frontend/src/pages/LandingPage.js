@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import './LandingPage.css';
+import { BrandLogo } from '../hooks/useBranding';
 
 function LandingPage() {
   const [navScrolled, setNavScrolled] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    email: '',
     company: '',
     role: '',
     fleet: '',
@@ -49,6 +51,7 @@ function LandingPage() {
     const payload = {
       name: formData.name.trim(),
       phone,
+      email: formData.email.trim() || undefined,
       company: formData.company.trim(),
       role: formData.role,
       fleet: formData.fleet,
@@ -76,28 +79,7 @@ function LandingPage() {
       <nav id="nav" className={navScrolled ? 'scrolled' : ''}>
         <div className="nav-inner">
           <Link to="/" className="nav-logo">
-            <svg className="nav-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="36" height="36" rx="9" fill="#4f46e5" />
-              <circle cx="10" cy="10" r="1.8" fill="white" opacity="0.45" />
-              <circle cx="18" cy="10" r="1.8" fill="white" opacity="0.45" />
-              <circle cx="26" cy="10" r="1.8" fill="white" opacity="0.45" />
-              <circle cx="10" cy="18" r="1.8" fill="white" opacity="0.45" />
-              <circle cx="26" cy="18" r="1.8" fill="white" opacity="0.45" />
-              <circle cx="10" cy="26" r="1.8" fill="white" opacity="0.45" />
-              <circle cx="18" cy="26" r="1.8" fill="white" opacity="0.45" />
-              <circle cx="26" cy="26" r="1.8" fill="white" opacity="0.45" />
-              <circle cx="18" cy="18" r="4" fill="white" />
-              <text x="18" y="21.5" fontFamily="Georgia,serif" fontWeight="900" fontSize="7" fill="#4f46e5" textAnchor="middle">M</text>
-              <line x1="18" y1="14" x2="10" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
-              <line x1="18" y1="14" x2="18" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
-              <line x1="18" y1="14" x2="26" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
-              <line x1="22" y1="18" x2="26" y2="18" stroke="white" strokeWidth="0.9" opacity="0.3" />
-              <line x1="18" y1="22" x2="26" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
-              <line x1="18" y1="22" x2="18" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
-              <line x1="18" y1="22" x2="10" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
-              <line x1="14" y1="18" x2="10" y2="18" stroke="white" strokeWidth="0.9" opacity="0.3" />
-            </svg>
-            <span className="nav-wordmark">Mobility<span>Grid</span></span>
+            <BrandLogo variant="cyan" height={32} alt="MobilityGrid" />
           </Link>
           <div className="nav-links">
             <a href="#vision" className="nav-link">Vision</a>
@@ -790,6 +772,11 @@ function LandingPage() {
                   </div>
 
                   <div className="field">
+                    <label>Email Address <span style={{fontWeight:400,color:'#94a3b8',fontSize:'12px'}}>(optional — for confirmation)</span></label>
+                    <input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="you@example.com" />
+                  </div>
+
+                  <div className="field">
                     <label>Organisation / Fleet Name</label>
                     <input name="company" value={formData.company} onChange={handleChange} placeholder="Your company or fleet" required />
                   </div>
@@ -854,28 +841,7 @@ function LandingPage() {
           <div className="footer-top">
             <div className="footer-brand">
               <div className="footer-logo">
-                <svg className="footer-logo-mark" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="36" height="36" rx="9" fill="#4f46e5" />
-                  <circle cx="10" cy="10" r="1.8" fill="white" opacity="0.45" />
-                  <circle cx="18" cy="10" r="1.8" fill="white" opacity="0.45" />
-                  <circle cx="26" cy="10" r="1.8" fill="white" opacity="0.45" />
-                  <circle cx="10" cy="18" r="1.8" fill="white" opacity="0.45" />
-                  <circle cx="26" cy="18" r="1.8" fill="white" opacity="0.45" />
-                  <circle cx="10" cy="26" r="1.8" fill="white" opacity="0.45" />
-                  <circle cx="18" cy="26" r="1.8" fill="white" opacity="0.45" />
-                  <circle cx="26" cy="26" r="1.8" fill="white" opacity="0.45" />
-                  <circle cx="18" cy="18" r="4" fill="white" />
-                  <text x="18" y="21.5" fontFamily="Georgia,serif" fontWeight="900" fontSize="7" fill="#4f46e5" textAnchor="middle">M</text>
-                  <line x1="18" y1="14" x2="10" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
-                  <line x1="18" y1="14" x2="18" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
-                  <line x1="18" y1="14" x2="26" y2="10" stroke="white" strokeWidth="0.9" opacity="0.3" />
-                  <line x1="22" y1="18" x2="26" y2="18" stroke="white" strokeWidth="0.9" opacity="0.3" />
-                  <line x1="18" y1="22" x2="26" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
-                  <line x1="18" y1="22" x2="18" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
-                  <line x1="18" y1="22" x2="10" y2="26" stroke="white" strokeWidth="0.9" opacity="0.3" />
-                  <line x1="14" y1="18" x2="10" y2="18" stroke="white" strokeWidth="0.9" opacity="0.3" />
-                </svg>
-                <span className="footer-wordmark">Mobility<span>Grid</span></span>
+                <BrandLogo variant="cyan" height={30} alt="MobilityGrid" />
               </div>
               <p className="footer-tagline">The operating system for India's fleet economy — built for every operator, manager, and driver.</p>
               <div className="footer-badge">

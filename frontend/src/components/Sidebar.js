@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LanguageSelector from './LanguageSelect';
+import { BrandLogo } from '../hooks/useBranding';
 const ownerLinks = [
   { label: 'Earnings', path: '/owner/earnings', icon: '💰' },
   { label: 'My Vehicles', path: '/owner/vehicles', icon: '🚗' },
@@ -30,7 +31,7 @@ export default function Sidebar() {
   };
   return (
     <div style={styles.sidebar}>
-      <div style={styles.logo}>Mobility Grid</div>
+      <div style={styles.logo}><BrandLogo variant="cyan" height={28} alt="MobilityGrid" /></div>
       <div style={styles.toggle}>
         <button
           style={{ ...styles.toggleBtn, ...(isOwner ? styles.toggleActive : {}) }}

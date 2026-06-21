@@ -817,7 +817,7 @@ router.post('/reset-pin', validate(ResetPinSchema), async (req, res) => {
 
 // POST /api/auth/waitlist — Landing page interest form
 router.post('/waitlist', async (req, res) => {
-  var { name, phone, company, role, fleet, city, type } = req.body;
+  var { name, phone, company, role, fleet, city, type, email } = req.body;
   if (!name || !phone) return res.status(400).json({ success: false, message: 'name and phone required' });
   try {
     // Ensure columns exist (safe to run repeatedly)
@@ -825,7 +825,8 @@ router.post('/waitlist', async (req, res) => {
       ALTER TABLE public.waitlist_leads
         ADD COLUMN IF NOT EXISTS ip_address TEXT,
         ADD COLUMN IF NOT EXISTS user_agent TEXT,
-        ADD COLUMN IF NOT EXISTS source_url TEXT
+        ADD COLUMN IF NOT EXISTS source_url TEXT,
+        ADD COLUMN IF NOT EXISTS email TEXT
     `).catch(() => {});
 
     const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
@@ -834,10 +835,17 @@ router.post('/waitlist', async (req, res) => {
 
     await pool.query(
       `INSERT INTO public.waitlist_leads
-         (name, phone, company, role, fleet, city, type, ip_address, user_agent, source_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [name, phone, company||null, role||null, fleet||null, city||null, type||null, ip||null, ua||null, src||null]
+         (name, phone, company, role, fleet, city, type, ip_address, user_agent, source_url, email)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [name, phone, company||null, role||null, fleet||null, city||null, type||null, ip||null, ua||null, src||null, email||null]
     );
+
+    // Fire emails (non-blocking — don't fail the response if email fails)
+    try {
+      const { sendLeadEmails } = require('../services/mailer');
+      sendLeadEmails({ name, phone, company, role, fleet, city, type, email }).catch(() => {});
+    } catch (_) {}
+
     res.json({ success: true });
   } catch (err) {
     console.error('waitlist error:', err);

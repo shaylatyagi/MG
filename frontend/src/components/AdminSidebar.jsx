@@ -1,9 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, Building2, Users, Eye, 
-  LogOut, Shield, Wallet, Settings 
+import {
+  LayoutDashboard, Building2, Users, Eye,
+  LogOut, Shield, Wallet, Settings
 } from 'lucide-react';
+import { BrandLogo } from '../hooks/useBranding';
 
 export default function AdminSidebar({ activeTab, setActiveTab }) {
   const navigate = useNavigate();
@@ -27,12 +28,9 @@ export default function AdminSidebar({ activeTab, setActiveTab }) {
     <aside className="w-64 bg-slate-900 text-slate-400 flex flex-col">
       <div className="p-5 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-            <Shield className="w-4 h-4 text-white" />
-          </div>
           <div>
-            <h1 className="text-white font-bold text-sm">MobilityGrid</h1>
-            <span className="text-[10px] text-slate-500">Admin Portal</span>
+            <BrandLogo variant="white" height={28} alt="MobilityGrid" />
+            <div className="text-[10px] text-slate-500 mt-0.5">Admin Portal</div>
           </div>
         </div>
       </div>

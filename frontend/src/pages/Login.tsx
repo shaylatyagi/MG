@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Truck, Building2, Shield, Phone, ArrowRight, Lock, Eye, EyeOff } from 'lucide-react';
 import styles from './Login.module.css';
+import { BrandLogo } from '../hooks/useBranding';
 
 // Types
 interface Role { type: string; name: string; icon: React.ReactNode; redirect: string; }
@@ -23,10 +24,7 @@ const Shell: React.FC<ShellProps> = ({ children, showBack, onBack, title, subtit
     <div className={styles.gridBg} />
     <div className={styles.shellContent}>
       <div className={styles.logoWrap}>
-        <div className={styles.logoIcon}>
-          <span className={styles.logoInitial}>M</span>
-        </div>
-        <h1 className={styles.logoTitle}>MobilityGrid</h1>
+        <BrandLogo variant="cyan" height={44} style={{ maxWidth: 220 }} alt="MobilityGrid" />
         <p className={styles.logoTagline}>FLEET OPERATING SYSTEM</p>
       </div>
       <div className={styles.card}>

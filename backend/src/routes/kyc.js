@@ -20,43 +20,108 @@ const SETU_BASE   = process.env.SETU_BASE_URL     || 'https://dg-sandbox.setu.co
 const SETU_ID     = process.env.SETU_CLIENT_ID;
 const SETU_SECRET = process.env.SETU_CLIENT_SECRET;
 const SETU_PID    = process.env.SETU_PRODUCT_ID;
-// REPLACE THIS IN kyc.js
+// ── Payyantra UAT KYC provider ────────────────────────────────────────────────
+// Base URL: https://secure-api-uat.payyantra.com
+// Switch to prod by changing PAYYANTRA_KYC_BASE_URL env var
+const PY_BASE   = process.env.PAYYANTRA_KYC_BASE_URL || 'https://secure-api-uat.payyantra.com';
+const PY_HEADERS = () => ({
+  'x-api-key':    process.env.PAYYANTRA_KYC_API_KEY,
+  'x-secret-key': process.env.PAYYANTRA_KYC_SECRET_KEY,
+  'Content-Type': 'application/json',
+});
+
 const kycProviders = {
   payyantra: {
+    // ── PAN ──────────────────────────────────────────────────────────────────
     verifyPAN: async (panNumber, clientRef) => {
-      const res = await fetch('https://secure-api-uat.payyantra.com/api/v1/pans/details', {
+      const res  = await fetch(`${PY_BASE}/api/v1/pans/details`, {
         method: 'POST',
-        headers: {
-          'x-api-key': process.env.PAYYANTRA_API_KEY,
-          'Content-Type': 'application/json'
-        },
+        headers: PY_HEADERS(),
         body: JSON.stringify({ pan: panNumber, client_ref_num: clientRef, consent: true }),
       });
       const data = await res.json();
+      const r    = data?.data?.result || {};
       return {
         verified: res.ok && data?.data?.verificationStatus === 'SUCCESS',
-        name: data?.data?.result ? `${data.data.result.firstName} ${data.data.result.lastName}` : null,
-        status: data?.data?.verificationStatus,
-        raw: data
+        name:     r.firstName ? `${r.firstName} ${r.lastName || ''}`.trim() : null,
+        status:   data?.data?.verificationStatus,
+        raw:      data,
       };
     },
-    verifyBank: async (accountNumber, ifsc, beneficiaryName, clientRef) => {
-      const res = await fetch('https://secure-api-uat.payyantra.com/api/v1/bank-accounts/verify', {
+
+    // ── Aadhaar DigiLocker — step 1: initiate (sends OTP to Aadhaar-linked mobile) ──
+    initiateAadhaar: async (aadhaarNumber) => {
+      const res  = await fetch(`${PY_BASE}/api/v1/aadhaar/request`, {
         method: 'POST',
-        headers: {
-          'x-api-key': process.env.PAYYANTRA_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ifsc, accountNumber, beneficiaryName, paymentMode: 'IMPSPENNY', client_ref_num: clientRef }),
+        headers: PY_HEADERS(),
+        body: JSON.stringify({ aadhaar: aadhaarNumber, consent: true }),
       });
       const data = await res.json();
       return {
-        verified: res.ok && data?.data?.verificationStatus === 'SUCCESS',
-        accountName: data?.data?.result?.beneficiaryName,
-        raw: data
+        success:   res.ok && !data?.error,
+        requestId: data?.data?.request_id || data?.request_id || null,
+        message:   data?.message || (res.ok ? 'OTP sent' : 'Failed to initiate Aadhaar'),
+        raw:       data,
       };
-    }
-  }
+    },
+
+    // ── Aadhaar DigiLocker — step 2: verify OTP ──────────────────────────────
+    verifyAadhaar: async (requestId, otp) => {
+      const res  = await fetch(`${PY_BASE}/api/v1/aadhaar/verify`, {
+        method: 'POST',
+        headers: PY_HEADERS(),
+        body: JSON.stringify({ request_id: requestId, otp }),
+      });
+      const data = await res.json();
+      const r    = data?.data?.result || {};
+      return {
+        verified: res.ok && data?.data?.verificationStatus === 'SUCCESS',
+        name:     r.name || null,
+        last4:    r.aadhaar_number ? r.aadhaar_number.slice(-4) : null,
+        raw:      data,
+      };
+    },
+
+    // ── Driving License ───────────────────────────────────────────────────────
+    verifyDL: async (dlNumber, dob) => {
+      const res  = await fetch(`${PY_BASE}/api/v1/driving-license/details`, {
+        method: 'POST',
+        headers: PY_HEADERS(),
+        body: JSON.stringify({ dl_number: dlNumber, dob, consent: true }),
+      });
+      const data = await res.json();
+      const r    = data?.data?.result || {};
+      return {
+        verified: res.ok && data?.data?.verificationStatus === 'SUCCESS',
+        name:     r.name || null,
+        expiry:   r.validity_to || null,
+        status:   data?.data?.verificationStatus,
+        raw:      data,
+      };
+    },
+
+    // ── Bank Account Penny Drop ───────────────────────────────────────────────
+    verifyBank: async (accountNumber, ifsc, beneficiaryName, clientRef) => {
+      const res  = await fetch(`${PY_BASE}/api/v1/bank-accounts/verify`, {
+        method: 'POST',
+        headers: PY_HEADERS(),
+        body: JSON.stringify({
+          ifsc,
+          accountNumber,
+          beneficiaryName: beneficiaryName || '',
+          paymentMode:     'IMPSPENNY',
+          client_ref_num:  clientRef,
+        }),
+      });
+      const data = await res.json();
+      return {
+        verified:    res.ok && data?.data?.verificationStatus === 'SUCCESS',
+        accountName: data?.data?.result?.beneficiaryName || null,
+        bankName:    data?.data?.result?.bankName || null,
+        raw:         data,
+      };
+    },
+  },
 };
 
 const kyc = kycProviders[PROVIDER] || kycProviders.setu;

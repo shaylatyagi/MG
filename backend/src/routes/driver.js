@@ -24,7 +24,7 @@ router.post('/profile', verifyToken, async (req, res) => {
 
     // 2. INSERT WITH ALL METADATA
     const result = await pool.query(
-      `INSERT INTO drivers (user_id, driver_id, vehicle_owner_company_id, full_name) 
+      `INSERT INTO drivers (user_id, driver_id, company_id, full_name) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [user_id, userCode, companyId, name]
     );
