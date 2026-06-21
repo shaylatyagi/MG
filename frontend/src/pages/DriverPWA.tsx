@@ -225,7 +225,7 @@ export default function DriverPWA() {
   const [chatMsgs, setChatMsgs] = useState([]);
 
   const [kycState, setKycState] = useState({
-    aadhaar: { value: '', status: 'pending', reqId: null, otp: '', showOtp: false },
+    aadhaar: { publicId: null, kycUrl: null, polling: false, status: 'pending', maskedAadhaar: '' },
     pan: { value: '', status: 'pending', verifiedName: '' },
     dl: { value: '', dob: '', status: 'pending' },
     bank: { acc: '', ifsc: '', status: 'pending' },
@@ -657,6 +657,28 @@ export default function DriverPWA() {
     localStorage.setItem('mg_passkey_nudge_dismissed', (Date.now() + 7 * 24 * 3600 * 1000).toString());
   };
 
+  // Poll Aadhaar DigiLocker status while tab is open
+  useEffect(() => {
+    if (!kycState.aadhaar.polling || !kycState.aadhaar.publicId) return;
+    const intervalId = setInterval(async () => {
+      try {
+        const tk = localStorage.getItem('token');
+        const r  = await fetch(`${API}/api/kyc/aadhaar-status/${kycState.aadhaar.publicId}?phone=${encodeURIComponent(phone())}`, {
+          headers: { Authorization: `Bearer ${tk}` },
+        });
+        const data = await r.json();
+        if (data.verified || data.status === 'SUCCESS') {
+          setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, status: 'verified', polling: false, maskedAadhaar: data.maskedAadhaar || '' } }));
+          toast.success('Aadhaar Verified ✓');
+        } else if (data.status === 'FAILED') {
+          setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, status: 'failed', polling: false } }));
+          toast.error('Aadhaar verification failed');
+        }
+      } catch { /* ignore network hiccups */ }
+    }, 3000);
+    return () => clearInterval(intervalId);
+  }, [kycState.aadhaar.polling, kycState.aadhaar.publicId]);
+
   const requestNotifPermission = async () => {
     setShowNotifNudge(false);
     localStorage.setItem('mg_notif_nudge_dismissed', '1');
@@ -696,15 +718,20 @@ export default function DriverPWA() {
     else { setKycState(s => ({ ...s, pan: { ...s.pan, status: 'failed' } })); toast.error(r.message || 'Verification failed'); }
   };
   const kycAadhaarInit = async () => {
-    if (kycState.aadhaar.value.length !== 12) return toast.error('Enter 12-digit Aadhaar');
-    const r = await kycCall('aadhaar-initiate', { aadhaar_number: kycState.aadhaar.value }, 'aadhaar');
-    if (r.success) { setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, reqId: r.requestId, showOtp: true } })); } else toast.error(r.message || 'Failed');
-  };
-  const kycAadhaarVerify = async () => {
-    if (!kycState.aadhaar.otp) return toast.error('Enter OTP');
-    const r = await kycCall('aadhaar-verify', { request_id: kycState.aadhaar.reqId, otp: kycState.aadhaar.otp }, 'aadhaar');
-    setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, status: r.verified ? 'verified' : 'failed', showOtp: false } }));
-    r.verified ? toast.success('Aadhaar Verified ✓') : toast.error('Invalid OTP');
+    const user   = JSON.parse(localStorage.getItem('user') || '{}');
+    const name   = user.full_name || user.name || 'Driver';
+    const mobile = user.mobile_number || phone();
+    const r = await kycCall('aadhaar-initiate', {
+      name,
+      mobile,
+      redirect_url: window.location.origin + '/driver',
+    }, 'aadhaar');
+    if (r.success && r.kycUrl) {
+      setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, publicId: r.publicId, kycUrl: r.kycUrl, polling: true } }));
+      window.open(r.kycUrl, '_blank');
+    } else {
+      toast.error(r.message || 'Failed to start Aadhaar verification');
+    }
   };
   const kycVerifyDL = async () => {
     const r = await kycCall('verify-dl', { dl_number: kycState.dl.value, dob: kycState.dl.dob }, 'dl');
@@ -733,7 +760,7 @@ export default function DriverPWA() {
         const data = await res.json();
         if (data.success && data.fields) {
           const f = data.fields;
-          if (docType === 'AADHAAR' && f.aadhaar_number) setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, value: f.aadhaar_number.replace(/\D/g,'').slice(0,12) } }));
+          // AADHAAR: DigiLocker flow — no manual number entry needed
           if (docType === 'PAN' && f.pan_number) setKycState(s => ({ ...s, pan: { ...s.pan, value: f.pan_number.toUpperCase() } }));
           if (docType === 'DL') {
             if (f.dl_number) setKycState(s => ({ ...s, dl: { ...s.dl, value: f.dl_number } }));
@@ -1321,19 +1348,25 @@ export default function DriverPWA() {
               <span className="text-sm font-black text-slate-800 flex items-center gap-2"><Fingerprint size={14} className="text-indigo-600"/> Aadhaar</span>
               {statusBadge(kycState.aadhaar.status)}
             </div>
-            <div className="flex gap-2 mb-2">
-              <input value={kycState.aadhaar.value} maxLength={12}
-                onChange={e => setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, value: e.target.value.replace(/\D/g,'').slice(0,12) } }))}
-                placeholder="12-digit Aadhaar" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm bg-slate-50 focus:outline-none focus:border-indigo-500"/>
-              <button onClick={kycAadhaarInit} disabled={kycLoading === 'aadhaar'}
-                className="bg-indigo-600 text-white px-4 rounded-xl text-xs font-black hover:bg-indigo-700 transition">OTP</button>
-            </div>
-            {kycState.aadhaar.showOtp && (
-              <div className="flex gap-2 mb-2">
-                <input value={kycState.aadhaar.otp} onChange={e => setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, otp: e.target.value } }))}
-                  placeholder="Enter OTP" className="flex-1 border border-slate-200 rounded-xl p-2.5 font-mono text-sm bg-slate-50 focus:outline-none focus:border-indigo-500"/>
-                <button onClick={kycAadhaarVerify} className="bg-slate-800 text-white px-4 rounded-xl text-xs font-black">Verify</button>
-              </div>
+            {kycState.aadhaar.status !== 'verified' && (
+              kycState.aadhaar.polling ? (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-2 text-center">
+                  <p className="text-xs font-black text-indigo-700">⏳ Waiting for DigiLocker...</p>
+                  <p className="text-[10px] text-indigo-500 mt-1">Complete Aadhaar verification in the opened tab</p>
+                  <div className="flex gap-2 justify-center mt-2">
+                    <button onClick={() => kycState.aadhaar.kycUrl && window.open(kycState.aadhaar.kycUrl, '_blank')}
+                      className="text-[10px] font-black text-indigo-600 underline">Reopen link</button>
+                    <span className="text-[10px] text-slate-400">·</span>
+                    <button onClick={() => setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, polling: false } }))}
+                      className="text-[10px] text-slate-500 underline">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={kycAadhaarInit} disabled={kycLoading === 'aadhaar'}
+                  className="w-full bg-indigo-600 text-white py-2.5 rounded-xl text-xs font-black hover:bg-indigo-700 transition mb-2">
+                  {kycLoading === 'aadhaar' ? '...' : '🔗 Verify via DigiLocker'}
+                </button>
+              )
             )}
             <div className="flex gap-2 mt-2">
               <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-100 border border-slate-200 border-dashed">

@@ -7,8 +7,8 @@ const pool = new Pool({
     ? { rejectUnauthorized: false }
     : false,
   max: 20,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000,
+  idleTimeoutMillis: 60_000,
+  connectionTimeoutMillis: 30_000,
 });
 
 pool.on('error', (err) => {

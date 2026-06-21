@@ -49,36 +49,44 @@ const kycProviders = {
       };
     },
 
-    // ── Aadhaar DigiLocker — step 1: initiate (sends OTP to Aadhaar-linked mobile) ──
-    initiateAadhaar: async (aadhaarNumber) => {
-      const res  = await fetch(`${PY_BASE}/api/v1/aadhaar/request`, {
+    // ── Aadhaar DigiLocker — step 1: create session ──────────────────────────
+    initiateAadhaarDigilocker: async ({ clientRef, name, mobile, emailId, redirectionUrl, notifyUrl }) => {
+      const body = { client_ref_num: clientRef, name, mobile };
+      if (emailId)        body.emailId        = emailId;
+      if (redirectionUrl) body.redirectionUrl = redirectionUrl;
+      if (notifyUrl)      body.notifyUrl      = notifyUrl;
+      const res  = await fetch(`${PY_BASE}/api/v1/aadhaar/digilocker/sessions`, {
         method: 'POST',
         headers: PY_HEADERS(),
-        body: JSON.stringify({ aadhaar: aadhaarNumber, consent: true }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       return {
-        success:   res.ok && !data?.error,
-        requestId: data?.data?.request_id || data?.request_id || null,
-        message:   data?.message || (res.ok ? 'OTP sent' : 'Failed to initiate Aadhaar'),
-        raw:       data,
+        success:     res.ok && data?.success,
+        publicId:    data?.data?.publicId    || null,
+        sessionCode: data?.data?.sessionCode || null,
+        kycUrl:      data?.data?.kycUrl      || null,
+        message:     data?.data?.message     || (res.ok ? 'DigiLocker session created' : 'Failed to initiate Aadhaar'),
+        raw:         data,
       };
     },
 
-    // ── Aadhaar DigiLocker — step 2: verify OTP ──────────────────────────────
-    verifyAadhaar: async (requestId, otp) => {
-      const res  = await fetch(`${PY_BASE}/api/v1/aadhaar/verify`, {
-        method: 'POST',
+    // ── Aadhaar DigiLocker — step 2: poll session status ─────────────────────
+    checkAadhaarStatus: async (publicId) => {
+      const res  = await fetch(`${PY_BASE}/api/v1/aadhaar/digilocker/sessions/${publicId}?sync=true`, {
         headers: PY_HEADERS(),
-        body: JSON.stringify({ request_id: requestId, otp }),
       });
       const data = await res.json();
-      const r    = data?.data?.result || {};
+      const result = data?.data?.result || {};
       return {
-        verified: res.ok && data?.data?.verificationStatus === 'SUCCESS',
-        name:     r.name || null,
-        last4:    r.aadhaar_number ? r.aadhaar_number.slice(-4) : null,
-        raw:      data,
+        success:      res.ok,
+        status:       data?.data?.status             || 'PENDING',
+        verified:     data?.data?.verificationStatus === 'SUCCESS',
+        name:         result.name                    || null,
+        maskedAadhaar: result.maskedAadhaarNumber    || null,
+        dob:          result.dob                     || null,
+        address:      result.address?.fullAddress    || null,
+        raw:          data,
       };
     },
 
@@ -172,19 +180,39 @@ const result = await kyc.verifyPAN(pan_number.toUpperCase(), clientRef);
 
 // ─────────────────────────────────────────────────────────────────────
 // POST /api/kyc/aadhaar-initiate
-// Body: { aadhaar_number }
+// Body: { name, mobile, email?, redirect_url? }
+// Returns: { success, publicId, kycUrl, sessionCode, message }
 // ─────────────────────────────────────────────────────────────────────
 router.post('/aadhaar-initiate', async (req, res) => {
   try {
-    const { aadhaar_number } = req.body;
-    if (!aadhaar_number || !/^\d{12}$/.test(aadhaar_number))
-      return res.status(400).json({ success: false, message: 'Aadhaar must be 12 digits' });
+    const { name, mobile, email, redirect_url } = req.body;
+    if (!name || !mobile)
+      return res.status(400).json({ success: false, message: 'name and mobile required' });
 
-    const result = await kyc.initiateAadhaar(aadhaar_number);
+    const crypto    = require('crypto');
+    const clientRef = crypto.randomUUID();
+    const notifyUrl = `${process.env.BACKEND_URL || 'https://mg-qw5s.onrender.com'}/api/kyc/aadhaar-webhook`;
+
+    const result = await kyc.initiateAadhaarDigilocker({
+      clientRef,
+      name,
+      mobile,
+      emailId:        email        || undefined,
+      redirectionUrl: redirect_url || undefined,
+      notifyUrl,
+    });
+
+    console.log('[KYC] aadhaar-initiate raw:', JSON.stringify(result.raw));
+    if (!result.success) {
+      console.error('[KYC] aadhaar-initiate FAILED:', result.message, '| raw:', JSON.stringify(result.raw));
+    }
+
     res.json({
-      success:   result.success,
-      requestId: result.requestId,
-      message:   result.success ? 'OTP sent to Aadhaar registered mobile' : result.message,
+      success:     result.success,
+      publicId:    result.publicId,
+      kycUrl:      result.kycUrl,
+      sessionCode: result.sessionCode,
+      message:     result.success ? result.message : (result.raw?.message || result.message),
     });
   } catch (err) {
     console.error('Aadhaar initiate error:', err.message);
@@ -194,27 +222,58 @@ router.post('/aadhaar-initiate', async (req, res) => {
 
 
 // ─────────────────────────────────────────────────────────────────────
-// POST /api/kyc/aadhaar-verify
-// Body: { phone, request_id, otp }
+// GET /api/kyc/aadhaar-status/:publicId?phone=xxx
+// Poll until status = SUCCESS or FAILED
 // ─────────────────────────────────────────────────────────────────────
-router.post('/aadhaar-verify', async (req, res) => {
+router.get('/aadhaar-status/:publicId', async (req, res) => {
   try {
-    const { phone, request_id, otp } = req.body;
-    if (!request_id || !otp)
-      return res.status(400).json({ success: false, message: 'request_id and otp required' });
+    const { publicId } = req.params;
+    const { phone }    = req.query;
 
-    const result = await kyc.verifyAadhaar(request_id, otp);
-    if (phone && result.last4) await saveKycResult(phone, 'aadhaar', result.verified, result.last4);
+    const result = await kyc.checkAadhaarStatus(publicId);
+
+    if (result.verified && phone && result.maskedAadhaar) {
+      const last4 = result.maskedAadhaar.replace(/\D/g, '').slice(-4);
+      await saveKycResult(phone, 'aadhaar', true, last4);
+    }
 
     res.json({
-      success:  result.verified,
-      verified: result.verified,
-      name:     result.name,
-      message:  result.verified ? '✅ Aadhaar Verified' : '❌ OTP invalid or Aadhaar mismatch',
+      success:       result.success,
+      status:        result.status,
+      verified:      result.verified,
+      name:          result.name,
+      maskedAadhaar: result.maskedAadhaar,
+      message:       result.verified
+        ? '✅ Aadhaar Verified'
+        : result.status === 'FAILED'
+          ? '❌ Aadhaar verification failed'
+          : 'Verification in progress...',
     });
   } catch (err) {
-    console.error('Aadhaar verify error:', err.message);
-    res.status(500).json({ success: false, message: 'Failed: ' + err.message });
+    console.error('Aadhaar status error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/aadhaar-webhook
+// Payyantra webhook — fires on verification.completed / .failed
+// ─────────────────────────────────────────────────────────────────────
+router.post('/aadhaar-webhook', async (req, res) => {
+  try {
+    const { publicId, status } = req.body;
+    console.log('[KYC Webhook] received:', { publicId, status });
+    if (status === 'SUCCESS' && publicId) {
+      const result = await kyc.checkAadhaarStatus(publicId);
+      if (result.verified) {
+        console.log('[KYC Webhook] SUCCESS — name:', result.name, 'masked:', result.maskedAadhaar);
+      }
+    }
+    res.json({ received: true });
+  } catch (err) {
+    console.error('[KYC Webhook] error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -18,6 +18,7 @@ function LandingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [activeTab, setActiveTab] = useState('admin');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setNavScrolled(window.scrollY > 40);
@@ -79,7 +80,7 @@ function LandingPage() {
       <nav id="nav" className={navScrolled ? 'scrolled' : ''}>
         <div className="nav-inner">
           <Link to="/" className="nav-logo">
-            <BrandLogo variant="cyan" height={32} alt="MobilityGrid" />
+            <BrandLogo variant="cyan" height={40} alt="MobilityGrid" />
           </Link>
           <div className="nav-links">
             <a href="#vision" className="nav-link">Vision</a>
@@ -92,8 +93,28 @@ function LandingPage() {
           <div className="nav-actions">
             <a href="#signup" className="btn btn-primary btn-sm">Get Early Access</a>
           </div>
+          <button
+            className={`hamburger${mobileMenuOpen ? ' open' : ''}`}
+            aria-label="Toggle menu"
+            onClick={() => setMobileMenuOpen(o => !o)}
+          >
+            <span /><span /><span />
+          </button>
         </div>
       </nav>
+
+      {/* Mobile drawer */}
+      <div className={`mobile-drawer${mobileMenuOpen ? ' open' : ''}`}>
+        <div className="mobile-drawer-inner">
+          <a href="#vision"   className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Vision</a>
+          <a href="#gaps"     className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>The Problem</a>
+          <a href="#product"  className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Product</a>
+          <a href="#how"      className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>How it Works</a>
+          <a href="#pricing"  className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
+          <a href="https://partners.mobilitygrid.in" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Partners</a>
+          <a href="#signup"   className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => setMobileMenuOpen(false)}>Get Early Access</a>
+        </div>
+      </div>
 
       <section className="hero">
         <div className="hero-content container">
@@ -104,7 +125,7 @@ function LandingPage() {
           <h1>
             The Operating<br />
             System for India's<br />
-            <em>Fleet Economy</em>
+            <em>Fleet Operations</em>
           </h1>
           <p className="hero-sub">
             Digital rent collection, driver KYC, fleet management, and earnings tracking — built from the ground up for how India's gig workforce actually lives and works.
@@ -179,7 +200,7 @@ function LandingPage() {
 
       <div className="trust-bar">
         <div className="trust-inner">
-          <span className="trust-label">Built for India's fleet economy</span>
+          <span className="trust-label">Built for India's fleet operations</span>
           <div className="trust-divider" />
           <div className="trust-stat"><div className="trust-stat-val">Any Scale</div><div className="trust-stat-lbl">Small fleet to enterprise</div></div>
           <div className="trust-divider" />
@@ -285,7 +306,7 @@ function LandingPage() {
           <div className="product-header">
             <p className="section-label">The Platform</p>
             <h2 className="display">One ecosystem. <em>Three stakeholders.</em></h2>
-            <p>MobilityGrid is not a single app — it is a coordinated operating system with purpose-built interfaces for every actor in the fleet economy.</p>
+            <p>MobilityGrid is not a single app — it is a coordinated operating system with purpose-built interfaces for every actor in the fleet operations.</p>
           </div>
 
           <div className="product-tabs">
@@ -503,7 +524,7 @@ function LandingPage() {
         <div className="container">
           <div className="features-header">
             <p className="section-label section-label-light">Platform Capabilities</p>
-            <h2 className="display display-light">Everything the fleet economy needs,<br /><em>nothing it doesn't</em></h2>
+            <h2 className="display display-light">Everything the fleet operations needs,<br /><em>nothing it doesn't</em></h2>
             <p>Every feature was built from direct research with fleet operators and drivers across India — not from assumptions.</p>
           </div>
           <div className="features-grid">
@@ -751,7 +772,7 @@ function LandingPage() {
                 <div className="success-body">
                   Thank you for your interest in MobilityGrid.<br />
                   Our team will reach out on WhatsApp within 24 hours.<br /><br />
-                  You are now part of building the infrastructure that India's fleet economy deserves.
+                  You are now part of building the infrastructure that India's fleet operations deserves.
                 </div>
               </div>
 
@@ -843,7 +864,7 @@ function LandingPage() {
               <div className="footer-logo">
                 <BrandLogo variant="cyan" height={30} alt="MobilityGrid" />
               </div>
-              <p className="footer-tagline">The operating system for India's fleet economy — built for every operator, manager, and driver.</p>
+              <p className="footer-tagline">The operating system for India's fleet operations — built for every operator, manager, and driver.</p>
               <div className="footer-badge">
                 <div className="footer-badge-dot" />
                 <span className="footer-badge-text">India's Fleet Operating System</span>

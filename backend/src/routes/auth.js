@@ -220,7 +220,7 @@ router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const table = safeTable(user.role);
     await pool.query(`UPDATE public.${table} SET session_token=$1 WHERE id=$2`, [sessionToken, user.id]);
-    const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null, session_token: sessionToken });
+    const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null, owner_code: user.owner_code || null, driver_code: user.driver_code || null, session_token: sessionToken });
     res.json({
       success: true, token,
       user: {
@@ -587,6 +587,8 @@ router.post('/passkey/auth-verify', async (req, res) => {
     var token = generateToken({
       id: user.id, phone_number: user.mobile_number,
       role: user.role, owner_id: user.owner_id || null,
+      owner_code: user.owner_code || null,
+      driver_code: user.driver_code || null,
       session_token: sessionToken
     });
 
@@ -641,6 +643,8 @@ router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
     var token = generateToken({
       id: user.id, phone_number: user.mobile_number,
       role: user.role, owner_id: user.owner_id || null,
+      owner_code: user.owner_code || null,
+      driver_code: user.driver_code || null,
       session_token: sessionToken
     });
 

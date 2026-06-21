@@ -29,7 +29,7 @@ export default function AdminSidebar({ activeTab, setActiveTab }) {
       <div className="p-5 border-b border-slate-800">
         <div className="flex items-center gap-2">
           <div>
-            <BrandLogo variant="white" height={28} alt="MobilityGrid" />
+            <BrandLogo variant="white" height={36} alt="MobilityGrid" />
             <div className="text-[10px] text-slate-500 mt-0.5">Admin Portal</div>
           </div>
         </div>

@@ -22,7 +22,7 @@ async function bootstrap() {
   // THIRD: run lightweight DB migrations (idempotent — safe to re-run)
   try {
     const { Pool } = require('pg');
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false },connectionTimeoutMillis: 30000 });
     await pool.query(`
       ALTER TABLE public.owners
         ADD COLUMN IF NOT EXISTS payment_mode VARCHAR(20) NOT NULL DEFAULT 'BOTH'

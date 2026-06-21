@@ -712,9 +712,60 @@ footer {
   .admin-mock     { grid-template-columns: 160px 1fr; }
 }
 
+/* ── HAMBURGER ────────────────────────────────────────────────────────────── */
+.hamburger {
+  display: none;
+  flex-direction: column; justify-content: center; align-items: center;
+  gap: 5px; width: 40px; height: 40px; background: none; border: none;
+  cursor: pointer; padding: 6px; border-radius: 8px;
+  transition: background 0.2s;
+}
+.hamburger:hover { background: rgba(255,255,255,0.1); }
+#nav.scrolled .hamburger:hover { background: var(--slate-100); }
+.hamburger span {
+  display: block; width: 22px; height: 2px;
+  background: var(--white); border-radius: 2px;
+  transition: all 0.3s;
+  transform-origin: center;
+}
+#nav.scrolled .hamburger span { background: var(--slate-700); }
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ── MOBILE DRAWER ────────────────────────────────────────────────────────── */
+.mobile-drawer {
+  display: none;
+  position: fixed; top: 64px; left: 0; right: 0; z-index: 199;
+  background: rgba(4, 7, 18, 0.97);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  transform: translateY(-8px); opacity: 0;
+  pointer-events: none;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.mobile-drawer.open {
+  transform: translateY(0); opacity: 1;
+  pointer-events: auto;
+}
+.mobile-drawer-inner {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 16px 20px 24px;
+}
+.mobile-nav-link {
+  font-size: 16px; font-weight: 500;
+  color: rgba(255,255,255,0.75); text-decoration: none;
+  padding: 12px 16px; border-radius: 10px;
+  transition: background 0.15s, color 0.15s;
+}
+.mobile-nav-link:hover { background: rgba(255,255,255,0.08); color: var(--white); }
+
 @media (max-width: 768px) {
   #nav { padding: 0 16px; }
+  .hamburger { display: flex; }
+  .mobile-drawer { display: block; }
   .nav-links  { display: none; }
+  .nav-actions { display: none; }
   .hero { padding: 120px 16px 0; }
   .hero h1 { font-size: 44px; }
   .admin-sidebar-mock { display: none; }

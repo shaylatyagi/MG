@@ -111,17 +111,17 @@ const Badge = ({ status }) => {
 
 const StatCard = ({ label, value, sub, color = 'indigo' }) => {
   const colors = {
-    indigo: 'border-indigo-400 bg-indigo-50',
-    green:  'border-green-400 bg-green-50',
-    blue:   'border-blue-400 bg-blue-50',
-    orange: 'border-orange-400 bg-orange-50',
-    red:    'border-red-400 bg-red-50',
+    indigo: 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/40',
+    green:  'border-green-400 bg-green-50 dark:bg-green-900/40',
+    blue:   'border-blue-400 bg-blue-50 dark:bg-blue-900/40',
+    orange: 'border-orange-400 bg-orange-50 dark:bg-orange-900/40',
+    red:    'border-red-400 bg-red-50 dark:bg-red-900/40',
   };
   return (
     <div className={`border-l-4 rounded-lg p-4 shadow-sm ${colors[color] || colors.indigo}`}>
-      <p className="text-xs text-gray-500 dark:text-gray-700 uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 mt-1">{value}</p>
-      {sub && <p className="text-xs text-gray-500 dark:text-gray-700 mt-1">{sub}</p>}
+      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</p>
+      <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sub}</p>}
     </div>
   );
 };
@@ -259,7 +259,7 @@ function DocumentsSection({ userType, userId }) {
         <p className="text-center text-gray-700 dark:text-gray-500 py-6 text-sm">No documents uploaded yet</p>
       ) : (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Type</th>
               <th className="px-3 py-2 text-left">File</th>
@@ -486,7 +486,7 @@ function Dashboard({ onSetTab }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Platform Dashboard</h2>
+      <h2 className="text-xl font-bold text-gray-800 dark:text-white">Platform Dashboard</h2>
       {pending > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-sm flex items-center justify-between">
           <span>⚠️ <strong>{pending} KYC verification(s)</strong> pending review</span>
@@ -510,7 +510,7 @@ function Dashboard({ onSetTab }) {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {['VERIFIED','PENDING','SUBMITTED','UNDER_REVIEW','REJECTED'].map(status => (
             <button key={status} onClick={() => onSetTab && onSetTab('kyc')} className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:ring-2 hover:ring-indigo-300 transition cursor-pointer w-full">
-              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{k[status] || 0}</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-white">{k[status] || 0}</p>
               <Badge status={status} />
             </button>
           ))}
@@ -587,7 +587,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
 
       {tab === 'history' && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Driver</th>
               <th className="px-3 py-2 text-left">Phone</th>
@@ -689,7 +689,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
       {tab === 'transactions' && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">Date</th>
                 <th className="px-3 py-2 text-right">Amount</th>
@@ -716,7 +716,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
       {tab === 'vehicles' && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">Vehicle</th>
                 <th className="px-3 py-2 text-left">Assigned</th>
@@ -745,7 +745,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
       {tab === 'logs' && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">Date</th>
                 <th className="px-3 py-2 text-right">Active Minutes</th>
@@ -831,7 +831,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
 
       {tab === 'drivers' && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Driver</th>
               <th className="px-3 py-2 text-left">Phone</th>
@@ -863,7 +863,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
 
       {tab === 'vehicles' && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Vehicle</th>
               <th className="px-3 py-2 text-left">Model</th>
@@ -895,7 +895,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
 
       {tab === 'payments' && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+          <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Date</th>
               <th className="px-3 py-2 text-left">Driver</th>
@@ -988,7 +988,7 @@ function CompanyDocsSection({ companyId }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">User</th>
                 <th className="px-3 py-2 text-left">Type</th>
@@ -1214,7 +1214,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
           </div>
           {loading ? <Spinner /> : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+              <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
                 <tr>
                   <th className="px-3 py-2 text-left">Owner</th>
                   <th className="px-3 py-2 text-left">Phone</th>
@@ -1280,7 +1280,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                       <p className="text-sm text-gray-700 dark:text-gray-500 py-3">No drivers assigned to this branch</p>
                     ) : (
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+                        <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
                           <tr>
                             <th className="px-3 py-2 text-left">Name</th>
                             <th className="px-3 py-2 text-left">Phone</th>
@@ -1308,7 +1308,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                       <p className="text-sm text-gray-700 dark:text-gray-500 py-3">No vehicles assigned to this branch</p>
                     ) : (
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+                        <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
                           <tr>
                             <th className="px-3 py-2 text-left">Reg Number</th>
                             <th className="px-3 py-2 text-left">Type</th>
@@ -1636,7 +1636,7 @@ function Companies() {
       {loading ? <Spinner /> : (
         <div className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-sm border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Company</th>
                 <th className="px-4 py-3 text-left">City</th>
@@ -1858,7 +1858,7 @@ function KycReview() {
       {loading ? <Spinner /> : (
         <div className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-sm border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Driver</th>
                 <th className="px-4 py-3 text-left">Phone</th>
@@ -2301,7 +2301,7 @@ function Transactions() {
       {loading ? <Spinner /> : (
         <div className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Date</th>
                 <th className="px-4 py-3 text-left">Driver</th>
@@ -2354,7 +2354,7 @@ function AuditLog() {
       {loading ? <Spinner /> : (
         <div className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-sm border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-700 text-xs uppercase">
+            <thead className="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Time</th>
                 <th className="px-4 py-3 text-left">Action</th>

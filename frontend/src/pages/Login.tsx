@@ -24,7 +24,7 @@ const Shell: React.FC<ShellProps> = ({ children, showBack, onBack, title, subtit
     <div className={styles.gridBg} />
     <div className={styles.shellContent}>
       <div className={styles.logoWrap}>
-        <BrandLogo variant="cyan" height={44} style={{ maxWidth: 220 }} alt="MobilityGrid" />
+        <BrandLogo variant="cyan" height={56} style={{ maxWidth: 260, display: 'block', margin: '0 auto' }} alt="MobilityGrid" />
         <p className={styles.logoTagline}>FLEET OPERATING SYSTEM</p>
       </div>
       <div className={styles.card}>
