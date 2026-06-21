@@ -31,7 +31,7 @@ export default function Sidebar() {
   };
   return (
     <div style={styles.sidebar}>
-      <div style={styles.logo}><BrandLogo variant="cyan" height={60} alt="MobilityGrid" /></div>
+      <div style={styles.logo}><BrandLogo variant="cyan" height={40} alt="MobilityGrid" /></div>
       <div style={styles.toggle}>
         <button
           style={{ ...styles.toggleBtn, ...(isOwner ? styles.toggleActive : {}) }}

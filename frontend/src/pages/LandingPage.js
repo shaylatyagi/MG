@@ -19,6 +19,15 @@ function LandingPage() {
   const [submitted, setSubmitted] = useState(false);
   const [activeTab, setActiveTab] = useState('admin');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [landingPartners, setLandingPartners] = useState([]);
+
+  useEffect(() => {
+    const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
+    fetch(`${API}/api/config/partners`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setLandingPartners(d.partners || []); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setNavScrolled(window.scrollY > 40);
@@ -723,12 +732,32 @@ function LandingPage() {
             Verified fleet operators who have onboarded their drivers and vehicles on our platform.
           </p>
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 40 }}>
-            {/* Recovery Nest card */}
+            {landingPartners.map(p => {
+              const initials = (p.brand_name || p.full_name || '?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+              return (
+                <a key={p.partner_slug} href={`https://partners.mobilitygrid.in/${p.partner_slug}`} style={{ textDecoration: 'none' }}>
+                  <div style={{
+                    background: 'white', borderRadius: 20, padding: '24px 28px',
+                    border: '1.5px solid #e2e8f0', width: 240, cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)', transition: 'all 0.2s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.10)'; e.currentTarget.style.transform='translateY(-2px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'; e.currentTarget.style.transform='translateY(0)'; }}
+                  >
+                    <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, color: 'white', fontWeight: 900, fontSize: 18 }}>{initials}</div>
+                    <p style={{ fontWeight: 800, fontSize: 15, color: '#1e293b', marginBottom: 4 }}>{p.brand_name || p.full_name}</p>
+                    {p.tagline && <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.4 }}>{p.tagline}</p>}
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: 20 }}>✓ Verified Partner</span>
+                  </div>
+                </a>
+              );
+            })}
+            {/* legacy placeholder - remove below block once all partners are in DB */}
+            {landingPartners.length === 0 && (
             <a href="/partners/recoverynest" style={{ textDecoration: 'none' }}>
               <div style={{
                 background: 'white', borderRadius: 20, padding: '24px 28px',
-                border: '1.5px solid #e2e8f0', width: 240, cursor: 'pointer',
-                transition: 'box-shadow 0.2s, transform 0.2s',
+                border: '1.5px solid #e2e8f0', width: 240, cursor: 'pointer',                transition: 'box-shadow 0.2s, transform 0.2s',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
               }}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow='0 8px 32px rgba(79,70,229,0.12)'; e.currentTarget.style.transform='translateY(-2px)'; }}
@@ -740,7 +769,7 @@ function LandingPage() {
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: 20 }}>✓ Verified Partner</span>
               </div>
             </a>
-            {/* Add more partners here */}
+            )}
           </div>
           <div style={{ textAlign: 'center' }}>
             <a href="/partners" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700, color: '#4f46e5', textDecoration: 'none' }}>
@@ -862,7 +891,7 @@ function LandingPage() {
           <div className="footer-top">
             <div className="footer-brand">
               <div className="footer-logo">
-                <BrandLogo variant="cyan" height={64} alt="MobilityGrid" />
+                <BrandLogo variant="cyan" height={31} alt="MobilityGrid" />
               </div>
               <p className="footer-tagline">The operating system for India's fleet operations — built for every operator, manager, and driver.</p>
               <div className="footer-badge">
