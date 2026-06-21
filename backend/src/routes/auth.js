@@ -942,10 +942,15 @@ router.post('/owner-signup/verify', validate(OwnerSignupVerifySchema), async (re
     if (existing.rows[0])
       return res.status(409).json({ success: false, message: 'Account already exists. Please login.' });
 
-    // Generate owner_code
+    // Generate owner_code — ensure uniqueness by appending suffix if collision
     var namePrefix = full_name.replace(/\s+/g,'').toUpperCase().slice(0,3);
     var phoneEnd   = mobile_number.slice(-4);
     var owner_code = 'MG-OWN-' + namePrefix + phoneEnd;
+    var codeCheck  = await pool.query('SELECT id FROM public.owners WHERE owner_code=$1', [owner_code]);
+    if (codeCheck.rows[0]) {
+      // collision — append last 2 digits of timestamp to make unique
+      owner_code = owner_code + Date.now().toString().slice(-2);
+    }
 
     // Create company if provided
     var company_id = null;

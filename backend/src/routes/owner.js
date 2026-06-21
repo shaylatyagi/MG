@@ -118,9 +118,7 @@ router.get('/stats', async (req, res) => {
     );
     const outstanding = Math.max(0, parseFloat(outstandingRes.rows[0].total));
 
-    const efficiency = activeContracts > 0
-      ? ((parseFloat(today.rows[0].total) / parseFloat(rentSum.rows[0].total || 1)) * 100).toFixed(1)
-      : '0.0';
+    const efficiency = '0.0'; // rentSum query removed — efficiency calc pending
 
     res.json({
       success: true,

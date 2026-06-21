@@ -48,15 +48,7 @@ cron.schedule('30 18 * * *', async () => {
     for (const row of drivers) {
       const rent   = parseFloat(row.daily_rent);
       const wallet = parseFloat(row.wallet_balance);
-
-      if (wallet <= 0) {
-        // Nothing to deduct — log and skip (owner will see outstanding balance)
-        logger.info(`CRON: skip ${row.full_name} — wallet is ₹${wallet}`);
-        skipped++;
-        continue;
-      }
-
-      const deduction = Math.min(rent, wallet); // never go below 0
+      const deduction = Math.min(rent, Math.max(0, wallet)); // deduct only what's available
       const dateStr   = new Date().toLocaleDateString('en-IN', {
         day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata',
       });
@@ -64,16 +56,19 @@ cron.schedule('30 18 * * *', async () => {
       try {
         await client.query('BEGIN');
 
-        // 1. Deduct from wallet
-        await client.query(
-          `UPDATE public.drivers
-           SET wallet_balance = wallet_balance - $1,
-               updated_at     = NOW()
-           WHERE id = $2`,
-          [deduction, row.driver_id]
-        );
+        // 1. Deduct from wallet only if wallet > 0
+        if (deduction > 0) {
+          await client.query(
+            `UPDATE public.drivers
+             SET wallet_balance = wallet_balance - $1,
+                 updated_at     = NOW()
+             WHERE id = $2`,
+            [deduction, row.driver_id]
+          );
+        }
 
-        // 2. Record in driver_ledger so owner can see it in reports
+        // 2. Always record RENT_CHARGE in driver_ledger (full rent amount)
+        //    even if wallet was 0 — this is what drives outstanding balance
         await client.query(
           `INSERT INTO public.driver_ledger
              (driver_id, owner_id, entry_type, amount, description, created_by)
@@ -83,19 +78,37 @@ cron.schedule('30 18 * * *', async () => {
            LIMIT 1`,
           [
             row.driver_id,
-            deduction,
-            `Auto midnight rent ₹${deduction} — ${row.vehicle_number} — ${dateStr}`,
+            rent,
+            `Auto midnight rent ₹${rent} — ${row.vehicle_number} — ${dateStr}`,
             row.owner_code,
           ]
         );
 
+        // 3. If wallet partially covered the rent, also record PAYMENT for that portion
+        if (deduction > 0) {
+          await client.query(
+            `INSERT INTO public.driver_ledger
+               (driver_id, owner_id, entry_type, amount, description, created_by)
+             SELECT $1, o.id, 'PAYMENT', $2, $3, 'SYSTEM'
+             FROM public.owners o
+             WHERE o.owner_code = $4
+             LIMIT 1`,
+            [
+              row.driver_id,
+              deduction,
+              `Wallet auto-deduction ₹${deduction} — ${row.vehicle_number} — ${dateStr}`,
+              row.owner_code,
+            ]
+          );
+        }
+
         await client.query('COMMIT');
         processed++;
-        logger.info(`CRON: deducted ₹${deduction} from ${row.full_name} (wallet was ₹${wallet})`);
+        logger.info(`CRON: rent ₹${rent} charged for ${row.full_name} — wallet deducted ₹${deduction}`);
       } catch (txErr) {
         await client.query('ROLLBACK');
         errors++;
-        logger.error(`CRON: failed to deduct rent for driver ${row.driver_id}`, {
+        logger.error(`CRON: failed to process rent for driver ${row.driver_id}`, {
           error: txErr.message,
         });
       }

@@ -1380,12 +1380,14 @@ router.get('/owner/drivers/list', verifyToken, async (req, res) => {
     }
 
     const whereClause = ownerCode
-  ? `WHERE UPPER(d.status) = 'ACTIVE' AND d.owner_code = $3`
-  : `WHERE UPPER(d.status) = 'ACTIVE'`;
-    const params = ownerCode ? [limit, offset, ownerCode] : [limit, offset];
+      ? `WHERE UPPER(d.status) = 'ACTIVE' AND d.deleted_at IS NULL AND d.owner_code = $3`
+      : `WHERE UPPER(d.status) = 'ACTIVE' AND d.deleted_at IS NULL AND d.owner_id = $3`;
+    const params = ownerCode ? [limit, offset, ownerCode] : [limit, offset, parseInt(ownerId)];
 
-    const countParams = ownerCode ? [ownerCode] : [];
-    const countWhere = ownerCode ? `WHERE status = 'ACTIVE' AND owner_code = $1` : `WHERE status = 'ACTIVE'`;
+    const countParams = ownerCode ? [ownerCode] : [parseInt(ownerId)];
+    const countWhere = ownerCode
+      ? `WHERE status = 'ACTIVE' AND deleted_at IS NULL AND owner_code = $1`
+      : `WHERE status = 'ACTIVE' AND deleted_at IS NULL AND owner_id = $1`;
     const countRes = await pool.query(
       `SELECT COUNT(*) FROM public.drivers ${countWhere}`, countParams
     );

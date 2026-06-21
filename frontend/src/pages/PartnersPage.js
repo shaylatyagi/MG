@@ -269,7 +269,7 @@ function PartnerListing() {
                     width: 52, height: 52, borderRadius: 14, flexShrink: 0,
                     background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, fontWeight: 900,
+                    fontSize: 18, fontWeight: 900, marginLeft: 6,
                   }}>
                     {initials(p.brand_name || p.full_name)}
                   </div>
@@ -277,7 +277,7 @@ function PartnerListing() {
                     <p style={{ fontWeight: 800, fontSize: 16, margin: 0 }}>{p.full_name}</p>
                     {p.tagline && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.tagline}</p>}
                   </div>
-                  <ArrowRight size={16} color="rgba(255,255,255,0.25)" />
+                  <ArrowRight size={16} color="rgba(255,255,255,0.25)" style={{ marginRight: 6, flexShrink: 0 }} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 40, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -299,7 +299,7 @@ function PartnerListing() {
         }}>
           <p style={{ fontSize: 22, fontWeight: 800, margin: '0 0 8px' }}>Want to list your fleet?</p>
           <p style={{ color: 'rgba(255,255,255,0.45)', margin: '0 0 24px', fontSize: 15 }}>Join the MobilityGrid partner network</p>
-          <a href="https://mobilitygrid.in/#contact" style={{
+          <a href="https://mobilitygrid.in/#signup" style={{
             display: 'inline-block', background: '#4f46e5', color: '#fff',
             padding: '12px 28px', borderRadius: 40, fontWeight: 700, fontSize: 14,
             textDecoration: 'none', transition: 'background 0.2s',
