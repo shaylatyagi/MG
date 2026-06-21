@@ -11,7 +11,7 @@
  */
 
 const cron   = require('node-cron');
-const pool   = require('../db');
+const pool   = require('../config/db');
 const logger = require('../utils/logger');
 
 // ─────────────────────────────────────────────────────────────────────────────
