@@ -951,29 +951,35 @@ router.post('/owner/notify-unpaid', verifyToken, async (req, res) => {
 });
 router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
   try {
-    // Get the owner_code directly from the user object in the token
-    // Assuming your JWT contains owner_code. If not, use req.user.id to fetch it.
-    const ownerCode = req.user.owner_code; 
-
-    if (!ownerCode) {
-      return res.status(400).json({ success: false, message: "Owner code missing in token" });
-    }
+    const ownerId = req.user.id;
+    const ownerRes = await pool.query(
+      'SELECT id, owner_code FROM public.owners WHERE id = $1 LIMIT 1',
+      [parseInt(ownerId)]
+    );
+    if (!ownerRes.rows[0]) return res.json([]);
+    const { id: oId, owner_code: ownerCode } = ownerRes.rows[0];
 
     const result = await pool.query(`
       SELECT d.id, d.full_name, v.vehicle_number, v.daily_rent,
-      ( 
-        (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('RENT_CHARGE', 'DAMAGE_CHARGE', 'PENALTY')) 
-        - 
-        (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger WHERE driver_id = d.id AND entry_type IN ('CASH_PAYMENT', 'UPI_PAYMENT', 'ADVANCE_CREDIT', 'REFUND')) 
+      GREATEST(0,
+        (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger
+         WHERE driver_id = d.id
+           AND entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','PENALTY','SECURITY_DEPOSIT'))
+        -
+        (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger
+         WHERE driver_id = d.id
+           AND entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REFUND','PAYMENT'))
       ) AS balance
       FROM public.drivers d
-      JOIN public.vehicles v ON v.driver_id = d.id
-      WHERE d.owner_code = $1 AND d.status = 'ACTIVE'
-    `, [ownerCode]);
+      LEFT JOIN public.vehicles v ON v.driver_id = d.id
+      WHERE (d.owner_id = $1 OR d.owner_code = $2)
+        AND d.status = 'ACTIVE'
+        AND d.deleted_at IS NULL
+    `, [oId, ownerCode]);
 
-    res.json(result.rows);
+    res.json(result.rows.filter(r => parseFloat(r.balance) > 0));
   } catch (err) {
-    console.error("DEBUG: Error in overdue-drivers:", err);
+    console.error("overdue-drivers error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

@@ -2071,9 +2071,11 @@ const removeRule = (i) => setIncentiveRules(prev => ({
             fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: { Authorization: `Bearer ${token()}` } })
               .then(r => r.json()).then(d => { setOverdueDrivers(Array.isArray(d) ? d : []); setShowOverdue(true); }).catch(() => {});
           }}
-          style={{background:'#eef2ff',border:'1px solid #c7d2fe',borderRadius:12,padding:12,textAlign:'left',width:'100%',display:'flex',flexDirection:'column',gap:4,cursor:'pointer'}}>
-          <span style={{fontSize:9,fontWeight:900,letterSpacing:'0.08em',textTransform:'uppercase',color:'#6366f1',display:'block'}}>
-            {t.outstanding}
+          className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-left w-full" style={{display:'flex',flexDirection:'column',cursor:'pointer'}}>
+          <span className="text-[9px] text-indigo-600 font-black uppercase block">{t.outstanding}</span>
+          <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
+          <span className="text-[9px] text-indigo-600 font-black uppercase block mt-1">See who owes →</span>
+        </button>
           </span>
           <span style={{fontSize:18,fontWeight:900,color:'#1e293b',display:'block'}}>
             ₹{ledger.outstanding.toLocaleString('en-IN')}
