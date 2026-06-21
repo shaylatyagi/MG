@@ -231,6 +231,11 @@ export default function DriverPWA() {
     bank: { acc: '', ifsc: '', status: 'pending' },
   });
   const [kycLoading, setKycLoading] = useState('');
+  // AccountTab upload state lifted here to prevent remount-on-rerender scroll bug
+  const [uploadPreview, setUploadPreview] = useState<any>(null);
+  const [uploading, setUploading]         = useState(false);
+  const [uploadDone, setUploadDone]       = useState('');
+  const [ocrLoading, setOcrLoading]       = useState(false);
 
   const tk = () => localStorage.getItem('token');
   const phone = () => {
@@ -712,6 +717,57 @@ export default function DriverPWA() {
     r.verified ? toast.success('Bank account verified ✓') : toast.error('Bank verification failed');
   };
 
+  const selectForPreview = (docType, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e: any) => {
+      const dataUrl = file.type.startsWith('image/') ? e.target.result : null;
+      setUploadPreview({ docType, file, dataUrl, ocrFields: null });
+      if (!file.type.startsWith('image/')) return;
+      setOcrLoading(true);
+      try {
+        const formData = new FormData();
+        formData.append('document', file);
+        formData.append('doc_type', docType);
+        const res  = await fetch(`${API}/api/kyc/ocr`, { method: 'POST', headers: { Authorization: `Bearer ${tk()}` }, body: formData });
+        const data = await res.json();
+        if (data.success && data.fields) {
+          const f = data.fields;
+          if (docType === 'AADHAAR' && f.aadhaar_number) setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, value: f.aadhaar_number.replace(/\D/g,'').slice(0,12) } }));
+          if (docType === 'PAN' && f.pan_number) setKycState(s => ({ ...s, pan: { ...s.pan, value: f.pan_number.toUpperCase() } }));
+          if (docType === 'DL') {
+            if (f.dl_number) setKycState(s => ({ ...s, dl: { ...s.dl, value: f.dl_number } }));
+            if (f.dob)       setKycState(s => ({ ...s, dl: { ...s.dl, dob: f.dob } }));
+          }
+          if (docType === 'BANK') {
+            if (f.account_number) setKycState(s => ({ ...s, bank: { ...s.bank, acc: f.account_number } }));
+            if (f.ifsc)           setKycState(s => ({ ...s, bank: { ...s.bank, ifsc: f.ifsc.toUpperCase() } }));
+          }
+          setUploadPreview((prev: any) => prev ? { ...prev, ocrFields: f } : prev);
+        }
+      } catch (err) { console.warn('OCR failed (non-critical):', err); }
+      finally { setOcrLoading(false); }
+    };
+    reader.readAsDataURL(file);
+  };
+  const confirmUpload = async () => {
+    if (!uploadPreview || uploading) return;
+    setUploading(true);
+    const { docType, file } = uploadPreview;
+    const formData = new FormData();
+    formData.append('document', file);
+    formData.append('type', docType);
+    formData.append('phone', phone());
+    try {
+      const res  = await fetch(`${API}/api/kyc/upload-document`, { method: 'POST', headers: { Authorization: `Bearer ${tk()}` }, body: formData });
+      const data = await res.json();
+      setUploadPreview(null);
+      if (data.success) { setUploadDone(`✅ ${docType} submitted for admin review!`); setTimeout(() => setUploadDone(''), 4000); }
+      else toast.error('Upload failed: ' + (data.message || ''));
+    } catch { toast.error('Upload failed — network error'); }
+    finally { setUploading(false); }
+  };
+
   const statusBadge = (s) => {
     const styles = { verified: 'bg-indigo-50 text-indigo-700 border-indigo-200', failed: 'bg-red-50 text-red-600 border-red-200', pending: 'bg-slate-50 text-slate-500 border-slate-200' };
     const labels = { verified: '✓ Verified', failed: '✗ Failed', pending: 'Pending' };
@@ -1106,88 +1162,9 @@ export default function DriverPWA() {
   };
 
   // ── ACCOUNT TAB ───────────────────────────────────────────────────────────
-  const AccountTab = () => {
-    const [uploadPreview, setUploadPreview] = useState(null); // { docType, file, dataUrl, ocrFields }
-    const [uploading, setUploading]         = useState(false);
-    const [uploadDone, setUploadDone]       = useState('');
-    const [ocrLoading, setOcrLoading]       = useState(false);
-
-    const selectForPreview = (docType, file) => {
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const dataUrl = file.type.startsWith('image/') ? e.target.result : null;
-        setUploadPreview({ docType, file, dataUrl, ocrFields: null });
-
-        if (!file.type.startsWith('image/')) return;
-
-        setOcrLoading(true);
-        try {
-          const formData = new FormData();
-          formData.append('document', file);
-          formData.append('doc_type', docType);
-          const res  = await fetch(`${API}/api/kyc/ocr`, {
-            method:  'POST',
-            headers: { Authorization: `Bearer ${tk()}` },
-            body:    formData,
-          });
-          const data = await res.json();
-          if (data.success && data.fields) {
-            const f = data.fields;
-
-            if (docType === 'AADHAAR' && f.aadhaar_number) {
-              setKycState(s => ({ ...s, aadhaar: { ...s.aadhaar, value: f.aadhaar_number.replace(/\D/g,'').slice(0,12) } }));
-            }
-            if (docType === 'PAN' && f.pan_number) {
-              setKycState(s => ({ ...s, pan: { ...s.pan, value: f.pan_number.toUpperCase() } }));
-            }
-            if (docType === 'DL') {
-              if (f.dl_number) setKycState(s => ({ ...s, dl: { ...s.dl, value: f.dl_number } }));
-              if (f.dob)       setKycState(s => ({ ...s, dl: { ...s.dl, dob: f.dob } }));
-            }
-            if (docType === 'BANK') {
-              if (f.account_number) setKycState(s => ({ ...s, bank: { ...s.bank, acc: f.account_number } }));
-              if (f.ifsc)           setKycState(s => ({ ...s, bank: { ...s.bank, ifsc: f.ifsc.toUpperCase() } }));
-            }
-
-            setUploadPreview(prev => prev ? { ...prev, ocrFields: f } : prev);
-          }
-        } catch (err) {
-          console.warn('OCR failed (non-critical):', err);
-        } finally {
-          setOcrLoading(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    };
-
-    const confirmUpload = async () => {
-      if (!uploadPreview || uploading) return;
-      setUploading(true);
-      const { docType, file } = uploadPreview;
-      const formData = new FormData();
-      formData.append('document', file);
-      formData.append('type', docType);
-      formData.append('phone', phone());
-      try {
-        const res = await fetch(`${API}/api/kyc/upload-document`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${tk()}` },
-          body: formData
-        });
-        const data = await res.json();
-        setUploadPreview(null);
-        if (data.success) {
-          setUploadDone(`✅ ${docType} submitted for admin review!`);
-          setTimeout(() => setUploadDone(''), 4000);
-        } else {
-          toast.error('Upload failed: ' + (data.message || ''));
-        }
-      } catch { toast.error('Upload failed — network error'); }
-      finally { setUploading(false); }
-    };
-
-    return (
+  // AccountTab: rendered as a function call (not <AccountTab/>) to prevent remount-on-rerender.
+  // All useState hooks were lifted to parent scope above — this function has NO hooks.
+  const AccountTab = () => (
       <div className="space-y-3 pb-4">
 
       {/* ── Document Upload Preview Sheet ── */}
@@ -1460,8 +1437,7 @@ export default function DriverPWA() {
           <LogOut size={13}/> {t.logout}
         </button>
       </div>
-    );
-  };
+  );
 
   // ── STATIONS TAB ──────────────────────────────────────────────────────────
   // Stations with real coordinates — sorted by GPS distance from driver
@@ -1747,7 +1723,7 @@ export default function DriverPWA() {
               {tab === 'home' && <HomeTab/>}
               {tab === 'wallet' && <WalletTab/>}
               {tab === 'stations' && <StationsTab/>}
-              {tab === 'account' && <AccountTab/>}
+              {tab === 'account' && AccountTab()}
             </div>
           )}
         </div>
@@ -2098,3 +2074,4 @@ export default function DriverPWA() {
   );
 }
 
+                                                                                                           
