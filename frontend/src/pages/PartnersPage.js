@@ -85,7 +85,7 @@ function PartnerDetail({ slug }) {
     <div style={{ minHeight: '100vh', background: PAGE_BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', gap: 12 }}>
       <p style={{ fontSize: 20, fontWeight: 800 }}>Partner not found</p>
       <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>{error}</p>
-      <button onClick={() => navigate('/partners')} style={{ marginTop: 8, background: '#4f46e5', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 40, fontWeight: 700, cursor: 'pointer' }}>
+      <button onClick={() => navigate('/')} style={{ marginTop: 8, background: '#4f46e5', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 40, fontWeight: 700, cursor: 'pointer' }}>
         ← All Partners
       </button>
     </div>
@@ -93,7 +93,7 @@ function PartnerDetail({ slug }) {
 
   return (
     <div style={{ minHeight: '100vh', background: PAGE_BG, color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <Nav onBack={() => navigate('/partners')} />
+      <Nav onBack={() => navigate('/')} />
 
       {/* Hero */}
       <div style={{ paddingTop: 120, paddingBottom: 60, maxWidth: 800, margin: '0 auto', padding: '120px 24px 60px' }}>
@@ -253,7 +253,7 @@ function PartnerListing() {
             {partners.map(p => (
               <button
                 key={p.partner_slug}
-                onClick={() => navigate(`/partners/${p.partner_slug}`)}
+                onClick={() => navigate(`/${p.partner_slug}`)}
                 style={{
                   background: CARD_BG, border: `1px solid ${BORDER}`,
                   borderRadius: 20, padding: '28px', textAlign: 'left',
