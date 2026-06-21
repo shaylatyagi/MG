@@ -1337,7 +1337,7 @@ useEffect(() => {
           d.outstanding = s.data.outstanding;
         }
       }
-      if (d.outstanding == null || d.outstanding === undefined) {
+      if (!d.outstanding) {
         try {
           const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${ownerId()}`, {
             headers: { Authorization: `Bearer ${token()}` }
@@ -2064,16 +2064,16 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           <span className="text-[9px] text-indigo-600 font-black uppercase block">{t.received}</span>
           <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.received.toLocaleString('en-IN')}</b>
         </div>
-        <button className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-left w-full active:bg-slate-100 flex flex-col"
+        <button className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-left w-full active:bg-indigo-100"
           onClick={() => {
             const oId = ownerId();
             if (!oId) return;
             fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${oId}`, { headers: { Authorization: `Bearer ${token()}` } })
               .then(r => r.json()).then(d => { setOverdueDrivers(Array.isArray(d) ? d : []); setShowOverdue(true); }).catch(() => {});
           }}>
-          <span style={{fontSize:9,fontWeight:900,letterSpacing:'0.08em',textTransform:'uppercase',color:'#94a3b8'}}>{t.outstanding}</span>
-          <span style={{fontSize:18,fontWeight:900,color:'#1e293b',marginTop:4}}>₹{ledger.outstanding.toLocaleString('en-IN')}</span>
-          <span style={{fontSize:10,fontWeight:600,color:'#6366f1',marginTop:6}}>See who owes →</span>
+          <span className="text-[9px] text-indigo-600 font-black uppercase block">{t.outstanding}</span>
+          <b className="text-base font-black text-slate-800 block mt-1">₹{ledger.outstanding.toLocaleString('en-IN')}</b>
+          <span className="text-[9px] text-indigo-500 font-semibold block mt-1">See who owes →</span>
         </button>
       </div>
       <div className="flex items-center justify-between text-[9px] text-slate-600">
