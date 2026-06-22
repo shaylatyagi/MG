@@ -11,7 +11,7 @@ const {
   ResetPinSchema, ForgotPinSchema, OwnerSignupSchema, OwnerSignupVerifySchema,
   AdminSendOtpSchema, AdminVerifyOtpSchema, AdminLoginSchema,
 } = require('../schemas/auth.schemas');
-const nodemailer = require('nodemailer');
+const { sendMail } = require('../services/mailer');
 
 // C-2: safe table lookup — NEVER interpolate user-supplied role directly into SQL
 const ROLE_TABLE = { DRIVER: 'drivers', OWNER: 'owners' };
@@ -70,23 +70,18 @@ const clearAttempts = async (phone) => {
   ).catch(() => {}); // non-critical
 };
 
-// Send admin OTP via email (free — uses same Brevo SMTP as forgot-pin)
+// Send admin OTP via email (Brevo REST API — works on Render free tier)
 const sendAdminOtpEmail = async (otp) => {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) { console.warn('[OTP] ADMIN_EMAIL not set — OTP not sent via email'); return false; }
   try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com', port: 587, secure: false,
-      auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS },
-    });
-    await transporter.sendMail({
-      from: '"MobilityGrid" <' + (process.env.BREVO_USER || 'noreply@mobilitygrid.in') + '>',
-      to:   adminEmail,
+    const result = await sendMail({
+      to:      adminEmail,
       subject: 'MobilityGrid Admin Login OTP',
-      text: `Your admin login OTP is: ${otp}\n\nValid for 10 minutes. Do not share.`,
-      html: `<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid Admin</h2><p>Your login OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">${otp}</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes. Do not share this OTP.</p></div>`,
+      html:    `<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid Admin</h2><p>Your login OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">${otp}</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes. Do not share this OTP.</p></div>`,
     });
-    return true;
+    if (!result.ok) console.error('[OTP] Email send failed:', result.reason);
+    return result.ok;
   } catch (err) {
     console.error('[OTP] Email send error:', err.message);
     return false;
@@ -752,21 +747,16 @@ router.post('/forgot-pin', validate(ForgotPinSchema), async (req, res) => {
         message: 'DEV: OTP is ' + otp });
     }
 
-    // Send via email — free (nodemailer + Brevo SMTP)
-    var nodemailer = require('nodemailer');
-    var transporter = nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: 587,
-      secure: false,
-      auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
-    });
-    await transporter.sendMail({
-      from: '"MobilityGrid" <' + process.env.GMAIL_USER + '>',
-      to:   user.email,
+    // Send via email — Brevo REST API (works on Render free tier)
+    var mailResult = await sendMail({
+      to:      user.email,
       subject: 'MobilityGrid — PIN Reset OTP',
-      text: 'Your PIN reset OTP is: ' + otp + '\n\nValid for 10 minutes.\n\nIf you did not request this, ignore this email or contact support@mobilitygrid.in',
-      html: '<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid</h2><p>Your PIN reset OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">' + otp + '</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes. If you did not request this, ignore this email.</p></div>'
+      html:    '<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid</h2><p>Your PIN reset OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">' + otp + '</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes. If you did not request this, ignore this email.</p></div>',
     });
+    if (!mailResult.ok) {
+      console.error('[forgot-pin] Email failed:', mailResult.reason);
+      return res.status(500).json({ success: false, message: 'Failed to send OTP email. Please try again.' });
+    }
 
     var parts = user.email.split('@');
     var masked = parts[0].slice(0,2) + '***@' + parts[1];
@@ -912,17 +902,15 @@ router.post('/owner-signup', validate(OwnerSignupSchema), async (req, res) => {
 
     var devBypass = process.env.DEV_BYPASS_OTP === 'true';
     if (!devBypass) {
-      var nodemailer = require('nodemailer');
-      var transporter = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com', port: 587, secure: false,
-        auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
-      });
-      await transporter.sendMail({
-        from: '"MobilityGrid" <' + process.env.BREVO_USER + '>',
-        to: email,
+      var signupMailResult = await sendMail({
+        to:      email,
         subject: 'Verify your MobilityGrid account',
-        html: '<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid</h2><p>Your verification OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">' + otp + '</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes.</p></div>'
+        html:    '<div style="font-family:sans-serif;max-width:400px"><h2 style="color:#4f46e5">MobilityGrid</h2><p>Your verification OTP is:</p><h1 style="letter-spacing:0.3em;color:#0f172a">' + otp + '</h1><p style="color:#64748b;font-size:13px">Valid for 10 minutes.</p></div>',
       });
+      if (!signupMailResult.ok) {
+        console.error('[owner-signup] Email failed:', signupMailResult.reason);
+        return res.status(500).json({ success: false, message: 'Failed to send verification email. Please try again.' });
+      }
       res.json({ success: true, message: 'OTP sent to ' + email });
     } else {
       res.json({ success: true, otp: otp, message: 'DEV: OTP is ' + otp });

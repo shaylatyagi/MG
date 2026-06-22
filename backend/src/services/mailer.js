@@ -1,104 +1,90 @@
 /**
- * mailer.js — Gmail SMTP (primary) → Brevo SMTP (fallback)
+ * mailer.js — Brevo REST API via https module (works on Render free tier)
  *
- * Render env vars needed (set in Render → Environment):
- *   GMAIL_USER=mobilitygrid@gmail.com
- *   GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx   ← Gmail App Password (NOT login password)
- *
- * Optional fallback:
- *   BREVO_USER=your_brevo_login_email
- *   BREVO_PASS=your_brevo_smtp_key
- *
- * Lead destination:
- *   LEADS_EMAIL=mobilitygrid@gmail.com   (defaults to mobilitygrid@gmail.com)
+ * Render env vars needed:
+ *   BREVO_API_KEY   = xkeysib-xxxxxxxxxxxx
+ *   BREVO_SENDER    = mobilitygrid@gmail.com  (verified in Brevo)
+ *   LEADS_EMAIL     = mobilitygrid@gmail.com
  */
-const nodemailer = require('nodemailer');
-const logger     = require('../utils/logger');
+const https  = require('https');
+const logger = require('../utils/logger');
 
-// ── Build transporter — Gmail first, Brevo second ────────────────────────────
-function makeTransporter() {
-  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
-  }
-  if (process.env.BREVO_USER && process.env.BREVO_PASS) {
-    return nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: 587,
-      secure: false,
-      auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS },
-    });
-  }
-  // No credentials — return null, will skip sending
-  return null;
-}
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_SENDER  = process.env.BREVO_SENDER || process.env.BREVO_USER || 'mobilitygrid@gmail.com';
+const LEADS_EMAIL   = process.env.LEADS_EMAIL  || process.env.ADMIN_EMAIL || 'mobilitygrid@gmail.com';
 
-// ── Send helper — tries primary, then secondary if first fails ───────────────
-async function sendMail(mailOptions) {
-  const primary = makeTransporter();
-  if (!primary) {
-    console.error('[mailer] No SMTP credentials set. Set GMAIL_USER + GMAIL_APP_PASSWORD in Render env.');
-    return { ok: false, reason: 'no_credentials' };
-  }
-
-  const from = process.env.GMAIL_USER
-    ? `"MobilityGrid" <${process.env.GMAIL_USER}>`
-    : process.env.BREVO_USER
-      ? `"MobilityGrid" <${process.env.BREVO_USER}>`
-      : '"MobilityGrid" <noreply@mobilitygrid.in>';
-
-  try {
-    await primary.sendMail({ ...mailOptions, from });
-    console.log('[mailer] ✅ Email sent to', mailOptions.to);
-    return { ok: true };
-  } catch (err) {
-    console.error('[mailer] Primary SMTP failed:', err.message);
-
-    // If primary was Gmail, try Brevo as fallback
-    if (process.env.GMAIL_USER && process.env.BREVO_USER && process.env.BREVO_PASS) {
-      const fallback = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com', port: 587, secure: false,
-        auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS },
-      });
-      try {
-        await fallback.sendMail({ ...mailOptions, from: `"MobilityGrid" <${process.env.BREVO_USER}>` });
-        console.log('[mailer] ✅ Email sent via Brevo fallback to', mailOptions.to);
-        return { ok: true };
-      } catch (err2) {
-        console.error('[mailer] Brevo fallback also failed:', err2.message);
-        return { ok: false, reason: err2.message };
-      }
+// ── Core send via Brevo REST API (https module, no native fetch needed) ───────
+function sendMail({ to, subject, html }) {
+  return new Promise((resolve) => {
+    if (!BREVO_API_KEY) {
+      console.error('[mailer] BREVO_API_KEY not set in Render env vars');
+      return resolve({ ok: false, reason: 'no_api_key' });
     }
-    return { ok: false, reason: err.message };
-  }
+
+    const body = JSON.stringify({
+      sender:      { name: 'MobilityGrid', email: BREVO_SENDER },
+      to:          [{ email: to }],
+      subject,
+      htmlContent: html,
+    });
+
+    const req = https.request({
+      hostname: 'api.brevo.com',
+      path:     '/v3/smtp/email',
+      method:   'POST',
+      headers:  {
+        'accept':         'application/json',
+        'api-key':        BREVO_API_KEY,
+        'content-type':   'application/json',
+        'content-length': Buffer.byteLength(body),
+      },
+      timeout: 10000,
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            console.log('[mailer] ✅ Sent to', to, '| messageId:', parsed.messageId);
+            resolve({ ok: true });
+          } else {
+            console.error('[mailer] ❌ Brevo error', res.statusCode, data);
+            resolve({ ok: false, reason: parsed.message || data });
+          }
+        } catch (e) {
+          resolve({ ok: false, reason: 'parse_error: ' + data });
+        }
+      });
+    });
+
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, reason: 'Request timed out' }); });
+    req.on('error',   (err) => { resolve({ ok: false, reason: err.message }); });
+    req.write(body);
+    req.end();
+  });
 }
 
-// ── HTML helpers ─────────────────────────────────────────────────────────────
+// ── HTML helpers ──────────────────────────────────────────────────────────────
 const row = (label, value) =>
   `<tr><td style="padding:8px 12px;color:#64748b;width:200px;vertical-align:top">${label}</td><td style="padding:8px 12px;font-weight:600;color:#1e293b">${value || '—'}</td></tr>`;
 
-const wrapHtml = (body) => `
+const wrapHtml = (content) => `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#1e293b;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
   <div style="background:#0f172a;padding:20px 28px">
     <p style="color:#94a3b8;margin:0;font-size:13px">MobilityGrid — Fleet Management Platform</p>
   </div>
-  <div style="padding:28px">${body}</div>
+  <div style="padding:28px">${content}</div>
 </div>`;
 
-// ── sendLeadEmails — called after waitlist form submission ───────────────────
+// ── sendLeadEmails ────────────────────────────────────────────────────────────
 async function sendLeadEmails(lead) {
   const { name, phone, company = '—', role = '—', fleet = '—', city = '—', type = '—', email } = lead;
-  const adminTo  = process.env.LEADS_EMAIL || process.env.ADMIN_EMAIL || 'mobilitygrid@gmail.com';
   const dateTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'long', timeStyle: 'short' });
 
-  // ── 1. Internal lead alert ─────────────────────────────────────────────────
+  // 1. Internal alert
   await sendMail({
-    to: adminTo,
+    to: LEADS_EMAIL,
     subject: `🔔 New Lead | ${company} | ${city}`,
     html: wrapHtml(`
       <p style="font-size:15px;margin:0 0 20px">New Expression of Interest from <strong>${name}</strong></p>
@@ -120,7 +106,7 @@ async function sendLeadEmails(lead) {
     `),
   });
 
-  // ── 2. Confirmation to user (only if email provided) ──────────────────────
+  // 2. Confirmation to submitter
   if (email) {
     await sendMail({
       to: email,
