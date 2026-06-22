@@ -94,8 +94,8 @@ function LandingPage() {
           </Link>
           <div className="nav-links">
             <a href="#vision" className="nav-link">Vision</a>
-            <a href="#gaps" className="nav-link">The Problem</a>
-            <a href="#product" className="nav-link">Product</a>
+            <a href="#gaps" className="nav-link">Problems</a>
+            <a href="#solutions" className="nav-link">Solutions</a>
             <a href="#how" className="nav-link">How it Works</a>
             <a href="#pricing" className="nav-link">Pricing</a>
             <a href="https://partners.mobilitygrid.in" className="nav-link" target="_blank" rel="noopener noreferrer">Partners</a>
@@ -117,8 +117,8 @@ function LandingPage() {
       <div className={`mobile-drawer${mobileMenuOpen ? ' open' : ''}`}>
         <div className="mobile-drawer-inner">
           <a href="#vision"   className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Vision</a>
-          <a href="#gaps"     className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>The Problem</a>
-          <a href="#product"  className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Product</a>
+          <a href="#gaps"     className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Problems</a>
+          <a href="#solutions"  className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Solutions</a>
           <a href="#how"      className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>How it Works</a>
           <a href="#pricing"  className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
           <a href="https://partners.mobilitygrid.in" className="mobile-nav-link" target="_blank" rel="noopener noreferrer" onClick={() => setMobileMenuOpen(false)}>Partners</a>
@@ -143,7 +143,7 @@ function LandingPage() {
             </p>
             <div className="hero-ctas">
               <a href="#signup" className="btn btn-primary btn-lg">Get Early Access</a>
-              <Link to="/login" className="btn btn-outline-light btn-lg">See the Product</Link>
+              <Link to="/login" className="btn btn-outline-light btn-lg">See the solutions</Link>
             </div>
           </div>
           <div className="hero-right">
@@ -257,7 +257,7 @@ function LandingPage() {
               <h2 className="display" style={{ marginBottom: '24px' }}>Most people see the <em>convenience.</em></h2>
               <p>Every day, millions of drivers, riders, and logistics workers power the Indian city: delivering food, ferrying passengers, moving goods. They are the circulatory system of the modern urban economy.</p>
               <p>Yet the infrastructure built around them was never truly designed for <strong>how they live and work</strong>. Fleet operators, often small business owners managing 5 to 500 vehicles, carry enormous operational weight on fragmented, manual systems: WhatsApp messages, paper ledgers, and disconnected spreadsheets.</p>
-              <p>We spent months listening to the ground truth. What we found is not a technology problem. It is a <strong>design problem</strong>. The products built for this workforce were designed around the platform's convenience, not the person doing the work.</p>
+              <p>We spent months listening to the ground truth. What we found is not a technology problem. It is a <strong>design problem</strong>. The solutionss built for this workforce were designed around the platform's convenience, not the person doing the work.</p>
               <p>MobilityGrid is our answer to that.</p>
             </div>
           </div>
@@ -267,7 +267,7 @@ function LandingPage() {
       <section className="gaps-section" id="gaps">
         <div className="container">
           <div className="gaps-header">
-            <p className="section-label">The Problem</p>
+            <p className="section-label">The Problems</p>
             <h2 className="display">Three gaps that define the challenge</h2>
             <p>Through months of direct research, we identified three structural mismatches that compound into a system that consistently fails both the operator and the driver.</p>
           </div>
@@ -313,15 +313,15 @@ function LandingPage() {
         </div>
       </section>
 
-      <section className="product-section" id="product">
+      <section className="solutions-section" id="solutions">
         <div className="container">
-          <div className="product-header">
-            <p className="section-label">The Platform</p>
+          <div className="solutions-header">
+            <p className="section-label">Problems</p>
             <h2 className="display">One ecosystem. <em>Three stakeholders.</em></h2>
             <p>MobilityGrid is not a single app. It is a coordinated operating system with purpose-built interfaces for every actor in the fleet.</p>
           </div>
 
-          <div className="product-tabs">
+          <div className="solutions-tabs">
             <button type="button" className={`ptab ${activeTab === 'admin' ? 'active' : ''}`} onClick={() => setActiveTab('admin')}>
               <span className="ptab-dot" /> Super Admin Console
             </button>
@@ -333,8 +333,8 @@ function LandingPage() {
             </button>
           </div>
 
-          <div className="product-panels">
-            <div className={`product-panel ${activeTab === 'admin' ? 'active' : ''}`}>
+          <div className="solutions-panels">
+            <div className={`solutions-panel ${activeTab === 'admin' ? 'active' : ''}`}>
               <div className="panel-content">
                 <span className="tag tag-indigo">Super Admin</span>
                 <h3>Full platform oversight from one console</h3>
@@ -403,7 +403,7 @@ function LandingPage() {
               </div>
             </div>
 
-            <div className={`product-panel ${activeTab === 'owner' ? 'active' : ''}`}>
+            <div className={`solutions-panel ${activeTab === 'owner' ? 'active' : ''}`}>
               <div className="panel-content">
                 <span className="tag tag-gold">Fleet Owner</span>
                 <h3>Complete fleet visibility, zero spreadsheets</h3>
@@ -452,7 +452,7 @@ function LandingPage() {
               </div>
             </div>
 
-            <div className={`product-panel ${activeTab === 'driver' ? 'active' : ''}`}>
+            <div className={`solutions-panel ${activeTab === 'driver' ? 'active' : ''}`}>
               <div className="panel-content">
                 <span className="tag tag-slate">Driver</span>
                 <h3>Your earnings, your vehicle, your future</h3>
@@ -544,37 +544,37 @@ function LandingPage() {
               <div className="feature-icon">💳</div>
               <div className="feature-title">UPI Rent Collection</div>
               <div className="feature-body">Verified digital payments via MobilityGrid. Drivers pay through any UPI app. Owners see collections in real time with a full audit trail.</div>
-              <a href="#product" className="feature-link">Learn more →</a>
+              <a href="#solutions" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">🪪</div>
               <div className="feature-title">Driver KYC & Verification</div>
               <div className="feature-body">Aadhaar, PAN, Driving Licence, and bank verification managed through an admin queue.</div>
-              <a href="#product" className="feature-link">Learn more →</a>
+              <a href="#solutions" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">📊</div>
               <div className="feature-title">Live Fleet Dashboard</div>
               <div className="feature-body">Real-time visibility across your vehicles, drivers, and collections in a single system.</div>
-              <a href="#product" className="feature-link">Learn more →</a>
+              <a href="#solutions" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">🔒</div>
               <div className="feature-title">Private Earnings Tracker</div>
               <div className="feature-body">Drivers track earnings privately, which helps build trust while keeping operations transparent.</div>
-              <a href="#product" className="feature-link">Learn more →</a>
+              <a href="#solutions" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">📁</div>
               <div className="feature-title">Compliance Vault</div>
               <div className="feature-body">Store documents, RC copies, and KYC files in one searchable place.</div>
-              <a href="#product" className="feature-link">Learn more →</a>
+              <a href="#solutions" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">🌐</div>
               <div className="feature-title">Hindi + English Interface</div>
               <div className="feature-body">The driver terminal supports both Hindi and English for real-world usability.</div>
-              <a href="#product" className="feature-link">Learn more →</a>
+              <a href="#solutions" className="feature-link">Learn more →</a>
             </div>
           </div>
         </div>
@@ -798,7 +798,7 @@ function LandingPage() {
               <div className="signup-promises">
                 <div className="sp-item"><span className="sp-dot" />Our team reaches out within 24 hours</div>
                 <div className="sp-item"><span className="sp-dot" />This is a conversation, not a sales call</div>
-                <div className="sp-item"><span className="sp-dot" />Early participants shape the product roadmap</div>
+                <div className="sp-item"><span className="sp-dot" />Early participants shape the solutions roadmap</div>
                 <div className="sp-item"><span className="sp-dot" />Your details are never shared with third parties</div>
               </div>
             </div>
@@ -909,19 +909,19 @@ function LandingPage() {
               </div>
             </div>
             <div className="footer-col">
-              <div className="footer-col-title">Product</div>
+              <div className="footer-col-title">solutions</div>
               <ul className="footer-links">
-                <li><a href="#product" className="footer-link">Super Admin Console</a></li>
-                <li><a href="#product" className="footer-link">Fleet Owner Dashboard</a></li>
-                <li><a href="#product" className="footer-link">Driver Terminal</a></li>
-                <li><a href="#product" className="footer-link">KYC &amp; Compliance</a></li>
+                <li><a href="#solutions" className="footer-link">Super Admin Console</a></li>
+                <li><a href="#solutions" className="footer-link">Fleet Owner Dashboard</a></li>
+                <li><a href="#solutions" className="footer-link">Driver Terminal</a></li>
+                <li><a href="#solutions" className="footer-link">KYC &amp; Compliance</a></li>
               </ul>
             </div>
             <div className="footer-col">
               <div className="footer-col-title">Company</div>
               <ul className="footer-links">
                 <li><a href="#vision" className="footer-link">Vision &amp; Mission</a></li>
-                <li><a href="#gaps" className="footer-link">The Problem</a></li>
+                <li><a href="#gaps" className="footer-link">Problems</a></li>
                 <li><a href="#how" className="footer-link">How It Works</a></li>
                 <li><a href="#signup" className="footer-link">Get Early Access</a></li>
               </ul>
