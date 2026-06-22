@@ -37,17 +37,15 @@ const logUnassignment = async (vehicleId) => {
 // Get available vehicles for a driver (vehicles without driver)
 router.get('/available/vehicles', async (req, res) => {
   try {
-    const { driverId, ownerId } = req.query;
-    // Always filter by ownerId so owners only see their own vehicles
+    // Use JWT user.id — never trust ownerId query param
     const result = await pool.query(
       `SELECT v.id, v.vehicle_number, v.vehicle_model, v.daily_rent
        FROM public.vehicles v
-       JOIN public.owners o ON o.id = v.owner_id
        WHERE v.driver_id IS NULL
          AND v.status IN ('ACTIVE', 'AVAILABLE')
-         AND ($1::int IS NULL OR v.owner_id = $1::int)
+         AND v.owner_id = $1
        ORDER BY v.vehicle_number`,
-      [ownerId ? parseInt(ownerId) : null]
+      [req.user.id]
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
@@ -157,29 +155,47 @@ router.post('/unassign', async (req, res) => {
 // Get available drivers for a vehicle (drivers without vehicle)
 router.get('/available/drivers', async (req, res) => {
   try {
-    const { vehicleId } = req.query;
-    
+    // Get owner's owner_code to filter properly
+    const ownerRow = await pool.query(
+      'SELECT id, owner_code FROM owners WHERE id = $1', [req.user.id]
+    );
+    const owner = ownerRow.rows[0];
+    if (!owner) return res.status(404).json({ success: false, error: 'Owner not found' });
+
     const result = await pool.query(
-      `SELECT id, full_name, mobile_number, driver_code 
-       FROM drivers 
-       WHERE assigned_vehicle_id IS NULL 
-AND status IN ('ACTIVE', 'AVAILABLE')
-       ORDER BY full_name`
+      `SELECT id, full_name, mobile_number, driver_code
+       FROM drivers
+       WHERE assigned_vehicle_id IS NULL
+         AND status IN ('ACTIVE', 'AVAILABLE')
+         AND deleted_at IS NULL
+         AND (owner_id = $1 OR owner_code = $2)
+       ORDER BY full_name`,
+      [owner.id, owner.owner_code]
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 // Get unassigned drivers (for owner dashboard top section)
 router.get('/unassigned/drivers', async (req, res) => {
   try {
+    const ownerRow = await pool.query(
+      'SELECT id, owner_code FROM owners WHERE id = $1', [req.user.id]
+    );
+    const owner = ownerRow.rows[0];
+    if (!owner) return res.status(404).json({ success: false, error: 'Owner not found' });
+
     const result = await pool.query(
-      `SELECT id, full_name, mobile_number, driver_code, wallet_balance 
-       FROM drivers 
-       WHERE assigned_vehicle_id IS NULL 
-AND status IN ('ACTIVE', 'AVAILABLE')
-       ORDER BY full_name`
+      `SELECT id, full_name, mobile_number, driver_code, wallet_balance
+       FROM drivers
+       WHERE assigned_vehicle_id IS NULL
+         AND status IN ('ACTIVE', 'AVAILABLE')
+         AND deleted_at IS NULL
+         AND (owner_id = $1 OR owner_code = $2)
+       ORDER BY full_name`,
+      [owner.id, owner.owner_code]
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {

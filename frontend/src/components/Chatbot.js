@@ -178,16 +178,16 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
     try {
       const H = { Authorization: `Bearer ${token}` };
       if (isOwner) {
-        const res = await fetch(`${API}/api/payment/owner/stats?ownerId=${userId}`, { headers: H });
+        const res = await fetch(`${API}/api/owner/stats`, { headers: H });
         const d = await res.json();
-        setQuickStats({ a: d.total_earnings || 0, b: d.total_drivers || 0, c: d.total_vehicles || 0 });
+        const sd = d.data || {};
+        setQuickStats({ a: sd.collection_today || 0, b: sd.total_drivers || 0, c: sd.total_vehicles || 0 });
       } else {
-        const [pRes, dRes] = await Promise.all([
-          fetch(`${API}/api/payment/driver/profile?phone=${userPhone}`, { headers: H }),
-          fetch(`${API}/api/payment/driver/dues?phone=${userPhone}`, { headers: H })
-        ]);
-        const p = await pRes.json(); const d = await dRes.json();
-        setQuickStats({ a: p.wallet_balance || 0, b: d.dues || 0, c: p.vehicle_number || '—' });
+        const wRes = await fetch(`${API}/api/driver/wallet`, { headers: H });
+        const w = await wRes.json();
+        const wd = w.data || {};
+        const due = Math.max(0, (wd.vehicle?.rent_amount || 0) - (wd.paid_today || 0));
+        setQuickStats({ a: wd.wallet_balance || 0, b: due, c: wd.vehicle?.reg_number || '—' });
       }
     } catch {}
   };
@@ -235,137 +235,133 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
   // ─── DATA FETCHERS ──────────────────────────────────────────────────
   const H = () => ({ Authorization: `Bearer ${token}` });
 
+  // Returns { success, data: { total_vehicles, total_drivers, collection_today, collection_month, collection_total, outstanding } }
   const fetchStats = () =>
-    fetch(`${API}/api/payment/owner/stats?ownerId=${userId}`, { headers: H() }).then(r => r.json());
+    fetch(`${API}/api/owner/stats`, { headers: H() }).then(r => r.json()).then(d => d.data || d);
 
+  // Returns { drivers: [...], orders: [...] }
+  // drivers: { id, name, phone_number, vehicle_id, vehicle_reg, daily_rent, paid_today }
+  // orders:  { amount, transaction_status, phone_number, created_at }
   const fetchDriversAndTx = async () => {
     const [dRes, tRes] = await Promise.all([
-      fetch(`${API}/api/payment/owner/drivers/list?ownerId=${userId}`, { headers: H() }),
-      fetch(`${API}/api/payment/owner/transactions?ownerId=${userId}`, { headers: H() })
+      fetch(`${API}/api/owner/drivers?limit=200`, { headers: H() }),
+      fetch(`${API}/api/owner/payments?limit=200`, { headers: H() })
     ]);
     const d = await dRes.json(); const t = await tRes.json();
     return {
-      drivers: Array.isArray(d) ? d : (d.drivers || []),
-      orders: Array.isArray(t) ? t : (t.transactions || [])
+      drivers: d.data || [],
+      orders:  t.data || []
     };
   };
 
   const fetchVehiclesAndDrivers = async () => {
     const [vRes, dRes] = await Promise.all([
-      fetch(`${API}/api/payment/owner/vehicles?ownerId=${userId}`, { headers: H() }),
-      fetch(`${API}/api/payment/owner/drivers/list?ownerId=${userId}`, { headers: H() })
+      fetch(`${API}/api/owner/vehicles`, { headers: H() }),
+      fetch(`${API}/api/owner/drivers?limit=200`, { headers: H() })
     ]);
     const v = await vRes.json(); const d = await dRes.json();
     return {
-      vehicles: Array.isArray(v) ? v : (v.vehicles || []),
-      drivers: Array.isArray(d) ? d : (d.drivers || [])
+      vehicles: v.data || [],
+      drivers:  d.data || []
     };
   };
 
-  const fetchLedger = () =>
-    fetch(`${API}/api/payment/owner/driver-ledger?ownerId=${userId}`, { headers: H() }).then(r => r.json());
+  // Reuse drivers data for ledger summary (paid_today is already on each driver)
+  const fetchLedger = async () => {
+    const res = await fetch(`${API}/api/owner/drivers?limit=200`, { headers: H() });
+    const d = await res.json();
+    return (d.data || []).map(dr => ({
+      full_name:  dr.name,
+      total_paid: dr.paid_today || 0,
+      pending:    Math.max(0, (dr.daily_rent || 0) - (dr.paid_today || 0)),
+      advance:    0,
+    }));
+  };
 
-  const fetchDriverProfile = () =>
-    fetch(`${API}/api/payment/driver/profile?phone=${userPhone}`, { headers: H() }).then(r => r.json());
+  // Returns driver wallet data
+  const fetchDriverWallet = () =>
+    fetch(`${API}/api/driver/wallet`, { headers: H() }).then(r => r.json()).then(d => d.data || {});
 
-  const fetchDriverDues = () =>
-    fetch(`${API}/api/payment/driver/dues?phone=${userPhone}`, { headers: H() }).then(r => r.json());
+  // Legacy aliases
+  const fetchDriverProfile = fetchDriverWallet;
+  const fetchDriverDues = async () => {
+    const wd = await fetchDriverWallet();
+    const due = Math.max(0, (wd.vehicle?.rent_amount || 0) - (wd.paid_today || 0));
+    return { dues: due, daily_rent: wd.vehicle?.rent_amount || 0, paid_today: wd.paid_today || 0 };
+  };
 
   // ─── INTENT HANDLERS ────────────────────────────────────────────────
-  const hasDriverPaidToday = (phone, orders) => {
-    const today = new Date().toISOString().split('T')[0];
-    return orders.some(o =>
-      o.payer_mobile === phone &&
-      o.transaction_status === 'SUCCESS' &&
-      o.order_completion_date?.split('T')[0] === today
-    );
+  // drivers from /api/owner/drivers already have paid_today field
+  const hasDriverPaidToday = (driver, _orders) => {
+    return (driver.paid_today || 0) > 0;
   };
 
   const handleIntent = async (intent, msg) => {
     switch (intent) {
       case 'hello': {
   if (isOwner) {
-    const [stats, ledger] = await Promise.all([
-      fetchStats(),
-      fetch(`${API}/api/payment/owner/ledger?period=today`, { headers: H() })
-        .then(r => r.json()).catch(() => ({ received: 0 }))
-    ]);
-    const todayAmt = ledger.received || 0;
-    const sd = stats.data || stats;
-    return `Namaste! Main aapka Fleet Assistant hoon.\n\nAaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nDrivers: ${sd.total_drivers || 0} | Vehicles: ${sd.total_vehicles || 0}\n\nMain in cheezon mein madad kar sakta hoon:\n• Collection aur earnings\n• Kaun paid, kaun pending\n• Vehicle assign/unassign\n• Driver details\n• Ledger aur accounts\n\nKuch bhi poochein!`;
+    const sd = await fetchStats();
+    return `Namaste! Main aapka Fleet Assistant hoon.\n\nAaj ka collection: ₹${(sd.collection_today || 0).toLocaleString('en-IN')}\nDrivers: ${sd.total_drivers || 0} | Vehicles: ${sd.total_vehicles || 0}\n\nMain in cheezon mein madad kar sakta hoon:\n• Collection aur earnings\n• Kaun paid, kaun pending\n• Vehicle assign/unassign\n• Driver details\n• Ledger aur accounts\n\nKuch bhi poochein!`;
   } else {
-    const [profile, dues] = await Promise.all([fetchDriverProfile(), fetchDriverDues()]);
-    return `Namaste ${profile.name || ''}! Main aapka Driver Assistant hoon.\n\nBakaya: ${dues.dues || 0} rupaye\nWallet: ${profile.wallet_balance || 0} rupaye\nGaadi: ${profile.vehicle_number || 'assign nahi'}\n\nMain in cheezon mein madad kar sakta hoon:\n• Aapka bakaya\n• Wallet balance\n• Gaadi ki details\n• Payment info`;
+    const wd = await fetchDriverWallet();
+    const due = Math.max(0, (wd.vehicle?.rent_amount || 0) - (wd.paid_today || 0));
+    return `Namaste! Main aapka Driver Assistant hoon.\n\nBakaya: ₹${due}\nWallet: ₹${wd.wallet_balance || 0}\nGaadi: ${wd.vehicle?.reg_number || 'assign nahi'}\n\nMain in cheezon mein madad kar sakta hoon:\n• Aapka bakaya\n• Wallet balance\n• Gaadi ki details\n• Payment info`;
   }
 }
 
       case 'collection': {
-  const [stats, ledger] = await Promise.all([
-    fetchStats(),
-    fetch(`${API}/api/payment/owner/ledger?period=today`, { headers: H() })
-      .then(r => r.json()).catch(() => ({ received: 0, outstanding: 0 }))
-  ]);
-  const todayAmt = ledger.received || 0;
-  const sd = stats.data || stats;
-  const outstanding = sd.outstanding || 0;
-  return `Aaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nBaaki outstanding: ${outstanding.toLocaleString('en-IN')} rupaye\nTotal drivers: ${sd.total_drivers || 0}`;
+  const sd = await fetchStats();
+  return `Aaj ka collection: ₹${(sd.collection_today || 0).toLocaleString('en-IN')}\nIs mahine: ₹${(sd.collection_month || 0).toLocaleString('en-IN')}\nBaaki outstanding: ₹${(sd.outstanding || 0).toLocaleString('en-IN')}\nTotal drivers: ${sd.total_drivers || 0}`;
 }
 
       case 'who_paid': {
-        const { drivers, orders } = await fetchDriversAndTx();
-        const paid = drivers.filter(d => hasDriverPaidToday(d.mobile_number, orders));
-        const notPaid = drivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders));
-        return `Paid aaj (${paid.length}): ${paid.map(d => d.full_name).join(', ') || 'koi nahi'}\n\nNahi diya (${notPaid.length}): ${notPaid.map(d => d.full_name).join(', ') || 'koi nahi'}`;
+        const { drivers } = await fetchDriversAndTx();
+        const paid    = drivers.filter(d => hasDriverPaidToday(d));
+        const notPaid = drivers.filter(d => !hasDriverPaidToday(d));
+        return `Paid aaj (${paid.length}): ${paid.map(d => d.name).join(', ') || 'koi nahi'}\n\nNahi diya (${notPaid.length}): ${notPaid.map(d => d.name).join(', ') || 'koi nahi'}`;
       }
 
       case 'pending': {
-        const { drivers, orders } = await fetchDriversAndTx();
-        // Only assigned drivers can have pending rent
+        const { drivers } = await fetchDriversAndTx();
         const assignedDrivers = drivers.filter(d => d.vehicle_id);
-        const pending = assignedDrivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders));
+        const pending = assignedDrivers.filter(d => !hasDriverPaidToday(d));
         if (pending.length === 0) return assignedDrivers.length === 0
           ? 'Koi bhi driver vehicle assign nahi hai abhi.'
           : 'Sabne payment kar di aaj! 🎉';
-        return `Aaj pending (${pending.length} drivers):\n${pending.map(d => `${d.full_name} - ${d.phone_number || d.mobile_number}`).join('\n')}`;
+        return `Aaj pending (${pending.length} drivers):\n${pending.map(d => `${d.name} - ${d.phone_number}`).join('\n')}`;
       }
 
       case 'ledger': {
-        const ledgerData = await fetchLedger();
-        if (!ledgerData?.length) return 'Abhi koi ledger data nahi hai.';
-        // Specific driver dhundo message mein
-        const named = ledgerData.find(d =>
-          (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
+        const { drivers } = await fetchDriversAndTx();
+        if (!drivers?.length) return 'Abhi koi data nahi hai.';
+        const named = drivers.find(d =>
+          (d.name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
         );
         if (named) {
-          const net = parseFloat(named.pending || 0) - parseFloat(named.advance || 0);
-          return `${named.full_name}\nKul paid: ${parseFloat(named.total_paid || 0).toLocaleString('en-IN')} rupaye\nPending: ${parseFloat(named.pending || 0).toLocaleString('en-IN')} rupaye\nAdvance: ${parseFloat(named.advance || 0).toLocaleString('en-IN')} rupaye\nNet: ${net > 0 ? net.toLocaleString('en-IN') + ' rupaye baaki' : Math.abs(net).toLocaleString('en-IN') + ' rupaye credit'}`;
+          const due = Math.max(0, (named.daily_rent || 0) - (named.paid_today || 0));
+          return `${named.name}\nAaj paid: ₹${(named.paid_today || 0).toLocaleString('en-IN')}\nDaily rent: ₹${named.daily_rent || 0}\nAaj baaki: ₹${due.toLocaleString('en-IN')}\nWallet: ₹${named.wallet_balance || 0}`;
         }
-        // Overall summary
-        const totalPending = ledgerData.reduce((s, d) => s + parseFloat(d.pending || 0), 0);
-        const totalPaid = ledgerData.reduce((s, d) => s + parseFloat(d.total_paid || 0), 0);
-        return `Kul ledger (${ledgerData.length} drivers):\nTotal collected: ${totalPaid.toLocaleString('en-IN')} rupaye\nTotal pending: ${totalPending.toLocaleString('en-IN')} rupaye\n\nKisi ek driver ka naam lo detail ke liye.`;
+        const sd = await fetchStats();
+        return `Kul drivers: ${drivers.length}\nAaj collection: ₹${(sd.collection_today || 0).toLocaleString('en-IN')}\nOutstanding: ₹${(sd.outstanding || 0).toLocaleString('en-IN')}\n\nKisi driver ka naam lo detail ke liye.`;
       }
 
       case 'vehicles': {
-        const { vehicles, drivers } = await fetchVehiclesAndDrivers();
+        const { vehicles } = await fetchVehiclesAndDrivers();
         const assigned = vehicles.filter(v => v.driver_id);
         const free = vehicles.filter(v => !v.driver_id);
-        const list = assigned.map(v => `${v.vehicle_number} - ${v.driver_name || '?'} - ${v.daily_rent} rupaye/day`).join('\n');
+        const list = assigned.map(v => `${v.vehicle_number} - ${v.driver_name || '?'} - ₹${v.daily_rent}/day`).join('\n');
         return `Fleet (${vehicles.length} total)\n\nAssigned (${assigned.length}):\n${list || 'koi nahi'}\n\nFree (${free.length}): ${free.map(v => v.vehicle_number).join(', ') || 'koi nahi'}`;
       }
 
       case 'drivers': {
-        const { drivers, orders } = await fetchDriversAndTx();
-        const paid = drivers.filter(d => hasDriverPaidToday(d.mobile_number, orders)).length;
-        // Specific driver dhundo
+        const { drivers } = await fetchDriversAndTx();
+        const paid = drivers.filter(d => hasDriverPaidToday(d)).length;
         const named = drivers.find(d =>
-          (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
+          (d.name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
         );
         if (named) {
-          const paidToday = hasDriverPaidToday(named.mobile_number, orders);
-          const { vehicles } = await fetchVehiclesAndDrivers();
-          const veh = vehicles.find(v => v.driver_id === named.id);
-          return `${named.full_name}\nPhone: ${named.phone_number || named.mobile_number}\nAaj payment: ${paidToday ? 'Ho gayi' : 'Nahi hui'}\nVehicle: ${veh?.vehicle_number || 'assign nahi'}\nWallet: ${named.wallet_balance || 0} rupaye`;
+          const paidToday = hasDriverPaidToday(named);
+          return `${named.name}\nPhone: ${named.phone_number}\nAaj payment: ${paidToday ? `Ho gayi ✅ (₹${named.paid_today})` : 'Nahi hui ❌'}\nVehicle: ${named.vehicle_reg || 'assign nahi'}\nWallet: ₹${named.wallet_balance || 0}`;
         }
         return `Kul drivers: ${drivers.length}\nAaj paid: ${paid}\nPending: ${drivers.length - paid}\n\nKisi driver ka naam lo detail ke liye.`;
       }
@@ -373,9 +369,9 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
       case 'assign': {
         const { vehicles, drivers } = await fetchVehiclesAndDrivers();
         const freeV = vehicles.filter(v => !v.driver_id);
-        const freeD = drivers.filter(d => !vehicles.some(v => v.driver_id === d.id));
+        const freeD = drivers.filter(d => !d.vehicle_id);
         const driver = freeD.find(d =>
-          (d.full_name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
+          (d.name || '').toLowerCase().split(' ').some(p => p.length > 2 && msg.includes(p.toLowerCase()))
         );
         const vehicle = freeV.find(v => msg.toLowerCase().includes(v.vehicle_number.toLowerCase()));
         const rentMatch = msg.match(/\b(\d{3,5})\b/);
@@ -389,13 +385,13 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
           });
           const result = await res.json();
           return result.success
-            ? `${vehicle.vehicle_number} assign ho gaya ${driver.full_name} ko. Rent: ${rent} rupaye per day.`
-            : `Assignment fail: ${result.error}`;
+            ? `${vehicle.vehicle_number} assign ho gaya ${driver.name} ko. Rent: ₹${rent}/day.`
+            : `Assignment fail: ${result.message || result.error}`;
         }
-        if (!driver && !vehicle) return `Driver aur vehicle dono bolo.\n\nFree drivers: ${freeD.map(d => d.full_name).join(', ') || 'koi nahi'}\nFree vehicles: ${freeV.map(v => v.vehicle_number).join(', ') || 'koi nahi'}`;
-        if (!driver) return `Konsa driver?\nFree: ${freeD.map(d => d.full_name).join(', ')}`;
+        if (!driver && !vehicle) return `Driver aur vehicle dono bolo.\n\nFree drivers: ${freeD.map(d => d.name).join(', ') || 'koi nahi'}\nFree vehicles: ${freeV.map(v => v.vehicle_number).join(', ') || 'koi nahi'}`;
+        if (!driver) return `Konsa driver?\nFree: ${freeD.map(d => d.name).join(', ')}`;
         if (!vehicle) return `Konsa vehicle?\nFree: ${freeV.map(v => v.vehicle_number).join(', ')}`;
-        if (!rent) return `${driver.full_name} ko ${vehicle.vehicle_number} — rent kitna? (sirf number bolo, jaise 700)`;
+        if (!rent) return `${driver.name} ko ${vehicle.vehicle_number} — rent kitna? (sirf number bolo, jaise 700)`;
         return 'Kuch samajh nahi aaya. Driver naam, vehicle number, aur rent amount bolo.';
       }
 
@@ -416,47 +412,37 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
           body: JSON.stringify({ vehicleId: veh.id })
         });
         const result = await res.json();
-        return result.success ? `${veh.vehicle_number} free ho gaya. ${veh.driver_name} unassigned.` : `Failed: ${result.error}`;
+        return result.success ? `${veh.vehicle_number} free ho gaya. ${veh.driver_name} unassigned.` : `Failed: ${result.message || result.error}`;
       }
 
       case 'summary': {
-        const [stats, { drivers, orders }, ledgerData] = await Promise.all([
-          fetchStats(), fetchDriversAndTx(), fetchLedger()
-        ]);
-        const paid = drivers.filter(d => hasDriverPaidToday(d.mobile_number, orders)).length;
-        const totalPending = (ledgerData || []).reduce((s, d) => s + parseFloat(d.pending || 0), 0);
-        return `Aaj ka summary:\nCollection: ${(stats.total_earnings || 0).toLocaleString('en-IN')} rupaye\nDrivers paid: ${paid} out of ${drivers.length}\nPending dues: ${totalPending.toLocaleString('en-IN')} rupaye\nFleet: ${stats.total_vehicles || 0} vehicles\n${drivers.length - paid > 0 ? `\nAbhi baki: ${drivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders)).map(d => d.full_name).join(', ')}` : ''}`;
+        const [sd, { drivers }] = await Promise.all([fetchStats(), fetchDriversAndTx()]);
+        const paid = drivers.filter(d => hasDriverPaidToday(d)).length;
+        const unpaid = drivers.filter(d => !hasDriverPaidToday(d));
+        return `Aaj ka summary:\nCollection: ₹${(sd.collection_today || 0).toLocaleString('en-IN')}\nIs mahine: ₹${(sd.collection_month || 0).toLocaleString('en-IN')}\nDrivers paid: ${paid} / ${drivers.length}\nOutstanding: ₹${(sd.outstanding || 0).toLocaleString('en-IN')}\nFleet: ${sd.total_vehicles || 0} vehicles${unpaid.length > 0 ? `\n\nAbhi baki: ${unpaid.map(d => d.name).join(', ')}` : '\n\nSabne payment kar di! 🎉'}`;
       }
 
       // ─── DRIVER INTENTS ───────────────────────────────────────────
       case 'my_dues': {
         const dues = await fetchDriverDues();
-        if (dues.dues <= 0) return 'Aaj ka koi bakaya nahi hai!';
-        return `Aaj dena hai: ${dues.dues} rupaye\nRent: ${dues.daily_rent || 0} rupaye per day\nAaj paid: ${dues.paid_today || 0} rupaye`;
+        if (dues.dues <= 0) return 'Aaj ka koi bakaya nahi hai! ✅';
+        return `Aaj dena hai: ₹${dues.dues}\nRent: ₹${dues.daily_rent}/day\nAaj paid: ₹${dues.paid_today}`;
       }
 
       case 'my_wallet': {
-        const profile = await fetchDriverProfile();
-        return `Wallet balance: ${profile.wallet_balance || 0} rupaye\nStatus: ${profile.status || 'Active'}`;
+        const wd = await fetchDriverWallet();
+        return `Wallet balance: ₹${wd.wallet_balance || 0}\nAaj paid: ₹${wd.paid_today || 0}`;
       }
 
       case 'my_vehicle': {
-        const profile = await fetchDriverProfile();
-        if (!profile.vehicle_number) return 'Abhi koi vehicle assign nahi hai. Owner se baat karein.';
-        return `Gaadi: ${profile.vehicle_number}\nModel: ${profile.vehicle_model || '—'}\nRent: ${profile.vehicle_daily_rent || profile.daily_rent || '—'} rupaye per day`;
+        const wd = await fetchDriverWallet();
+        if (!wd.vehicle) return 'Abhi koi vehicle assign nahi hai. Owner se baat karein.';
+        return `Gaadi: ${wd.vehicle.reg_number}\nType: ${wd.vehicle.type || '—'}\nModel: ${wd.vehicle.model || '—'}\nRent: ₹${wd.vehicle.rent_amount}/day`;
       }
 
       case 'pay_info': {
         const dues = await fetchDriverDues();
-        return `Bakaya: ${dues.dues || 0} rupaye\nPayment karne ke liye Dashboard ke Wallet section mein jaayein.\nUPI aur online payment available hai.`;
-      }
-
-      case 'hello': {
-        if (!isOwner) {
-          const [profile, dues] = await Promise.all([fetchDriverProfile(), fetchDriverDues()]);
-          return `Namaste ${profile.name || ''}!\nBakaya: ${dues.dues || 0} rupaye\nWallet: ${profile.wallet_balance || 0} rupaye\nGaadi: ${profile.vehicle_number || 'assign nahi'}\n\nKya poochna hai?`;
-        }
-        break;
+        return `Bakaya: ₹${dues.dues || 0}\nPayment karne ke liye Dashboard ke Wallet section mein jaayein.\nUPI aur online payment available hai.`;
       }
 
       default:
@@ -477,23 +463,12 @@ const processMessage = async (userMessage) => {
     }
   }
 
-  // Unknown ya intent fail — LLM try karo
+  // Unknown ya intent fail — helpful fallback
   try {
-    const statsRaw = await fetchStats().catch(() => ({}));
-    const res = await fetch(`${API}/api/payment/chatbot`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        message: userMessage,
-        context: { role: userRole, ...statsRaw, userId, userPhone },
-        history: messages.slice(-6).map(m => ({
-          role: m.role === 'user' ? 'user' : 'assistant',
-          content: m.content
-        }))
-      })
-    });
-    const d = await res.json();
-    if (d.reply || d.message) return d.reply || d.message;
+    const sd = isOwner ? await fetchStats().catch(() => ({})) : null;
+    if (sd && (sd.total_drivers || sd.total_vehicles)) {
+      return `"${userMessage}" samajh nahi aaya.\n\nAapke paas: ${sd.total_drivers || 0} drivers, ${sd.total_vehicles || 0} vehicles\nCollection today: ₹${(sd.collection_today || 0).toLocaleString('en-IN')}\n\nTry: "collection", "pending", "vehicles", "summary"`;
+    }
   } catch {}
 
   // Final fallback — helpful hint

@@ -626,7 +626,7 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
       [rent, req.params.id]
     );
 
-    // Notify the driver currently assigned to this vehicle
+    // Update today's RENT_CHARGE in driver_ledger so dues reflect new rent immediately
     try {
       const driverRes = await pool.query(
         `SELECT d.id, d.full_name FROM public.drivers d
@@ -635,16 +635,38 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
         [req.params.id]
       );
       if (driverRes.rows[0]) {
+        const driverId = driverRes.rows[0].id;
         const vNum = veh.rows[0].vehicle_number;
+
+        // Update today's RENT_CHARGE to new rent (if exists), else insert one
+        const updated = await pool.query(
+          `UPDATE public.driver_ledger
+           SET amount = $1, description = $2
+           WHERE driver_id = $3
+             AND entry_type = 'RENT_CHARGE'
+             AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
+          [rent, `Daily rent charge — ${vNum} (₹${rent}/day)`, driverId]
+        );
+
+        if (updated.rowCount === 0) {
+          // No charge yet for today — insert one
+          await pool.query(
+            `INSERT INTO public.driver_ledger (driver_id, entry_type, amount, description, created_at)
+             VALUES ($1, 'RENT_CHARGE', $2, $3, NOW())`,
+            [driverId, rent, `Daily rent charge — ${vNum} (₹${rent}/day)`]
+          );
+        }
+
+        // In-app notification to driver
         await pool.query(
           `INSERT INTO public.notifications (user_id, user_type, title, message, created_at)
            VALUES ($1, 'DRIVER', $2, $3, NOW())`,
           [
-            driverRes.rows[0].id,
+            driverId,
             `💰 Daily Rent Updated — ${vNum}`,
             `Your daily rent has been updated to ₹${rent}/day effective today.`,
           ]
-        );
+        ).catch(() => {});
       }
     } catch (_) {} // non-critical
 

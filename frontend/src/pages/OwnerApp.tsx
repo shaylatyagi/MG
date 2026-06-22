@@ -488,6 +488,114 @@ const [showChangeRent, setShowChangeRent] = useState(false);
 const [changeRentDriver, setChangeRentDriver] = useState(null); // { driverId, vehicleId, vehicleNumber, currentRent }
 const [changeRentAmt, setChangeRentAmt] = useState('');
 const [changeRentLoading, setChangeRentLoading] = useState(false);
+
+  // ── Payment Sound Notifications ───────────────────────────────────────────────
+  const knownPaymentIdsRef = React.useRef<Set<string>>(new Set(
+    JSON.parse(localStorage.getItem('mg_known_payment_ids') || '[]')
+  ));
+  const audioCtxRef = React.useRef<AudioContext | null>(null);
+
+  const playPaymentSound = React.useCallback((status: string) => {
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const now = ctx.currentTime;
+
+      if (status === 'SUCCESS') {
+        // Ascending ding — cash register feel
+        [523.25, 783.99].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.18);
+          gain.gain.setValueAtTime(0, now + i * 0.18);
+          gain.gain.linearRampToValueAtTime(0.4, now + i * 0.18 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.5);
+          osc.start(now + i * 0.18);
+          osc.stop(now + i * 0.18 + 0.5);
+        });
+      } else if (status === 'FAILED') {
+        // Descending tone
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.linearRampToValueAtTime(200, now + 0.4);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc.start(now); osc.stop(now + 0.5);
+      } else {
+        // Pending — single neutral beep
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(660, now);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.start(now); osc.stop(now + 0.35);
+      }
+    } catch {}
+  }, []);
+
+  // Poll payments every 30s — play sound + toast on new ones
+  React.useEffect(() => {
+    let mounted = true;
+    const pollPayments = async () => {
+      try {
+        const res = await fetch(`${API}/api/owner/payments?limit=50`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        });
+        const d = await res.json();
+        const payments: any[] = d.data || [];
+        const newOnes = payments.filter(p => !knownPaymentIdsRef.current.has(String(p.id)));
+
+        if (newOnes.length > 0 && mounted) {
+          // Update known IDs
+          newOnes.forEach(p => knownPaymentIdsRef.current.add(String(p.id)));
+          // Persist latest 200 IDs so refresh doesn't re-alert
+          const allIds = Array.from(knownPaymentIdsRef.current).slice(-200);
+          try { localStorage.setItem('mg_known_payment_ids', JSON.stringify(allIds)); } catch {}
+
+          // Group by status — play sound + toast for each new payment
+          newOnes.forEach(p => {
+            const status = (p.transaction_status || '').toUpperCase();
+            const name   = p.driver_name || 'Driver';
+            const amount = p.amount ? `₹${parseFloat(p.amount).toLocaleString('en-IN')}` : '';
+
+            if (status === 'SUCCESS') {
+              playPaymentSound('SUCCESS');
+              toast.success(`💰 Payment received — ${name} ${amount}`);
+            } else if (status === 'FAILED') {
+              playPaymentSound('FAILED');
+              toast.error(`❌ Payment failed — ${name} ${amount}`);
+            } else if (status === 'PENDING') {
+              playPaymentSound('PENDING');
+              toast.warn(`⏳ Payment pending — ${name} ${amount}`);
+            }
+          });
+        }
+
+        // Seed known IDs on first load (so existing payments don't trigger alerts)
+        if (knownPaymentIdsRef.current.size === 0 && payments.length > 0 && mounted) {
+          payments.forEach(p => knownPaymentIdsRef.current.add(String(p.id)));
+        }
+      } catch {}
+    };
+
+    // Delay first poll by 5s so page loads fully
+    const init = setTimeout(pollPayments, 5000);
+    const iv = setInterval(pollPayments, 30000);
+    return () => { mounted = false; clearTimeout(init); clearInterval(iv); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
@@ -5454,12 +5562,7 @@ const TrackFleetTab = () => {
     </div>
   </div>
 )}
-{lastSOS && !showSOSAlert && (
-  <div className="bg-red-600 text-white px-4 py-2 text-xs font-black flex justify-between items-center">
-    <span>🚨 SOS from {lastSOS.driver_name || lastSOS.full_name} at {new Date(lastSOS.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</span>
-    <button onClick={() => setLastSOS(null)} className="underline">Dismiss</button>
-  </div>
-)}
+{/* lastSOS banner removed */}
         {showVehicleDetailModal && <VehicleDetailModal />}
 {showDriverDetailsModal && <DriverDetailsModal />}
 {showCashModal && (

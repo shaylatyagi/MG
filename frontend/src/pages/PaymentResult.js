@@ -76,6 +76,55 @@ export default function PaymentResult() {
     };
   }, [loading, stopTimer, countdown, error, goToDashboard]);
 
+  // ── Payment sound — play once when result loads ─────────────────────────────
+  useEffect(() => {
+    if (loading || !orderData) return;
+    const status = (orderData?.transaction_status || orderData?.status || '').toUpperCase();
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+
+      if (status === 'SUCCESS') {
+        // Ascending triple ding — celebratory
+        [523.25, 659.25, 783.99].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.18);
+          gain.gain.setValueAtTime(0, now + i * 0.18);
+          gain.gain.linearRampToValueAtTime(0.5, now + i * 0.18 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.6);
+          osc.start(now + i * 0.18);
+          osc.stop(now + i * 0.18 + 0.65);
+        });
+      } else if (status === 'FAILED') {
+        // Descending tone
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.linearRampToValueAtTime(200, now + 0.5);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        osc.start(now); osc.stop(now + 0.6);
+      } else {
+        // Pending — two neutral beeps
+        [0, 0.25].forEach(delay => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(660, now + delay);
+          gain.gain.setValueAtTime(0.25, now + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.2);
+          osc.start(now + delay); osc.stop(now + delay + 0.25);
+        });
+      }
+    } catch {}
+  }, [loading, orderData]);
+
   // STRICT DB CHECK: Fake verification hata di gayi hai
   const dbStatus = orderData?.transaction_status || orderData?.status;
   const isSuccess = dbStatus === 'SUCCESS' || dbStatus === 'Success';
