@@ -3115,7 +3115,7 @@ function AdminPanelInner() {
   const tabLabel = navItems.find(n => n.key && n.key === tab)?.label || tab;
 
   return (
-    <div style={{ display:'flex', height:'100vh', background: isDark ? '#0d1520' : '#f3f4f6', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+    <div className={isDark ? 'admin-dark' : ''} style={{ display:'flex', height:'100vh', background: isDark ? '#0d1520' : '#f3f4f6', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside style={{
