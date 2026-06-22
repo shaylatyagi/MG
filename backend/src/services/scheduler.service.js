@@ -18,7 +18,7 @@ const generateDailyRentEntries = async () => {
       SELECT d.id, d.full_name, v.daily_rent, v.reg_number
       FROM public.drivers d
       JOIN public.vehicles v ON v.driver_id = d.id
-      WHERE d.status = 'ACTIVE' AND v.status = 'ASSIGNED'
+      WHERE d.status = 'ACTIVE' AND v.driver_id IS NOT NULL
     `);
 
     for (const driver of drivers) {

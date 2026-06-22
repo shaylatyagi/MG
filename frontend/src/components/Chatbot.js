@@ -197,7 +197,8 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
   // Exact patterns
   if (m.match(/collect|kitni aayi|kitna aaya|earning|kamai|received|aaj kitna|आज का/)) return 'collection';
   if (m.match(/kaun.*paid|kisne.*diya|who.*paid|paid.*today|payment.*kiya|paid list/)) return 'who_paid';
-  if (m.match(/pending|nahi.*diya|baaki|outstanding|due|kiska baaki/)) return 'pending';
+  if (m.match(/outstanding|baaki.*kitna|kitna.*baaki|total.*due|due.*total|pending.*amount|amount.*pending/)) return 'collection';
+  if (m.match(/pending|nahi.*diya|kiska baaki|aaj.*nahi|nahi.*aaj/)) return 'pending';
   if (m.match(/ledger|hisab|account|advance|entry|record/)) return 'ledger';
   if (m.match(/assign|de do|lagao|vehicle.*de|gaadi.*de|attach|rent.*set/)) return 'assign';
   if (m.match(/unassign|wapas|remove|hata|free karo|chhod/)) return 'unassign';
@@ -290,7 +291,8 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
         .then(r => r.json()).catch(() => ({ received: 0 }))
     ]);
     const todayAmt = ledger.received || 0;
-    return `Namaste! Main aapka Fleet Assistant hoon.\n\nAaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nDrivers: ${stats.total_drivers || 0} | Vehicles: ${stats.total_vehicles || 0}\n\nMain in cheezon mein madad kar sakta hoon:\n• Collection aur earnings\n• Kaun paid, kaun pending\n• Vehicle assign/unassign\n• Driver details\n• Ledger aur accounts\n\nKuch bhi poochein!`;
+    const sd = stats.data || stats;
+    return `Namaste! Main aapka Fleet Assistant hoon.\n\nAaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nDrivers: ${sd.total_drivers || 0} | Vehicles: ${sd.total_vehicles || 0}\n\nMain in cheezon mein madad kar sakta hoon:\n• Collection aur earnings\n• Kaun paid, kaun pending\n• Vehicle assign/unassign\n• Driver details\n• Ledger aur accounts\n\nKuch bhi poochein!`;
   } else {
     const [profile, dues] = await Promise.all([fetchDriverProfile(), fetchDriverDues()]);
     return `Namaste ${profile.name || ''}! Main aapka Driver Assistant hoon.\n\nBakaya: ${dues.dues || 0} rupaye\nWallet: ${profile.wallet_balance || 0} rupaye\nGaadi: ${profile.vehicle_number || 'assign nahi'}\n\nMain in cheezon mein madad kar sakta hoon:\n• Aapka bakaya\n• Wallet balance\n• Gaadi ki details\n• Payment info`;
@@ -304,8 +306,9 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
       .then(r => r.json()).catch(() => ({ received: 0, outstanding: 0 }))
   ]);
   const todayAmt = ledger.received || 0;
-  const outstanding = ledger.outstanding || 0;
-  return `Aaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nBaaki outstanding: ${outstanding.toLocaleString('en-IN')} rupaye\nTotal drivers: ${stats.total_drivers || 0}`;
+  const sd = stats.data || stats;
+  const outstanding = sd.outstanding || 0;
+  return `Aaj ka collection: ${todayAmt.toLocaleString('en-IN')} rupaye\nBaaki outstanding: ${outstanding.toLocaleString('en-IN')} rupaye\nTotal drivers: ${sd.total_drivers || 0}`;
 }
 
       case 'who_paid': {
@@ -317,9 +320,13 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
 
       case 'pending': {
         const { drivers, orders } = await fetchDriversAndTx();
-        const pending = drivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders));
-        if (pending.length === 0) return 'Sabne payment kar di aaj!';
-        return `Pending (${pending.length} drivers):\n${pending.map(d => `${d.full_name} - ${d.phone_number || d.mobile_number}`).join('\n')}`;
+        // Only assigned drivers can have pending rent
+        const assignedDrivers = drivers.filter(d => d.vehicle_id);
+        const pending = assignedDrivers.filter(d => !hasDriverPaidToday(d.mobile_number, orders));
+        if (pending.length === 0) return assignedDrivers.length === 0
+          ? 'Koi bhi driver vehicle assign nahi hai abhi.'
+          : 'Sabne payment kar di aaj! 🎉';
+        return `Aaj pending (${pending.length} drivers):\n${pending.map(d => `${d.full_name} - ${d.phone_number || d.mobile_number}`).join('\n')}`;
       }
 
       case 'ledger': {

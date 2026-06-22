@@ -1249,7 +1249,8 @@ router.post('/owner/add-driver', verifyToken, async (req, res) => {
   try {
     const { full_name, mobile_number, date_of_birth, emergency_contact_name,
         emergency_contact_number, driving_license_number,
-        driving_license_expiry, security_deposit, owner_id } = req.body;
+        driving_license_expiry, security_deposit, owner_id,
+        aadhaar_number, pan_number, address } = req.body;
 
     if (!full_name || !mobile_number)
       return res.status(400).json({ success: false, message: 'Name and phone required' });
@@ -1280,16 +1281,26 @@ router.post('/owner/add-driver', verifyToken, async (req, res) => {
 
     const driverCode = 'DRV' + Date.now().toString().slice(-6);
 
+    // Ensure aadhaar/pan columns exist
+    await pool.query(`
+      ALTER TABLE public.drivers
+        ADD COLUMN IF NOT EXISTS aadhaar_number VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS pan_number     VARCHAR(10),
+        ADD COLUMN IF NOT EXISTS address        TEXT
+    `).catch(() => {});
+
     const result = await pool.query(
   `INSERT INTO public.drivers
     (full_name, mobile_number, owner_code, driver_code, wallet_balance, status,
      date_of_birth, emergency_contact_name, emergency_contact_number,
-     driving_license_number, driving_license_expiry, security_deposit)
-   VALUES ($1,$2,$3,$4,0,'ACTIVE',$5,$6,$7,$8,$9,$10)
+     driving_license_number, driving_license_expiry, security_deposit,
+     aadhaar_number, pan_number, address)
+   VALUES ($1,$2,$3,$4,0,'ACTIVE',$5,$6,$7,$8,$9,$10,$11,$12,$13)
    RETURNING id, driver_code`,
   [full_name, mobile_number, ownerCode, driverCode,
    date_of_birth||null, emergency_contact_name||null, emergency_contact_number||null,
-   driving_license_number||null, driving_license_expiry||null, security_deposit||0]
+   driving_license_number||null, driving_license_expiry||null, security_deposit||0,
+   aadhaar_number||null, pan_number||null, address||null]
 );
 
     res.json({ success: true, message: '✅ Driver added!', driver_code: result.rows[0].driver_code,
@@ -3248,7 +3259,7 @@ router.get('/owner/attendance', async (req, res) => {
     const ownerIdRes = await pool.query('SELECT id FROM public.owners WHERE owner_code=$1 LIMIT 1', [ownerCode]);
     const ownerIdVal = ownerIdRes.rows[0]?.id || null;
     const driversRes = await pool.query(
-  `SELECT id, full_name, driver_code
+  `SELECT id, full_name, driver_code, mobile_number
    FROM public.drivers
    WHERE (owner_code=$1 OR (owner_id IS NOT NULL AND owner_id=$2))
      AND deleted_at IS NULL
@@ -3295,7 +3306,7 @@ router.get('/owner/attendance', async (req, res) => {
 
     const attendanceMap = {};
     driversRes.rows.forEach(d => {
-      attendanceMap[d.id] = { driverId: d.id, name: d.full_name, code: d.driver_code, presentDays: new Set() };
+      attendanceMap[d.id] = { driverId: d.id, name: d.full_name, code: d.driver_code, phone: d.mobile_number, presentDays: new Set() };
     });
     logsRes.rows.forEach(l => {
       if (attendanceMap[l.driver_id]) attendanceMap[l.driver_id].presentDays.add(l.day);

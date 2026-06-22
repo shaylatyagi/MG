@@ -37,14 +37,12 @@ const withRls = async (req, res, next) => {
 
     req.dbClient = client;
 
-    // Release client after response finishes
+    // Release client after response finishes — capture immediately to prevent double-release
     const release = () => {
-      if (client) {
-        client.query('COMMIT').catch(() => {}).finally(() => {
-          client.release();
-          client = null;
-        });
-      }
+      const c = client;
+      client = null;
+      if (!c) return;
+      c.query('COMMIT').catch(() => {}).finally(() => c.release());
     };
     res.on('finish',  release);
     res.on('close',   release);
@@ -71,12 +69,10 @@ const bypassRls = async (req, res, next) => {
     req.dbClient = client;
 
     const release = () => {
-      if (client) {
-        client.query('COMMIT').catch(() => {}).finally(() => {
-          client.release();
-          client = null;
-        });
-      }
+      const c = client;
+      client = null;
+      if (!c) return;
+      c.query('COMMIT').catch(() => {}).finally(() => c.release());
     };
     res.on('finish', release);
     res.on('close',  release);

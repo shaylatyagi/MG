@@ -157,7 +157,7 @@ router.get('/partner/:slug', async (req, res) => {
       success: true,
       partner: {
         slug:             o.partner_slug,
-        name:             o.full_name,
+        name:             o.brand_name || o.full_name,
         brand:            o.brand_name || o.full_name,
         tagline:          o.tagline,
         about:            o.about,
@@ -209,6 +209,78 @@ router.get('/partners', async (req, res) => {
 
     res.set('Cache-Control', 'public, max-age=300');
     res.json({ success: true, partners: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── VEHICLE TYPE MASTER ───────────────────────────────────────────────────────
+// GET /api/config/vehicle-types
+router.get('/vehicle-types', async (req, res) => {
+  try {
+    // Create table if not exists + seed on first call
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS public.vehicle_types (
+        id        SERIAL PRIMARY KEY,
+        code      VARCHAR(10) UNIQUE NOT NULL,
+        name      VARCHAR(100) NOT NULL,
+        category  VARCHAR(50),
+        is_ev     BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Add slug column if not exists (maps to existing vehicle_type text values)
+    await pool.query(`ALTER TABLE public.vehicle_types ADD COLUMN IF NOT EXISTS slug VARCHAR(30) UNIQUE`).catch(()=>{});
+
+    // Seed default types if table is empty
+    const count = await pool.query('SELECT COUNT(*) FROM public.vehicle_types');
+    if (parseInt(count.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO public.vehicle_types (code, slug, name, category, is_ev) VALUES
+          ('VH001', 'EV_2W',      'Electric 2-Wheeler (EV Bike)',      'EV',    TRUE),
+          ('VH002', 'EV_3W',      'Electric Auto (E-Rickshaw)',        'EV',    TRUE),
+          ('VH003', 'EV_4W',      'Electric Car',                      'EV',    TRUE),
+          ('VH004', 'EV_LCV',     'Electric Light CV / Van',           'EV',    TRUE),
+          ('VH005', 'EV_HCV',     'Electric Heavy CV / Truck',         'EV',    TRUE),
+          ('VH006', 'CNG_AUTO',   'CNG Auto',                          'CNG',   FALSE),
+          ('VH007', 'CNG_CAR',    'CNG Car',                           'CNG',   FALSE),
+          ('VH008', 'CNG_BUS',    'CNG Bus / Mini-bus',                'CNG',   FALSE),
+          ('VH009', 'PETROL_2W',  'Petrol 2-Wheeler',                  'FUEL',  FALSE),
+          ('VH010', 'PETROL_CAR', 'Petrol Car',                        'FUEL',  FALSE),
+          ('VH011', 'DIESEL_LCV', 'Diesel Truck / LCV',                'FUEL',  FALSE),
+          ('VH012', 'DIESEL_BUS', 'Diesel Bus',                        'FUEL',  FALSE),
+          ('VH013', 'OTHER',      'Other',                             'OTHER', FALSE)
+        ON CONFLICT (code) DO NOTHING
+      `);
+    }
+
+    const result = await pool.query(
+      'SELECT id, code, name, category, is_ev FROM public.vehicle_types WHERE is_active = TRUE ORDER BY code ASC'
+    );
+    res.json({ success: true, types: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/config/vehicle-types (admin: add custom type)
+router.post('/vehicle-types', async (req, res) => {
+  try {
+    const { name, category = 'OTHER', is_ev = false } = req.body;
+    if (!name) return res.status(400).json({ error: 'name required' });
+    // Auto-generate next code
+    const last = await pool.query(
+      "SELECT code FROM public.vehicle_types ORDER BY code DESC LIMIT 1"
+    );
+    const lastNum = last.rows[0] ? parseInt(last.rows[0].code.replace('VH', '')) : 0;
+    const newCode = `VH${String(lastNum + 1).padStart(3, '0')}`;
+    const r = await pool.query(
+      'INSERT INTO public.vehicle_types (code, name, category, is_ev) VALUES ($1,$2,$3,$4) RETURNING *',
+      [newCode, name, category, is_ev]
+    );
+    res.json({ success: true, type: r.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

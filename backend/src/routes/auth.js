@@ -819,6 +819,22 @@ router.post('/reset-pin', validate(ResetPinSchema), async (req, res) => {
   }
 });
 
+// GET /api/auth/test-email?to=xyz@gmail.com — smoke test SMTP
+router.get('/test-email', async (req, res) => {
+  try {
+    const { sendMail } = require('../services/mailer');
+    const to = req.query.to || process.env.LEADS_EMAIL || process.env.ADMIN_EMAIL || 'mobilitygrid@gmail.com';
+    const result = await sendMail({
+      to,
+      subject: '✅ MobilityGrid Email Test',
+      html: '<p style="font-family:sans-serif">If you see this, email is working correctly! 🎉</p>',
+    });
+    res.json({ success: result.ok, to, reason: result.reason || null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/auth/waitlist — Landing page interest form
 router.post('/waitlist', async (req, res) => {
   var { name, phone, company, role, fleet, city, type, email } = req.body;
@@ -847,8 +863,12 @@ router.post('/waitlist', async (req, res) => {
     // Fire emails (non-blocking — don't fail the response if email fails)
     try {
       const { sendLeadEmails } = require('../services/mailer');
-      sendLeadEmails({ name, phone, company, role, fleet, city, type, email }).catch(() => {});
-    } catch (_) {}
+      sendLeadEmails({ name, phone, company, role, fleet, city, type, email }).catch(e => {
+        console.error('sendLeadEmails failed:', e?.message || e);
+      });
+    } catch (e) {
+      console.error('sendLeadEmails import/call failed:', e?.message || e);
+    }
 
     res.json({ success: true });
   } catch (err) {

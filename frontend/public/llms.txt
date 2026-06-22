@@ -1,0 +1,29 @@
+# MobilityGrid
+
+> Fleet Operating System for India — digital rent collection, driver KYC, real-time tracking, and fleet management for EV and gig economy operators.
+
+## What is MobilityGrid?
+
+MobilityGrid is a SaaS platform built for India's fleet operators and gig workers. It helps fleet owners manage vehicles, drivers, daily rent collection, KYC verification, and real-time GPS tracking — all in one place.
+
+## Who is it for?
+
+- **Fleet Owners / Operators**: Manage vehicles, collect rent digitally, track drivers, view earnings dashboard
+- **Fleet Managers**: Oversee operations, manage driver onboarding, handle KYC approvals
+- **Drivers / Riders**: Track dues, make payments, view attendance, communicate with owner
+
+## Key Features
+
+- Digital rent collection (UPI + Cash)
+- Driver KYC and document verification
+- Real-time GPS fleet tracking
+- Automated daily rent deduction
+- Driver attendance tracking
+- Partner network for fleet operators
+- Multi-owner company management
+
+## Contact
+
+- Website: https://mobilitygrid.in
+- Get Early Access: https://mobilitygrid.in/#signup
+- Partners: https://partners.mobilitygrid.in

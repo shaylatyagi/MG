@@ -37,14 +37,17 @@ const logUnassignment = async (vehicleId) => {
 // Get available vehicles for a driver (vehicles without driver)
 router.get('/available/vehicles', async (req, res) => {
   try {
-    const { driverId } = req.query;
-    
+    const { driverId, ownerId } = req.query;
+    // Always filter by ownerId so owners only see their own vehicles
     const result = await pool.query(
-      `SELECT id, vehicle_number, vehicle_model, daily_rent 
-       FROM vehicles 
-       WHERE driver_id IS NULL 
-AND status IN ('ACTIVE', 'AVAILABLE')
-       ORDER BY vehicle_number`
+      `SELECT v.id, v.vehicle_number, v.vehicle_model, v.daily_rent
+       FROM public.vehicles v
+       JOIN public.owners o ON o.id = v.owner_id
+       WHERE v.driver_id IS NULL
+         AND v.status IN ('ACTIVE', 'AVAILABLE')
+         AND ($1::int IS NULL OR v.owner_id = $1::int)
+       ORDER BY v.vehicle_number`,
+      [ownerId ? parseInt(ownerId) : null]
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {

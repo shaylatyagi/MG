@@ -462,6 +462,7 @@ function Dashboard({ onSetTab }) {
   const [kyc, setKyc]             = useState(null);
   const [pendingDocs, setPendingDocs] = useState(0);
   const [loading, setLoading]     = useState(true);
+  const [seedStatus, setSeedStatus] = useState(null); // null | 'loading' | {ok, msg}
 
   useEffect(() => {
     Promise.all([
@@ -471,6 +472,16 @@ function Dashboard({ onSetTab }) {
     ]).then(([s, k, docs]) => { setStats(s); setKyc(k); setPendingDocs((docs?.docs || []).filter(d => d.status === 'PENDING').length); setLoading(false); });
   }, []);
 
+  const runSeedDemo = async () => {
+    setSeedStatus('loading');
+    try {
+      const r = await api('/api/admin/seed-demo-online', { method: 'POST' });
+      setSeedStatus({ ok: true, msg: `✅ ${r.driver?.name} → ${r.vehicle?.number} (₹${r.vehicle?.daily_rent}/day)` });
+    } catch (err) {
+      setSeedStatus({ ok: false, msg: `❌ ${err.message}` });
+    }
+  };
+
   if (loading) return <Spinner />;
   const s = stats || {};
   const k = Array.isArray(kyc)
@@ -478,34 +489,104 @@ function Dashboard({ onSetTab }) {
     : (kyc || {});
   const pending = (k.PENDING || 0) + (k.SUBMITTED || 0) + (k.UNDER_REVIEW || 0);
 
+  // Big stat card for dashboard
+  const BigStatCard = ({ label, value, sub, icon, accent }) => (
+    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e5e7eb', padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.04)', display:'flex', alignItems:'center', gap:14 }}>
+      <div style={{ width:46, height:46, borderRadius:12, background:accent+'18', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
+        {icon}
+      </div>
+      <div>
+        <p style={{ fontSize:24, fontWeight:800, color:'#111827', margin:0, lineHeight:1.1 }}>{value}</p>
+        <p style={{ fontSize:11, fontWeight:600, color:'#6b7280', margin:'3px 0 0', textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</p>
+        {sub && <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>{sub}</p>}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-800 dark:text-white  ">Platform Dashboard</h2>
+    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+      {/* Title + quick actions */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
+        <div>
+          <h2 style={{ fontSize:20, fontWeight:800, color:'#111827', margin:0 }}>Platform Dashboard</h2>
+          <p style={{ fontSize:12, color:'#9ca3af', margin:'3px 0 0' }}>MobilityGrid fleet overview · live data</p>
+        </div>
+        {/* Seed demo quick action */}
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <button onClick={runSeedDemo} disabled={seedStatus === 'loading'} style={{
+            padding:'8px 16px', borderRadius:8, border:'1px solid #e5e7eb',
+            background:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, color:'#4f46e5',
+            display:'flex', alignItems:'center', gap:6, fontFamily:'inherit',
+            opacity: seedStatus === 'loading' ? 0.6 : 1,
+          }}>
+            {seedStatus === 'loading' ? '⏳' : '⚡'} Seed Demo Driver
+          </button>
+          {seedStatus && seedStatus !== 'loading' && (
+            <span style={{ fontSize:12, color: seedStatus.ok ? '#059669' : '#dc2626', fontWeight:600 }}>{seedStatus.msg}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Alert banners */}
       {pending > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800 text-sm flex items-center justify-between">
-          <span>⚠️ <strong>{pending} KYC verification(s)</strong> pending review</span>
-          {onSetTab && <button onClick={() => onSetTab('kyc')} className="text-xs font-black text-yellow-700 underline ml-4">Review →</button>}
+        <div style={{ background:'#fefce8', border:'1px solid #fde047', borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <span style={{ fontSize:13, color:'#854d0e', fontWeight:600 }}>⚠️ {pending} KYC verification(s) pending review</span>
+          {onSetTab && <button onClick={() => onSetTab('kyc')} style={{ fontSize:12, fontWeight:700, color:'#92400e', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>Review →</button>}
         </div>
       )}
-      {pendingDocs > 0 && <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-2 flex items-center justify-between"><span className="text-sm font-black text-blue-800">📄 {pendingDocs} documents pending approval</span>{onSetTab && <button onClick={() => onSetTab('docs')} className="text-xs font-black text-blue-600 underline">Review →</button>}</div>}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Companies"    value={s.total_companies || 0} color="indigo" />
-        <StatCard label="Fleet Owners" value={s.total_owners   || 0} color="blue"   />
-        <StatCard label="Drivers"      value={s.total_drivers  || 0} color="green"  />
-        <StatCard label="Vehicles"     value={s.total_vehicles || 0} color="orange" />
+      {pendingDocs > 0 && (
+        <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <span style={{ fontSize:13, color:'#1e40af', fontWeight:600 }}>📄 {pendingDocs} document(s) pending approval</span>
+          {onSetTab && <button onClick={() => onSetTab('docs')} style={{ fontSize:12, fontWeight:700, color:'#1e40af', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>Review →</button>}
+        </div>
+      )}
+
+      {/* Fleet stats row */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:12 }}>
+        <BigStatCard label="Companies"    value={s.total_companies || 0} icon="🏢" accent="#6366f1" />
+        <BigStatCard label="Fleet Owners" value={s.total_owners   || 0} icon="👤" accent="#0891b2" />
+        <BigStatCard label="Drivers"      value={s.total_drivers  || 0} icon="🏍️" accent="#059669" />
+        <BigStatCard label="Vehicles"     value={s.total_vehicles || 0} icon="🚗" accent="#d97706" />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Collection Today"      value={fmt(s.collection_today || s.gmv_today)}  color="green"  />
-        <StatCard label="Collection This Month" value={fmt(s.collection_month || s.gmv_month)}  color="blue"   />
-        <StatCard label="Collection All Time"   value={fmt(s.collection_total || s.gmv_total)}  color="indigo" />
+
+      {/* Revenue row */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:12 }}>
+        <div style={{ background:'linear-gradient(135deg,#059669,#047857)', borderRadius:14, padding:'20px 22px', color:'#fff' }}>
+          <p style={{ fontSize:11, fontWeight:700, letterSpacing:'0.08em', opacity:0.8, margin:0, textTransform:'uppercase' }}>Today's Collection</p>
+          <p style={{ fontSize:26, fontWeight:800, margin:'6px 0 0', fontFamily:'monospace' }}>{fmt(s.collection_today || s.gmv_today || 0)}</p>
+          <p style={{ fontSize:11, opacity:0.7, margin:'4px 0 0' }}>All successful payments today</p>
+        </div>
+        <div style={{ background:'linear-gradient(135deg,#4f46e5,#7c3aed)', borderRadius:14, padding:'20px 22px', color:'#fff' }}>
+          <p style={{ fontSize:11, fontWeight:700, letterSpacing:'0.08em', opacity:0.8, margin:0, textTransform:'uppercase' }}>This Month</p>
+          <p style={{ fontSize:26, fontWeight:800, margin:'6px 0 0', fontFamily:'monospace' }}>{fmt(s.collection_month || s.gmv_month || 0)}</p>
+          <p style={{ fontSize:11, opacity:0.7, margin:'4px 0 0' }}>Month-to-date collections</p>
+        </div>
+        <div style={{ background:'linear-gradient(135deg,#0891b2,#0e7490)', borderRadius:14, padding:'20px 22px', color:'#fff' }}>
+          <p style={{ fontSize:11, fontWeight:700, letterSpacing:'0.08em', opacity:0.8, margin:0, textTransform:'uppercase' }}>All-Time Total</p>
+          <p style={{ fontSize:26, fontWeight:800, margin:'6px 0 0', fontFamily:'monospace' }}>{fmt(s.collection_total || s.gmv_total || 0)}</p>
+          <p style={{ fontSize:11, opacity:0.7, margin:'4px 0 0' }}>Lifetime platform collections</p>
+        </div>
       </div>
-      <div className="bg-white dark:bg-gray-900    rounded-xl shadow-sm border p-6">
-        <h3 className="font-semibold text-gray-700 dark:text-gray-300   mb-4">KYC Status Overview</h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+
+      {/* KYC overview */}
+      <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e5e7eb', padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+          <h3 style={{ fontSize:14, fontWeight:700, color:'#111827', margin:0 }}>KYC Status Overview</h3>
+          {onSetTab && <button onClick={() => onSetTab('kyc')} style={{ fontSize:12, fontWeight:600, color:'#4f46e5', background:'none', border:'none', cursor:'pointer' }}>View all →</button>}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:8 }}>
           {['VERIFIED','PENDING','SUBMITTED','UNDER_REVIEW','REJECTED'].map(status => (
-            <button key={status} onClick={() => onSetTab && onSetTab('kyc')} className="text-center p-3 bg-gray-50 dark:bg-gray-800   rounded-lg hover:ring-2 hover:ring-indigo-300 transition cursor-pointer w-full">
-              <p className="text-2xl font-bold text-gray-800 dark:text-white  ">{k[status] || 0}</p>
-              <Badge status={status} />
+            <button key={status} onClick={() => onSetTab && onSetTab('kyc')} style={{
+              textAlign:'center', padding:'12px 8px', borderRadius:10, border:'1px solid #f3f4f6',
+              background:'#f9fafb', cursor:'pointer', fontFamily:'inherit',
+              transition:'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background='#eef2ff'; e.currentTarget.style.borderColor='#c7d2fe'; }}
+            onMouseLeave={e => { e.currentTarget.style.background='#f9fafb'; e.currentTarget.style.borderColor='#f3f4f6'; }}
+            >
+              <p style={{ fontSize:22, fontWeight:800, color:'#111827', margin:0 }}>{k[status] || 0}</p>
+              <div style={{ marginTop:4 }}><Badge status={status} /></div>
             </button>
           ))}
         </div>
@@ -2109,7 +2190,8 @@ function AllOwners() {
     !q ||
     o.full_name?.toLowerCase().includes(q.toLowerCase()) ||
     o.mobile_number?.includes(q) ||
-    o.owner_code?.toLowerCase().includes(q.toLowerCase())
+    o.owner_code?.toLowerCase().includes(q.toLowerCase()) ||
+    o.company_name?.toLowerCase().includes(q.toLowerCase())
   );
 
   const avColors = ['#4f46e5','#7c3aed','#0891b2','#059669','#b45309','#be185d'];
@@ -2136,49 +2218,95 @@ function AllOwners() {
           <p style={{fontSize:14,fontWeight:600,color:'#64748b'}}>No owners found</p>
         </div>
       ) : (
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:12}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:14}}>
           {filtered.map(o => {
             const {ch, bg} = av(o.full_name);
+            const isActive = !o.status || o.status === 'ACTIVE';
             return (
-              <div key={o.id} className="press-card"
-                style={{background:'white',borderRadius:16,padding:'14px 16px',border:'1px solid #f1f5f9',boxShadow:'0 1px 4px rgba(0,0,0,0.04)',borderLeft:'3px solid #6366f1'}}
-                onClick={() => push({ type: 'owner', id: o.id, label: o.full_name })}>
-                <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  {/* Avatar */}
-                  <div style={{width:42,height:42,borderRadius:14,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>
-                    {ch}
-                  </div>
-                  {/* Info */}
-                  <div style={{flex:1,minWidth:0}}>
-                    <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{o.full_name}</span>
-                    <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}} onClick={e => e.stopPropagation()}>
-                      <span style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace'}}>{o.mobile_number}</span>
-                      <button onClick={e => startEditPhone(e, o)}
-                        style={{fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',padding:'0 2px'}}
-                        title="Edit phone">✏️</button>
+              <div key={o.id} style={{
+                background:'white', borderRadius:16, border:'1px solid #e5e7eb',
+                boxShadow:'0 1px 6px rgba(0,0,0,0.05)', overflow:'hidden',
+                display:'flex', flexDirection:'column',
+              }}>
+                {/* Card top */}
+                <div style={{padding:'16px 18px 12px', flex:1}}>
+                  <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
+                    {/* Avatar */}
+                    <div style={{width:40,height:40,borderRadius:12,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>
+                      {ch}
                     </div>
-                    <span style={{fontSize:10,fontWeight:700,color:'#6366f1',background:'#eef2ff',padding:'2px 8px',borderRadius:20,fontFamily:'monospace',display:'inline-block',marginTop:4}}>{o.owner_code}</span>
+                    {/* Name + status */}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                        <span style={{fontSize:14,fontWeight:700,color:'#111827',lineHeight:1.3}}>{o.full_name}</span>
+                        <span style={{
+                          fontSize:10,fontWeight:700,letterSpacing:'0.04em',padding:'2px 8px',borderRadius:20,
+                          background: isActive ? '#dcfce7' : '#fee2e2',
+                          color: isActive ? '#15803d' : '#b91c1c',
+                        }}>{isActive ? 'ACTIVE' : (o.status || 'INACTIVE')}</span>
+                      </div>
+                      {o.company_name && (
+                        <p style={{fontSize:12,color:'#6b7280',margin:'2px 0 0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          🏢 {o.company_name}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <svg width={14} height={14} fill="none" stroke="#cbd5e1" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+
+                  {/* Owner ID row */}
+                  <div style={{marginTop:10,padding:'8px 10px',background:'#f9fafb',borderRadius:8,border:'1px solid #f3f4f6'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                      <div>
+                        <p style={{fontSize:9,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Owner ID</p>
+                        <p style={{fontSize:12,fontWeight:700,color:'#4f46e5',fontFamily:'monospace',margin:'2px 0 0'}}>{o.owner_code}</p>
+                      </div>
+                      <div style={{textAlign:'right'}} onClick={e => e.stopPropagation()}>
+                        <p style={{fontSize:9,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Mobile</p>
+                        <div style={{display:'flex',alignItems:'center',gap:4}}>
+                          <p style={{fontSize:12,fontWeight:600,color:'#374151',fontFamily:'monospace',margin:'2px 0 0'}}>{o.mobile_number}</p>
+                          <button onClick={e => startEditPhone(e, o)}
+                            style={{fontSize:10,color:'#9ca3af',background:'none',border:'none',cursor:'pointer',padding:'0 2px',marginTop:2}}
+                            title="Edit phone">✏️</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats row */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:0,marginTop:12,paddingTop:12,borderTop:'1px solid #f3f4f6'}}>
+                    {[
+                      {val: o.total_drivers||0,   label:'Drivers',  color:'#111827'},
+                      {val: o.total_vehicles||0,  label:'Vehicles', color:'#111827'},
+                      {val: fmt(o.collection_month), label:'This Month', color:'#059669'},
+                      {val: fmt(o.collection_total), label:'Total',     color:'#111827'},
+                    ].map(({val,label,color}) => (
+                      <div key={label} style={{textAlign:'center',borderRight:'1px solid #f3f4f6',padding:'0 4px',lastChild:{borderRight:'none'}}}>
+                        <p style={{fontSize:13,fontWeight:800,color,margin:0,fontFamily:label.includes('Month')||label==='Total'?'monospace':'inherit'}}>{val}</p>
+                        <p style={{fontSize:9,fontWeight:600,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'2px 0 0'}}>{label}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                {/* Stats row */}
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8,marginTop:12,paddingTop:12,borderTop:'1px solid #f8fafc'}}>
-                  <div style={{textAlign:'center'}}>
-                    <p style={{fontSize:16,fontWeight:800,color:'#0f172a'}}>{o.total_drivers||0}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Drivers</p>
-                  </div>
-                  <div style={{textAlign:'center'}}>
-                    <p style={{fontSize:16,fontWeight:800,color:'#0f172a'}}>{o.total_vehicles||0}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Vehicles</p>
-                  </div>
-                  <div style={{textAlign:'center'}}>
-                    <p style={{fontSize:13,fontWeight:800,color:'#059669',fontFamily:'monospace'}}>{fmt(o.collection_month)}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Month</p>
-                  </div>
-                  <div style={{textAlign:'center'}}>
-                    <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(o.collection_total)}</p>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
-                  </div>
+
+                {/* Action buttons row — PayYantra style */}
+                <div style={{display:'flex',borderTop:'1px solid #f3f4f6',background:'#fafafa'}}>
+                  {[
+                    { label:'Details',  onClick: () => push({ type:'owner', id:o.id, label:o.full_name }), primary:true },
+                    { label:'Drivers',  onClick: () => push({ type:'owner', id:o.id, label:o.full_name }) },
+                    { label:'Vehicles', onClick: () => push({ type:'owner', id:o.id, label:o.full_name }) },
+                  ].map(({label,onClick,primary},i) => (
+                    <button key={label} onClick={onClick} style={{
+                      flex:1, padding:'9px 4px', border:'none',
+                      borderRight: i < 2 ? '1px solid #e5e7eb' : 'none',
+                      background:'transparent', cursor:'pointer',
+                      fontSize:12, fontWeight:600,
+                      color: primary ? '#4f46e5' : '#6b7280',
+                      fontFamily:'inherit', transition:'background 0.1s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background='#f0f0ff'; e.currentTarget.style.color='#4f46e5'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color= primary ? '#4f46e5' : '#6b7280'; }}
+                    >{label}</button>
+                  ))}
                 </div>
               </div>
             );
@@ -2978,33 +3106,41 @@ function AdminPanelInner() {
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
   const navItems = [
+    { section: 'MAIN' },
     { key: 'dashboard',    label: 'Dashboard',     icon: 'dashboard' },
+    { section: 'FLEET' },
     { key: 'companies',    label: 'Companies',      icon: 'companies' },
     { key: 'owners',       label: 'Owners',         icon: 'owners' },
     { key: 'drivers',      label: 'All Drivers',    icon: 'drivers' },
+    { section: 'COMPLIANCE' },
     { key: 'kyc',          label: 'KYC Review',     icon: 'kyc' },
     { key: 'docs',         label: 'Doc Approvals',  icon: 'docs' },
+    { section: 'FINANCE' },
     { key: 'transactions', label: 'Transactions',   icon: 'transactions' },
+    { key: 'leads',        label: 'Leads',          icon: 'leads' },
+    { section: 'TOOLS' },
     { key: 'chat',         label: 'Chat',           icon: 'chat' },
     { key: 'audit',        label: 'Audit Log',      icon: 'audit' },
     { key: 'pins',         label: 'PIN Management', icon: 'pins' },
-    { key: 'leads',        label: 'Leads',          icon: 'leads' },
   ];
 
   const doLogout = () => { clearToken(); window.location.href = '/login'; };
   const logout = () => setShowLogoutConfirm(true);
-  const tabLabel = navItems.find(n => n.key === tab)?.label || tab;
+  const tabLabel = navItems.find(n => n.key && n.key === tab)?.label || tab;
 
   return (
     <div style={{ display:'flex', height:'100vh', background: isDark ? '#020617' : '#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside style={{
-        width: 224, background: '#0d1117', display: 'flex', flexDirection: 'column',
-        flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)'
+        width: 224,
+        background: isDark ? '#0d1117' : '#ffffff',
+        display: 'flex', flexDirection: 'column',
+        flexShrink: 0,
+        borderRight: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e5e7eb'
       }}>
         {/* Logo */}
-        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: '20px 16px 16px', borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e5e7eb' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 34, height: 34, borderRadius: 10,
@@ -3015,32 +3151,47 @@ function AdminPanelInner() {
               <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>M</span>
             </div>
             <div>
-              <p style={{ color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', margin: 0 }}>MobilityGrid</p>
-              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 500, margin: 0, marginTop: 1 }}>Super Admin Console</p>
+              <p style={{ color: isDark ? '#fff' : '#111827', fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', margin: 0 }}>MobilityGrid</p>
+              <p style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af', fontSize: 10, fontWeight: 500, margin: 0, marginTop: 1 }}>Super Admin Console</p>
             </div>
           </div>
         </div>
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
-          {navItems.map(item => {
+          {navItems.map((item, idx) => {
+            if (item.section) {
+              return (
+                <p key={`sec-${idx}`} style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+                  color: isDark ? 'rgba(255,255,255,0.2)' : '#9ca3af',
+                  textTransform: 'uppercase',
+                  padding: '12px 12px 4px', margin: 0,
+                }}>
+                  {item.section}
+                </p>
+              );
+            }
             const active = tab === item.key;
+            const inactiveColor = isDark ? 'rgba(255,255,255,0.45)' : '#6b7280';
+            const hoverColor    = isDark ? 'rgba(255,255,255,0.75)' : '#111827';
+            const hoverBg       = isDark ? 'rgba(255,255,255,0.05)' : '#f3f4f6';
             return (
               <button key={item.key} onClick={() => setTab(item.key)} style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                 padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
                 marginBottom: 2, textAlign: 'left', fontSize: 13, fontWeight: active ? 600 : 500,
-                background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
-                color: active ? '#818cf8' : 'rgba(255,255,255,0.45)',
+                background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
+                color: active ? '#6366f1' : inactiveColor,
                 borderLeft: active ? '2px solid #6366f1' : '2px solid transparent',
                 transition: 'all 0.15s',
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}}
-              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}}
+              onMouseEnter={e => { if (!active) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = hoverColor; }}}
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = inactiveColor; }}}
               >
                 <span style={{ opacity: active ? 1 : 0.6, flexShrink: 0 }}>
-                  <NavIcon d={NAV_ICONS[item.icon]} size={15} />
+                  <NavIcon d={NAV_ICONS[item.icon]} size={15} color={active ? '#6366f1' : undefined} />
                 </span>
                 {item.label}
               </button>
@@ -3049,15 +3200,15 @@ function AdminPanelInner() {
         </nav>
 
         {/* Bottom — logout */}
-        <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: '8px', borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e5e7eb' }}>
           <button onClick={logout} style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 10,
             padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: 13,
+            background: 'transparent', color: isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af', fontSize: 13,
             fontWeight: 500, textAlign: 'left', fontFamily: 'inherit', transition: 'all 0.15s'
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#f87171'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#ef4444'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af'; }}
           >
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>

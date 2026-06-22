@@ -86,9 +86,10 @@ function LandingPage() {
 
   return (
     <>
+      <div id="page-top" style={{ position: 'absolute', top: 0 }} />
       <nav id="nav" className={navScrolled ? 'scrolled' : ''}>
         <div className="nav-inner">
-          <Link to="/" className="nav-logo">
+          <Link to="/" className="nav-logo" onClick={() => { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; }}>
             <BrandLogo variant="cyan" height={31} alt="MobilityGrid" />
           </Link>
           <div className="nav-links">
@@ -97,7 +98,7 @@ function LandingPage() {
             <a href="#product" className="nav-link">Product</a>
             <a href="#how" className="nav-link">How it Works</a>
             <a href="#pricing" className="nav-link">Pricing</a>
-            <a href="https://partners.mobilitygrid.in" className="nav-link">Partners</a>
+            <a href="https://partners.mobilitygrid.in" className="nav-link" target="_blank" rel="noopener noreferrer">Partners</a>
           </div>
           <div className="nav-actions">
             <a href="#signup" className="btn btn-primary btn-sm">Get Early Access</a>
@@ -120,7 +121,7 @@ function LandingPage() {
           <a href="#product"  className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Product</a>
           <a href="#how"      className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>How it Works</a>
           <a href="#pricing"  className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
-          <a href="https://partners.mobilitygrid.in" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Partners</a>
+          <a href="https://partners.mobilitygrid.in" className="mobile-nav-link" target="_blank" rel="noopener noreferrer" onClick={() => setMobileMenuOpen(false)}>Partners</a>
           <a href="#signup"   className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => setMobileMenuOpen(false)}>Get Early Access</a>
         </div>
       </div>
@@ -235,7 +236,7 @@ function LandingPage() {
                       <path d="M12 2v3m0 14v3M2 12h3m14 0h3m-3.5-6.5-2.12 2.12M6.62 17.38l-2.12 2.12M17.38 17.38l2.12 2.12M4.5 6.5l2.12 2.12" />
                     </svg>
                   </div>
-                  <h3>Our Vision</h3>
+                  <h2 className="vm-card-title">Our Vision</h2>
                   <p>A world where every fleet operator and gig worker in India has the infrastructure, visibility, and tools to build a financially secure livelihood — on their own terms.</p>
                 </div>
                 <div className="vm-card" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)' }}>
@@ -244,7 +245,7 @@ function LandingPage() {
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     </svg>
                   </div>
-                  <h3>Our Mission</h3>
+                  <h2 className="vm-card-title">Our Mission</h2>
                   <p>To close the three structural gaps — Time, Payment, and Asset — that hold India's gig workforce back, by building an operating ecosystem designed entirely around how they actually earn and live.</p>
                 </div>
               </div>
@@ -581,22 +582,22 @@ function LandingPage() {
           <div className="how-steps">
             <div className="how-step">
               <div className="how-step-num">1</div>
-              <h4>Admin onboards your company</h4>
+              <h3>Admin onboards your company</h3>
               <p>MobilityGrid verifies and activates your fleet, usually in under 24 hours.</p>
             </div>
             <div className="how-step">
               <div className="how-step-num">2</div>
-              <h4>Add vehicles and drivers</h4>
+              <h3>Add vehicles and drivers</h3>
               <p>Set up vehicles, assign drivers, and define daily rents from the owner dashboard.</p>
             </div>
             <div className="how-step">
               <div className="how-step-num">3</div>
-              <h4>Drivers complete KYC</h4>
+              <h3>Drivers complete KYC</h3>
               <p>Drivers upload documents through the mobile terminal. Admin verifies to unlock assignments.</p>
             </div>
             <div className="how-step">
               <div className="how-step-num">4</div>
-              <h4>Collections run digitally</h4>
+              <h3>Collections run digitally</h3>
               <p>Drivers pay rent via UPI. Every payment is recorded, visible, and reconciled automatically.</p>
             </div>
           </div>
@@ -612,7 +613,7 @@ function LandingPage() {
           <div className="for-grid">
             <div className="for-card">
               <div className="for-avatar" style={{ background: '#ede9fe' }}>🚗</div>
-              <h4>Fleet Owners</h4>
+              <h3>Fleet Owners</h3>
               <p className="sub">Any fleet, any size</p>
               <p>Replace WhatsApp reminders and paper ledgers with a real-time dashboard. Know exactly who has paid and what your fleet is worth.</p>
               <ul className="for-list">
@@ -623,7 +624,7 @@ function LandingPage() {
             </div>
             <div className="for-card">
               <div className="for-avatar" style={{ background: '#fef3c7' }}>🧑‍💼</div>
-              <h4>Fleet Managers</h4>
+              <h3>Fleet Managers</h3>
               <p className="sub">Day-to-day operations</p>
               <p>Manage assignments, record collections, and track driver compliance without access to owner-only financial controls.</p>
               <ul className="for-list">
@@ -634,7 +635,7 @@ function LandingPage() {
             </div>
             <div className="for-card">
               <div className="for-avatar" style={{ background: '#dcfce7' }}>🛺</div>
-              <h4>Drivers</h4>
+              <h3>Drivers</h3>
               <p className="sub">Gig workers, daily earners</p>
               <p>See dues, track earnings, pay rent with a tap, and keep documents in order using a phone that works even on 2G.</p>
               <ul className="for-list">
@@ -735,7 +736,7 @@ function LandingPage() {
             {landingPartners.map(p => {
               const initials = (p.brand_name || p.full_name || '?').split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
               return (
-                <a key={p.partner_slug} href={`https://partners.mobilitygrid.in/${p.partner_slug}`} style={{ textDecoration: 'none' }}>
+                <a key={p.partner_slug} href={`https://partners.mobilitygrid.in/${p.partner_slug}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                   <div style={{
                     background: 'white', borderRadius: 20, padding: '24px 28px',
                     border: '1.5px solid #e2e8f0', width: 240, cursor: 'pointer',
@@ -754,7 +755,7 @@ function LandingPage() {
             })}
             {/* legacy placeholder - remove below block once all partners are in DB */}
             {landingPartners.length === 0 && (
-            <a href="/partners/recoverynest" style={{ textDecoration: 'none' }}>
+            <a href="https://partners.mobilitygrid.in/recoverynest" style={{ textDecoration: 'none' }}>
               <div style={{
                 background: 'white', borderRadius: 20, padding: '24px 28px',
                 border: '1.5px solid #e2e8f0', width: 240, cursor: 'pointer',                transition: 'box-shadow 0.2s, transform 0.2s',
@@ -772,7 +773,7 @@ function LandingPage() {
             )}
           </div>
           <div style={{ textAlign: 'center' }}>
-            <a href="/partners" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700, color: '#4f46e5', textDecoration: 'none' }}>
+            <a href="https://partners.mobilitygrid.in" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700, color: '#4f46e5', textDecoration: 'none' }}>
               View all partners →
             </a>
           </div>
@@ -834,7 +835,7 @@ function LandingPage() {
                   <div className="field-row">
                     <div className="field">
                       <label>Your Role</label>
-                      <select name="role" value={formData.role} onChange={handleChange} required>
+                      <select name="role" value={formData.role} onChange={handleChange} required aria-label="Your Role">
                         <option value="" disabled>Select role</option>
                         <option>Fleet Owner / Operator</option>
                         <option>Fleet Manager</option>
@@ -845,7 +846,7 @@ function LandingPage() {
                     </div>
                     <div className="field">
                       <label>Fleet Size</label>
-                      <select name="fleet" value={formData.fleet} onChange={handleChange}>
+                      <select name="fleet" value={formData.fleet} onChange={handleChange} aria-label="Fleet Size">
                         <option value="" disabled>Select range</option>
                         <option>1 – 10 vehicles</option>
                         <option>11 – 30 vehicles</option>
@@ -862,7 +863,7 @@ function LandingPage() {
                     </div>
                     <div className="field">
                       <label>Vehicle Type</label>
-                      <select name="type" value={formData.type} onChange={handleChange}>
+                      <select name="type" value={formData.type} onChange={handleChange} aria-label="Vehicle Type">
                         <option value="" disabled>Select type</option>
                         <option>EV / Electric</option>
                         <option>Auto-Rickshaw</option>

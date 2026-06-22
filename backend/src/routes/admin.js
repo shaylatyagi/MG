@@ -1382,4 +1382,120 @@ router.get('/pin-status', async (req, res) => {
   }
 });
 
+// ── SEED DEMO ONLINE DRIVER ───────────────────────────────────────────────────
+// POST /api/admin/seed-demo-online
+// Finds the demo owner's first unassigned driver, renames to demo-driver-online,
+// creates (or reuses) vehicle DEMO-V001 with ₹1 daily rent, and assigns it.
+// Idempotent — safe to call multiple times.
+router.post('/seed-demo-online', async (req, res) => {
+  try {
+    // 1. Find demo owner — prefer name/mobile containing "demo" (case-insensitive)
+    let ownerRes = await pool.query(
+      `SELECT id, owner_code, full_name FROM public.owners
+       WHERE LOWER(full_name) LIKE '%demo%'
+          OR LOWER(full_name) LIKE '%test%'
+          OR mobile_number = '9999999999'
+       ORDER BY id ASC LIMIT 1`
+    );
+    // Fallback: first owner in DB
+    if (!ownerRes.rows[0]) {
+      ownerRes = await pool.query(
+        `SELECT id, owner_code, full_name FROM public.owners ORDER BY id ASC LIMIT 1`
+      );
+    }
+    if (!ownerRes.rows[0]) {
+      return res.status(404).json({ success: false, error: 'No owner found in DB' });
+    }
+    const owner = ownerRes.rows[0];
+
+    // 2. Find an unassigned driver under this owner
+    const driverRes = await pool.query(
+      `SELECT d.id, d.full_name, d.mobile_number
+       FROM public.drivers d
+       WHERE d.owner_code = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM public.vehicles v WHERE v.driver_id = d.id
+         )
+         AND d.deleted_at IS NULL
+       ORDER BY d.id ASC LIMIT 1`,
+      [owner.owner_code]
+    );
+    if (!driverRes.rows[0]) {
+      return res.status(404).json({
+        success: false,
+        error: `No unassigned driver found under owner ${owner.full_name} (${owner.owner_code})`,
+      });
+    }
+    const driver = driverRes.rows[0];
+
+    // 3. Rename driver to demo-driver-online
+    await pool.query(
+      `UPDATE public.drivers SET full_name = 'demo-driver-online' WHERE id = $1`,
+      [driver.id]
+    );
+
+    // 4. Find or create vehicle DEMO-V001 under demo owner with ₹1 rent
+    let vehRes = await pool.query(
+      `SELECT id, driver_id FROM public.vehicles WHERE vehicle_number = 'DEMO-V001' LIMIT 1`
+    );
+    let vehicleId;
+    if (vehRes.rows[0]) {
+      vehicleId = vehRes.rows[0].id;
+      // If already assigned to someone else, unassign first
+      if (vehRes.rows[0].driver_id && vehRes.rows[0].driver_id !== driver.id) {
+        await pool.query(
+          `UPDATE public.driver_vehicle_history SET unassigned_at = NOW(), reason = 'DEMO_RESET'
+           WHERE vehicle_id = $1 AND unassigned_at IS NULL`,
+          [vehicleId]
+        );
+        await pool.query(
+          `UPDATE public.vehicles SET driver_id = NULL WHERE id = $1`, [vehicleId]
+        );
+      }
+      // Update rent to ₹1
+      await pool.query(
+        `UPDATE public.vehicles SET daily_rent = 1, rent_type = 'DAILY' WHERE id = $1`, [vehicleId]
+      );
+    } else {
+      // Create the demo vehicle
+      const ins = await pool.query(
+        `INSERT INTO public.vehicles
+           (vehicle_number, vehicle_model, vehicle_type, daily_rent, rent_type, owner_id, status)
+         VALUES ('DEMO-V001', 'Demo Test Vehicle', 'EV_3W', 1, 'DAILY', $1, 'ACTIVE')
+         RETURNING id`,
+        [owner.id]
+      );
+      vehicleId = ins.rows[0].id;
+    }
+
+    // 5. Assign vehicle to driver (close any open history first)
+    await pool.query(
+      `UPDATE public.driver_vehicle_history SET unassigned_at = NOW(), reason = 'DEMO_RESET'
+       WHERE driver_id = $1 AND unassigned_at IS NULL`,
+      [driver.id]
+    );
+    await pool.query(
+      `INSERT INTO public.driver_vehicle_history
+         (driver_id, vehicle_id, owner_id, daily_rent, rent_type, reason)
+       VALUES ($1, $2, $3, 1, 'DAILY', 'DEMO_SEED')`,
+      [driver.id, vehicleId, owner.id]
+    );
+    await pool.query(
+      `UPDATE public.vehicles SET driver_id = $1 WHERE id = $2`,
+      [driver.id, vehicleId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Demo driver seeded successfully',
+      owner: { id: owner.id, name: owner.full_name, code: owner.owner_code },
+      driver: { id: driver.id, name: 'demo-driver-online', mobile: driver.mobile_number },
+      vehicle: { id: vehicleId, number: 'DEMO-V001', daily_rent: 1 },
+    });
+  } catch (err) {
+    console.error('seed-demo-online error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

@@ -39,7 +39,7 @@ cron.schedule('30 18 * * *', async () => {
       FROM public.drivers d
       JOIN public.vehicles v ON v.driver_id = d.id
       WHERE d.deleted_at IS NULL
-        AND v.status = 'ASSIGNED'
+        AND v.driver_id IS NOT NULL
         AND COALESCE(v.daily_rent, 0) > 0
     `);
 

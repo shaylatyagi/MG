@@ -80,23 +80,29 @@ router.get('/stats', async (req, res) => {
       pool.query(
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
-         WHERE owner_id = $1 AND transaction_status = 'SUCCESS'
+         WHERE payer_mobile IN (
+           SELECT mobile_number FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL
+         ) AND transaction_status = 'SUCCESS'
            AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
-        [oid]
+        [oid, ocode]
       ),
       pool.query(
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
-         WHERE owner_id = $1 AND transaction_status = 'SUCCESS'
-           AND DATE_TRUNC('month', payment_date AT TIME ZONE 'Asia/Kolkata')
+         WHERE payer_mobile IN (
+           SELECT mobile_number FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL
+         ) AND transaction_status = 'SUCCESS'
+           AND DATE_TRUNC('month', order_initiation_date AT TIME ZONE 'Asia/Kolkata')
              = DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Kolkata')`,
-        [oid]
+        [oid, ocode]
       ),
       pool.query(
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
-         WHERE owner_id = $1 AND transaction_status = 'SUCCESS'`,
-        [oid]
+         WHERE payer_mobile IN (
+           SELECT mobile_number FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL
+         ) AND transaction_status = 'SUCCESS'`,
+        [oid, ocode]
       ),
     ]);
 
@@ -606,8 +612,12 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
 
     const veh = await pool.query(
-      'SELECT id, vehicle_number FROM public.vehicles WHERE id = $1 AND owner_id = $2',
-      [req.params.id, owner.id]
+      `SELECT id, vehicle_number FROM public.vehicles
+       WHERE id = $1 AND (
+         owner_id = $2
+         OR EXISTS(SELECT 1 FROM public.drivers d WHERE d.id = vehicles.driver_id AND d.owner_code = $3 AND d.deleted_at IS NULL)
+       )`,
+      [req.params.id, owner.id, owner.owner_code]
     );
     if (!veh.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });
 

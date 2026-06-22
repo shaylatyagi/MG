@@ -274,7 +274,7 @@ function PartnerListing() {
                     {initials(p.brand_name || p.full_name)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 800, fontSize: 16, margin: 0 }}>{p.full_name}</p>
+                    <p style={{ fontWeight: 800, fontSize: 16, margin: 0 }}>{p.brand_name || p.full_name}</p>
                     {p.tagline && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.tagline}</p>}
                   </div>
                   <ArrowRight size={16} color="rgba(255,255,255,0.25)" style={{ marginRight: 6, flexShrink: 0 }} />

@@ -22,14 +22,19 @@ export function BrandLogo({
   const url = logos[key];
 
   if (url && !imgErr) {
+    // Logo aspect ratio 894×220 ≈ 4.06 — explicit width prevents CLS
+    const computedWidth = Math.round(height * (894 / 220));
     return (
       <img
         src={url}
         alt={alt}
+        width={computedWidth}
         height={height}
-        style={{ height, width: 'auto', objectFit: 'contain', ...style }}
+        style={{ height, width: 'auto', maxWidth: computedWidth, objectFit: 'contain', ...style }}
         className={className}
         onError={() => setImgErr(true)}
+        fetchPriority="high"
+        decoding="async"
       />
     );
   }

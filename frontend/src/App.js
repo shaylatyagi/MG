@@ -1,7 +1,18 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// ── Scroll to top on every route change ───────────────────────────────────────
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [pathname]);
+  return null;
+}
 
 // ── React Query client ────────────────────────────────────────────────────────
 const queryClient = new QueryClient({
@@ -94,6 +105,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <Router>
+              <ScrollToTop />
               <Suspense fallback={<PageLoader />}>
                 {isPartnersSubdomain ? (
                   <Routes>

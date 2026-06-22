@@ -378,6 +378,9 @@ const [editSaving, setEditSaving] = useState(false);
 const [cashAmount, setCashAmount] = useState('');
 const [cashConfirm, setCashConfirm] = useState(false);
 const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+// PWA install prompt
+const [installPrompt, setInstallPrompt] = React.useState<any>(null);
+const [showInstallBanner, setShowInstallBanner] = React.useState(false);
 // Passkey one-time nudge
 const [showPasskeyNudge, setShowPasskeyNudge]   = useState(false);
 const [enrollingPasskey, setEnrollingPasskey]   = useState(false);
@@ -473,6 +476,14 @@ const [bulkResult, setBulkResult] = useState(null);
 const [bulkFile, setBulkFile] = useState(null);
 const [addDriverMode, setAddDriverMode] = useState('single');
 const [multipleDrivers, setMultipleDrivers] = useState([{ name:'', phone:'' }]);
+// KYC inline verification state
+const [panVerifyStatus, setPanVerifyStatus]         = useState<null|'loading'|'verified'|'failed'>(null);
+const [panVerifyName, setPanVerifyName]             = useState<string|null>(null);
+const [aadhaarVerifyStatus, setAadhaarVerifyStatus] = useState<null|'loading'|'sent'|'verified'|'failed'>(null);
+const [aadhaarPublicId, setAadhaarPublicId]         = useState<string|null>(null);
+const [bankVerifyStatus, setBankVerifyStatus]       = useState<null|'loading'|'verified'|'failed'>(null);
+const [bankVerifyName, setBankVerifyName]           = useState<string|null>(null);
+const [newDriverBank, setNewDriverBank]             = useState({ accountNumber: '', ifsc: '' });
 const [showChangeRent, setShowChangeRent] = useState(false);
 const [changeRentDriver, setChangeRentDriver] = useState(null); // { driverId, vehicleId, vehicleNumber, currentRent }
 const [changeRentAmt, setChangeRentAmt] = useState('');
@@ -512,12 +523,15 @@ const [changeRentLoading, setChangeRentLoading] = useState(false);
   vehicleNumber: '', vehicleModel: '', vehicleType: DEFAULT_VEHICLE_TYPE, dailyRent: '',
   insuranceExpiry: '', fitnessExpiry: '', chassisNumber: ''
 });
-  const [newDriver, setNewDriver] = useState({ 
-  name: '', phone: '', email: '', 
+  const [vehiclePhotos, setVehiclePhotos] = React.useState<Record<string,File|null>>({ front: null, back: null, left: null, right: null });
+  const [vehiclePhotoPreviews, setVehiclePhotoPreviews] = React.useState<Record<string,string>>({});
+  const [newDriver, setNewDriver] = useState({
+  name: '', phone: '', email: '',
   vehicleId: '', securityDeposit: 0,
   dob: '', emergencyName: '', emergencyPhone: '',
   licenseNumber: '', licenseExpiry: '',
-  address: ''
+  address: '',
+  aadhaarNumber: '', panNumber: '',
 });
   const [agreementFile, setAgreementFile] = useState(null);
 
@@ -1132,11 +1146,33 @@ const addVehicle = async () => {
     const data = await response.json();
 
     if (response.ok && data.success) {
+      const vehicleId = data.vehicle?.id || data.id;
+      // Upload vehicle photos if any
+      const photoSides = ['front', 'back', 'left', 'right'];
+      for (const side of photoSides) {
+        const file = vehiclePhotos[side];
+        if (file && vehicleId) {
+          try {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('doc_type', `VEHICLE_${side.toUpperCase()}`);
+            fd.append('user_type', 'VEHICLE');
+            fd.append('user_id', String(vehicleId));
+            await fetch(`${API}/api/uploads/upload`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token()}` },
+              body: fd,
+            });
+          } catch (_) {}
+        }
+      }
       toast.success('Vehicle added successfully!');
       setShowAddVehicle(false);
       setNewVehicle({ vehicleNumber: '', vehicleModel: '', vehicleType: DEFAULT_VEHICLE_TYPE, dailyRent: 850, insuranceExpiry: '', fitnessExpiry: '', chassisNumber: '' });
+      setVehiclePhotos({ front: null, back: null, left: null, right: null });
+      setVehiclePhotoPreviews({});
       setSelectedDriverId('');
-      fetchAllData(); // Refresh vehicles list
+      fetchAllData();
     } else {
       toast.error(data.message || 'Failed to add vehicle');
     }
@@ -1462,6 +1498,19 @@ return () => clearInterval(interval);
     setTimeout(() => setShowNotifNudge(true), 6000); // 6s after mount
   }, []);
 
+  // PWA install prompt — capture beforeinstallprompt so we can trigger it manually
+  useEffect(() => {
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); setShowInstallBanner(true); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+  const handleInstallApp = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') { setInstallPrompt(null); setShowInstallBanner(false); }
+  };
+
   // SOS alarm: unlock AudioContext on first touch/click (mobile + desktop), play silent buffer to warm up
   const sosAudioCtxRef = React.useRef(null);
   useEffect(() => {
@@ -1489,6 +1538,14 @@ return () => clearInterval(interval);
 
   useEffect(() => {
     function playSOSAlarm() {
+      // Vibration fallback — works even on silent/muted Android
+      try {
+        if (navigator.vibrate) {
+          // SOS pattern: short short short — long long long — short short short
+          navigator.vibrate([150,100,150,100,150, 300, 400,100,400,100,400, 300, 150,100,150,100,150]);
+        }
+      } catch(_) {}
+
       try {
         var ctx = sosAudioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
         sosAudioCtxRef.current = ctx;
@@ -1867,7 +1924,9 @@ const removeRule = (i) => setIncentiveRules(prev => ({
   driving_license_number: newDriver.licenseNumber || null,
   driving_license_expiry: newDriver.licenseExpiry || null,
   security_deposit: parseFloat(newDriver.securityDeposit) || 0,
-  address: newDriver.address || null
+  address: newDriver.address || null,
+  aadhaar_number: newDriver.aadhaarNumber || null,
+  pan_number: newDriver.panNumber ? newDriver.panNumber.toUpperCase() : null,
 })
       });
       const data = await response.json();
@@ -1880,9 +1939,19 @@ const removeRule = (i) => setIncentiveRules(prev => ({
           fd.append('driverId', data.driver.id);
           fetch(`${API}/api/uploads/agreement`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).catch(()=>{});
         }
+        // Trigger PAN verification if provided (non-blocking)
+        if (newDriver.panNumber && data.driver?.id) {
+          fetch(`${API}/api/kyc/pan/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+            body: JSON.stringify({ pan: newDriver.panNumber.toUpperCase(), driver_id: data.driver.id }),
+          }).catch(() => {});
+        }
         toast.success('Driver added successfully!');
         setShowAddDriver(false);
-        setNewDriver({ name: '', phone: '', email: '', vehicleId: '', securityDeposit: 0, dob: '', emergencyName: '', emergencyPhone: '', licenseNumber: '', licenseExpiry: '', address: '' });
+        setNewDriver({ name: '', phone: '', email: '', vehicleId: '', securityDeposit: 0, dob: '', emergencyName: '', emergencyPhone: '', licenseNumber: '', licenseExpiry: '', address: '', aadhaarNumber: '', panNumber: '' });
+        setPanVerifyStatus(null); setPanVerifyName(null); setAadhaarVerifyStatus(null); setAadhaarPublicId(null);
+        setBankVerifyStatus(null); setBankVerifyName(null); setNewDriverBank({ accountNumber: '', ifsc: '' });
         setAgreementFile(null);
         fetchAllData();
       } else {
@@ -2225,9 +2294,9 @@ const removeRule = (i) => setIncentiveRules(prev => ({
               {attendanceData.drivers.map((d, i) => {
                 const bg = i % 2 === 0 ? 'white' : 'rgba(241,245,249,0.5)';
                 const rowItems = [
-                  <div key="driver" style={{ width: 100, padding: '6px 8px', fontWeight: 900, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', backgroundColor: bg }}>
-                    <span>{d.name}</span>
-                    <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 4 }}>{d.code}</span>
+                  <div key="driver" style={{ width: 120, padding: '6px 8px', backgroundColor: bg, overflow: 'hidden' }}>
+                    <div style={{ fontWeight: 900, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
+                    <div style={{ fontWeight: 500, color: '#4b5563', fontSize: 10, whiteSpace: 'nowrap' }}>{d.phone || d.code}</div>
                   </div>
                 ];
 
@@ -4582,6 +4651,43 @@ const TrackFleetTab = () => {
           />
         </div>
 
+        {/* Vehicle Photos — 4 sides (moved to top so visible immediately) */}
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block mb-2">Vehicle Photos <span className="font-normal text-slate-400">(optional — front, back, left, right)</span></label>
+          <div className="grid grid-cols-4 gap-2">
+            {(['front','back','left','right'] as const).map(side => (
+              <div key={side} className="flex flex-col items-center gap-1">
+                <label
+                  htmlFor={`vphoto-${side}`}
+                  className="w-full aspect-square rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer overflow-hidden bg-slate-50 hover:border-indigo-400 transition relative"
+                  style={{ minHeight: 60 }}
+                >
+                  {vehiclePhotoPreviews[side] ? (
+                    <img src={vehiclePhotoPreviews[side]} alt={side} className="w-full h-full object-cover" />
+                  ) : (
+                    <span style={{ fontSize: 22 }}>📷</span>
+                  )}
+                  <input
+                    id={`vphoto-${side}`}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      setVehiclePhotos(p => ({ ...p, [side]: f }));
+                      const url = URL.createObjectURL(f);
+                      setVehiclePhotoPreviews(p => ({ ...p, [side]: url }));
+                    }}
+                  />
+                </label>
+                <span className="text-[10px] font-semibold text-slate-400 capitalize">{side}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Model */}
         <div>
           <label className="text-xs font-semibold text-slate-500 block mb-1">Vehicle Model *</label>
@@ -4604,7 +4710,7 @@ const TrackFleetTab = () => {
             {VEHICLE_TYPE_GROUPS.map(g => (
               <optgroup key={g.group} label={g.group}>
                 {g.types.map(t => (
-                  <option key={t.code} value={t.code}>{t.icon} {t.label} · {t.code} [#{t.id}]{t.isEV ? ' ⚡EV' : ''}</option>
+                  <option key={t.code} value={t.code}>{t.icon} {t.label}</option>
                 ))}
               </optgroup>
             ))}
@@ -4647,7 +4753,7 @@ const TrackFleetTab = () => {
             Driver will pay ₹{Number(newVehicle.dailyRent).toLocaleString('en-IN')} per {rentType === 'DAILY' ? 'day' : rentType === 'WEEKLY' ? 'week' : 'month'}
           </p>
         )}
-        {(!newVehicle.dailyRent || newVehicle.dailyRent <= 0) && (
+        {newVehicle.dailyRent !== '' && newVehicle.dailyRent !== null && Number(newVehicle.dailyRent) === 0 && (
           <p className="text-xs text-rose-500 font-semibold -mt-1">Rent cannot be ₹0 or free</p>
         )}
 
@@ -4789,6 +4895,147 @@ const TrackFleetTab = () => {
               className="w-full border rounded-xl p-3 text-sm"
               value={newDriver.phone}
               onChange={e => setNewDriver({...newDriver, phone: e.target.value.replace(/\D/g,'').slice(0,10)})}/>
+
+            {/* KYC Section — inline Payyantra verification */}
+            <div className="border border-blue-100 bg-blue-50 rounded-xl p-3 space-y-3">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-wide">🔐 KYC Verification (Payyantra)</p>
+
+              {/* PAN */}
+              <div>
+                <label className="text-[10px] font-black text-slate-500 block mb-1">PAN Number</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    placeholder="ABCDE1234F"
+                    maxLength={10}
+                    className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm font-mono bg-white uppercase"
+                    value={newDriver.panNumber}
+                    onChange={e => { setNewDriver({...newDriver, panNumber: e.target.value.toUpperCase().slice(0,10)}); setPanVerifyStatus(null); setPanVerifyName(null); }}
+                  />
+                  <button
+                    type="button"
+                    disabled={panVerifyStatus === 'loading' || newDriver.panNumber.length !== 10}
+                    onClick={async () => {
+                      setPanVerifyStatus('loading');
+                      try {
+                        const r = await fetch(`${API}/api/kyc/verify-pan`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ phone: newDriver.phone, pan_number: newDriver.panNumber }),
+                        });
+                        const d = await r.json();
+                        setPanVerifyStatus(d.verified ? 'verified' : 'failed');
+                        setPanVerifyName(d.name || null);
+                      } catch { setPanVerifyStatus('failed'); }
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap disabled:opacity-40"
+                    style={{ background: panVerifyStatus === 'verified' ? '#dcfce7' : panVerifyStatus === 'failed' ? '#fee2e2' : '#dbeafe', color: panVerifyStatus === 'verified' ? '#166534' : panVerifyStatus === 'failed' ? '#991b1b' : '#1d4ed8' }}
+                  >
+                    {panVerifyStatus === 'loading' ? '...' : panVerifyStatus === 'verified' ? '✅ Verified' : panVerifyStatus === 'failed' ? '❌ Failed' : 'Verify'}
+                  </button>
+                </div>
+                {panVerifyName && <p className="text-[10px] text-emerald-700 font-black mt-1">Name on PAN: {panVerifyName}</p>}
+                {panVerifyStatus === 'failed' && <p className="text-[10px] text-red-600 mt-1">PAN verify failed — check number and retry</p>}
+              </div>
+
+              {/* Aadhaar via DigiLocker */}
+              <div>
+                <label className="text-[10px] font-black text-slate-500 block mb-1">Aadhaar — DigiLocker Verification</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    placeholder="Driver name required above"
+                    disabled
+                    className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-400"
+                    value={newDriver.name ? `${newDriver.name} · ${newDriver.phone || '—'}` : ''}
+                  />
+                  <button
+                    type="button"
+                    disabled={aadhaarVerifyStatus === 'loading' || !newDriver.name || !newDriver.phone}
+                    onClick={async () => {
+                      setAadhaarVerifyStatus('loading');
+                      try {
+                        const r = await fetch(`${API}/api/kyc/aadhaar-initiate`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: newDriver.name, mobile: newDriver.phone, redirect_url: window.location.href }),
+                        });
+                        const d = await r.json();
+                        if (d.success && d.kycUrl) {
+                          setAadhaarPublicId(d.publicId || null);
+                          setAadhaarVerifyStatus('sent');
+                          window.open(d.kycUrl, '_blank');
+                        } else {
+                          setAadhaarVerifyStatus('failed');
+                        }
+                      } catch { setAadhaarVerifyStatus('failed'); }
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap disabled:opacity-40"
+                    style={{ background: aadhaarVerifyStatus === 'verified' ? '#dcfce7' : aadhaarVerifyStatus === 'failed' ? '#fee2e2' : '#dbeafe', color: aadhaarVerifyStatus === 'verified' ? '#166534' : aadhaarVerifyStatus === 'failed' ? '#991b1b' : '#1d4ed8' }}
+                  >
+                    {aadhaarVerifyStatus === 'loading' ? '...' : aadhaarVerifyStatus === 'sent' ? '🔗 Link Sent' : aadhaarVerifyStatus === 'verified' ? '✅ Verified' : aadhaarVerifyStatus === 'failed' ? '❌ Failed' : 'Start'}
+                  </button>
+                </div>
+                {aadhaarVerifyStatus === 'sent' && aadhaarPublicId && (
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className="text-[10px] text-blue-600 flex-1">DigiLocker link opened — driver should complete verification. Then check status:</p>
+                    <button
+                      type="button"
+                      className="text-[10px] font-black text-indigo-700 underline"
+                      onClick={async () => {
+                        try {
+                          const r = await fetch(`${API}/api/kyc/aadhaar-status/${aadhaarPublicId}${newDriver.phone ? `?phone=${newDriver.phone}` : ''}`);
+                          const d = await r.json();
+                          setAadhaarVerifyStatus(d.verified ? 'verified' : 'sent');
+                        } catch {}
+                      }}
+                    >Check Status</button>
+                  </div>
+                )}
+                {aadhaarVerifyStatus === 'failed' && <p className="text-[10px] text-red-600 mt-1">Aadhaar initiation failed — name and phone required</p>}
+                {!newDriver.name && <p className="text-[9px] text-slate-400 mt-1">Enter driver name & phone above to enable Aadhaar verification</p>}
+              </div>
+
+              {/* Bank Account — Penny Drop */}
+              <div>
+                <label className="text-[10px] font-black text-slate-500 block mb-1">Bank Account — Penny Drop</label>
+                <div className="flex gap-2 mb-1">
+                  <input
+                    placeholder="Account Number"
+                    className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm font-mono bg-white"
+                    value={newDriverBank.accountNumber}
+                    onChange={e => { setNewDriverBank(b => ({ ...b, accountNumber: e.target.value.replace(/\D/g,'') })); setBankVerifyStatus(null); setBankVerifyName(null); }}
+                  />
+                  <input
+                    placeholder="IFSC"
+                    maxLength={11}
+                    className="w-28 border border-slate-200 rounded-xl p-2.5 text-sm font-mono bg-white uppercase"
+                    value={newDriverBank.ifsc}
+                    onChange={e => { setNewDriverBank(b => ({ ...b, ifsc: e.target.value.toUpperCase().slice(0,11) })); setBankVerifyStatus(null); setBankVerifyName(null); }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={bankVerifyStatus === 'loading' || !newDriverBank.accountNumber || newDriverBank.ifsc.length < 11}
+                  onClick={async () => {
+                    setBankVerifyStatus('loading');
+                    try {
+                      const r = await fetch(`${API}/api/kyc/verify-bank`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone: newDriver.phone, account_number: newDriverBank.accountNumber, ifsc: newDriverBank.ifsc }),
+                      });
+                      const d = await r.json();
+                      setBankVerifyStatus(d.verified ? 'verified' : 'failed');
+                      setBankVerifyName(d.accountName || null);
+                    } catch { setBankVerifyStatus('failed'); }
+                  }}
+                  className="w-full py-2 rounded-xl text-xs font-black disabled:opacity-40"
+                  style={{ background: bankVerifyStatus === 'verified' ? '#dcfce7' : bankVerifyStatus === 'failed' ? '#fee2e2' : '#dbeafe', color: bankVerifyStatus === 'verified' ? '#166534' : bankVerifyStatus === 'failed' ? '#991b1b' : '#1d4ed8' }}
+                >
+                  {bankVerifyStatus === 'loading' ? 'Verifying...' : bankVerifyStatus === 'verified' ? '✅ Bank Verified' : bankVerifyStatus === 'failed' ? '❌ Verification Failed — check details' : 'Verify Bank Account (Penny Drop)'}
+                </button>
+                {bankVerifyName && <p className="text-[10px] text-emerald-700 font-black mt-1">Account holder: {bankVerifyName}</p>}
+              </div>
+            </div>
             <div className="relative">
               <span className="absolute left-3 top-3 text-slate-600 text-sm font-black">₹</span>
               <input type="number" placeholder="Security Deposit (optional)"
@@ -4828,6 +5075,7 @@ const TrackFleetTab = () => {
               className="w-full border rounded-xl p-3 text-sm"
               value={newDriver.address}
               onChange={e => setNewDriver({...newDriver, address: e.target.value})}/>
+
             <div className="border border-dashed border-slate-300 rounded-xl p-3 space-y-1">
               <p className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Agreement / Contract (PDF/Image)</p>
               <input type="file" accept=".pdf,.jpg,.jpeg,.png"
@@ -5164,13 +5412,6 @@ const TrackFleetTab = () => {
     {/* Action buttons */}
     <div className="p-6 space-y-3">
       <button
-        onClick={() => { if ((window as any).__mgPlaySOSAlarm) (window as any).__mgPlaySOSAlarm(); }}
-        className="w-full py-3 rounded-2xl font-bold text-sm"
-        style={{ background: 'rgba(255,255,255,0.2)', color: 'var(--color-text-inverse)', border: '2px solid rgba(255,255,255,0.4)' }}
-      >
-        🔊 Replay Alarm
-      </button>
-      <button
         onClick={async () => {
           // Dismiss SOS
           await fetch(`${API}/api/payment/owner/sos-dismiss/${activeSOS.id}`, {
@@ -5484,7 +5725,7 @@ const TrackFleetTab = () => {
                             <td className="px-1 py-1">
                               <select value={v.vehicle_type||'EV'} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],vehicle_type:e.target.value};return u;})}}
                                 className="border border-slate-200 rounded px-1.5 py-1 text-xs bg-white focus:outline-none">
-                                {VEHICLE_TYPE_GROUPS.map(g => g.types.map(t => <option key={t.code} value={t.code}>{t.icon} {t.label} · {t.code} [#{t.id}]{t.isEV ? ' ⚡EV' : ''}</option>))}
+                                {VEHICLE_TYPE_GROUPS.map(g => g.types.map(t => <option key={t.code} value={t.code}>{t.icon} {t.label}</option>))}
                               </select>
                             </td>
                             <td className="px-1 py-1">
@@ -5554,6 +5795,28 @@ const TrackFleetTab = () => {
 )}
       </div>
     {/* ── Passkey Enrol Nudge ── */}
+    {showInstallBanner && (
+      <div style={{
+        position: 'fixed', bottom: 80, left: 16, right: 16, zIndex: 9990,
+        background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+        borderRadius: 20, padding: '14px 18px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        boxShadow: '0 8px 32px rgba(79,70,229,0.35)',
+      }}>
+        <span style={{ fontSize: 28 }}>📲</span>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, fontWeight: 800, color: '#fff', fontSize: 14 }}>Install MobilityGrid</p>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>Home screen pe add karo — faster access</p>
+        </div>
+        <button onClick={handleInstallApp}
+          style={{ background: '#fff', color: '#4f46e5', border: 'none', borderRadius: 12, padding: '8px 14px', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>
+          Install
+        </button>
+        <button onClick={() => setShowInstallBanner(false)}
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 18, cursor: 'pointer', padding: 4 }}>×</button>
+      </div>
+    )}
+
     {showPasskeyNudge && (
       <div style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
