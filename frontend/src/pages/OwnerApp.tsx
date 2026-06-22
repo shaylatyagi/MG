@@ -28,7 +28,6 @@ import {
 import Chatbot from '../components/Chatbot';  // ← "UniversalChatbot" ki jagah "Chatbot"
 import DocumentSection from '../components/DocumentSection';
 import PaymentLinks from './owner/PaymentLinks';
-import ThemeToggle from '../components/ThemeToggle';
 const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
 const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [ledgerData, setLedgerData] = useState([]);
@@ -4544,7 +4543,6 @@ const TrackFleetTab = () => {
               <button onClick={() => setLang('en')} className={`px-2 py-1 text-[10px] font-black rounded-md transition ${lang==='en'?'bg-white text-indigo-600 shadow-sm':'text-slate-600'}`}>EN</button>
               <button onClick={() => setLang('hi')} className={`px-2 py-1 text-[10px] font-black rounded-md transition ${lang==='hi'?'bg-white text-indigo-600 shadow-sm':'text-slate-600'}`}>हिं</button>
             </div>
-            <ThemeToggle />
             {/* AI Assistant */}
             <button onClick={() => setShowChatbot(true)} className="w-8 h-8 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition flex items-center justify-center" title="AI Assistant">
               <MessageCircle size={15} className="text-indigo-600" />

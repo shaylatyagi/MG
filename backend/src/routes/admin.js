@@ -1550,4 +1550,124 @@ router.get('/chat/messages', async (req, res) => {
   }
 });
 
+// ─── CASH PAYMENT MANAGEMENT ─────────────────────────────────────────────────
+
+// GET /api/admin/drivers/cash-payments?ownerName=&driverName=
+// Preview cash payments before deleting
+router.get('/drivers/cash-payments', async (req, res) => {
+  try {
+    const { ownerName, driverName, driverPhone } = req.query;
+    let where = `mo.payment_mode = 'CASH'`;
+    const params = [];
+    if (driverPhone) {
+      params.push(driverPhone);
+      where += ` AND mo.payer_mobile = $${params.length}`;
+    } else if (driverName) {
+      params.push(`%${driverName}%`);
+      where += ` AND (mo.payer_name ILIKE $${params.length} OR d.full_name ILIKE $${params.length})`;
+    }
+    if (ownerName) {
+      params.push(`%${ownerName}%`);
+      where += ` AND o.full_name ILIKE $${params.length}`;
+    }
+    const result = await pool.query(
+      `SELECT mo.order_id, mo.order_number, mo.order_amount, mo.order_completion_date,
+              mo.payer_mobile, mo.payer_name, mo.driver_code, mo.owner_code,
+              d.full_name as driver_name, o.full_name as owner_name
+       FROM public.ms_orders mo
+       LEFT JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+       LEFT JOIN public.owners o ON o.owner_code = mo.owner_code
+       WHERE ${where}
+       ORDER BY mo.order_completion_date DESC`,
+      params
+    );
+    res.json({ success: true, count: result.rows.length, payments: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/admin/drivers/cash-payments
+// Body: { ownerName, driverName } OR { orderIds: [...] }
+// Deletes cash payments and recalculates wallet_balance
+router.delete('/drivers/cash-payments', async (req, res) => {
+  try {
+    const { ownerName, driverName, driverPhone, orderIds } = req.body;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      let toDelete;
+      if (orderIds && orderIds.length) {
+        // Delete specific order IDs
+        const result = await client.query(
+          `SELECT order_id, order_amount, payer_mobile FROM public.ms_orders
+           WHERE order_id = ANY($1) AND payment_mode = 'CASH'`,
+          [orderIds]
+        );
+        toDelete = result.rows;
+      } else {
+        // Find by owner + driver name/phone
+        let where = `mo.payment_mode = 'CASH'`;
+        const params = [];
+        if (driverPhone) {
+          params.push(driverPhone);
+          where += ` AND mo.payer_mobile = $${params.length}`;
+        } else if (driverName) {
+          params.push(`%${driverName}%`);
+          where += ` AND (mo.payer_name ILIKE $${params.length} OR d.full_name ILIKE $${params.length})`;
+        }
+        if (ownerName) {
+          params.push(`%${ownerName}%`);
+          where += ` AND o.full_name ILIKE $${params.length}`;
+        }
+        const result = await client.query(
+          `SELECT mo.order_id, mo.order_amount, mo.payer_mobile
+           FROM public.ms_orders mo
+           LEFT JOIN public.drivers d ON d.mobile_number = mo.payer_mobile
+           LEFT JOIN public.owners o ON o.owner_code = mo.owner_code
+           WHERE ${where}`,
+          params
+        );
+        toDelete = result.rows;
+      }
+
+      if (!toDelete.length) {
+        await client.query('ROLLBACK');
+        return res.json({ success: true, deleted: 0, message: 'No matching cash payments found' });
+      }
+
+      // Delete from ms_orders
+      const ids = toDelete.map(r => r.order_id);
+      await client.query(
+        `DELETE FROM public.ms_orders WHERE order_id = ANY($1)`, [ids]
+      );
+
+      // Reverse wallet_balance for each affected driver
+      const byPhone = {};
+      for (const r of toDelete) {
+        if (!r.payer_mobile) continue;
+        byPhone[r.payer_mobile] = (byPhone[r.payer_mobile] || 0) + parseFloat(r.order_amount);
+      }
+      for (const [phone, total] of Object.entries(byPhone)) {
+        await client.query(
+          `UPDATE public.drivers SET wallet_balance = GREATEST(0, COALESCE(wallet_balance,0) - $1)
+           WHERE mobile_number = $2`,
+          [total, phone]
+        );
+      }
+
+      await client.query('COMMIT');
+      res.json({ success: true, deleted: toDelete.length, total_reversed: Object.values(byPhone).reduce((a,b)=>a+b,0) });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

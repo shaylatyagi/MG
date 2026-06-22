@@ -127,25 +127,26 @@ function LandingPage() {
       </div>
 
       <section className="hero">
-        <div className="hero-content container">
-          <div className="hero-badge">
-            <div className="hero-badge-dot" />
-            <span className="hero-badge-text">Now in private beta · Onboarding fleets across India</span>
+        <div className="hero-split">
+          <div className="hero-left">
+            <div className="hero-badge">
+              <div className="hero-badge-dot" />
+              <span className="hero-badge-text">Now in private beta · Onboarding fleets across India</span>
+            </div>
+            <h1>
+              The Operating<br />
+              System for India's<br />
+              <em>Fleet Operations</em>
+            </h1>
+            <p className="hero-sub">
+              Digital rent collection, driver KYC, fleet management, and earnings tracking. Built from the ground up for how India's gig workforce actually lives and works.
+            </p>
+            <div className="hero-ctas">
+              <a href="#signup" className="btn btn-primary btn-lg">Get Early Access</a>
+              <Link to="/login" className="btn btn-outline-light btn-lg">See the Product</Link>
+            </div>
           </div>
-          <h1>
-            The Operating<br />
-            System for India's<br />
-            <em>Fleet Operations</em>
-          </h1>
-          <p className="hero-sub">
-            Digital rent collection, driver KYC, fleet management, and earnings tracking — built from the ground up for how India's gig workforce actually lives and works.
-          </p>
-          <div className="hero-ctas">
-            <a href="#signup" className="btn btn-primary btn-lg">Get Early Access</a>
-            <Link to="/login" className="btn btn-outline-light btn-lg">See the Product</Link>
-          </div>
-        </div>
-        <div className="hero-preview container-wide">
+          <div className="hero-right">
           <div className="preview-glow" />
           <div className="browser-mock">
             <div className="browser-bar">
@@ -205,6 +206,7 @@ function LandingPage() {
               </div>
             </div>
           </div>
+          </div>
         </div>
       </section>
 
@@ -224,7 +226,7 @@ function LandingPage() {
         </div>
       </div>
 
-      <section className="vm-section" id="vision">
+<section className="vm-section" id="vision">
         <div className="container">
           <div className="vm-grid">
             <div>
@@ -237,7 +239,7 @@ function LandingPage() {
                     </svg>
                   </div>
                   <h2 className="vm-card-title">Our Vision</h2>
-                  <p>A world where every fleet operator and gig worker in India has the infrastructure, visibility, and tools to build a financially secure livelihood — on their own terms.</p>
+                  <p>A world where every fleet operator and gig worker in India has the infrastructure, visibility, and tools to build a financially secure livelihood. On their own terms.</p>
                 </div>
                 <div className="vm-card" style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%)' }}>
                   <div className="vm-card-icon">
@@ -246,15 +248,15 @@ function LandingPage() {
                     </svg>
                   </div>
                   <h2 className="vm-card-title">Our Mission</h2>
-                  <p>To close the three structural gaps — Time, Payment, and Asset — that hold India's gig workforce back, by building an operating ecosystem designed entirely around how they actually earn and live.</p>
+                  <p>To close the three structural gaps (Time, Payment, and Asset) that hold India's gig workforce back, by building an operating ecosystem designed entirely around how they actually earn and live.</p>
                 </div>
               </div>
             </div>
             <div className="vm-text">
               <p className="section-label">Why We Exist</p>
               <h2 className="display" style={{ marginBottom: '24px' }}>Most people see the <em>convenience.</em></h2>
-              <p>Every day, millions of drivers, riders, and logistics workers power the Indian city — delivering food, ferrying passengers, moving goods. They are the circulatory system of the modern urban economy.</p>
-              <p>Yet the infrastructure built around them was never truly designed for <strong>how they live and work</strong>. Fleet operators — often small business owners managing 5 to 500 vehicles — carry enormous operational weight on fragmented, manual systems: WhatsApp messages, paper ledgers, and disconnected spreadsheets.</p>
+              <p>Every day, millions of drivers, riders, and logistics workers power the Indian city: delivering food, ferrying passengers, moving goods. They are the circulatory system of the modern urban economy.</p>
+              <p>Yet the infrastructure built around them was never truly designed for <strong>how they live and work</strong>. Fleet operators, often small business owners managing 5 to 500 vehicles, carry enormous operational weight on fragmented, manual systems: WhatsApp messages, paper ledgers, and disconnected spreadsheets.</p>
               <p>We spent months listening to the ground truth. What we found is not a technology problem. It is a <strong>design problem</strong>. The products built for this workforce were designed around the platform's convenience, not the person doing the work.</p>
               <p>MobilityGrid is our answer to that.</p>
             </div>
@@ -316,7 +318,7 @@ function LandingPage() {
           <div className="product-header">
             <p className="section-label">The Platform</p>
             <h2 className="display">One ecosystem. <em>Three stakeholders.</em></h2>
-            <p>MobilityGrid is not a single app — it is a coordinated operating system with purpose-built interfaces for every actor in the fleet operations.</p>
+            <p>MobilityGrid is not a single app. It is a coordinated operating system with purpose-built interfaces for every actor in the fleet.</p>
           </div>
 
           <div className="product-tabs">
@@ -336,13 +338,13 @@ function LandingPage() {
               <div className="panel-content">
                 <span className="tag tag-indigo">Super Admin</span>
                 <h3>Full platform oversight from one console</h3>
-                <p>The Super Admin Console gives the MobilityGrid team complete visibility over every company, fleet owner, driver, and payment on the platform — with tools to onboard, approve, and monitor at scale.</p>
+                <p>The Super Admin Console gives the MobilityGrid team complete visibility over every company, fleet owner, driver, and payment on the platform. With tools to onboard, approve, and monitor at scale.</p>
                 <ul className="panel-features">
                   <li className="panel-feature"><span className="pf-check">✓</span>Company onboarding and fleet operator management</li>
-                  <li className="panel-feature"><span className="pf-check">✓</span>Driver KYC review queue — approve Aadhaar, PAN, DL, Bank</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Driver KYC review queue: Aadhaar, PAN, DL, Bank</li>
                   <li className="panel-feature"><span className="pf-check">✓</span>Real-time platform GMV and collections dashboard</li>
                   <li className="panel-feature"><span className="pf-check">✓</span>Cross-fleet driver and vehicle registry</li>
-                  <li className="panel-feature"><span className="pf-check">✓</span>Role-based access — admin, manager, read-only</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Role-based access: admin, manager, read-only</li>
                 </ul>
               </div>
               <div className="panel-visual">
@@ -405,10 +407,10 @@ function LandingPage() {
               <div className="panel-content">
                 <span className="tag tag-gold">Fleet Owner</span>
                 <h3>Complete fleet visibility, zero spreadsheets</h3>
-                <p>The Fleet Owner Dashboard replaces WhatsApp groups, paper ledgers, and Excel files with a single source of truth — so every operator knows exactly who has paid, who hasn't, and what their fleet is worth today.</p>
+                <p>The Fleet Owner Dashboard replaces WhatsApp groups, paper ledgers, and Excel files with one single source of truth. Every operator can see exactly who has paid, who hasn't, and what their fleet is worth today.</p>
                 <ul className="panel-features">
-                  <li className="panel-feature"><span className="pf-check">✓</span>Live dashboard — vehicles, drivers, outstanding dues</li>
-                  <li className="panel-feature"><span className="pf-check">✓</span>UPI payment links — send directly to driver via WhatsApp</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Live dashboard: vehicles, drivers, outstanding dues</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>UPI payment links you can send directly to drivers via WhatsApp</li>
                   <li className="panel-feature"><span className="pf-check">✓</span>Transaction history with driver-wise breakdown</li>
                   <li className="panel-feature"><span className="pf-check">✓</span>Driver onboarding with agreement upload and address verification</li>
                   <li className="panel-feature"><span className="pf-check">✓</span>Vehicle assignment and daily rent tracking</li>
@@ -454,12 +456,12 @@ function LandingPage() {
               <div className="panel-content">
                 <span className="tag tag-slate">Driver</span>
                 <h3>Your earnings, your vehicle, your future</h3>
-                <p>The Driver Terminal is a mobile-first terminal designed for low-end Android devices and 2G/3G networks. It gives every driver full transparency into their financial relationship with their fleet — in English and Hindi.</p>
+                <p>The Driver Terminal is a mobile-first app designed for low-end Android devices and 2G/3G networks. It gives every driver full transparency into their financial relationship with their fleet, in English and Hindi.</p>
                 <ul className="panel-features">
                   <li className="panel-feature"><span className="pf-check">✓</span>Wallet balance, daily dues, and outstanding amount</li>
-                  <li className="panel-feature"><span className="pf-check">✓</span>Pay rent instantly via UPI — any amount, any time</li>
-                  <li className="panel-feature"><span className="pf-check">✓</span>Private earnings tracker — only visible to the driver</li>
-                  <li className="panel-feature"><span className="pf-check">✓</span>KYC document upload — Aadhaar, PAN, Driving Licence</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Pay rent instantly via UPI, any amount, any time</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>Private earnings tracker, visible only to the driver</li>
+                  <li className="panel-feature"><span className="pf-check">✓</span>KYC document upload: Aadhaar, PAN, Driving Licence</li>
                   <li className="panel-feature"><span className="pf-check">✓</span>Full transaction history with downloadable receipts</li>
                 </ul>
               </div>
@@ -533,40 +535,46 @@ function LandingPage() {
       <section className="features-section">
         <div className="container">
           <div className="features-header">
-            <p className="section-label section-label-light">Platform Capabilities</p>
-            <h2 className="display display-light">Everything the fleet operations needs,<br /><em>nothing it doesn't</em></h2>
-            <p>Every feature was built from direct research with fleet operators and drivers across India — not from assumptions.</p>
+            <p className="section-label">Platform Capabilities</p>
+            <h2 className="display">Everything the fleet operations needs,<br /><em>nothing it doesn't</em></h2>
+            <p>Every feature was built from direct research with fleet operators and drivers across India. Not from assumptions.</p>
           </div>
           <div className="features-grid">
             <div className="feature-cell">
               <div className="feature-icon">💳</div>
               <div className="feature-title">UPI Rent Collection</div>
               <div className="feature-body">Verified digital payments via MobilityGrid. Drivers pay through any UPI app. Owners see collections in real time with a full audit trail.</div>
+              <a href="#product" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">🪪</div>
               <div className="feature-title">Driver KYC & Verification</div>
               <div className="feature-body">Aadhaar, PAN, Driving Licence, and bank verification managed through an admin queue.</div>
+              <a href="#product" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">📊</div>
               <div className="feature-title">Live Fleet Dashboard</div>
               <div className="feature-body">Real-time visibility across your vehicles, drivers, and collections in a single system.</div>
+              <a href="#product" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">🔒</div>
               <div className="feature-title">Private Earnings Tracker</div>
-              <div className="feature-body">Drivers track earnings privately — helping build trust while keeping operations transparent.</div>
+              <div className="feature-body">Drivers track earnings privately, which helps build trust while keeping operations transparent.</div>
+              <a href="#product" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">📁</div>
               <div className="feature-title">Compliance Vault</div>
               <div className="feature-body">Store documents, RC copies, and KYC files in one searchable place.</div>
+              <a href="#product" className="feature-link">Learn more →</a>
             </div>
             <div className="feature-cell">
               <div className="feature-icon">🌐</div>
               <div className="feature-title">Hindi + English Interface</div>
               <div className="feature-body">The driver terminal supports both Hindi and English for real-world usability.</div>
+              <a href="#product" className="feature-link">Learn more →</a>
             </div>
           </div>
         </div>
@@ -577,7 +585,7 @@ function LandingPage() {
           <div className="how-header">
             <p className="section-label">How It Works</p>
             <h2 className="display">Up and running in <em>four steps</em></h2>
-            <p>From fleet onboarding to digital collections — the process is designed to be simple, fast, and reliable.</p>
+            <p>From fleet onboarding to digital collections, the process is designed to be simple, fast, and reliable.</p>
           </div>
           <div className="how-steps">
             <div className="how-step">
@@ -694,7 +702,7 @@ function LandingPage() {
                 <li><span className="pf-check">✓</span> Custom payment cycles</li>
                 <li><span className="pf-check">✓</span> Driver performance tracking</li>
               </ul>
-              <div className="pricing-note">First 10 drivers — 50% off for 3 months</div>
+              <div className="pricing-note">First 10 drivers: 50% off for 3 months</div>
               <a href="/login?role=owner&signup=true" className="pricing-btn pricing-btn-primary">Start Growing</a>
             </div>
 
@@ -780,7 +788,7 @@ function LandingPage() {
         </div>
       </section>
 
-      <section className="signup-section" id="signup">
+<section className="signup-section" id="signup">
         <div className="container signup-inner">
           <div className="signup-grid">
             <div className="signup-left">
@@ -823,7 +831,7 @@ function LandingPage() {
                   </div>
 
                   <div className="field">
-                    <label>Email Address <span style={{fontWeight:400,color:'#94a3b8',fontSize:'12px'}}>(optional — for confirmation)</span></label>
+                    <label>Email Address <span style={{fontWeight:400,color:'#94a3b8',fontSize:'12px'}}>(optional, for confirmation)</span></label>
                     <input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="you@example.com" />
                   </div>
 
@@ -894,7 +902,7 @@ function LandingPage() {
               <div className="footer-logo">
                 <BrandLogo variant="cyan" height={31} alt="MobilityGrid" />
               </div>
-              <p className="footer-tagline">The operating system for India's fleet operations — built for every operator, manager, and driver.</p>
+              <p className="footer-tagline">The operating system for India's fleet operations. Built for every operator, manager, and driver.</p>
               <div className="footer-badge">
                 <div className="footer-badge-dot" />
                 <span className="footer-badge-text">India's Fleet Operating System</span>

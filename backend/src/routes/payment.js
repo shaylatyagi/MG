@@ -2383,19 +2383,20 @@ router.get('/owner/notifications', verifyToken, async (req, res) => {
     const { ownerId } = req.query;
     if (!ownerId) return res.status(400).json({ message: 'Owner ID required' });
     
-    // Owner-targeted notifications only (driver rent reminders excluded)
+    // Owner-targeted notifications: driver-linked ones + direct user_id ones (e.g. security alerts)
     const notifResult = await pool.query(
       `SELECT n.id, n.driver_id, n.title, n.message, n.is_read,
               n.created_at, n.metadata, d.full_name as driver_name
        FROM public.notifications n
        LEFT JOIN public.drivers d ON d.id = n.driver_id
-       WHERE n.user_type = 'OWNER' 
-AND n.driver_id IN (
-  SELECT id FROM public.drivers 
-  WHERE owner_code = (
-    SELECT owner_code FROM public.owners WHERE id = $1
-  )
-)
+       WHERE n.user_type = 'OWNER'
+         AND (
+           n.user_id = $1
+           OR n.driver_id IN (
+             SELECT id FROM public.drivers
+             WHERE owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
+           )
+         )
        ORDER BY n.created_at DESC
        LIMIT 50`,
       [ownerId]

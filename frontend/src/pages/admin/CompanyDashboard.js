@@ -1,6 +1,7 @@
 import { vehicleTypeLabel } from '../../constants/vehicleTypes';
 import React, { useState, useEffect, useCallback, useRef, Component } from 'react';
 import { toast, ToastContainer } from '../../components/Toast';
+import ThemeToggle, { useTheme } from '../../components/ThemeToggle';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -85,8 +86,6 @@ const apiUpload = async (path, formData) => {
   return data;
 };
 
-
-
 // ── Shared UI components (all at module level — never defined inside render) ──
 
 const Badge = ({ status }) => {
@@ -104,65 +103,75 @@ const Badge = ({ status }) => {
     FAILED:      'bg-red-100 text-red-700',
   };
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 dark:bg-gray-700  text-gray-600 dark:text-gray-400 '}`}>
       {status || 'N/A'}
     </span>
   );
 };
 
 const StatCard = ({ label, value, sub, color = 'indigo' }) => {
-  const lightBorders = { indigo:'border-indigo-400', green:'border-green-400', blue:'border-blue-400', orange:'border-orange-400', red:'border-red-400' };
+  const borders = { indigo:'border-indigo-400', green:'border-green-400', blue:'border-blue-400', orange:'border-orange-400', red:'border-red-400' };
   return (
-    <div className={`border-l-4 rounded-lg p-4 shadow-sm bg-white ${lightBorders[color] || lightBorders.indigo}`}>
-      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
+    <div className={`border-l-4 rounded-lg p-4 shadow-sm bg-white dark:bg-gray-800 ${borders[color] || borders.indigo}`}>
+      <p className="text-xs text-gray-500 dark:text-gray-300 uppercase tracking-wide">{label}</p>
+      <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-500 dark:text-gray-300 mt-1">{sub}</p>}
     </div>
   );
 };
 
-const Modal = ({ title, onClose, onBack, breadcrumbs, children, wide }) => {
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-8 px-4">
-      <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 25px 50px rgba(0,0,0,0.5)', width: '100%', maxWidth: wide ? 1000 : 640, position: 'relative' }}>
-        {breadcrumbs && breadcrumbs.length > 0 && (
-          <div className="px-6 pt-4 pb-0 flex items-center gap-1 text-xs flex-wrap" style={{ color: '#9ca3af' }}>
-            {breadcrumbs.map((crumb, i) => (
-              <span key={i} className="flex items-center gap-1">
-                {i > 0 && <span>›</span>}
-                <span style={{ color: i === breadcrumbs.length - 1 ? '#6366f1' : undefined }}>{crumb}</span>
-              </span>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #e5e7eb' }}>
-          <div className="flex items-center gap-3">
-            {onBack && <button onClick={onBack} style={{ color: '#6b7280', fontSize: 13, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}>← Back</button>}
-            <h3 style={{ fontWeight: 700, color: '#1f2937', fontSize: 18, margin: 0 }}>{title}</h3>
-          </div>
-          <button onClick={onClose} style={{ color: '#9ca3af', fontSize: 20, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>×</button>
+// Modal — supports breadcrumb trail + back button
+// breadcrumbs = ['Companies', 'TechCorp', 'John Owner'] (renders path above title)
+// onBack = go one level up (shows ← Back button)
+// onClose = close entire modal chain (shows × button)
+const Modal = ({ title, onClose, onBack, breadcrumbs, children, wide }) => (
+  <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-8 px-4">
+    <div className={`bg-white dark:bg-gray-900   rounded-2xl shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-2xl'} relative`}>
+      {/* Breadcrumb trail */}
+      {breadcrumbs && breadcrumbs.length > 0 && (
+        <div className="px-6 pt-4 pb-0 flex items-center gap-1 text-xs text-gray-400  flex-wrap">
+          {breadcrumbs.map((crumb, i) => (
+            <span key={i} className="flex items-center gap-1">
+              {i > 0 && <span className="text-gray-600 dark:text-gray-400  ">›</span>}
+              <span className={i === breadcrumbs.length - 1 ? 'text-indigo-600 font-medium' : ''}>{crumb}</span>
+            </span>
+          ))}
         </div>
-        <div className="p-6">{children}</div>
+      )}
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b ">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button onClick={onBack}
+              className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400  hover:text-indigo-600 font-medium transition">
+              ← Back
+            </button>
+          )}
+          <h3 className="font-bold text-gray-800 dark:text-white   text-lg">{title}</h3>
+        </div>
+        <button onClick={onClose} title="Close"
+          className="text-gray-400  hover:text-gray-700 dark:text-gray-300  :text-gray-700 dark:text-gray-300  text-xl font-bold leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:bg-gray-700  :bg-gray-100 dark:bg-gray-700  transition">
+          ×
+        </button>
       </div>
+      <div className="p-6">{children}</div>
     </div>
-  );
-};
+  </div>
+);
 
 const Spinner = () => (
-  <div className="flex items-center justify-center h-48" style={{ color: '#94a3b8' }}>
+  <div className="flex items-center justify-center h-48 text-gray-400 ">
     <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full mr-2" />
     Loading…
   </div>
 );
 
-const Row = ({ label, value }) => {
-  return (
-    <div className="flex justify-between items-start">
-      <span style={{ color: '#6b7280' }} className="shrink-0 mr-4">{label}</span>
-      <span style={{ color: '#1f2937' }} className="font-medium text-right">{value ?? '—'}</span>
-    </div>
-  );
-};
+const Row = ({ label, value }) => (
+  <div className="flex justify-between items-start">
+    <span className="text-gray-500 dark:text-gray-400   shrink-0 mr-4">{label}</span>
+    <span className="text-gray-800 dark:text-white   font-medium text-right">{value ?? '—'}</span>
+  </div>
+);
 
 // ── DOCUMENTS SECTION ─────────────────────────────────────────────────────────
 // Reusable for driver / owner / company document management
@@ -482,14 +491,14 @@ function Dashboard({ onSetTab }) {
 
   // Big stat card for dashboard
   const BigStatCard = ({ label, value, sub, icon, accent }) => (
-    <div style={{ background: '#fff', borderRadius:14, border: '1px solid #e5e7eb', padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', alignItems:'center', gap:14 }}>
-      <div style={{ width:46, height:46, borderRadius:12, background:accent+'28', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
+    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e5e7eb', padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.04)', display:'flex', alignItems:'center', gap:14 }}>
+      <div style={{ width:46, height:46, borderRadius:12, background:accent+'18', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
         {icon}
       </div>
       <div>
-        <p style={{ fontSize:24, fontWeight:800, color: '#111827', margin:0, lineHeight:1.1 }}>{value}</p>
-        <p style={{ fontSize:11, fontWeight:600, color: '#6b7280', margin:'3px 0 0', textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</p>
-        {sub && <p style={{ fontSize:11, color: '#9ca3af', margin:'2px 0 0' }}>{sub}</p>}
+        <p style={{ fontSize:24, fontWeight:800, color:'#111827', margin:0, lineHeight:1.1 }}>{value}</p>
+        <p style={{ fontSize:11, fontWeight:600, color:'#6b7280', margin:'3px 0 0', textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</p>
+        {sub && <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>{sub}</p>}
       </div>
     </div>
   );
@@ -500,8 +509,8 @@ function Dashboard({ onSetTab }) {
       {/* Title + quick actions */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
-          <h2 style={{ fontSize:20, fontWeight:800, color: '#111827', margin:0 }}>Platform Dashboard</h2>
-          <p style={{ fontSize:12, color: '#9ca3af', margin:'3px 0 0' }}>MobilityGrid fleet overview · live data</p>
+          <h2 style={{ fontSize:20, fontWeight:800, color:'#111827', margin:0 }}>Platform Dashboard</h2>
+          <p style={{ fontSize:12, color:'#9ca3af', margin:'3px 0 0' }}>MobilityGrid fleet overview · live data</p>
         </div>
       </div>
 
@@ -547,23 +556,22 @@ function Dashboard({ onSetTab }) {
       </div>
 
       {/* KYC overview */}
-      <div style={{ background: '#fff', borderRadius:14, border:'1px solid #e5e7eb', padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
+      <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e5e7eb', padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-          <h3 style={{ fontSize:14, fontWeight:700, color: '#111827', margin:0 }}>KYC Status Overview</h3>
-          {onSetTab && <button onClick={() => onSetTab('kyc')} style={{ fontSize:12, fontWeight:600, color:'#818cf8', background:'none', border:'none', cursor:'pointer' }}>View all →</button>}
+          <h3 style={{ fontSize:14, fontWeight:700, color:'#111827', margin:0 }}>KYC Status Overview</h3>
+          {onSetTab && <button onClick={() => onSetTab('kyc')} style={{ fontSize:12, fontWeight:600, color:'#4f46e5', background:'none', border:'none', cursor:'pointer' }}>View all →</button>}
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:8 }}>
           {['VERIFIED','PENDING','SUBMITTED','UNDER_REVIEW','REJECTED'].map(status => (
             <button key={status} onClick={() => onSetTab && onSetTab('kyc')} style={{
-              textAlign:'center', padding:'12px 8px', borderRadius:10,
-              border: '1px solid #f3f4f6',
-              background: '#f9fafb',
-              cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s',
+              textAlign:'center', padding:'12px 8px', borderRadius:10, border:'1px solid #f3f4f6',
+              background:'#f9fafb', cursor:'pointer', fontFamily:'inherit',
+              transition:'all 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#eef2ff'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#f9fafb'; }}
+            onMouseEnter={e => { e.currentTarget.style.background='#eef2ff'; e.currentTarget.style.borderColor='#c7d2fe'; }}
+            onMouseLeave={e => { e.currentTarget.style.background='#f9fafb'; e.currentTarget.style.borderColor='#f3f4f6'; }}
             >
-              <p style={{ fontSize:22, fontWeight:800, color: '#111827', margin:0 }}>{k[status] || 0}</p>
+              <p style={{ fontSize:22, fontWeight:800, color:'#111827', margin:0 }}>{k[status] || 0}</p>
               <div style={{ marginTop:4 }}><Badge status={status} /></div>
             </button>
           ))}
@@ -2060,10 +2068,14 @@ function AllDrivers() {
             const kycBg    = {VERIFIED:'#ecfdf5',REJECTED:'#fef2f2',SUBMITTED:'#eff6ff',UNDER_REVIEW:'#fffbeb',PENDING:'#f8fafc'}[d.kyc_status]||'#f8fafc';
             return (
               <div key={d.id} className="press-card"
-                style={{background:'white', borderRadius:16, padding:'14px 16px', border:'1px solid #f1f5f9', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`3px solid ${d.vehicle_number ? '#22c55e' : '#e2e8f0'}`}}
+                style={{background:'white',borderRadius:16,padding:'14px 16px',border:'1px solid #f1f5f9',boxShadow:'0 1px 4px rgba(0,0,0,0.04)',borderLeft:`3px solid ${d.vehicle_number ? '#22c55e' : '#e2e8f0'}`}}
                 onClick={() => push({ type: 'driver', id: d.id, label: d.full_name })}>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  <div style={{width:42,height:42,borderRadius:14,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>{ch}</div>
+                  {/* Avatar */}
+                  <div style={{width:42,height:42,borderRadius:14,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>
+                    {ch}
+                  </div>
+                  {/* Info */}
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                       <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{d.full_name}</span>
@@ -2071,13 +2083,22 @@ function AllDrivers() {
                     </div>
                     <p style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace',marginTop:2}}>{d.mobile_number}</p>
                   </div>
+                  {/* Arrow */}
                   <svg width={14} height={14} fill="none" stroke="#cbd5e1" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
                 </div>
+                {/* Details row */}
                 <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-                  {d.vehicle_number && <span style={{fontSize:10,fontWeight:600,color:'#059669',background:'#ecfdf5',padding:'3px 10px',borderRadius:20}}>🚗 {d.vehicle_number}</span>}
-                  {d.company_name && <span style={{fontSize:10,fontWeight:600,color:'#475569',background:'#f8fafc',padding:'3px 10px',borderRadius:20,border:'1px solid #e2e8f0'}}>{d.company_name}</span>}
-                  {d.owner_name && <span style={{fontSize:10,fontWeight:600,color:'#6366f1',background:'#eef2ff',padding:'3px 10px',borderRadius:20}}>👤 {d.owner_name}</span>}
+                  {d.vehicle_number && (
+                    <span style={{fontSize:10,fontWeight:600,color:'#059669',background:'#ecfdf5',padding:'3px 10px',borderRadius:20}}>🚗 {d.vehicle_number}</span>
+                  )}
+                  {d.company_name && (
+                    <span style={{fontSize:10,fontWeight:600,color:'#475569',background:'#f8fafc',padding:'3px 10px',borderRadius:20,border:'1px solid #e2e8f0'}}>{d.company_name}</span>
+                  )}
+                  {d.owner_name && (
+                    <span style={{fontSize:10,fontWeight:600,color:'#6366f1',background:'#eef2ff',padding:'3px 10px',borderRadius:20}}>👤 {d.owner_name}</span>
+                  )}
                 </div>
+                {/* Revenue row */}
                 <div style={{display:'flex',gap:16,marginTop:10,paddingTop:10,borderTop:'1px solid #f8fafc'}}>
                   <div>
                     <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Today</p>
@@ -2190,12 +2211,17 @@ function AllOwners() {
             return (
               <div key={o.id} style={{
                 background:'white', borderRadius:16, border:'1px solid #e5e7eb',
-                boxShadow:'0 1px 6px rgba(0,0,0,0.08)', overflow:'hidden',
+                boxShadow:'0 1px 6px rgba(0,0,0,0.05)', overflow:'hidden',
                 display:'flex', flexDirection:'column',
               }}>
+                {/* Card top */}
                 <div style={{padding:'16px 18px 12px', flex:1}}>
                   <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
-                    <div style={{width:40,height:40,borderRadius:12,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>{ch}</div>
+                    {/* Avatar */}
+                    <div style={{width:40,height:40,borderRadius:12,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>
+                      {ch}
+                    </div>
+                    {/* Name + status */}
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                         <span style={{fontSize:14,fontWeight:700,color:'#111827',lineHeight:1.3}}>{o.full_name}</span>
@@ -2213,39 +2239,42 @@ function AllOwners() {
                     </div>
                   </div>
 
+                  {/* Owner ID row */}
                   <div style={{marginTop:10,padding:'8px 10px',background:'#f9fafb',borderRadius:8,border:'1px solid #f3f4f6'}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
                       <div>
-                        <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Owner ID</p>
+                        <p style={{fontSize:9,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Owner ID</p>
                         <p style={{fontSize:12,fontWeight:700,color:'#4f46e5',fontFamily:'monospace',margin:'2px 0 0'}}>{o.owner_code}</p>
                       </div>
                       <div style={{textAlign:'right'}} onClick={e => e.stopPropagation()}>
-                        <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Mobile</p>
+                        <p style={{fontSize:9,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Mobile</p>
                         <div style={{display:'flex',alignItems:'center',gap:4}}>
                           <p style={{fontSize:12,fontWeight:600,color:'#374151',fontFamily:'monospace',margin:'2px 0 0'}}>{o.mobile_number}</p>
                           <button onClick={e => startEditPhone(e, o)}
-                            style={{fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',padding:'0 2px',marginTop:2}}
+                            style={{fontSize:10,color:'#9ca3af',background:'none',border:'none',cursor:'pointer',padding:'0 2px',marginTop:2}}
                             title="Edit phone">✏️</button>
                         </div>
                       </div>
                     </div>
                   </div>
 
+                  {/* Stats row */}
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:0,marginTop:12,paddingTop:12,borderTop:'1px solid #f3f4f6'}}>
                     {[
                       {val: o.total_drivers||0,   label:'Drivers',  color:'#111827'},
                       {val: o.total_vehicles||0,  label:'Vehicles', color:'#111827'},
-                      {val: fmt(o.collection_month), label:'This Month', color:'#22c55e'},
+                      {val: fmt(o.collection_month), label:'This Month', color:'#059669'},
                       {val: fmt(o.collection_total), label:'Total',     color:'#111827'},
                     ].map(({val,label,color}) => (
-                      <div key={label} style={{textAlign:'center',borderRight:'1px solid #f3f4f6',padding:'0 4px'}}>
+                      <div key={label} style={{textAlign:'center',borderRight:'1px solid #f3f4f6',padding:'0 4px',lastChild:{borderRight:'none'}}}>
                         <p style={{fontSize:13,fontWeight:800,color,margin:0,fontFamily:label.includes('Month')||label==='Total'?'monospace':'inherit'}}>{val}</p>
-                        <p style={{fontSize:9,fontWeight:600,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em',margin:'2px 0 0'}}>{label}</p>
+                        <p style={{fontSize:9,fontWeight:600,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'2px 0 0'}}>{label}</p>
                       </div>
                     ))}
                   </div>
                 </div>
 
+                {/* Action buttons row — PayYantra style */}
                 <div style={{display:'flex',borderTop:'1px solid #f3f4f6',background:'#fafafa'}}>
                   {[
                     { label:'Details',  onClick: () => push({ type:'owner', id:o.id, label:o.full_name }), primary:true },
@@ -2811,9 +2840,9 @@ function LeadsSection() {
         </button>
       </div>
       {loading ? <p style={{ color: '#64748b' }}>Loading…</p> : leads.length === 0 ? (
-        <p style={{ color: '#64748b', textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
+        <p style={{ color: '#94a3b8', textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
       ) : (
-        <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+        <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#f8fafc' }}>
@@ -2824,9 +2853,9 @@ function LeadsSection() {
             </thead>
             <tbody>
               {leads.map((l, i) => (
-                <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: i%2===0?'#fff':'#fafafa' }}>
+                <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                   <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{l.name}</td>
-                  <td style={{ padding: '10px 12px', color: '#818cf8', fontWeight: 600 }}>{l.phone}</td>
+                  <td style={{ padding: '10px 12px', color: '#4f46e5', fontWeight: 600 }}>{l.phone}</td>
                   <td style={{ padding: '10px 12px', color: '#334155' }}>{l.company || '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#334155' }}>{l.role || '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#334155' }}>{l.fleet || '—'}</td>
@@ -3059,7 +3088,6 @@ function AdminPanelInner() {
   const [showNotifs, setShowNotifs] = useState(false);
   const { notifications, unread, markAllRead } = useAdminNotifications();
 
-
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
   const navItems = [
@@ -3086,7 +3114,7 @@ function AdminPanelInner() {
   const tabLabel = navItems.find(n => n.key && n.key === tab)?.label || tab;
 
   return (
-    <div style={{ display:'flex', height:'100vh', background: '#f3f4f6', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+    <div className="" style={{ display:'flex', height:'100vh', background: '#f3f4f6', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside style={{
@@ -3159,7 +3187,6 @@ function AdminPanelInner() {
         {/* Bottom — logout */}
         <div style={{ padding: '8px', borderTop: '1px solid #e5e7eb' }}>
 
-
           <button onClick={logout} style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 10,
             padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -3224,4 +3251,98 @@ function AdminPanelInner() {
               {showNotifs && (
                 <div style={{
                   position: 'absolute', right: 0, top: 44, width: 320,
-                  background: '#ff
+                  background: '#fff',
+                  borderRadius: 12,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                  border: '1px solid #e5e7eb',
+                  zIndex: 50, overflow: 'hidden'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${'#f3f4f6'}` }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>Notifications</span>
+                    <button onClick={markAllRead} style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Mark all read</button>
+                  </div>
+                  <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
+                    ) : notifications.map(n => (
+                      <div key={n.id} style={{
+                        padding: '12px 16px',
+                        borderBottom: `1px solid ${'#f9fafb'}`,
+                        background: !n.is_read ? '#fafaff' : '#fff'
+                      }}>
+                        {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginRight: 6, verticalAlign: 'middle' }} />}
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{n.title}</p>
+                        <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
+                        <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Avatar chip */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '4px 12px 4px 4px', borderRadius: 20,
+              border: '1px solid #e5e7eb',
+              background: '#fff', cursor: 'default'
+            }}>
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%',
+                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SA</span>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                {(() => { try { const p = JSON.parse(atob((localStorage.getItem('mg_admin_token')||'..').split('.')[1])); return p.phone ? `+91 ••••${String(p.phone).slice(-4)}` : 'Super Admin'; } catch { return 'Super Admin'; } })()}
+              </span>
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <div style={{ padding: 24, flex: 1, background: '#f4f6f9' }}>
+          {tab === 'dashboard'    && <Dashboard onSetTab={setTab} />}
+          {tab === 'companies'    && <Companies />}
+          {tab === 'owners'       && <AllOwners />}
+          {tab === 'drivers'      && <AllDrivers />}
+          {tab === 'kyc'          && <KycReview />}
+          {tab === 'docs'         && <DocApprovals />}
+          {tab === 'transactions' && <Transactions />}
+          {tab === 'chat'         && <ChatViewer />}
+          {tab === 'audit'        && <AuditLog />}
+          {tab === 'pins'         && <PinManagementSection />}
+          {tab === 'leads'        && <LeadsSection />}
+        </div>
+      </main>
+
+      {showLogoutConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 320, padding: 24, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Sign Out?</h3>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Are you sure you want to sign out of the admin console?</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowLogoutConfirm(false)}
+                style={{ flex: 1, padding: '10px 0', background: '#f1f5f9', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.href = '/login'; }}
+                style={{ flex: 1, padding: '10px 0', background: '#ef4444', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+export default AdminPanelInner;

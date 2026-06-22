@@ -1,41 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
+// Dark mode has been removed. useTheme always returns light mode.
 export function useTheme() {
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('mg_theme');
-    if (saved) return saved === 'dark';
-    return false; // default to light
-  });
-
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('mg_theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('mg_theme', 'light');
-    }
-  }, [isDark]);
-
-  return [isDark, () => setIsDark(p => !p)];
+  // Always remove dark class in case it was set by a previous session
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.remove('dark');
+    localStorage.setItem('mg_theme', 'light');
+  }
+  return [false, () => {}];
 }
 
-export default function ThemeToggle({ className = '' }) {
-  const [isDark, toggle] = useTheme();
-  return (
-    <button
-      onClick={toggle}
-      className={`mg-theme-toggle p-2 rounded-xl flex items-center justify-center ${
-        isDark
-          ? 'bg-indigo-500/20 hover:bg-indigo-500/30 text-yellow-300'
-          : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-      } ${className}`}
-      title={isDark ? 'Light Mode' : 'Dark Mode'}
-      aria-label="Toggle theme"
-    >
-      <span className="text-base leading-none select-none">
-        {isDark ? '☀️' : '🌙'}
-      </span>
-    </button>
-  );
+export default function ThemeToggle() {
+  return null;
 }

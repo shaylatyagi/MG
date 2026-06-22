@@ -214,8 +214,48 @@ router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
     // Single-device login: generate new session token, invalidate old sessions
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const table = safeTable(user.role);
+
+    // If user already had an active session → notify them that a new device logged in
+    if (user.session_token) {
+      const alertTitle = '⚠️ New Login Detected';
+      const alertMsg = `Someone just logged into your account (${user.mobile_number}) from a new device. If this wasn't you, contact support immediately.`;
+      if (user.role === 'DRIVER') {
+        pool.query(
+          `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+           VALUES ($1, 'DRIVER', $2, $3, NOW())`,
+          [user.id, alertTitle, alertMsg]
+        ).catch(() => {});
+      } else if (user.role === 'OWNER') {
+        pool.query(
+          `INSERT INTO public.notifications (user_id, user_type, title, message, created_at)
+           VALUES ($1, 'OWNER', $2, $3, NOW())`,
+          [user.id, alertTitle, alertMsg]
+        ).catch(() => {});
+      }
+      // Also alert admin
+      pool.query(
+        `INSERT INTO public.notifications (user_type, title, message, created_at)
+         VALUES ('ADMIN', $1, $2, NOW())`,
+        [
+          `🔐 Concurrent Login — ${user.role === 'OWNER' ? 'Owner' : 'Driver'}`,
+          `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in on a new device while another session was active`
+        ]
+      ).catch(() => {});
+    }
+
     await pool.query(`UPDATE public.${table} SET session_token=$1 WHERE id=$2`, [sessionToken, user.id]);
     const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null, owner_code: user.owner_code || null, driver_code: user.driver_code || null, session_token: sessionToken });
+
+    // Notify admin on every owner/driver login
+    pool.query(
+      `INSERT INTO public.notifications (user_type, title, message, created_at)
+       VALUES ('ADMIN', $1, $2, NOW())`,
+      [
+        `${user.role === 'OWNER' ? '🏢 Owner' : '🚗 Driver'} Login`,
+        `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in`
+      ]
+    ).catch(() => {});
+
     res.json({
       success: true, token,
       user: {
@@ -632,6 +672,34 @@ router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
     if (!valid) return res.status(401).json({ success: false, message: 'Incorrect PIN' });
 
     const table = safeTable(role);
+
+    // If user already had an active session → notify them
+    if (user.session_token) {
+      const alertTitle = '⚠️ New Login Detected';
+      const alertMsg = `Someone just logged into your account (${user.mobile_number}) from a new device. If this wasn't you, contact support immediately.`;
+      if (role === 'DRIVER') {
+        pool.query(
+          `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+           VALUES ($1, 'DRIVER', $2, $3, NOW())`,
+          [user.id, alertTitle, alertMsg]
+        ).catch(() => {});
+      } else if (role === 'OWNER') {
+        pool.query(
+          `INSERT INTO public.notifications (user_id, user_type, title, message, created_at)
+           VALUES ($1, 'OWNER', $2, $3, NOW())`,
+          [user.id, alertTitle, alertMsg]
+        ).catch(() => {});
+      }
+      pool.query(
+        `INSERT INTO public.notifications (user_type, title, message, created_at)
+         VALUES ('ADMIN', $1, $2, NOW())`,
+        [
+          `🔐 Concurrent Login — ${role === 'OWNER' ? 'Owner' : 'Driver'}`,
+          `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in on a new device while another session was active`
+        ]
+      ).catch(() => {});
+    }
+
     var sessionToken = require('crypto').randomBytes(32).toString('hex');
     await pool.query('UPDATE public.' + table + ' SET session_token=$1 WHERE id=$2', [sessionToken, user.id]);
 

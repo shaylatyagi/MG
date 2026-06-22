@@ -5,6 +5,7 @@
 const jwt = require('jsonwebtoken');
 const { ApiError } = require('./error.middleware');
 const pool = require('../config/db');
+
 const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -16,17 +17,35 @@ const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // CRITICAL: Normalize data before assigning to req.user
-    // If the DB expects an integer ID, force it now.
     req.user = {
-      id: parseInt(decoded.id, 10), 
+      id: parseInt(decoded.id, 10),
       owner_code: decoded.owner_code || null,
       role: decoded.role || 'OWNER'
     };
 
-    // If ID is still NaN, we have a major token issue
     if (isNaN(req.user.id)) {
       console.error("DEBUG: Token decoded but ID is missing/invalid:", decoded);
       return res.status(401).json({ success: false, message: 'Invalid token payload' });
+    }
+
+    // SECURITY: Validate session_token for DRIVER and OWNER roles.
+    // When a new login happens, DB gets a new session_token. Any old JWT
+    // still passes jwt.verify() but must be rejected here to prevent
+    // stale sessions from accessing another user's data.
+    if (['DRIVER', 'OWNER'].includes(decoded.role) && decoded.session_token) {
+      const table = decoded.role === 'DRIVER' ? 'drivers' : 'owners';
+      const dbRes = await pool.query(
+        `SELECT session_token FROM public.${table} WHERE id = $1`,
+        [req.user.id]
+      );
+      const dbToken = dbRes.rows[0]?.session_token;
+      if (!dbToken || dbToken !== decoded.session_token) {
+        return res.status(401).json({
+          success: false,
+          message: 'Session expired. Please login again.',
+          code: 'SESSION_INVALIDATED'
+        });
+      }
     }
 
     next();
