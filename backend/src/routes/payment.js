@@ -280,9 +280,8 @@ router.post('/driver/activity/login', async (req, res) => {
   try {
     const { driverPhone } = req.body;
     const dr = await pool.query(
-      `SELECT d.*, o.id as owner_db_id
+      `SELECT d.*, d.owner_id as owner_db_id
        FROM public.drivers d
-       LEFT JOIN public.owners o ON o.owner_code = d.owner_code
        WHERE d.mobile_number = $1`, [driverPhone]
     );
     if (!dr.rows[0]) return res.json({ success: false });
@@ -316,9 +315,8 @@ router.post('/driver/activity/logout', async (req, res) => {
   try {
     const { driverPhone } = req.body;
     const dr = await pool.query(
-      `SELECT d.*, o.id as owner_db_id
+      `SELECT d.*, d.owner_id as owner_db_id
        FROM public.drivers d
-       LEFT JOIN public.owners o ON o.owner_code = d.owner_code
        WHERE d.mobile_number = $1`, [driverPhone]
     );
     if (!dr.rows[0]) return res.json({ success: false });
@@ -388,9 +386,9 @@ router.get('/owner/driver-history/:driverId', verifyToken, async (req, res) => {
   try {
     const { driverId } = req.params;
     // Ownership check
-    const own = await pool.query('SELECT owner_code FROM public.owners WHERE id=$1',[req.user.id]);
+    const own = await pool.query('SELECT id FROM public.owners WHERE id=$1',[req.user.id]);
     if (!own.rows[0]) return res.status(403).json({ error: 'Not authorized' });
-    const dCheck = await pool.query('SELECT id FROM public.drivers WHERE id=$1 AND owner_code=$2',[driverId, own.rows[0].owner_code]);
+    const dCheck = await pool.query('SELECT id FROM public.drivers WHERE id=$1 AND owner_id=$2',[driverId, req.user.id]);
     if (!dCheck.rows[0]) return res.status(403).json({ error: 'Driver not in your fleet' });
 
     const [vehicleHistory, dailyLog] = await Promise.all([

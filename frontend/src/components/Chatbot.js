@@ -7,9 +7,10 @@ const API = 'https://mg-qw5s.onrender.com';
 export default function Chatbot({ userRole, userId = null, userPhone, token, onClose, onMessagesUpdate, persistedMessages = null }) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const chatKey = `mg_chat_${userRole}_${userId || 'anon'}`;
   const [messages, setMessages] = useState(() => {
     try {
-      const saved = localStorage.getItem(`mg_chat_${userRole}`);
+      const saved = localStorage.getItem(chatKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -28,8 +29,21 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
   const accumulatedTextRef = useRef('');  // ✅ poori baat collect karo
   const silenceTimerRef = useRef(null);   // ✅ silence detect karo
 
+  const clearChat = () => {
+    try { localStorage.removeItem(chatKey); } catch {}
+    const w = isOwner
+      ? 'Namaste! Fleet Assistant ready hoon.\n\nCollection, drivers, vehicles, ledger — kuch bhi poochein!'
+      : 'Namaste! Driver Assistant ready hoon.\n\nBakaya, wallet, gaadi — kuch bhi poochein!';
+    setMessages([{ role: 'bot', content: w }]);
+  };
+
   // ─── INIT ───────────────────────────────────────────────────────────
   useEffect(() => {
+    // Clear old-format keys (before userId was part of key)
+    try {
+      localStorage.removeItem(`mg_chat_OWNER`);
+      localStorage.removeItem(`mg_chat_DRIVER`);
+    } catch {}
     setMessages(prev => {
       if (prev.length === 0) {
         const w = isOwner
@@ -48,7 +62,7 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
 
   useEffect(() => {
     if (messages.length > 0) {
-      try { localStorage.setItem(`mg_chat_${userRole}`, JSON.stringify(messages.slice(-50))); } catch {}
+      try { localStorage.setItem(chatKey, JSON.stringify(messages.slice(-50))); } catch {}
     }
   }, [messages]);
 
@@ -109,7 +123,11 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
     recognitionRef.current.onerror = (e) => {
       setIsListening(false);
       if (e.error === 'not-allowed' || e.error === 'audio-capture') {
-        addMessage('bot', 'Mic access nahi mila. Browser permissions check karein.');
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'bot' && last?.content?.includes('Mic access')) return prev;
+          return [...prev, { role: 'bot', content: 'Mic access nahi mila. Browser permissions check karein.' }];
+        });
       }
       // network/service errors are transient — silently ignore
     };

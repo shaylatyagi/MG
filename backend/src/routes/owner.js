@@ -56,53 +56,52 @@ router.get('/stats', async (req, res) => {
 
     const oid = owner.id;
 
-    const ocode = owner.owner_code;
     const [vehicles, drivers, contracts, pendingKyc, today, month, total] = await Promise.all([
       // vehicles owned directly OR assigned to drivers who belong to this owner
       pool.query(
         `SELECT COUNT(*) FROM vehicles v WHERE v.owner_id = $1
-         OR v.driver_id IN (SELECT id FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL)`,
-        [oid, ocode]
+         OR v.driver_id IN (SELECT id FROM drivers WHERE owner_id=$1 AND deleted_at IS NULL)`,
+        [oid]
       ),
       pool.query(
-        'SELECT COUNT(*) FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL',
-        [oid, ocode]
+        'SELECT COUNT(*) FROM drivers WHERE owner_id=$1 AND deleted_at IS NULL',
+        [oid]
       ),
       pool.query(
         `SELECT COUNT(*) FROM driver_vehicle_history WHERE owner_id=$1
-         OR driver_id IN (SELECT id FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL)`,
-        [oid, ocode]
+         OR driver_id IN (SELECT id FROM drivers WHERE owner_id=$1 AND deleted_at IS NULL)`,
+        [oid]
       ),
       pool.query(
-        `SELECT COUNT(*) FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND kyc_status IN ('PENDING','PARTIAL') AND deleted_at IS NULL`,
-        [oid, ocode]
+        `SELECT COUNT(*) FROM drivers WHERE owner_id=$1 AND kyc_status IN ('PENDING','PARTIAL') AND deleted_at IS NULL`,
+        [oid]
       ),
       pool.query(
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
          WHERE payer_mobile IN (
-           SELECT mobile_number FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL
+           SELECT mobile_number FROM drivers WHERE owner_id=$1 AND deleted_at IS NULL
          ) AND transaction_status = 'SUCCESS'
            AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
-        [oid, ocode]
+        [oid]
       ),
       pool.query(
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
          WHERE payer_mobile IN (
-           SELECT mobile_number FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL
+           SELECT mobile_number FROM drivers WHERE owner_id=$1 AND deleted_at IS NULL
          ) AND transaction_status = 'SUCCESS'
            AND DATE_TRUNC('month', order_initiation_date AT TIME ZONE 'Asia/Kolkata')
              = DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Kolkata')`,
-        [oid, ocode]
+        [oid]
       ),
       pool.query(
         `SELECT COALESCE(SUM(order_amount),0) AS total
          FROM ms_orders
          WHERE payer_mobile IN (
-           SELECT mobile_number FROM drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL
+           SELECT mobile_number FROM drivers WHERE owner_id=$1 AND deleted_at IS NULL
          ) AND transaction_status = 'SUCCESS'`,
-        [oid, ocode]
+        [oid]
       ),
     ]);
 
@@ -118,9 +117,9 @@ router.get('/stats', async (req, res) => {
        ), 0) AS total
        FROM public.driver_ledger
        WHERE driver_id IN (
-         SELECT id FROM public.drivers WHERE (owner_id=$1 OR owner_code=$2) AND deleted_at IS NULL
+         SELECT id FROM public.drivers WHERE owner_id=$1 AND deleted_at IS NULL
        )`,
-      [oid, owner.owner_code]
+      [oid]
     );
     const outstanding = Math.max(0, parseFloat(outstandingRes.rows[0].total));
 
@@ -211,8 +210,8 @@ router.get('/drivers', async (req, res) => {
     if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
 
     const { q, status, page = 1, limit = 50 } = req.query;
-    const params = [owner.id, owner.owner_code];
-    const conditions = ['(d.owner_id = $1 OR d.owner_code = $2)', 'd.deleted_at IS NULL'];
+    const params = [owner.id];
+    const conditions = ['d.owner_id = $1', 'd.deleted_at IS NULL'];
 
     if (q) {
       params.push(`%${q.trim()}%`);
@@ -613,13 +612,18 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
 
     const veh = await pool.query(
       `SELECT id, vehicle_number FROM public.vehicles
-       WHERE id = $1 AND (
-         owner_id = $2
-         OR EXISTS(SELECT 1 FROM public.drivers d WHERE d.id = vehicles.driver_id AND d.owner_code = $3 AND d.deleted_at IS NULL)
-       )`,
-      [req.params.id, owner.id, owner.owner_code]
+       WHERE id = $1 AND owner_id = $2`,
+      [req.params.id, owner.id]
     );
     if (!veh.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+
+    const driverRes = await pool.query(
+      `SELECT d.id FROM public.drivers d
+       WHERE d.id = (SELECT driver_id FROM public.vehicles WHERE id = $1)
+         AND d.deleted_at IS NULL`,
+      [req.params.id]
+    );
+    const driverId = driverRes.rows[0]?.id;
 
     await pool.query(
       'UPDATE public.vehicles SET daily_rent = $1 WHERE id = $2',
@@ -628,35 +632,25 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
 
     // Update today's RENT_CHARGE in driver_ledger so dues reflect new rent immediately
     try {
-      const driverRes = await pool.query(
-        `SELECT d.id, d.full_name FROM public.drivers d
-         WHERE d.id = (SELECT driver_id FROM public.vehicles WHERE id = $1)
-           AND d.deleted_at IS NULL`,
-        [req.params.id]
-      );
-      if (driverRes.rows[0]) {
-        const driverId = driverRes.rows[0].id;
+      if (driverId) {
         const vNum = veh.rows[0].vehicle_number;
 
-        // Update today's RENT_CHARGE to new rent (if exists), else insert one
+        // Update today's RENT_CHARGE to new rent (if exists), mark as OWNER_MANUAL
         const updated = await pool.query(
           `UPDATE public.driver_ledger
-           SET amount = $1, description = $2
+           SET amount = $1, description = $2, created_by = 'OWNER_MANUAL'
            WHERE driver_id = $3
              AND entry_type = 'RENT_CHARGE'
              AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date`,
-          [rent, `Daily rent charge — ${vNum} (₹${rent}/day)`, driverId]
+          [rent, `Rent updated by owner — ${vNum} (₹${rent}/day)`, driverId]
         );
 
         if (updated.rowCount === 0) {
           // No charge yet for today — insert one
           await pool.query(
-            `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description, created_at)
-             SELECT $1, o.id, 'RENT_CHARGE', $2, $3, NOW()
-             FROM public.owners o
-             WHERE o.id = $4
-             LIMIT 1`,
-            [driverId, rent, `Daily rent charge — ${vNum} (₹${rent}/day)`, req.user.id]
+            `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description, created_by, created_at)
+             VALUES ($1, $2, 'RENT_CHARGE', $3, $4, 'OWNER_MANUAL', NOW())`,
+            [driverId, req.user.id, rent, `Rent updated by owner — ${vNum} (₹${rent}/day)`]
           );
         }
 
@@ -664,14 +658,12 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
         await pool.query(
           `INSERT INTO public.notifications (user_id, user_type, title, message, created_at)
            VALUES ($1, 'DRIVER', $2, $3, NOW())`,
-          [
-            driverId,
-            `💰 Daily Rent Updated — ${vNum}`,
-            `Your daily rent has been updated to ₹${rent}/day effective today.`,
-          ]
+          [driverId, `💰 Daily Rent Updated — ${vNum}`, `Your daily rent has been updated to ₹${rent}/day effective today.`]
         ).catch(() => {});
       }
-    } catch (_) {} // non-critical
+    } catch (ledgerErr) {
+      console.error('rent update: ledger sync failed', ledgerErr.message);
+    }
 
     res.json({ success: true, message: `Rent updated to ₹${rent}/day`, daily_rent: rent });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }

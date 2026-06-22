@@ -15,23 +15,19 @@ const pool   = require('../config/db');
 const logger = require('../utils/logger');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Midnight rent deduction
-// Cron: "0 0 * * *" = 00:00 server time
-// Render servers run UTC, so we fire at 18:30 UTC = 00:00 IST
+// Core rent deduction logic — exported so admin can trigger manually for testing
 // ─────────────────────────────────────────────────────────────────────────────
-cron.schedule('30 18 * * *', async () => {
+async function runMidnightRentDeduction() {
   logger.info('CRON: midnight rent deduction — starting');
   const client = await pool.connect();
   let processed = 0, skipped = 0, errors = 0;
 
   try {
-    // Find all drivers who currently have a vehicle assigned to them
-    // and whose vehicle has daily_rent > 0
     const { rows: drivers } = await client.query(`
       SELECT
         d.id            AS driver_id,
         d.full_name,
-        d.owner_code,
+        d.owner_id,
         COALESCE(d.wallet_balance, 0)  AS wallet_balance,
         v.id            AS vehicle_id,
         v.vehicle_number,
@@ -41,14 +37,15 @@ cron.schedule('30 18 * * *', async () => {
       WHERE d.deleted_at IS NULL
         AND v.driver_id IS NOT NULL
         AND COALESCE(v.daily_rent, 0) > 0
+        AND d.owner_id IS NOT NULL
     `);
 
     logger.info(`CRON: found ${drivers.length} assigned drivers to process`);
 
     for (const row of drivers) {
-      const rent   = parseFloat(row.daily_rent);
-      const wallet = parseFloat(row.wallet_balance);
-      const deduction = Math.min(rent, Math.max(0, wallet)); // deduct only what's available
+      const rent      = parseFloat(row.daily_rent);
+      const wallet    = parseFloat(row.wallet_balance);
+      const deduction = Math.min(rent, Math.max(0, wallet));
       const dateStr   = new Date().toLocaleDateString('en-IN', {
         day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata',
       });
@@ -56,49 +53,24 @@ cron.schedule('30 18 * * *', async () => {
       try {
         await client.query('BEGIN');
 
-        // 1. Deduct from wallet only if wallet > 0
         if (deduction > 0) {
           await client.query(
-            `UPDATE public.drivers
-             SET wallet_balance = wallet_balance - $1,
-                 updated_at     = NOW()
-             WHERE id = $2`,
+            `UPDATE public.drivers SET wallet_balance = wallet_balance - $1, updated_at = NOW() WHERE id = $2`,
             [deduction, row.driver_id]
           );
         }
 
-        // 2. Always record RENT_CHARGE in driver_ledger (full rent amount)
-        //    even if wallet was 0 — this is what drives outstanding balance
         await client.query(
-          `INSERT INTO public.driver_ledger
-             (driver_id, owner_id, entry_type, amount, description, created_by)
-           SELECT $1, o.id, 'RENT_CHARGE', $2, $3, 'SYSTEM'
-           FROM public.owners o
-           WHERE o.owner_code = $4
-           LIMIT 1`,
-          [
-            row.driver_id,
-            rent,
-            `Auto midnight rent ₹${rent} — ${row.vehicle_number} — ${dateStr}`,
-            row.owner_code,
-          ]
+          `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description, created_by)
+           VALUES ($1, $2, 'RENT_CHARGE', $3, $4, 'SYSTEM')`,
+          [row.driver_id, row.owner_id, rent, `Auto midnight rent ₹${rent} — ${row.vehicle_number} — ${dateStr}`]
         );
 
-        // 3. If wallet partially covered the rent, also record PAYMENT for that portion
         if (deduction > 0) {
           await client.query(
-            `INSERT INTO public.driver_ledger
-               (driver_id, owner_id, entry_type, amount, description, created_by)
-             SELECT $1, o.id, 'PAYMENT', $2, $3, 'SYSTEM'
-             FROM public.owners o
-             WHERE o.owner_code = $4
-             LIMIT 1`,
-            [
-              row.driver_id,
-              deduction,
-              `Wallet auto-deduction ₹${deduction} — ${row.vehicle_number} — ${dateStr}`,
-              row.owner_code,
-            ]
+            `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description, created_by)
+             VALUES ($1, $2, 'PAYMENT', $3, $4, 'SYSTEM')`,
+            [row.driver_id, row.owner_id, deduction, `Wallet auto-deduction ₹${deduction} — ${row.vehicle_number} — ${dateStr}`]
           );
         }
 
@@ -108,20 +80,23 @@ cron.schedule('30 18 * * *', async () => {
       } catch (txErr) {
         await client.query('ROLLBACK');
         errors++;
-        logger.error(`CRON: failed to process rent for driver ${row.driver_id}`, {
-          error: txErr.message,
-        });
+        logger.error(`CRON: failed for driver ${row.driver_id}`, { error: txErr.message });
       }
     }
 
-    logger.info(`CRON: midnight rent done — processed=${processed} skipped=${skipped} errors=${errors}`);
+    logger.info(`CRON: done — processed=${processed} skipped=${skipped} errors=${errors}`);
+    return { processed, skipped, errors, total: drivers.length };
   } catch (err) {
-    logger.error('CRON: midnight rent deduction fatal error', { error: err.message });
+    logger.error('CRON: fatal error', { error: err.message });
+    throw err;
   } finally {
     client.release();
   }
-}, {
-  timezone: 'UTC', // cron expression is in UTC (18:30 UTC = midnight IST)
-});
+}
+
+// Schedule at 18:30 UTC = 00:00 IST daily
+cron.schedule('15 17 * * *', runMidnightRentDeduction, { timezone: 'UTC' });
 
 logger.info('CRON: midnight rent deduction scheduled (18:30 UTC = 00:00 IST)');
+
+module.exports = { runMidnightRentDeduction };

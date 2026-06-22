@@ -91,7 +91,7 @@ router.post('/unassign', async (req, res) => {
       // Owner ka incentive rule fetch karo
       const ownerRes = await pool.query(
         `SELECT o.id FROM public.owners o
-         JOIN public.drivers d ON d.owner_code = o.owner_code
+         JOIN public.drivers d ON d.owner_id = o.id
          WHERE d.id = $1`, [driverId]
       );
       const ownerId = ownerRes.rows[0]?.id;
@@ -168,9 +168,9 @@ router.get('/available/drivers', async (req, res) => {
        WHERE assigned_vehicle_id IS NULL
          AND status IN ('ACTIVE', 'AVAILABLE')
          AND deleted_at IS NULL
-         AND (owner_id = $1 OR owner_code = $2)
+         AND owner_id = $1
        ORDER BY full_name`,
-      [owner.id, owner.owner_code]
+      [owner.id]
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
@@ -182,7 +182,7 @@ router.get('/available/drivers', async (req, res) => {
 router.get('/unassigned/drivers', async (req, res) => {
   try {
     const ownerRow = await pool.query(
-      'SELECT id, owner_code FROM owners WHERE id = $1', [req.user.id]
+      'SELECT id FROM owners WHERE id = $1', [req.user.id]
     );
     const owner = ownerRow.rows[0];
     if (!owner) return res.status(404).json({ success: false, error: 'Owner not found' });
@@ -193,9 +193,9 @@ router.get('/unassigned/drivers', async (req, res) => {
        WHERE assigned_vehicle_id IS NULL
          AND status IN ('ACTIVE', 'AVAILABLE')
          AND deleted_at IS NULL
-         AND (owner_id = $1 OR owner_code = $2)
+         AND owner_id = $1
        ORDER BY full_name`,
-      [owner.id, owner.owner_code]
+      [owner.id]
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {

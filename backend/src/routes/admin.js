@@ -1670,4 +1670,15 @@ router.delete('/drivers/cash-payments', async (req, res) => {
   }
 });
 
+// POST /api/admin/trigger-midnight-cron — manual test trigger (admin only)
+router.post('/trigger-midnight-cron', verifyAdmin, async (req, res) => {
+  try {
+    const { runMidnightRentDeduction } = require('../services/cronJobs');
+    const result = await runMidnightRentDeduction();
+    res.json({ success: true, message: 'Cron executed manually', result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
