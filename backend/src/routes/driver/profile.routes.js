@@ -30,20 +30,31 @@ router.get('/profile', async (req, res) => {
 
     if (p.vehicle_number && p.vehicle_daily_rent) {
       const dailyRent = parseFloat(p.vehicle_daily_rent);
-      const [totalPaidRes, todayPaidRes] = await Promise.all([
-        pool.query(`SELECT COALESCE(SUM(order_amount),0) as total FROM public.ms_orders WHERE payer_mobile=$1 AND transaction_status='SUCCESS'`, [phone]),
-        pool.query(`SELECT COALESCE(SUM(order_amount),0) as total FROM public.ms_orders WHERE payer_mobile=$1 AND transaction_status='SUCCESS' AND DATE(order_completion_date)=CURRENT_DATE`, [phone])
-      ]);
-      const totalPaid = parseFloat(totalPaidRes.rows[0].total);
-      const assignedSince = p.assigned_since ? new Date(p.assigned_since) : new Date();
-      const daysDiff = Math.max(1, Math.floor((new Date()-assignedSince)/(1000*60*60*24)));
       const securityDeposit = parseFloat(p.security_deposit || 0);
-      dailyDepositRecovery = securityDeposit > 0 ? Math.round(securityDeposit/100) : 0;
+      dailyDepositRecovery = securityDeposit > 0 ? Math.round(securityDeposit / 100) : 0;
       effectiveDailyCharge = dailyRent + dailyDepositRecovery;
-      const totalCharged = daysDiff * effectiveDailyCharge;
-      const advance = parseFloat(p.advance_balance || 0);
-      total_outstanding = Math.max(0, totalCharged - totalPaid - advance);
-      amount_paid_today = parseFloat(todayPaidRes.rows[0].total);
+
+      // Use driver_ledger as single source of truth (same as owner stats)
+      const [ledgerRes, todayPaidRes] = await Promise.all([
+        pool.query(`
+          SELECT
+            COALESCE(SUM(CASE WHEN entry_type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT','DAMAGE_CHARGE') THEN amount ELSE 0 END), 0) AS total_charged,
+            COALESCE(SUM(CASE WHEN entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REFUND') THEN amount ELSE 0 END), 0) AS total_paid
+          FROM public.driver_ledger
+          WHERE driver_id = $1`, [p.id]),
+        pool.query(`
+          SELECT COALESCE(SUM(order_amount), 0) AS total
+          FROM public.ms_orders
+          WHERE payer_mobile = $1 AND transaction_status = 'SUCCESS'
+            AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = (NOW() AT TIME ZONE 'Asia/Kolkata')::date`,
+          [phone])
+      ]);
+
+      const totalCharged = parseFloat(ledgerRes.rows[0].total_charged);
+      const totalPaid    = parseFloat(ledgerRes.rows[0].total_paid);
+      const advance      = parseFloat(p.advance_balance || 0);
+      total_outstanding  = Math.max(0, totalCharged - totalPaid - advance);
+      amount_paid_today  = parseFloat(todayPaidRes.rows[0].total);
     }
 
     res.json({ ...p, amount_paid_today, total_outstanding, current_dues: total_outstanding,

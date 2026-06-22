@@ -269,7 +269,7 @@ function PartnerListing() {
                     width: 52, height: 52, borderRadius: 14, flexShrink: 0,
                     background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, fontWeight: 900,
+                    fontSize: 18, fontWeight: 900, overflow: 'hidden',
                   }}>
                     {initials(p.brand_name || p.full_name)}
                   </div>
@@ -277,7 +277,6 @@ function PartnerListing() {
                     <p style={{ fontWeight: 800, fontSize: 16, margin: 0 }}>{p.brand_name || p.full_name}</p>
                     {p.tagline && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.tagline}</p>}
                   </div>
-                  <ArrowRight size={16} color="rgba(255,255,255,0.25)" style={{ flexShrink: 0 }} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 40, display: 'flex', alignItems: 'center', gap: 4 }}>

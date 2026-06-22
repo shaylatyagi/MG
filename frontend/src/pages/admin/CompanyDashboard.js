@@ -512,20 +512,6 @@ function Dashboard({ onSetTab }) {
           <h2 style={{ fontSize:20, fontWeight:800, color:'#111827', margin:0 }}>Platform Dashboard</h2>
           <p style={{ fontSize:12, color:'#9ca3af', margin:'3px 0 0' }}>MobilityGrid fleet overview · live data</p>
         </div>
-        {/* Seed demo quick action */}
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <button onClick={runSeedDemo} disabled={seedStatus === 'loading'} style={{
-            padding:'8px 16px', borderRadius:8, border:'1px solid #e5e7eb',
-            background:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, color:'#4f46e5',
-            display:'flex', alignItems:'center', gap:6, fontFamily:'inherit',
-            opacity: seedStatus === 'loading' ? 0.6 : 1,
-          }}>
-            {seedStatus === 'loading' ? '⏳' : '⚡'} Seed Demo Driver
-          </button>
-          {seedStatus && seedStatus !== 'loading' && (
-            <span style={{ fontSize:12, color: seedStatus.ok ? '#059669' : '#dc2626', fontWeight:600 }}>{seedStatus.msg}</span>
-          )}
-        </div>
       </div>
 
       {/* Alert banners */}
@@ -3129,18 +3115,18 @@ function AdminPanelInner() {
   const tabLabel = navItems.find(n => n.key && n.key === tab)?.label || tab;
 
   return (
-    <div style={{ display:'flex', height:'100vh', background: isDark ? '#020617' : '#f4f6f9', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+    <div style={{ display:'flex', height:'100vh', background: isDark ? '#0d1520' : '#f3f4f6', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside style={{
         width: 224,
-        background: isDark ? '#0d1117' : '#ffffff',
+        background: isDark ? '#111c2d' : '#ffffff',
         display: 'flex', flexDirection: 'column',
         flexShrink: 0,
-        borderRight: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e5e7eb'
+        borderRight: isDark ? '1px solid #1e3450' : '1px solid #e5e7eb'
       }}>
         {/* Logo */}
-        <div style={{ padding: '20px 16px 16px', borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e5e7eb' }}>
+        <div style={{ padding: '20px 16px 16px', borderBottom: isDark ? '1px solid #1e3450' : '1px solid #e5e7eb' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 34, height: 34, borderRadius: 10,
@@ -3200,7 +3186,35 @@ function AdminPanelInner() {
         </nav>
 
         {/* Bottom — logout */}
-        <div style={{ padding: '8px', borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e5e7eb' }}>
+        <div style={{ padding: '8px', borderTop: isDark ? '1px solid #1e3450' : '1px solid #e5e7eb' }}>
+
+          {/* Dark Mode toggle — PayYantra style */}
+          <button onClick={toggleDark} style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            background: 'transparent', fontFamily: 'inherit', marginBottom: 2,
+          }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500,
+              color: isDark ? 'rgba(255,255,255,0.55)' : '#6b7280' }}>
+              <span style={{ fontSize: 15 }}>{isDark ? '🌙' : '☀️'}</span>
+              Dark Mode
+            </span>
+            {/* iOS-style toggle switch */}
+            <span style={{
+              width: 36, height: 20, borderRadius: 10, position: 'relative', flexShrink: 0,
+              background: isDark ? '#3b82f6' : '#d1d5db',
+              transition: 'background 0.2s',
+              display: 'inline-block',
+            }}>
+              <span style={{
+                position: 'absolute', top: 2, left: isDark ? 18 : 2,
+                width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                transition: 'left 0.2s',
+              }} />
+            </span>
+          </button>
+
           <button onClick={logout} style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: 10,
             padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -3223,8 +3237,8 @@ function AdminPanelInner() {
 
         {/* Header */}
         <header style={{
-          background: isDark ? '#0f172a' : '#fff',
-          borderBottom: `1px solid ${isDark ? '#1e293b' : '#e5e7eb'}`,
+          background: isDark ? '#111c2d' : '#fff',
+          borderBottom: `1px solid ${isDark ? '#1e3450' : '#e5e7eb'}`,
           padding: '0 24px', height: 56, display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10,
           flexShrink: 0
@@ -3236,7 +3250,6 @@ function AdminPanelInner() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ThemeToggle />
 
             {/* Bell */}
             <div style={{ position: 'relative' }}>
@@ -3244,7 +3257,7 @@ function AdminPanelInner() {
                 style={{
                   width: 36, height: 36, borderRadius: 8,
                   border: `1px solid ${isDark ? '#1e293b' : '#e5e7eb'}`,
-                  background: isDark ? (showNotifs ? '#1e293b' : '#0f172a') : (showNotifs ? '#f3f4f6' : '#fff'),
+                  background: isDark ? (showNotifs ? '#1e3450' : '#111c2d') : (showNotifs ? '#f3f4f6' : '#fff'),
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: isDark ? '#94a3b8' : '#6b7280', position: 'relative', transition: 'all 0.15s'
                 }}>

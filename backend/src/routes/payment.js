@@ -3287,22 +3287,30 @@ router.get('/owner/attendance', async (req, res) => {
       [driverIds, targetMonth + '-01']
     );
 
-    // Get assignment dates: prefer driver_vehicle_history, fall back to vehicles.created_at
-    // This handles cases where vehicle was assigned without creating a history record
+    // Get earliest assignment overlapping the requested month from history
+    // Uses driver_vehicle_history so past months work even if driver was later reassigned/unassigned
     const asgnRes = await pool.query(
-      `SELECT v.driver_id,
-              COALESCE(
-                (SELECT dvh.assigned_at FROM public.driver_vehicle_history dvh
-                 WHERE dvh.driver_id = v.driver_id AND dvh.unassigned_at IS NULL
-                 ORDER BY dvh.assigned_at DESC LIMIT 1),
-                v.created_at
-              ) AS assigned_at
-       FROM public.vehicles v
-       WHERE v.driver_id = ANY($1::int[])`,
-      [driverIds]
+      `SELECT DISTINCT ON (driver_id) driver_id, assigned_at
+       FROM public.driver_vehicle_history
+       WHERE driver_id = ANY($1::int[])
+         AND assigned_at <= $2::date + INTERVAL '1 month'
+         AND (unassigned_at IS NULL OR unassigned_at >= $2::date)
+       ORDER BY driver_id, assigned_at ASC`,
+      [driverIds, targetMonth + '-01']
     );
     const asgnMap = {};
     asgnRes.rows.forEach(r => { asgnMap[r.driver_id] = new Date(r.assigned_at); });
+
+    // Fallback: for drivers not in history (old data), check vehicles.driver_id
+    const missingIds = driverIds.filter(id => !asgnMap[id]);
+    if (missingIds.length) {
+      const fallbackRes = await pool.query(
+        `SELECT driver_id, created_at AS assigned_at FROM public.vehicles
+         WHERE driver_id = ANY($1::int[])`,
+        [missingIds]
+      );
+      fallbackRes.rows.forEach(r => { asgnMap[r.driver_id] = new Date(r.assigned_at); });
+    }
 
     const attendanceMap = {};
     driversRes.rows.forEach(d => {

@@ -5,15 +5,11 @@ const API = 'https://mg-qw5s.onrender.com';
 const DOC_CONFIG = {
   OWNER: [
     { key: 'PROFILE',      label: 'Profile Photo',         icon: '📸', accept: 'image/*' },
-    { key: 'AADHAAR',      label: 'Aadhaar Card',          icon: '🪪', accept: '.pdf,.jpg,.jpeg,.png' },
-    { key: 'PAN',          label: 'PAN Card',              icon: '📋', accept: '.pdf,.jpg,.jpeg,.png' },
     { key: 'BUSINESS_REG', label: 'Business Registration', icon: '🏢', accept: '.pdf,.jpg,.jpeg,.png' },
     { key: 'GST',          label: 'GST Certificate',       icon: '📄', accept: '.pdf,.jpg,.jpeg,.png' },
   ],
   DRIVER: [
     { key: 'PROFILE',     label: 'Profile Photo',    icon: '📸', accept: 'image/*' },
-    { key: 'AADHAAR',     label: 'Aadhaar Card',     icon: '🪪', accept: '.pdf,.jpg,.jpeg,.png' },
-    { key: 'PAN',         label: 'PAN Card',         icon: '📋', accept: '.pdf,.jpg,.jpeg,.png' },
     { key: 'LICENSE',     label: 'Driving License',  icon: '🚗', accept: '.pdf,.jpg,.jpeg,.png' },
     { key: 'BANK_CHEQUE', label: 'Cancelled Cheque', icon: '🏦', accept: '.pdf,.jpg,.jpeg,.png' },
     { key: 'AGREEMENT',   label: 'Vehicle Agreement', icon: '📝', accept: '.pdf,.jpg,.jpeg,.png' },
