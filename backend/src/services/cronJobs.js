@@ -43,40 +43,24 @@ async function runMidnightRentDeduction() {
     logger.info(`CRON: found ${drivers.length} assigned drivers to process`);
 
     for (const row of drivers) {
-      const rent      = parseFloat(row.daily_rent);
-      const wallet    = parseFloat(row.wallet_balance);
-      const deduction = Math.min(rent, Math.max(0, wallet));
-      const dateStr   = new Date().toLocaleDateString('en-IN', {
+      const rent    = parseFloat(row.daily_rent);
+      const dateStr = new Date().toLocaleDateString('en-IN', {
         day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata',
       });
 
       try {
         await client.query('BEGIN');
 
-        if (deduction > 0) {
-          await client.query(
-            `UPDATE public.drivers SET wallet_balance = wallet_balance - $1, updated_at = NOW() WHERE id = $2`,
-            [deduction, row.driver_id]
-          );
-        }
-
+        // Only record RENT_CHARGE — wallet deduction happens when driver pays manually
         await client.query(
           `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description, created_by)
            VALUES ($1, $2, 'RENT_CHARGE', $3, $4, 'SYSTEM')`,
-          [row.driver_id, row.owner_id, rent, `Auto midnight rent ₹${rent} — ${row.vehicle_number} — ${dateStr}`]
+          [row.driver_id, row.owner_id, rent, `Daily rent ₹${rent} — ${row.vehicle_number} — ${dateStr}`]
         );
-
-        if (deduction > 0) {
-          await client.query(
-            `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description, created_by)
-             VALUES ($1, $2, 'PAYMENT', $3, $4, 'SYSTEM')`,
-            [row.driver_id, row.owner_id, deduction, `Wallet auto-deduction ₹${deduction} — ${row.vehicle_number} — ${dateStr}`]
-          );
-        }
 
         await client.query('COMMIT');
         processed++;
-        logger.info(`CRON: rent ₹${rent} charged for ${row.full_name} — wallet deducted ₹${deduction}`);
+        logger.info(`CRON: rent ₹${rent} charged for ${row.full_name}`);
       } catch (txErr) {
         await client.query('ROLLBACK');
         errors++;
@@ -95,7 +79,7 @@ async function runMidnightRentDeduction() {
 }
 
 // Schedule at 18:30 UTC = 00:00 IST daily
-cron.schedule('52 17 * * *', runMidnightRentDeduction, { timezone: 'UTC' });
+cron.schedule('30 18 * * *', runMidnightRentDeduction, { timezone: 'UTC' });
 
 logger.info('CRON: midnight rent deduction scheduled (18:30 UTC = 00:00 IST)');
 
