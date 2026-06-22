@@ -86,6 +86,21 @@ const apiUpload = async (path, formData) => {
   return data;
 };
 
+// ── Theme context — lets every component read isDark without prop drilling ──
+const AdminThemeCtx = React.createContext(false);
+const useAdminTheme = () => React.useContext(AdminThemeCtx);
+
+// Dark mode palette
+const D = {
+  cardBg:    '#1a2438',
+  pageBg:    '#0d1520',
+  rowHover:  '#1e2d42',
+  border:    '#1e3450',
+  text:      '#e2e8f0',
+  textMuted: '#94a3b8',
+  inputBg:   '#162133',
+};
+
 // ── Shared UI components (all at module level — never defined inside render) ──
 
 const Badge = ({ status }) => {
@@ -103,75 +118,75 @@ const Badge = ({ status }) => {
     FAILED:      'bg-red-100 text-red-700',
   };
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 dark:bg-gray-700  text-gray-600 dark:text-gray-400 '}`}>
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>
       {status || 'N/A'}
     </span>
   );
 };
 
 const StatCard = ({ label, value, sub, color = 'indigo' }) => {
-  const borders = { indigo:'border-indigo-400', green:'border-green-400', blue:'border-blue-400', orange:'border-orange-400', red:'border-red-400' };
-  return (
-    <div className={`border-l-4 rounded-lg p-4 shadow-sm bg-white dark:bg-gray-800 ${borders[color] || borders.indigo}`}>
-      <p className="text-xs text-gray-500 dark:text-gray-300 uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">{value}</p>
-      {sub && <p className="text-xs text-gray-500 dark:text-gray-300 mt-1">{sub}</p>}
+  const dk = useAdminTheme();
+  const borderColors = { indigo:'#818cf8', green:'#4ade80', blue:'#60a5fa', orange:'#fb923c', red:'#f87171' };
+  const lightBorders = { indigo:'border-indigo-400', green:'border-green-400', blue:'border-blue-400', orange:'border-orange-400', red:'border-red-400' };
+  return dk ? (
+    <div style={{ borderLeft: `4px solid ${borderColors[color] || borderColors.indigo}`, borderRadius: 8, padding: 16, background: D.cardBg, boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+      <p style={{ fontSize: 11, color: D.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>{label}</p>
+      <p style={{ fontSize: 24, fontWeight: 700, color: D.text, margin: '4px 0 0' }}>{value}</p>
+      {sub && <p style={{ fontSize: 11, color: D.textMuted, margin: '4px 0 0' }}>{sub}</p>}
+    </div>
+  ) : (
+    <div className={`border-l-4 rounded-lg p-4 shadow-sm bg-white ${lightBorders[color] || lightBorders.indigo}`}>
+      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
     </div>
   );
 };
 
-// Modal — supports breadcrumb trail + back button
-// breadcrumbs = ['Companies', 'TechCorp', 'John Owner'] (renders path above title)
-// onBack = go one level up (shows ← Back button)
-// onClose = close entire modal chain (shows × button)
-const Modal = ({ title, onClose, onBack, breadcrumbs, children, wide }) => (
-  <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-8 px-4">
-    <div className={`bg-white dark:bg-gray-900   rounded-2xl shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-2xl'} relative`}>
-      {/* Breadcrumb trail */}
-      {breadcrumbs && breadcrumbs.length > 0 && (
-        <div className="px-6 pt-4 pb-0 flex items-center gap-1 text-xs text-gray-400  flex-wrap">
-          {breadcrumbs.map((crumb, i) => (
-            <span key={i} className="flex items-center gap-1">
-              {i > 0 && <span className="text-gray-600 dark:text-gray-400  ">›</span>}
-              <span className={i === breadcrumbs.length - 1 ? 'text-indigo-600 font-medium' : ''}>{crumb}</span>
-            </span>
-          ))}
+const Modal = ({ title, onClose, onBack, breadcrumbs, children, wide }) => {
+  const dk = useAdminTheme();
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-8 px-4">
+      <div style={{ background: dk ? D.cardBg : '#fff', borderRadius: 16, boxShadow: '0 25px 50px rgba(0,0,0,0.5)', width: '100%', maxWidth: wide ? 1000 : 640, position: 'relative' }}>
+        {breadcrumbs && breadcrumbs.length > 0 && (
+          <div className="px-6 pt-4 pb-0 flex items-center gap-1 text-xs flex-wrap" style={{ color: dk ? D.textMuted : '#9ca3af' }}>
+            {breadcrumbs.map((crumb, i) => (
+              <span key={i} className="flex items-center gap-1">
+                {i > 0 && <span>›</span>}
+                <span style={{ color: i === breadcrumbs.length - 1 ? '#6366f1' : undefined }}>{crumb}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1px solid ${dk ? D.border : '#e5e7eb'}` }}>
+          <div className="flex items-center gap-3">
+            {onBack && <button onClick={onBack} style={{ color: dk ? D.textMuted : '#6b7280', fontSize: 13, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}>← Back</button>}
+            <h3 style={{ fontWeight: 700, color: dk ? D.text : '#1f2937', fontSize: 18, margin: 0 }}>{title}</h3>
+          </div>
+          <button onClick={onClose} style={{ color: dk ? D.textMuted : '#9ca3af', fontSize: 20, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>×</button>
         </div>
-      )}
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b ">
-        <div className="flex items-center gap-3">
-          {onBack && (
-            <button onClick={onBack}
-              className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400  hover:text-indigo-600 font-medium transition">
-              ← Back
-            </button>
-          )}
-          <h3 className="font-bold text-gray-800 dark:text-white   text-lg">{title}</h3>
-        </div>
-        <button onClick={onClose} title="Close"
-          className="text-gray-400  hover:text-gray-700 dark:text-gray-300  :text-gray-700 dark:text-gray-300  text-xl font-bold leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:bg-gray-700  :bg-gray-100 dark:bg-gray-700  transition">
-          ×
-        </button>
+        <div className="p-6">{children}</div>
       </div>
-      <div className="p-6">{children}</div>
     </div>
-  </div>
-);
+  );
+};
 
 const Spinner = () => (
-  <div className="flex items-center justify-center h-48 text-gray-400 ">
+  <div className="flex items-center justify-center h-48" style={{ color: '#94a3b8' }}>
     <div className="animate-spin w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full mr-2" />
     Loading…
   </div>
 );
 
-const Row = ({ label, value }) => (
-  <div className="flex justify-between items-start">
-    <span className="text-gray-500 dark:text-gray-400   shrink-0 mr-4">{label}</span>
-    <span className="text-gray-800 dark:text-white   font-medium text-right">{value ?? '—'}</span>
-  </div>
-);
+const Row = ({ label, value }) => {
+  const dk = useAdminTheme();
+  return (
+    <div className="flex justify-between items-start">
+      <span style={{ color: dk ? D.textMuted : '#6b7280' }} className="shrink-0 mr-4">{label}</span>
+      <span style={{ color: dk ? D.text : '#1f2937' }} className="font-medium text-right">{value ?? '—'}</span>
+    </div>
+  );
+};
 
 // ── DOCUMENTS SECTION ─────────────────────────────────────────────────────────
 // Reusable for driver / owner / company document management
@@ -458,6 +473,7 @@ function LoginPage({ onLogin }) {
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard({ onSetTab }) {
+  const dk = useAdminTheme();
   const [stats, setStats]         = useState(null);
   const [kyc, setKyc]             = useState(null);
   const [pendingDocs, setPendingDocs] = useState(0);
@@ -491,14 +507,14 @@ function Dashboard({ onSetTab }) {
 
   // Big stat card for dashboard
   const BigStatCard = ({ label, value, sub, icon, accent }) => (
-    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e5e7eb', padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.04)', display:'flex', alignItems:'center', gap:14 }}>
-      <div style={{ width:46, height:46, borderRadius:12, background:accent+'18', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
+    <div style={{ background: dk ? D.cardBg : '#fff', borderRadius:14, border: `1px solid ${dk ? D.border : '#e5e7eb'}`, padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)', display:'flex', alignItems:'center', gap:14 }}>
+      <div style={{ width:46, height:46, borderRadius:12, background:accent+'28', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
         {icon}
       </div>
       <div>
-        <p style={{ fontSize:24, fontWeight:800, color:'#111827', margin:0, lineHeight:1.1 }}>{value}</p>
-        <p style={{ fontSize:11, fontWeight:600, color:'#6b7280', margin:'3px 0 0', textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</p>
-        {sub && <p style={{ fontSize:11, color:'#9ca3af', margin:'2px 0 0' }}>{sub}</p>}
+        <p style={{ fontSize:24, fontWeight:800, color: dk ? D.text : '#111827', margin:0, lineHeight:1.1 }}>{value}</p>
+        <p style={{ fontSize:11, fontWeight:600, color: dk ? D.textMuted : '#6b7280', margin:'3px 0 0', textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</p>
+        {sub && <p style={{ fontSize:11, color: dk ? D.textMuted : '#9ca3af', margin:'2px 0 0' }}>{sub}</p>}
       </div>
     </div>
   );
@@ -509,8 +525,8 @@ function Dashboard({ onSetTab }) {
       {/* Title + quick actions */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12 }}>
         <div>
-          <h2 style={{ fontSize:20, fontWeight:800, color:'#111827', margin:0 }}>Platform Dashboard</h2>
-          <p style={{ fontSize:12, color:'#9ca3af', margin:'3px 0 0' }}>MobilityGrid fleet overview · live data</p>
+          <h2 style={{ fontSize:20, fontWeight:800, color: dk ? D.text : '#111827', margin:0 }}>Platform Dashboard</h2>
+          <p style={{ fontSize:12, color: dk ? D.textMuted : '#9ca3af', margin:'3px 0 0' }}>MobilityGrid fleet overview · live data</p>
         </div>
       </div>
 
@@ -556,22 +572,23 @@ function Dashboard({ onSetTab }) {
       </div>
 
       {/* KYC overview */}
-      <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e5e7eb', padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div style={{ background: dk ? D.cardBg : '#fff', borderRadius:14, border:`1px solid ${dk ? D.border : '#e5e7eb'}`, padding:'18px 20px', boxShadow:'0 1px 4px rgba(0,0,0,0.08)' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-          <h3 style={{ fontSize:14, fontWeight:700, color:'#111827', margin:0 }}>KYC Status Overview</h3>
-          {onSetTab && <button onClick={() => onSetTab('kyc')} style={{ fontSize:12, fontWeight:600, color:'#4f46e5', background:'none', border:'none', cursor:'pointer' }}>View all →</button>}
+          <h3 style={{ fontSize:14, fontWeight:700, color: dk ? D.text : '#111827', margin:0 }}>KYC Status Overview</h3>
+          {onSetTab && <button onClick={() => onSetTab('kyc')} style={{ fontSize:12, fontWeight:600, color:'#818cf8', background:'none', border:'none', cursor:'pointer' }}>View all →</button>}
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:8 }}>
           {['VERIFIED','PENDING','SUBMITTED','UNDER_REVIEW','REJECTED'].map(status => (
             <button key={status} onClick={() => onSetTab && onSetTab('kyc')} style={{
-              textAlign:'center', padding:'12px 8px', borderRadius:10, border:'1px solid #f3f4f6',
-              background:'#f9fafb', cursor:'pointer', fontFamily:'inherit',
-              transition:'all 0.15s',
+              textAlign:'center', padding:'12px 8px', borderRadius:10,
+              border: `1px solid ${dk ? D.border : '#f3f4f6'}`,
+              background: dk ? D.inputBg : '#f9fafb',
+              cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background='#eef2ff'; e.currentTarget.style.borderColor='#c7d2fe'; }}
-            onMouseLeave={e => { e.currentTarget.style.background='#f9fafb'; e.currentTarget.style.borderColor='#f3f4f6'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = dk ? '#1e2d42' : '#eef2ff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = dk ? D.inputBg : '#f9fafb'; }}
             >
-              <p style={{ fontSize:22, fontWeight:800, color:'#111827', margin:0 }}>{k[status] || 0}</p>
+              <p style={{ fontSize:22, fontWeight:800, color: dk ? D.text : '#111827', margin:0 }}>{k[status] || 0}</p>
               <div style={{ marginTop:4 }}><Badge status={status} /></div>
             </button>
           ))}
@@ -1999,6 +2016,7 @@ function KycReview() {
 
 // ── ALL DRIVERS ───────────────────────────────────────────────────────────────
 function AllDrivers() {
+  const dk = useAdminTheme();
   const [drivers, setDrivers]   = useState([]);
   const [q, setQ]               = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -2036,8 +2054,8 @@ function AllDrivers() {
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div>
-          <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:0}}>All Drivers</h2>
-          <p style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{drivers.length} registered · {filtered.length} shown</p>
+          <h2 style={{fontSize:20,fontWeight:800,color: dk?D.text:'#0f172a',margin:0}}>All Drivers</h2>
+          <p style={{fontSize:12,color:D.textMuted,marginTop:2}}>{drivers.length} registered · {filtered.length} shown</p>
         </div>
       </div>
 
@@ -2046,19 +2064,19 @@ function AllDrivers() {
         <input type="text" placeholder="Search name, phone, owner, vehicle…" value={q} onChange={e => setQ(e.target.value)}
           className="mg-input" style={{flex:1,fontSize:13,padding:'8px 14px'}} />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-          style={{padding:'8px 12px',border:'1.5px solid #e2e8f0',borderRadius:12,fontSize:12,fontWeight:600,color:'#475569',background:'#f8fafc',outline:'none',cursor:'pointer'}}>
+          style={{padding:'8px 12px',border:`1.5px solid ${dk?D.border:'#e2e8f0'}`,borderRadius:12,fontSize:12,fontWeight:600,color: dk?D.text:'#475569',background: dk?D.inputBg:'#f8fafc',outline:'none',cursor:'pointer'}}>
           <option value="">All KYC</option>
           {['PENDING','SUBMITTED','UNDER_REVIEW','VERIFIED','REJECTED'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
       {loading ? <Spinner /> : filtered.length === 0 ? (
-        <div style={{background:'white',borderRadius:16,padding:'40px 20px',textAlign:'center',border:'1px solid #f1f5f9'}}>
-          <div style={{width:48,height:48,borderRadius:16,background:'#f8fafc',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
-            <svg width={20} height={20} fill="none" stroke="#cbd5e1" strokeWidth={2} viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <div style={{background: dk?D.cardBg:'white',borderRadius:16,padding:'40px 20px',textAlign:'center',border:`1px solid ${dk?D.border:'#f1f5f9'}`}}>
+          <div style={{width:48,height:48,borderRadius:16,background: dk?D.inputBg:'#f8fafc',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}>
+            <svg width={20} height={20} fill="none" stroke={dk?'#4a6080':'#cbd5e1'} strokeWidth={2} viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
-          <p style={{fontSize:14,fontWeight:600,color:'#64748b'}}>No drivers found</p>
-          <p style={{fontSize:12,color:'#94a3b8',marginTop:4}}>Try adjusting your search or filters</p>
+          <p style={{fontSize:14,fontWeight:600,color: dk?D.textMuted:'#64748b'}}>No drivers found</p>
+          <p style={{fontSize:12,color:D.textMuted,marginTop:4}}>Try adjusting your search or filters</p>
         </div>
       ) : (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:12}}>
@@ -2068,49 +2086,36 @@ function AllDrivers() {
             const kycBg    = {VERIFIED:'#ecfdf5',REJECTED:'#fef2f2',SUBMITTED:'#eff6ff',UNDER_REVIEW:'#fffbeb',PENDING:'#f8fafc'}[d.kyc_status]||'#f8fafc';
             return (
               <div key={d.id} className="press-card"
-                style={{background:'white',borderRadius:16,padding:'14px 16px',border:'1px solid #f1f5f9',boxShadow:'0 1px 4px rgba(0,0,0,0.04)',borderLeft:`3px solid ${d.vehicle_number ? '#22c55e' : '#e2e8f0'}`}}
+                style={{background: dk ? D.cardBg : 'white', borderRadius:16, padding:'14px 16px', border:`1px solid ${dk ? D.border : '#f1f5f9'}`, boxShadow:'0 1px 4px rgba(0,0,0,0.08)', borderLeft:`3px solid ${d.vehicle_number ? '#22c55e' : (dk ? D.border : '#e2e8f0')}`}}
                 onClick={() => push({ type: 'driver', id: d.id, label: d.full_name })}>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  {/* Avatar */}
-                  <div style={{width:42,height:42,borderRadius:14,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>
-                    {ch}
-                  </div>
-                  {/* Info */}
+                  <div style={{width:42,height:42,borderRadius:14,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>{ch}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                      <span style={{fontSize:14,fontWeight:700,color:'#0f172a'}}>{d.full_name}</span>
+                      <span style={{fontSize:14,fontWeight:700,color: dk ? D.text : '#0f172a'}}>{d.full_name}</span>
                       <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,background:kycBg,color:kycColor}}>{d.kyc_status||'—'}</span>
                     </div>
-                    <p style={{fontSize:11,color:'#94a3b8',fontFamily:'monospace',marginTop:2}}>{d.mobile_number}</p>
+                    <p style={{fontSize:11,color:D.textMuted,fontFamily:'monospace',marginTop:2}}>{d.mobile_number}</p>
                   </div>
-                  {/* Arrow */}
-                  <svg width={14} height={14} fill="none" stroke="#cbd5e1" strokeWidth={2.5} viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                  <svg width={14} height={14} fill="none" stroke={dk?'#4a6080':'#cbd5e1'} strokeWidth={2.5} viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
                 </div>
-                {/* Details row */}
                 <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-                  {d.vehicle_number && (
-                    <span style={{fontSize:10,fontWeight:600,color:'#059669',background:'#ecfdf5',padding:'3px 10px',borderRadius:20}}>🚗 {d.vehicle_number}</span>
-                  )}
-                  {d.company_name && (
-                    <span style={{fontSize:10,fontWeight:600,color:'#475569',background:'#f8fafc',padding:'3px 10px',borderRadius:20,border:'1px solid #e2e8f0'}}>{d.company_name}</span>
-                  )}
-                  {d.owner_name && (
-                    <span style={{fontSize:10,fontWeight:600,color:'#6366f1',background:'#eef2ff',padding:'3px 10px',borderRadius:20}}>👤 {d.owner_name}</span>
-                  )}
+                  {d.vehicle_number && <span style={{fontSize:10,fontWeight:600,color:'#22c55e',background: dk?'#0f2a1a':'#ecfdf5',padding:'3px 10px',borderRadius:20}}>🚗 {d.vehicle_number}</span>}
+                  {d.company_name && <span style={{fontSize:10,fontWeight:600,color: dk?D.textMuted:'#475569',background: dk?D.inputBg:'#f8fafc',padding:'3px 10px',borderRadius:20,border:`1px solid ${dk?D.border:'#e2e8f0'}`}}>{d.company_name}</span>}
+                  {d.owner_name && <span style={{fontSize:10,fontWeight:600,color:'#818cf8',background: dk?'#1a1f4a':'#eef2ff',padding:'3px 10px',borderRadius:20}}>👤 {d.owner_name}</span>}
                 </div>
-                {/* Revenue row */}
-                <div style={{display:'flex',gap:16,marginTop:10,paddingTop:10,borderTop:'1px solid #f8fafc'}}>
+                <div style={{display:'flex',gap:16,marginTop:10,paddingTop:10,borderTop:`1px solid ${dk?D.border:'#f8fafc'}`}}>
                   <div>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Today</p>
-                    <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(d.paid_today)}</p>
+                    <p style={{fontSize:9,fontWeight:700,color:D.textMuted,textTransform:'uppercase',letterSpacing:'0.06em'}}>Today</p>
+                    <p style={{fontSize:13,fontWeight:800,color: dk?D.text:'#0f172a',fontFamily:'monospace'}}>{fmt(d.paid_today)}</p>
                   </div>
                   <div>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
-                    <p style={{fontSize:13,fontWeight:800,color:'#0f172a',fontFamily:'monospace'}}>{fmt(d.total_paid)}</p>
+                    <p style={{fontSize:9,fontWeight:700,color:D.textMuted,textTransform:'uppercase',letterSpacing:'0.06em'}}>Total</p>
+                    <p style={{fontSize:13,fontWeight:800,color: dk?D.text:'#0f172a',fontFamily:'monospace'}}>{fmt(d.total_paid)}</p>
                   </div>
                   <div style={{marginLeft:'auto',textAlign:'right'}}>
-                    <p style={{fontSize:9,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em'}}>Joined</p>
-                    <p style={{fontSize:11,fontWeight:600,color:'#64748b'}}>{timeSince(d.created_at)}</p>
+                    <p style={{fontSize:9,fontWeight:700,color:D.textMuted,textTransform:'uppercase',letterSpacing:'0.06em'}}>Joined</p>
+                    <p style={{fontSize:11,fontWeight:600,color: dk?D.textMuted:'#64748b'}}>{timeSince(d.created_at)}</p>
                   </div>
                 </div>
               </div>
@@ -2133,6 +2138,7 @@ function AllDrivers() {
 
 // ── ALL OWNERS ────────────────────────────────────────────────────────────────
 function AllOwners() {
+  const dk = useAdminTheme();
   const [owners, setOwners]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [q, setQ]                   = useState('');
@@ -2191,8 +2197,8 @@ function AllOwners() {
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div>
-          <h2 style={{fontSize:20,fontWeight:800,color:'#0f172a',margin:0}}>Fleet Owners</h2>
-          <p style={{fontSize:12,color:'#94a3b8',marginTop:2}}>{owners.length} registered · {filtered.length} shown</p>
+          <h2 style={{fontSize:20,fontWeight:800,color: dk?D.text:'#0f172a',margin:0}}>Fleet Owners</h2>
+          <p style={{fontSize:12,color:D.textMuted,marginTop:2}}>{owners.length} registered · {filtered.length} shown</p>
         </div>
       </div>
 
@@ -2200,8 +2206,8 @@ function AllOwners() {
         className="mg-input" style={{fontSize:13,padding:'8px 14px'}} />
 
       {loading ? <Spinner /> : filtered.length === 0 ? (
-        <div style={{background:'white',borderRadius:16,padding:'40px 20px',textAlign:'center',border:'1px solid #f1f5f9'}}>
-          <p style={{fontSize:14,fontWeight:600,color:'#64748b'}}>No owners found</p>
+        <div style={{background: dk?D.cardBg:'white',borderRadius:16,padding:'40px 20px',textAlign:'center',border:`1px solid ${dk?D.border:'#f1f5f9'}`}}>
+          <p style={{fontSize:14,fontWeight:600,color: dk?D.textMuted:'#64748b'}}>No owners found</p>
         </div>
       ) : (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:14}}>
@@ -2210,72 +2216,64 @@ function AllOwners() {
             const isActive = !o.status || o.status === 'ACTIVE';
             return (
               <div key={o.id} style={{
-                background:'white', borderRadius:16, border:'1px solid #e5e7eb',
-                boxShadow:'0 1px 6px rgba(0,0,0,0.05)', overflow:'hidden',
+                background: dk?D.cardBg:'white', borderRadius:16, border:`1px solid ${dk?D.border:'#e5e7eb'}`,
+                boxShadow:'0 1px 6px rgba(0,0,0,0.08)', overflow:'hidden',
                 display:'flex', flexDirection:'column',
               }}>
-                {/* Card top */}
                 <div style={{padding:'16px 18px 12px', flex:1}}>
                   <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
-                    {/* Avatar */}
-                    <div style={{width:40,height:40,borderRadius:12,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>
-                      {ch}
-                    </div>
-                    {/* Name + status */}
+                    <div style={{width:40,height:40,borderRadius:12,background:bg,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:800,fontSize:16}}>{ch}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                        <span style={{fontSize:14,fontWeight:700,color:'#111827',lineHeight:1.3}}>{o.full_name}</span>
+                        <span style={{fontSize:14,fontWeight:700,color: dk?D.text:'#111827',lineHeight:1.3}}>{o.full_name}</span>
                         <span style={{
                           fontSize:10,fontWeight:700,letterSpacing:'0.04em',padding:'2px 8px',borderRadius:20,
-                          background: isActive ? '#dcfce7' : '#fee2e2',
-                          color: isActive ? '#15803d' : '#b91c1c',
+                          background: isActive ? (dk?'#0f2a1a':'#dcfce7') : (dk?'#2a0f0f':'#fee2e2'),
+                          color: isActive ? '#22c55e' : '#f87171',
                         }}>{isActive ? 'ACTIVE' : (o.status || 'INACTIVE')}</span>
                       </div>
                       {o.company_name && (
-                        <p style={{fontSize:12,color:'#6b7280',margin:'2px 0 0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                        <p style={{fontSize:12,color: dk?D.textMuted:'#6b7280',margin:'2px 0 0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                           🏢 {o.company_name}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Owner ID row */}
-                  <div style={{marginTop:10,padding:'8px 10px',background:'#f9fafb',borderRadius:8,border:'1px solid #f3f4f6'}}>
+                  <div style={{marginTop:10,padding:'8px 10px',background: dk?D.inputBg:'#f9fafb',borderRadius:8,border:`1px solid ${dk?D.border:'#f3f4f6'}`}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
                       <div>
-                        <p style={{fontSize:9,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Owner ID</p>
-                        <p style={{fontSize:12,fontWeight:700,color:'#4f46e5',fontFamily:'monospace',margin:'2px 0 0'}}>{o.owner_code}</p>
+                        <p style={{fontSize:9,fontWeight:700,color:D.textMuted,textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Owner ID</p>
+                        <p style={{fontSize:12,fontWeight:700,color:'#818cf8',fontFamily:'monospace',margin:'2px 0 0'}}>{o.owner_code}</p>
                       </div>
                       <div style={{textAlign:'right'}} onClick={e => e.stopPropagation()}>
-                        <p style={{fontSize:9,fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Mobile</p>
+                        <p style={{fontSize:9,fontWeight:700,color:D.textMuted,textTransform:'uppercase',letterSpacing:'0.08em',margin:0}}>Mobile</p>
                         <div style={{display:'flex',alignItems:'center',gap:4}}>
-                          <p style={{fontSize:12,fontWeight:600,color:'#374151',fontFamily:'monospace',margin:'2px 0 0'}}>{o.mobile_number}</p>
+                          <p style={{fontSize:12,fontWeight:600,color: dk?D.text:'#374151',fontFamily:'monospace',margin:'2px 0 0'}}>{o.mobile_number}</p>
                           <button onClick={e => startEditPhone(e, o)}
-                            style={{fontSize:10,color:'#9ca3af',background:'none',border:'none',cursor:'pointer',padding:'0 2px',marginTop:2}}
+                            style={{fontSize:10,color:D.textMuted,background:'none',border:'none',cursor:'pointer',padding:'0 2px',marginTop:2}}
                             title="Edit phone">✏️</button>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Stats row */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:0,marginTop:12,paddingTop:12,borderTop:'1px solid #f3f4f6'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:0,marginTop:12,paddingTop:12,borderTop:`1px solid ${dk?D.border:'#f3f4f6'}`}}>
                     {[
-                      {val: o.total_drivers||0,   label:'Drivers',  color:'#111827'},
-                      {val: o.total_vehicles||0,  label:'Vehicles', color:'#111827'},
-                      {val: fmt(o.collection_month), label:'This Month', color:'#059669'},
-                      {val: fmt(o.collection_total), label:'Total',     color:'#111827'},
+                      {val: o.total_drivers||0,   label:'Drivers',  color: dk?D.text:'#111827'},
+                      {val: o.total_vehicles||0,  label:'Vehicles', color: dk?D.text:'#111827'},
+                      {val: fmt(o.collection_month), label:'This Month', color:'#22c55e'},
+                      {val: fmt(o.collection_total), label:'Total',     color: dk?D.text:'#111827'},
                     ].map(({val,label,color}) => (
-                      <div key={label} style={{textAlign:'center',borderRight:'1px solid #f3f4f6',padding:'0 4px',lastChild:{borderRight:'none'}}}>
+                      <div key={label} style={{textAlign:'center',borderRight:`1px solid ${dk?D.border:'#f3f4f6'}`,padding:'0 4px'}}>
                         <p style={{fontSize:13,fontWeight:800,color,margin:0,fontFamily:label.includes('Month')||label==='Total'?'monospace':'inherit'}}>{val}</p>
-                        <p style={{fontSize:9,fontWeight:600,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.06em',margin:'2px 0 0'}}>{label}</p>
+                        <p style={{fontSize:9,fontWeight:600,color:D.textMuted,textTransform:'uppercase',letterSpacing:'0.06em',margin:'2px 0 0'}}>{label}</p>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Action buttons row — PayYantra style */}
-                <div style={{display:'flex',borderTop:'1px solid #f3f4f6',background:'#fafafa'}}>
+                <div style={{display:'flex',borderTop:`1px solid ${dk?D.border:'#f3f4f6'}`,background: dk?D.inputBg:'#fafafa'}}>
                   {[
                     { label:'Details',  onClick: () => push({ type:'owner', id:o.id, label:o.full_name }), primary:true },
                     { label:'Drivers',  onClick: () => push({ type:'owner', id:o.id, label:o.full_name }) },
@@ -2283,14 +2281,14 @@ function AllOwners() {
                   ].map(({label,onClick,primary},i) => (
                     <button key={label} onClick={onClick} style={{
                       flex:1, padding:'9px 4px', border:'none',
-                      borderRight: i < 2 ? '1px solid #e5e7eb' : 'none',
+                      borderRight: i < 2 ? `1px solid ${dk?D.border:'#e5e7eb'}` : 'none',
                       background:'transparent', cursor:'pointer',
                       fontSize:12, fontWeight:600,
-                      color: primary ? '#4f46e5' : '#6b7280',
+                      color: primary ? '#818cf8' : (dk?D.textMuted:'#6b7280'),
                       fontFamily:'inherit', transition:'background 0.1s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background='#f0f0ff'; e.currentTarget.style.color='#4f46e5'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color= primary ? '#4f46e5' : '#6b7280'; }}
+                    onMouseEnter={e => { e.currentTarget.style.background= dk?'#1a2050':'#f0f0ff'; e.currentTarget.style.color='#818cf8'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color= primary ? '#818cf8' : (dk?D.textMuted:'#6b7280'); }}
                     >{label}</button>
                   ))}
                 </div>
@@ -2785,6 +2783,7 @@ const NAV_ICONS = {
 // PIN MANAGEMENT SECTION
 // ═══════════════════════════════════════════════════════════════════════════════
 function LeadsSection() {
+  const dk = useAdminTheme();
   const [leads, setLeads] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -2829,40 +2828,40 @@ function LeadsSection() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1100px' }}>
+    <div style={{ padding: '24px', maxWidth: '1100px', background: dk?D.pageBg:'transparent', minHeight: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Landing Page Leads</h2>
-          <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0' }}>{leads.length} total submissions · timestamps in UTC</p>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: dk?D.text:'#0f172a', margin: 0 }}>Landing Page Leads</h2>
+          <p style={{ fontSize: '13px', color: D.textMuted, margin: '4px 0 0' }}>{leads.length} total submissions · timestamps in UTC</p>
         </div>
         <button onClick={downloadCSV} style={{ padding: '8px 16px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
           Download CSV
         </button>
       </div>
-      {loading ? <p style={{ color: '#64748b' }}>Loading…</p> : leads.length === 0 ? (
-        <p style={{ color: '#94a3b8', textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
+      {loading ? <p style={{ color: D.textMuted }}>Loading…</p> : leads.length === 0 ? (
+        <p style={{ color: D.textMuted, textAlign: 'center', padding: '48px 0' }}>No leads yet</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto', background: dk?D.cardBg:'#fff', borderRadius: 12, border: `1px solid ${dk?D.border:'#e2e8f0'}` }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
+              <tr style={{ background: dk?D.inputBg:'#f8fafc' }}>
                 {['Name', 'Phone', 'Company', 'Role', 'Fleet', 'City', 'Submitted (UTC)', 'IP', 'Browser'].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: dk?D.textMuted:'#475569', borderBottom: `1px solid ${dk?D.border:'#e2e8f0'}`, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {leads.map((l, i) => (
-                <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{l.name}</td>
-                  <td style={{ padding: '10px 12px', color: '#4f46e5', fontWeight: 600 }}>{l.phone}</td>
-                  <td style={{ padding: '10px 12px', color: '#334155' }}>{l.company || '—'}</td>
-                  <td style={{ padding: '10px 12px', color: '#334155' }}>{l.role || '—'}</td>
-                  <td style={{ padding: '10px 12px', color: '#334155' }}>{l.fleet || '—'}</td>
-                  <td style={{ padding: '10px 12px', color: '#334155' }}>{l.city || '—'}</td>
-                  <td style={{ padding: '10px 12px', color: '#64748b', fontFamily: 'monospace', fontSize: '12px', whiteSpace: 'nowrap' }}>{fmtUTC(l.submitted_at)}</td>
-                  <td style={{ padding: '10px 12px', color: '#94a3b8', fontFamily: 'monospace', fontSize: '11px' }}>{l.ip_address || '—'}</td>
-                  <td style={{ padding: '10px 12px', color: '#64748b' }}>{parseBrowser(l.user_agent)}</td>
+                <tr key={l.id} style={{ borderBottom: `1px solid ${dk?D.border:'#f1f5f9'}`, background: dk ? (i%2===0?D.cardBg:D.inputBg) : (i%2===0?'#fff':'#fafafa') }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: dk?D.text:'#0f172a' }}>{l.name}</td>
+                  <td style={{ padding: '10px 12px', color: '#818cf8', fontWeight: 600 }}>{l.phone}</td>
+                  <td style={{ padding: '10px 12px', color: dk?D.text:'#334155' }}>{l.company || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: dk?D.text:'#334155' }}>{l.role || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: dk?D.text:'#334155' }}>{l.fleet || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: dk?D.text:'#334155' }}>{l.city || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: dk?D.textMuted:'#64748b', fontFamily: 'monospace', fontSize: '12px', whiteSpace: 'nowrap' }}>{fmtUTC(l.submitted_at)}</td>
+                  <td style={{ padding: '10px 12px', color: D.textMuted, fontFamily: 'monospace', fontSize: '11px' }}>{l.ip_address || '—'}</td>
+                  <td style={{ padding: '10px 12px', color: dk?D.textMuted:'#64748b' }}>{parseBrowser(l.user_agent)}</td>
                 </tr>
               ))}
             </tbody>
@@ -3089,6 +3088,75 @@ function AdminPanelInner() {
   const { notifications, unread, markAllRead } = useAdminNotifications();
   const [isDark, toggleDark] = useTheme();
 
+  // Inject dark-mode overrides directly into <head> — no CSS build dependency
+  React.useEffect(() => {
+    const id = 'mg-admin-dark-css';
+    let el = document.getElementById(id);
+    if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
+    el.textContent = isDark ? `
+      .admin-dark { color-scheme: dark; }
+
+      /* ── Backgrounds ── */
+      .admin-dark .bg-white, .admin-dark [class*="bg-white"] { background-color: #1a2438 !important; }
+      .admin-dark .bg-gray-50,  .admin-dark .bg-slate-50  { background-color: #162133 !important; }
+      .admin-dark .bg-gray-100, .admin-dark .bg-slate-100 { background-color: #1a2438 !important; }
+      .admin-dark .bg-gray-200  { background-color: #1e2d42 !important; }
+      .admin-dark .bg-gray-800, .admin-dark .bg-slate-800 { background-color: #162133 !important; }
+      .admin-dark .bg-gray-900  { background-color: #0d1520 !important; }
+
+      /* ── Text — bright enough to read on navy ── */
+      .admin-dark, .admin-dark p, .admin-dark span, .admin-dark td, .admin-dark th,
+      .admin-dark div, .admin-dark label, .admin-dark li { color: #c8d6e8; }
+      .admin-dark .text-gray-900, .admin-dark .text-slate-900,
+      .admin-dark .text-gray-800, .admin-dark .text-slate-800 { color: #f1f5f9 !important; }
+      .admin-dark .text-gray-700, .admin-dark .text-slate-700 { color: #e2e8f0 !important; }
+      .admin-dark .text-gray-600, .admin-dark .text-slate-600 { color: #cbd5e1 !important; }
+      .admin-dark .text-gray-500, .admin-dark .text-slate-500 { color: #94a3b8 !important; }
+      .admin-dark .text-gray-400, .admin-dark .text-slate-400 { color: #7c8fa8 !important; }
+      .admin-dark .uppercase { color: #94a3b8 !important; }
+
+      /* ── Borders ── */
+      .admin-dark .border-gray-100, .admin-dark .border-gray-200,
+      .admin-dark .border-gray-300, .admin-dark .border-gray-700,
+      .admin-dark .border-slate-100, .admin-dark .border-slate-200 { border-color: #1e3450 !important; }
+      .admin-dark .border, .admin-dark .border-b, .admin-dark .border-t { border-color: #1e3450 !important; }
+      .admin-dark .divide-y > * + * { border-color: #1e3450 !important; }
+
+      /* ── Hover rows ── */
+      .admin-dark .hover\\:bg-gray-50:hover, .admin-dark .hover\\:bg-gray-100:hover,
+      .admin-dark .hover\\:bg-slate-50:hover { background-color: #1e2d42 !important; }
+      .admin-dark tr:hover td { background-color: #1e2d42 !important; }
+
+      /* ── Tinted bg cards ── */
+      .admin-dark .bg-yellow-50  { background-color: #2a2500 !important; }
+      .admin-dark .bg-blue-50    { background-color: #0f2a4a !important; }
+      .admin-dark .bg-red-50     { background-color: #2a0f0f !important; }
+      .admin-dark .bg-indigo-50  { background-color: #1a1f4a !important; }
+      .admin-dark .bg-emerald-50 { background-color: #0f2a1a !important; }
+      .admin-dark .bg-purple-50  { background-color: #1f1040 !important; }
+      .admin-dark .bg-amber-50   { background-color: #2a2000 !important; }
+
+      /* ── Accent text (keep colored) ── */
+      .admin-dark .text-indigo-600 { color: #818cf8 !important; }
+      .admin-dark .text-indigo-700 { color: #a5b4fc !important; }
+      .admin-dark .text-green-700  { color: #4ade80 !important; }
+      .admin-dark .text-red-700    { color: #f87171 !important; }
+      .admin-dark .text-blue-700   { color: #60a5fa !important; }
+      .admin-dark .text-yellow-700 { color: #fbbf24 !important; }
+
+      /* ── Inputs ── */
+      .admin-dark input, .admin-dark textarea, .admin-dark select {
+        background-color: #1a2438 !important;
+        color: #e2e8f0 !important;
+        border-color: #1e3450 !important;
+      }
+      .admin-dark input::placeholder { color: #7c8fa8 !important; }
+
+      /* ── Shadow ── */
+      .admin-dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.5) !important; }
+    ` : '';
+  }, [isDark]);
+
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
 
   const navItems = [
@@ -3115,6 +3183,7 @@ function AdminPanelInner() {
   const tabLabel = navItems.find(n => n.key && n.key === tab)?.label || tab;
 
   return (
+  <AdminThemeCtx.Provider value={isDark}>
     <div className={isDark ? 'admin-dark' : ''} style={{ display:'flex', height:'100vh', background: isDark ? '#0d1520' : '#f3f4f6', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
@@ -3279,100 +3348,4 @@ function AdminPanelInner() {
               {showNotifs && (
                 <div style={{
                   position: 'absolute', right: 0, top: 44, width: 320,
-                  background: isDark ? '#0f172a' : '#fff',
-                  borderRadius: 12,
-                  boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.12)',
-                  border: `1px solid ${isDark ? '#1e293b' : '#e5e7eb'}`,
-                  zIndex: 50, overflow: 'hidden'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${isDark ? '#1e293b' : '#f3f4f6'}` }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#f1f5f9' : '#111827' }}>Notifications</span>
-                    <button onClick={markAllRead} style={{ fontSize: 11, color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Mark all read</button>
-                  </div>
-                  <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                    {notifications.length === 0 ? (
-                      <p style={{ fontSize: 13, color: isDark ? '#475569' : '#9ca3af', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
-                    ) : notifications.map(n => (
-                      <div key={n.id} style={{
-                        padding: '12px 16px',
-                        borderBottom: `1px solid ${isDark ? '#1e293b' : '#f9fafb'}`,
-                        background: isDark
-                          ? (!n.is_read ? '#131f35' : '#0f172a')
-                          : (!n.is_read ? '#fafaff' : '#fff')
-                      }}>
-                        {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginRight: 6, verticalAlign: 'middle' }} />}
-                        <p style={{ fontSize: 13, fontWeight: 600, color: isDark ? '#e2e8f0' : '#111827', margin: 0 }}>{n.title}</p>
-                        <p style={{ fontSize: 12, color: isDark ? '#64748b' : '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
-                        <p style={{ fontSize: 10, color: isDark ? '#334155' : '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Avatar chip */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '4px 12px 4px 4px', borderRadius: 20,
-              border: `1px solid ${isDark ? '#1e293b' : '#e5e7eb'}`,
-              background: isDark ? '#0f172a' : '#fff', cursor: 'default'
-            }}>
-              <div style={{
-                width: 26, height: 26, borderRadius: '50%',
-                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SA</span>
-              </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#cbd5e1' : '#374151' }}>
-                {(() => { try { const p = JSON.parse(atob((localStorage.getItem('mg_admin_token')||'..').split('.')[1])); return p.phone ? `+91 ••••${String(p.phone).slice(-4)}` : 'Super Admin'; } catch { return 'Super Admin'; } })()}
-              </span>
-            </div>
-          </div>
-        </header>
-
-        {/* Content */}
-        <div style={{ padding: 24, flex: 1, background: isDark ? '#0b1120' : '#f4f6f9' }}>
-          {tab === 'dashboard'    && <Dashboard onSetTab={setTab} />}
-          {tab === 'companies'    && <Companies />}
-          {tab === 'owners'       && <AllOwners />}
-          {tab === 'drivers'      && <AllDrivers />}
-          {tab === 'kyc'          && <KycReview />}
-          {tab === 'docs'         && <DocApprovals />}
-          {tab === 'transactions' && <Transactions />}
-          {tab === 'chat'         && <ChatViewer />}
-          {tab === 'audit'        && <AuditLog />}
-          {tab === 'pins'         && <PinManagementSection />}
-          {tab === 'leads'        && <LeadsSection />}
-        </div>
-      </main>
-
-      {showLogoutConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 320, padding: 24, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
-            <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-            </div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Sign Out?</h3>
-            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Are you sure you want to sign out of the admin console?</p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setShowLogoutConfirm(false)}
-                style={{ flex: 1, padding: '10px 0', background: '#f1f5f9', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
-                Cancel
-              </button>
-              <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.href = '/login'; }}
-                style={{ flex: 1, padding: '10px 0', background: '#ef4444', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-export default AdminPanelInner;
+                  background: isDark ? '#0f172a' : '#ff
