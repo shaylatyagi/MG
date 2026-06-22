@@ -644,16 +644,19 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
            SET amount = $1, description = $2
            WHERE driver_id = $3
              AND entry_type = 'RENT_CHARGE'
-             AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'`,
+             AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date`,
           [rent, `Daily rent charge — ${vNum} (₹${rent}/day)`, driverId]
         );
 
         if (updated.rowCount === 0) {
           // No charge yet for today — insert one
           await pool.query(
-            `INSERT INTO public.driver_ledger (driver_id, entry_type, amount, description, created_at)
-             VALUES ($1, 'RENT_CHARGE', $2, $3, NOW())`,
-            [driverId, rent, `Daily rent charge — ${vNum} (₹${rent}/day)`]
+            `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description, created_at)
+             SELECT $1, o.id, 'RENT_CHARGE', $2, $3, NOW()
+             FROM public.owners o
+             WHERE o.id = $4
+             LIMIT 1`,
+            [driverId, rent, `Daily rent charge — ${vNum} (₹${rent}/day)`, req.user.id]
           );
         }
 

@@ -883,14 +883,14 @@ router.post('/user-docs/upload', upload.single('file'), async (req, res) => {
     await pool.query(
       `INSERT INTO public.user_documents
          (user_id, user_type, doc_type, original_name, s3_key, file_size, mime_type, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'UPLOADED')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING')
        ON CONFLICT (user_id, user_type, doc_type)
        DO UPDATE SET
          original_name = EXCLUDED.original_name,
          s3_key        = EXCLUDED.s3_key,
          file_size     = EXCLUDED.file_size,
          mime_type     = EXCLUDED.mime_type,
-         status        = 'UPLOADED',
+         status        = 'PENDING',
          uploaded_at   = NOW()`,
       [uId, uType, doc_type, file.originalname, s3Key, file.size, file.mimetype]
     );
@@ -1182,7 +1182,7 @@ router.get('/document-approvals', async (req, res) => {
       LEFT JOIN public.drivers d  ON d.id  = ud.user_id AND ud.user_type = 'DRIVER'
       LEFT JOIN public.owners  o  ON o.id  = ud.user_id AND ud.user_type = 'OWNER'
       LEFT JOIN public.companies c ON c.id = COALESCE(d.company_id, o.company_id)
-      WHERE ud.status = 'PENDING'
+      WHERE ud.status IN ('PENDING', 'UPLOADED', 'SUBMITTED')
       ORDER BY ud.uploaded_at DESC
     `);
     const docs = await Promise.all(result.rows.map(async doc => ({
@@ -1494,6 +1494,58 @@ router.post('/seed-demo-online', async (req, res) => {
     });
   } catch (err) {
     console.error('seed-demo-online error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/admin/chat/threads — all chat threads with last message
+router.get('/chat/threads', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        d.id AS driver_id,
+        d.full_name AS driver_name,
+        d.mobile_number,
+        o.full_name AS owner_name,
+        cm.message AS last_message,
+        cm.created_at AS last_message_at,
+        cm.sender_type AS last_sender,
+        COUNT(CASE WHEN cm2.is_read = FALSE AND cm2.sender_type = 'DRIVER' THEN 1 END)::int AS unread_count
+      FROM public.drivers d
+      LEFT JOIN public.owners o ON o.id = d.owner_id
+      LEFT JOIN LATERAL (
+        SELECT message, created_at, sender_type
+        FROM public.chat_messages
+        WHERE driver_id = d.id
+        ORDER BY created_at DESC LIMIT 1
+      ) cm ON TRUE
+      LEFT JOIN public.chat_messages cm2 ON cm2.driver_id = d.id
+      WHERE d.deleted_at IS NULL
+      GROUP BY d.id, d.full_name, d.mobile_number, o.full_name, cm.message, cm.created_at, cm.sender_type
+      ORDER BY cm.created_at DESC NULLS LAST
+      LIMIT 100
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/admin/chat/messages?driver_id= — messages for a thread
+router.get('/chat/messages', async (req, res) => {
+  try {
+    const { driver_id, limit = 50 } = req.query;
+    if (!driver_id) return res.status(400).json({ error: 'driver_id required' });
+    const result = await pool.query(
+      `SELECT id, sender_type, message, is_read, created_at
+       FROM public.chat_messages
+       WHERE driver_id = $1
+       ORDER BY created_at ASC
+       LIMIT $2`,
+      [driver_id, parseInt(limit)]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });

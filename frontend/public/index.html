@@ -31,36 +31,27 @@
   })();
 </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="preload" href="%PUBLIC_URL%/logos/logo-cyan.png" as="image" type="image/png" fetchpriority="high" />
-<link 
-  href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" 
-  rel="stylesheet" 
-  media="print" 
-  onload="this.media='all'" 
-/>
-<noscript>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
-</noscript>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://mg-qw5s.onrender.com" />
+    <link rel="preconnect" href="https://mg-qw5s.onrender.com" crossorigin />
+    <link rel="preload" href="%PUBLIC_URL%/logos/logo-cyan.png" as="image" type="image/png" fetchpriority="high" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+    </noscript>
     <title>MobilityGrid</title>
     <script>
-      // Enable Tailwind dark mode via class strategy
-      tailwind = window.tailwind || {};
-      window.tailwindConfig = { darkMode: 'class' };
-      // Apply saved theme before page renders (no flash)
+      // Dark mode: apply saved theme before paint (no flash) + init Tailwind config
       (function() {
-        try {
-          if (localStorage.getItem('mg_theme') === 'dark') {
-            document.documentElement.classList.add('dark');
-          }
-        } catch(e) {}
+        try { if (localStorage.getItem('mg_theme') === 'dark') document.documentElement.classList.add('dark'); } catch(e) {}
+        window.tailwindConfig = { darkMode: 'class' };
+        if (window.tailwind && window.tailwind.config) tailwind.config = { darkMode: 'class' };
       })();
-    </script>
-    <script>
-      // Apply dark mode config after Tailwind loads
-      if (window.tailwind && window.tailwind.config) {
-        tailwind.config = { darkMode: 'class' };
-      }
     </script>
   </head>
   <body>

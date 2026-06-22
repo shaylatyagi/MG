@@ -2,28 +2,30 @@
 
 > Fleet Operating System for India — digital rent collection, driver KYC, real-time tracking, and fleet management for EV and gig economy operators.
 
-## What is MobilityGrid?
+MobilityGrid is a SaaS platform for India's fleet operators and gig workers. Fleet owners manage vehicles, collect rent digitally, track drivers, handle KYC verification, and view earnings — all in one place.
 
-MobilityGrid is a SaaS platform built for India's fleet operators and gig workers. It helps fleet owners manage vehicles, drivers, daily rent collection, KYC verification, and real-time GPS tracking — all in one place.
+## Docs
 
-## Who is it for?
+- [Fleet Owner Dashboard](https://mobilitygrid.in/owner/dashboard): Manage vehicles, drivers, rent collection, and earnings
+- [Driver App](https://mobilitygrid.in/driver/dashboard): Driver PWA for payments, attendance, and wallet
+- [Get Early Access](https://mobilitygrid.in/#signup): Sign up form for new fleet owners
+- [Partner Network](https://partners.mobilitygrid.in/): EV and gig economy fleet partner directory
+- [Login](https://mobilitygrid.in/login): Sign in to the platform
+
+## Optional
+
+- [Backend API](https://mg-qw5s.onrender.com/): REST API base URL (auth required for most endpoints)
+
+## About
 
 - **Fleet Owners / Operators**: Manage vehicles, collect rent digitally, track drivers, view earnings dashboard
 - **Fleet Managers**: Oversee operations, manage driver onboarding, handle KYC approvals
 - **Drivers / Riders**: Track dues, make payments, view attendance, communicate with owner
 
-## Key Features
-
-- Digital rent collection (UPI + Cash)
-- Driver KYC and document verification
-- Real-time GPS fleet tracking
-- Automated daily rent deduction
-- Driver attendance tracking
-- Partner network for fleet operators
-- Multi-owner company management
+Key features: UPI + Cash rent collection, PayYantra KYC verification, real-time GPS tracking, automated daily rent deduction, attendance tracking, partner network, multi-owner company management.
 
 ## Contact
 
 - Website: https://mobilitygrid.in
-- Get Early Access: https://mobilitygrid.in/#signup
 - Partners: https://partners.mobilitygrid.in
+- Support: mobilitygrid@gmail.com

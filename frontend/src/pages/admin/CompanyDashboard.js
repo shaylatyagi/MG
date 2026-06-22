@@ -469,7 +469,7 @@ function Dashboard({ onSetTab }) {
       api('/api/admin/platform-stats').catch(() => null),
       api('/api/admin/kyc/summary').catch(() => null),
       api('/api/admin/document-approvals').catch(() => null),
-    ]).then(([s, k, docs]) => { setStats(s); setKyc(k); setPendingDocs((docs?.docs || []).filter(d => d.status === 'PENDING').length); setLoading(false); });
+    ]).then(([s, k, docs]) => { setStats(s); setKyc(k); setPendingDocs((docs?.docs || []).filter(d => ['PENDING','UPLOADED','SUBMITTED'].includes(d.status)).length); setLoading(false); });
   }, []);
 
   const runSeedDemo = async () => {

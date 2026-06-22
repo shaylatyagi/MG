@@ -7,8 +7,22 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
   useEffect(() => {
-    // If there's a hash anchor, let the browser scroll to it naturally
-    if (hash) return;
+    if (hash) {
+      // Wait for React to render, then scroll to element
+      const id = hash.slice(1);
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        // Element not rendered yet — retry after paint
+        const timer = setTimeout(() => {
+          const el2 = document.getElementById(id);
+          if (el2) el2.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;

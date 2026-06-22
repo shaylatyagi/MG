@@ -137,11 +137,13 @@ const kyc = kycProviders[PROVIDER] || kycProviders.setu;
 // Helper: save KYC result to DB
 const saveKycResult = async (phone, docType, verified, verifiedName) => {
   try {
-    const colMap = { aadhaar: 'aadhaar_last4', pan: 'pan_number', dl: 'driving_license_number' };
-    if (colMap[docType] && verifiedName) {
+    const colMap = { aadhaar: 'aadhaar_number', pan: 'pan_number', dl: 'driving_license_number' };
+    const col = colMap[docType];
+    if (col && verifiedName) {
+      // Update public.drivers by phone_number
       await pool.query(
-        `UPDATE auth.vehicle_drivers SET ${colMap[docType]}=$1
-         WHERE user_id=(SELECT id FROM auth.users WHERE mobile_number=$2)`,
+        `UPDATE public.drivers SET ${col}=$1, updated_at=NOW()
+         WHERE mobile_number=$2 OR phone_number=$2`,
         [verifiedName, phone]
       );
     }

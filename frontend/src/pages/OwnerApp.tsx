@@ -484,10 +484,21 @@ const [aadhaarPublicId, setAadhaarPublicId]         = useState<string|null>(null
 const [bankVerifyStatus, setBankVerifyStatus]       = useState<null|'loading'|'verified'|'failed'>(null);
 const [bankVerifyName, setBankVerifyName]           = useState<string|null>(null);
 const [newDriverBank, setNewDriverBank]             = useState({ accountNumber: '', ifsc: '' });
+const [ownerPanInput, setOwnerPanInput] = useState('');
+const [ownerPanStatus, setOwnerPanStatus] = useState<null|'loading'|'verified'|'failed'>(null);
+const [ownerPanName, setOwnerPanName] = useState<string|null>(null);
+const [ownerBankAccount, setOwnerBankAccount] = useState('');
+const [ownerBankIfsc, setOwnerBankIfsc] = useState('');
+const [ownerBankStatus, setOwnerBankStatus] = useState<null|'loading'|'verified'|'failed'>(null);
+const [ownerBankName, setOwnerBankName] = useState<string|null>(null);
+const [ownerAadhaarStatus, setOwnerAadhaarStatus] = useState<null|'loading'|'sent'|'verified'|'failed'>(null);
+const [ownerAadhaarPublicId, setOwnerAadhaarPublicId] = useState<string|null>(null);
 const [showChangeRent, setShowChangeRent] = useState(false);
 const [changeRentDriver, setChangeRentDriver] = useState(null); // { driverId, vehicleId, vehicleNumber, currentRent }
 const [changeRentAmt, setChangeRentAmt] = useState('');
 const [changeRentLoading, setChangeRentLoading] = useState(false);
+const vehicleModalScrollPos = React.useRef(0);
+const vehicleModalScrollRef = React.useRef<HTMLDivElement>(null);
 
   // ── Payment Sound Notifications ───────────────────────────────────────────────
   const knownPaymentIdsRef = React.useRef<Set<string>>(new Set(
@@ -882,6 +893,22 @@ const DriverDetailsModal = () => {
     <FileCheck2 size={18} /> KYC & Details
   </h3>
   <div className="space-y-2">
+    {/* PAN — show value or add prompt */}
+    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+      <span className="text-sm text-slate-500">🪪 PAN Number</span>
+      {driver.pan_number
+        ? <span className="text-sm font-black font-mono text-emerald-700">{driver.pan_number} ✅</span>
+        : <span className="text-xs bg-amber-100 text-amber-700 font-black px-2 py-1 rounded-lg">⚠️ Pending — Add via KYC</span>
+      }
+    </div>
+    {/* Aadhaar */}
+    <div className="flex justify-between items-center py-2 border-b border-slate-100">
+      <span className="text-sm text-slate-500">🆔 Aadhaar</span>
+      {driver.aadhaar_number
+        ? <span className="text-sm font-black font-mono text-emerald-700">{String(driver.aadhaar_number).replace(/(\d{4})(\d{4})(\d{4})/, 'XXXX-XXXX-$3')} ✅</span>
+        : <span className="text-xs bg-amber-100 text-amber-700 font-black px-2 py-1 rounded-lg">⚠️ Pending — Add via KYC</span>
+      }
+    </div>
     {driver.date_of_birth && (
       <div className="flex justify-between items-center py-2 border-b border-slate-100">
         <span className="text-sm text-slate-500">📅 Date of Birth</span>
@@ -2874,6 +2901,13 @@ const [damageForm, setDamageForm] = useState({
   type:'ACCIDENT', amount:'', desc:'', recovery:'LEDGER' 
 });
 
+  // Restore scroll position after re-mount (parent re-renders reset it)
+  React.useLayoutEffect(() => {
+    if (vehicleModalScrollRef.current && vehicleModalScrollPos.current > 0) {
+      vehicleModalScrollRef.current.scrollTop = vehicleModalScrollPos.current;
+    }
+  });
+
 useEffect(() => {
   if (selectedVehicleDetails?.id) {
     fetch(`${API}/api/payment/owner/damage-records/${selectedVehicleDetails.id}`, {
@@ -2943,7 +2977,12 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
   return (
     <div className="absolute inset-0 bg-black/90 z-[1000] flex items-center justify-center p-4 overflow-hidden"
       onClick={(e) => { if(e.target===e.currentTarget){ setShowVehicleDetailModal(false); setSelectedVehicleDetails(null); } }}>
-      <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+      <div
+        ref={vehicleModalScrollRef}
+        onScroll={() => { vehicleModalScrollPos.current = vehicleModalScrollRef.current?.scrollTop || 0; }}
+        className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+        onClick={e=>e.stopPropagation()}
+      >
         
         {/* Sticky top bar — always visible when scrolled */}
         <div className="sticky top-0 z-10 bg-white border-b border-slate-100 flex items-center px-4 py-3 rounded-t-3xl">
@@ -3739,6 +3778,136 @@ const ProfileTab = () => {
       className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2">
       <Edit2 size={14} /> {t.editProfile}
     </button>
+
+    {/* ─── Owner KYC Verification ─── */}
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100">
+        <p className="text-sm font-black text-slate-800 flex items-center gap-2">🪪 KYC Verification</p>
+        <p className="text-xs text-slate-500 mt-0.5">Verify your identity via PayYantra</p>
+      </div>
+      <div className="p-4 space-y-4">
+        {/* PAN */}
+        <div>
+          <label className="text-xs font-black text-slate-600 block mb-1">PAN Number</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="ABCDE1234F"
+              maxLength={10}
+              value={ownerPanInput}
+              onChange={e => setOwnerPanInput(e.target.value.toUpperCase())}
+              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-400"
+            />
+            <button
+              onClick={async () => {
+                if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(ownerPanInput)) { toast.warn('Invalid PAN format'); return; }
+                setOwnerPanStatus('loading');
+                try {
+                  const r = await fetch(`${API}/api/kyc/verify-pan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                    body: JSON.stringify({ pan_number: ownerPanInput, phone: owner?.mobile_number }),
+                  });
+                  const d = await r.json();
+                  if (d.verified) { setOwnerPanStatus('verified'); setOwnerPanName(d.name || null); toast.success('PAN Verified ✅'); }
+                  else { setOwnerPanStatus('failed'); toast.error('PAN could not be verified'); }
+                } catch { setOwnerPanStatus('failed'); toast.error('Network error'); }
+              }}
+              disabled={ownerPanStatus === 'loading'}
+              className="px-3 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl disabled:opacity-50"
+            >
+              {ownerPanStatus === 'loading' ? '...' : ownerPanStatus === 'verified' ? '✅' : 'Verify'}
+            </button>
+          </div>
+          {ownerPanStatus === 'verified' && ownerPanName && <p className="text-[11px] text-emerald-600 mt-1 font-black">✅ {ownerPanName}</p>}
+          {ownerPanStatus === 'failed' && <p className="text-[11px] text-red-500 mt-1">❌ Verification failed</p>}
+        </div>
+
+        {/* Bank Account */}
+        <div>
+          <label className="text-xs font-black text-slate-600 block mb-1">Bank Account</label>
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder="Account Number"
+              value={ownerBankAccount}
+              onChange={e => setOwnerBankAccount(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="IFSC Code"
+                value={ownerBankIfsc}
+                onChange={e => setOwnerBankIfsc(e.target.value.toUpperCase())}
+                className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-400"
+              />
+              <button
+                onClick={async () => {
+                  if (!ownerBankAccount || !ownerBankIfsc) { toast.warn('Account number and IFSC required'); return; }
+                  setOwnerBankStatus('loading');
+                  try {
+                    const r = await fetch(`${API}/api/kyc/verify-bank`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                      body: JSON.stringify({ account_number: ownerBankAccount, ifsc: ownerBankIfsc, phone: owner?.mobile_number }),
+                    });
+                    const d = await r.json();
+                    if (d.verified) { setOwnerBankStatus('verified'); setOwnerBankName(d.name || null); toast.success('Bank Verified ✅'); }
+                    else { setOwnerBankStatus('failed'); toast.error('Bank verification failed'); }
+                  } catch { setOwnerBankStatus('failed'); toast.error('Network error'); }
+                }}
+                disabled={ownerBankStatus === 'loading'}
+                className="px-3 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl disabled:opacity-50"
+              >
+                {ownerBankStatus === 'loading' ? '...' : ownerBankStatus === 'verified' ? '✅' : 'Verify'}
+              </button>
+            </div>
+          </div>
+          {ownerBankStatus === 'verified' && ownerBankName && <p className="text-[11px] text-emerald-600 mt-1 font-black">✅ {ownerBankName}</p>}
+          {ownerBankStatus === 'failed' && <p className="text-[11px] text-red-500 mt-1">❌ Verification failed</p>}
+        </div>
+
+        {/* Aadhaar */}
+        <div>
+          <label className="text-xs font-black text-slate-600 block mb-1">Aadhaar (DigiLocker)</label>
+          <button
+            onClick={async () => {
+              setOwnerAadhaarStatus('loading');
+              try {
+                const r = await fetch(`${API}/api/kyc/aadhaar-initiate`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                  body: JSON.stringify({ name: owner?.full_name || owner?.name, mobile: owner?.mobile_number }),
+                });
+                const d = await r.json();
+                if (d.kycUrl) { window.open(d.kycUrl, '_blank'); setOwnerAadhaarStatus('sent'); setOwnerAadhaarPublicId(d.publicId); toast.success('DigiLocker link opened'); }
+                else { setOwnerAadhaarStatus('failed'); toast.error('Could not initiate Aadhaar verification'); }
+              } catch { setOwnerAadhaarStatus('failed'); toast.error('Network error'); }
+            }}
+            disabled={ownerAadhaarStatus === 'loading' || ownerAadhaarStatus === 'verified'}
+            className="w-full py-2 bg-slate-800 text-white text-xs font-black rounded-xl disabled:opacity-50"
+          >
+            {ownerAadhaarStatus === 'verified' ? '✅ Aadhaar Verified' : ownerAadhaarStatus === 'sent' ? '⏳ Verify via DigiLocker link →' : ownerAadhaarStatus === 'loading' ? '...' : '🔗 Start Aadhaar Verification'}
+          </button>
+          {ownerAadhaarStatus === 'sent' && ownerAadhaarPublicId && (
+            <button
+              onClick={async () => {
+                try {
+                  const r = await fetch(`${API}/api/kyc/aadhaar-status/${ownerAadhaarPublicId}`, { headers: { Authorization: `Bearer ${token()}` } });
+                  const d = await r.json();
+                  if (d.verified) { setOwnerAadhaarStatus('verified'); toast.success('Aadhaar Verified ✅'); }
+                  else toast.warn('Not verified yet. Complete DigiLocker flow first.');
+                } catch { toast.error('Network error'); }
+              }}
+              className="w-full mt-2 py-2 border border-indigo-300 text-indigo-600 text-xs font-black rounded-xl"
+            >
+              Check Status
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
 
     {/* ─── Payment Mode Config ─── */}
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">

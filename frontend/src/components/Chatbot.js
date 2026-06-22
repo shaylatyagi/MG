@@ -108,8 +108,10 @@ export default function Chatbot({ userRole, userId = null, userPhone, token, onC
 };
     recognitionRef.current.onerror = (e) => {
       setIsListening(false);
-      if (e.error !== 'no-speech' && e.error !== 'aborted')
+      if (e.error === 'not-allowed' || e.error === 'audio-capture') {
         addMessage('bot', 'Mic access nahi mila. Browser permissions check karein.');
+      }
+      // network/service errors are transient — silently ignore
     };
     recognitionRef.current.onend = () => setIsListening(false);
   }, []);
