@@ -2388,12 +2388,9 @@ router.get('/owner/notifications', verifyToken, async (req, res) => {
        FROM public.notifications n
        LEFT JOIN public.drivers d ON d.id = n.driver_id
        WHERE n.user_type = 'OWNER'
-         AND (
-           n.user_id = $1
-           OR n.driver_id IN (
-             SELECT id FROM public.drivers
-             WHERE owner_code = (SELECT owner_code FROM public.owners WHERE id = $1)
-           )
+         AND n.driver_id IN (
+           SELECT id FROM public.drivers
+           WHERE owner_id = $1 AND deleted_at IS NULL
          )
        ORDER BY n.created_at DESC
        LIMIT 50`,

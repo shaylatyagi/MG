@@ -95,7 +95,7 @@ async function runMidnightRentDeduction() {
 }
 
 // Schedule at 18:30 UTC = 00:00 IST daily
-cron.schedule('15 17 * * *', runMidnightRentDeduction, { timezone: 'UTC' });
+cron.schedule('52 17 * * *', runMidnightRentDeduction, { timezone: 'UTC' });
 
 logger.info('CRON: midnight rent deduction scheduled (18:30 UTC = 00:00 IST)');
 
