@@ -372,23 +372,35 @@ router.post('/admin-verify-otp', validate(AdminVerifyOtpSchema), async (req, res
 });
 
 // POST /api/auth/admin-login  — Body: { phone_number, password }
-// Security: phone_number must match ADMIN_PHONE env var AND password must match ADMIN_PASSWORD.
+// Security: phone_number must match ADMIN_PHONE env var OR admins table, AND password must match ADMIN_PASSWORD.
 // Both checks always run (no short-circuit) so attacker can't enumerate which field is wrong.
 router.post('/admin-login', validate(AdminLoginSchema), async (req, res) => {
   const { phone_number, password } = req.body;
   if (!phone_number || !password)
     return res.status(400).json({ success: false, message: 'phone_number and password required' });
-  const expectedPw   = process.env.ADMIN_PASSWORD;
+  const expectedPw    = process.env.ADMIN_PASSWORD;
   const expectedPhone = process.env.ADMIN_PHONE;
-  if (!expectedPw || !expectedPhone)
+  if (!expectedPw)
     return res.status(500).json({ success: false, message: 'Server misconfiguration' });
-  // Always compare both — same generic error either way (no enumeration)
-  const phoneOk = phone_number === expectedPhone;
-  const passOk  = password === expectedPw;
+  // Check phone: matches env var OR exists in admins table
+  const isEnvPhone = expectedPhone && phone_number === expectedPhone;
+  let phoneOk = isEnvPhone;
+  let adminName = 'Admin';
+  if (!isEnvPhone) {
+    try {
+      const { rows } = await pool.query(
+        'SELECT name FROM public.admins WHERE phone_number=$1 AND is_active=true LIMIT 1',
+        [phone_number]
+      );
+      phoneOk = rows.length > 0;
+      if (rows.length) adminName = rows[0].name;
+    } catch (_) { phoneOk = false; }
+  }
+  const passOk = password === expectedPw;
   if (!phoneOk || !passOk)
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
-  const token = jwt.sign({ id: 'admin', role: 'admin', phone: phone_number }, process.env.JWT_SECRET, { expiresIn: '30d' });
-  res.json({ success: true, token, user: { role: 'admin', phone: phone_number } });
+  const token = jwt.sign({ id: 'admin', role: 'admin', phone: phone_number, name: adminName }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  res.json({ success: true, token, user: { role: 'admin', phone: phone_number, name: adminName } });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
