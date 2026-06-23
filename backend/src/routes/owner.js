@@ -6,6 +6,7 @@ const router  = express.Router();
 const pool    = require('../config/db');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { validate } = require('../middleware/validate');
+const { logAudit } = require('../utils/audit');
 const {
   AddDriverSchema, UpdateDriverSchema,
   AddVehicleSchema, UpdateVehicleSchema,
@@ -295,6 +296,10 @@ router.post('/drivers', validate(AddDriverSchema), async (req, res) => {
       ]
     ).catch(() => {});
 
+    logAudit('OWNER_DRIVER_ADDED', 'driver', result.rows[0].id,
+      `owner:${owner.id}:${owner.mobile_number}`,
+      { driver_name: name.trim(), driver_phone: phone_number, owner_name: owner.full_name });
+
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
     console.error('owner/drivers POST:', err);
@@ -366,6 +371,10 @@ router.post('/assign', validate(AssignVehicleSchema), async (req, res) => {
 
     await client.query('COMMIT');
 
+    logAudit('OWNER_VEHICLE_ASSIGNED', 'vehicle', vehicle.id,
+      `owner:${owner.id}:${owner.mobile_number}`,
+      { vehicle_number: vehicle.vehicle_number, driver_name: driver.name, driver_id: driver.id, rent: effectiveRent, owner_name: owner.full_name });
+
     res.json({
       success: true,
       message: `${vehicle.vehicle_number} assigned to ${driver.name}`,
@@ -423,6 +432,10 @@ router.post('/unassign', async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    logAudit('OWNER_VEHICLE_UNASSIGNED', 'vehicle', driver.assigned_vehicle_id,
+      `owner:${owner.id}:${owner.mobile_number}`,
+      { driver_id: driver.id, owner_name: owner.full_name });
 
     res.json({ success: true, message: 'Vehicle unassigned successfully' });
   } catch (err) {
@@ -664,6 +677,10 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
     } catch (ledgerErr) {
       console.error('rent update: ledger sync failed', ledgerErr.message);
     }
+
+    logAudit('OWNER_RENT_CHANGED', 'vehicle', req.params.id,
+      `owner:${owner.id}:${owner.mobile_number}`,
+      { vehicle_number: veh.rows[0].vehicle_number, new_rent: rent, owner_name: owner.full_name });
 
     res.json({ success: true, message: `Rent updated to ₹${rent}/day`, daily_rent: rent });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }

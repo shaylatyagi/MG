@@ -84,7 +84,7 @@ function PartnerDetail({ slug }) {
   if (!partner) return (
     <div style={{ minHeight: '100vh', background: PAGE_BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', gap: 12 }}>
       <p style={{ fontSize: 20, fontWeight: 800 }}>Partner not found</p>
-      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>{error}</p>
+      <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>{error}</p>
       <button onClick={() => navigate('/')} style={{ marginTop: 8, background: '#4f46e5', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 40, fontWeight: 700, cursor: 'pointer' }}>
         ← All Partners
       </button>
@@ -115,7 +115,7 @@ function PartnerDetail({ slug }) {
                 </span>
               )}
               {partner.since && (
-                <span style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 40 }}>
+                <span style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: 600, padding: '4px 12px', borderRadius: 40 }}>
                   Since {partner.since}
                 </span>
               )}
@@ -130,7 +130,7 @@ function PartnerDetail({ slug }) {
               <p style={{ color: '#a5b4fc', fontSize: 14, margin: '4px 0 0', fontWeight: 600 }}>Brand: {partner.brand}</p>
             )}
             {partner.tagline && (
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, margin: '6px 0 0' }}>{partner.tagline}</p>
+              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 15, margin: '6px 0 0' }}>{partner.tagline}</p>
             )}
           </div>
         </div>
@@ -144,7 +144,7 @@ function PartnerDetail({ slug }) {
             <div key={s.label} style={{ background: CARD_BG, padding: '24px', textAlign: 'center' }}>
               <div style={{ marginBottom: 8 }}>{s.icon}</div>
               <div style={{ fontSize: 36, fontWeight: 900 }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginTop: 4 }}>{s.label}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 600, marginTop: 4 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -171,8 +171,8 @@ function PartnerDetail({ slug }) {
 
         {partner.about && (
           <div style={{ marginTop: 20, background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 20, padding: '28px 32px' }}>
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', marginBottom: 10 }}>About</p>
-            <p style={{ color: 'rgba(255,255,255,0.65)', lineHeight: 1.7, fontSize: 15, margin: 0 }}>{partner.about}</p>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', marginBottom: 10 }}>About</p>
+            <p style={{ color: 'rgba(255,255,255,0.8)', lineHeight: 1.7, fontSize: 15, margin: 0 }}>{partner.about}</p>
           </div>
         )}
       </div>
@@ -187,7 +187,7 @@ function Detail({ icon, label, value }) {
     <div style={{ display: 'flex', gap: 12 }}>
       <div style={{ marginTop: 2, flexShrink: 0 }}>{icon}</div>
       <div>
-        <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 4px' }}>{label}</p>
+        <p style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 4px' }}>{label}</p>
         <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>{value}</div>
       </div>
     </div>
@@ -234,7 +234,7 @@ function PartnerListing() {
           <h1 style={{ fontSize: 52, fontWeight: 900, margin: '0 0 16px', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
             Fleets running on<br /><em style={{ fontStyle: 'italic', color: '#c4965a' }}>MobilityGrid</em>
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 17, lineHeight: 1.7, margin: 0 }}>
+          <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 17, lineHeight: 1.7, margin: 0 }}>
             Onboarded merchants managing their EV fleets with digital rent collection, driver KYC, and real-time tracking.
           </p>
         </div>
@@ -247,7 +247,7 @@ function PartnerListing() {
             <Loader2 size={24} color="#6366f1" style={{ animation: 'spin 1s linear infinite' }} />
           </div>
         ) : partners.length === 0 ? (
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', paddingTop: 60, fontSize: 15 }}>No partners listed yet.</p>
+          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', paddingTop: 60, fontSize: 15 }}>No partners listed yet.</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(360px, 100%), 1fr))', gap: 20 }}>
             {partners.map(p => (
@@ -275,15 +275,15 @@ function PartnerListing() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontWeight: 800, fontSize: 16, margin: 0 }}>{p.brand_name || p.full_name}</p>
-                    {p.tagline && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.tagline}</p>}
+                    {p.tagline && <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.tagline}</p>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 40, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <CheckCircle size={9} /> {p.partner_status === 'ACTIVE' ? 'Active' : p.partner_status}
                   </span>
-                  {p.since_year && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Since {p.since_year}</span>}
-                  {p.vehicle_count > 0 && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>{p.vehicle_count} vehicles</span>}
+                  {p.since_year && <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Since {p.since_year}</span>}
+                  {p.vehicle_count > 0 && <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>{p.vehicle_count} vehicles</span>}
                 </div>
               </button>
             ))}
@@ -297,7 +297,7 @@ function PartnerListing() {
           padding: '40px 32px', textAlign: 'center',
         }}>
           <p style={{ fontSize: 22, fontWeight: 800, margin: '0 0 8px' }}>Want to list your fleet?</p>
-          <p style={{ color: 'rgba(255,255,255,0.45)', margin: '0 0 24px', fontSize: 15 }}>Join the MobilityGrid partner network</p>
+          <p style={{ color: 'rgba(255,255,255,0.75)', margin: '0 0 24px', fontSize: 15 }}>Join the MobilityGrid partner network</p>
           <a href="https://mobilitygrid.in/#signup" style={{
             display: 'inline-block', background: '#4f46e5', color: '#fff',
             padding: '12px 28px', borderRadius: 40, fontWeight: 700, fontSize: 14,

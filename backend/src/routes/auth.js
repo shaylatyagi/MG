@@ -12,6 +12,40 @@ const {
   AdminSendOtpSchema, AdminVerifyOtpSchema, AdminLoginSchema,
 } = require('../schemas/auth.schemas');
 const { sendMail } = require('../services/mailer');
+const { logAudit } = require('../utils/audit');
+
+// ── Device/IP helpers ─────────────────────────────────────────────────────────
+function parseDevice(ua = '') {
+  if (!ua) return 'Unknown Device';
+  let os = 'Unknown OS';
+  let browser = 'Unknown Browser';
+  if (/Windows NT 10/i.test(ua))      os = 'Windows 10/11';
+  else if (/Windows NT 6\.3/i.test(ua)) os = 'Windows 8.1';
+  else if (/Windows/i.test(ua))       os = 'Windows';
+  else if (/iPhone/i.test(ua))        os = 'iPhone';
+  else if (/iPad/i.test(ua))          os = 'iPad';
+  else if (/Android/i.test(ua))       os = `Android`;
+  else if (/Mac OS X/i.test(ua))      os = 'macOS';
+  else if (/Linux/i.test(ua))         os = 'Linux';
+
+  if (/Edg\//i.test(ua))             browser = 'Edge';
+  else if (/OPR\//i.test(ua))        browser = 'Opera';
+  else if (/Chrome\//i.test(ua))     browser = 'Chrome';
+  else if (/Firefox\//i.test(ua))    browser = 'Firefox';
+  else if (/Safari\//i.test(ua))     browser = 'Safari';
+
+  // Add Android version if available
+  const androidMatch = ua.match(/Android ([0-9.]+)/i);
+  if (androidMatch) os = `Android ${androidMatch[1]}`;
+
+  return `${browser} on ${os}`;
+}
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return req.ip || req.connection?.remoteAddress || 'Unknown';
+}
 
 // C-2: safe table lookup — NEVER interpolate user-supplied role directly into SQL
 const ROLE_TABLE = { DRIVER: 'drivers', OWNER: 'owners' };
@@ -216,6 +250,18 @@ router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
     const table = safeTable(user.role);
 
     // If user already had an active session → notify them that a new device logged in
+    const clientIp     = getClientIp(req);
+    const deviceInfo   = parseDevice(req.headers['user-agent']);
+    const loginMeta    = {
+      ip: clientIp,
+      device: deviceInfo,
+      user_agent: req.headers['user-agent'] || null,
+      user_id: user.id,
+      role: user.role,
+      mobile: user.mobile_number,
+      name: user.full_name || null,
+    };
+
     if (user.session_token) {
       const alertTitle = '⚠️ New Login Detected';
       const alertMsg = `Someone just logged into your account (${user.mobile_number}) from a new device. If this wasn't you, contact support immediately.`;
@@ -232,13 +278,14 @@ router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
           [user.id, alertTitle, alertMsg]
         ).catch(() => {});
       }
-      // Also alert admin
+      // Also alert admin — with full device/IP metadata
       pool.query(
-        `INSERT INTO public.notifications (user_type, title, message, created_at)
-         VALUES ('ADMIN', $1, $2, NOW())`,
+        `INSERT INTO public.notifications (user_type, title, message, metadata, created_at)
+         VALUES ('ADMIN', $1, $2, $3, NOW())`,
         [
           `🔐 Concurrent Login — ${user.role === 'OWNER' ? 'Owner' : 'Driver'}`,
-          `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in on a new device while another session was active`
+          `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in on a new device while another session was active`,
+          JSON.stringify({ ...loginMeta, type: 'concurrent_login' }),
         ]
       ).catch(() => {});
     }
@@ -246,15 +293,27 @@ router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
     await pool.query(`UPDATE public.${table} SET session_token=$1 WHERE id=$2`, [sessionToken, user.id]);
     const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null, owner_code: user.owner_code || null, driver_code: user.driver_code || null, session_token: sessionToken });
 
-    // Notify admin on every owner/driver login
+    // Notify admin on every owner/driver login — include device/IP
     pool.query(
-      `INSERT INTO public.notifications (user_type, title, message, created_at)
-       VALUES ('ADMIN', $1, $2, NOW())`,
+      `INSERT INTO public.notifications (user_type, title, message, metadata, created_at)
+       VALUES ('ADMIN', $1, $2, $3, NOW())`,
       [
         `${user.role === 'OWNER' ? '🏢 Owner' : '🚗 Driver'} Login`,
-        `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in`
+        `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in`,
+        JSON.stringify({ ...loginMeta, type: 'login' }),
       ]
     ).catch(() => {});
+
+    // Audit log — owner/driver login with device & IP
+    if (user.role === 'OWNER' || user.role === 'DRIVER') {
+      logAudit(
+        user.role === 'OWNER' ? 'OWNER_LOGIN' : 'DRIVER_LOGIN',
+        user.role === 'OWNER' ? 'owner' : 'driver',
+        user.id,
+        `${user.role.toLowerCase()}:${user.id}:${user.mobile_number}`,
+        { name: user.full_name, mobile: user.mobile_number, ip: clientIp, device: deviceInfo }
+      );
+    }
 
     res.json({
       success: true, token,

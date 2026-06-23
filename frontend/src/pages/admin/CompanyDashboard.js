@@ -2440,55 +2440,157 @@ function Transactions() {
 }
 
 // ── AUDIT LOG ─────────────────────────────────────────────────────────────────
+const ACTION_META = {
+  OWNER_LOGIN:            { icon: '🔑', label: 'Logged in',           color: '#6366f1' },
+  DRIVER_LOGIN:           { icon: '🔑', label: 'Driver logged in',    color: '#8b5cf6' },
+  OWNER_CASH_PAYMENT:     { icon: '💵', label: 'Cash payment recorded', color: '#10b981' },
+  OWNER_RENT_CHANGED:     { icon: '📝', label: 'Rent changed',         color: '#f59e0b' },
+  OWNER_DRIVER_ADDED:     { icon: '➕', label: 'Driver added',         color: '#3b82f6' },
+  OWNER_VEHICLE_ASSIGNED: { icon: '🚗', label: 'Vehicle assigned',     color: '#06b6d4' },
+  OWNER_VEHICLE_UNASSIGNED:{ icon: '🔓', label: 'Vehicle unassigned',  color: '#64748b' },
+  KYC_APPROVED:           { icon: '✅', label: 'KYC approved',         color: '#10b981' },
+  KYC_REJECTED:           { icon: '❌', label: 'KYC rejected',         color: '#ef4444' },
+  DOC_APPROVED:           { icon: '✅', label: 'Doc approved',         color: '#10b981' },
+  DOC_REJECTED:           { icon: '❌', label: 'Doc rejected',         color: '#ef4444' },
+  COMPANY_STATUS_CHANGED: { icon: '🏢', label: 'Company status changed', color: '#6366f1' },
+  MANAGER_CREATED:        { icon: '👤', label: 'Manager added',        color: '#3b82f6' },
+};
+
+function formatActivityLine(action, details) {
+  const d = details || {};
+  switch (action) {
+    case 'OWNER_LOGIN':
+      return `Logged in from ${d.device || 'unknown device'} · IP ${d.ip || '—'}`;
+    case 'OWNER_CASH_PAYMENT':
+      return `Recorded ₹${d.amount} cash from ${d.driver_name || d.driver_phone}${d.vehicle ? ` (${d.vehicle})` : ''}`;
+    case 'OWNER_RENT_CHANGED':
+      return `Changed rent of ${d.vehicle_number || 'vehicle'} to ₹${d.new_rent}/day`;
+    case 'OWNER_DRIVER_ADDED':
+      return `Added driver ${d.driver_name} (${d.driver_phone})`;
+    case 'OWNER_VEHICLE_ASSIGNED':
+      return `Assigned ${d.vehicle_number} to ${d.driver_name} · ₹${d.rent}/day`;
+    case 'OWNER_VEHICLE_UNASSIGNED':
+      return `Unassigned vehicle from driver #${d.driver_id}`;
+    default:
+      return Object.entries(d).filter(([k]) => !['owner_name'].includes(k)).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—';
+  }
+}
+
 function AuditLog() {
-  const [logs, setLogs]       = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [view, setView]         = useState('owner'); // 'owner' | 'admin'
+  const [logs, setLogs]         = useState([]);
+  const [ownerLogs, setOwnerLogs] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [ownerFilter, setOwnerFilter] = useState('');
 
   useEffect(() => {
-    api('/api/admin/audit-log')
-      .then(d => { setLogs(d.logs || d || []); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([
+      api('/api/admin/audit-log?limit=150'),
+      api('/api/admin/owner-activity?limit=200'),
+    ]).then(([a, b]) => {
+      setLogs(a.logs || []);
+      setOwnerLogs(b.logs || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
-  const actionColors = {
-    KYC_APPROVED: 'text-green-600', KYC_REJECTED: 'text-red-600',
-    COMPANY_STATUS_CHANGED: 'text-blue-600', COMPANY_CREATED: 'text-indigo-600',
-    ADMIN_DOC_UPLOADED: 'text-purple-600', DOC_APPROVED: 'text-green-600', DOC_REJECTED: 'text-red-600',
-  };
+  const filteredOwnerLogs = ownerFilter
+    ? ownerLogs.filter(l => {
+        const d = l.details || {};
+        return (d.owner_name || '').toLowerCase().includes(ownerFilter.toLowerCase())
+          || (d.mobile || '').includes(ownerFilter)
+          || l.performed_by.includes(ownerFilter);
+      })
+    : ownerLogs;
+
+  // Group owner logs by owner (performed_by)
+  const grouped = {};
+  filteredOwnerLogs.forEach(l => {
+    const key = l.performed_by || 'unknown';
+    if (!grouped[key]) grouped[key] = { name: (l.details?.owner_name || l.details?.name || key), logs: [] };
+    grouped[key].logs.push(l);
+  });
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800 dark:text-white  ">Audit Log</h2>
-      {loading ? <Spinner /> : (
-        <div className="bg-white dark:bg-gray-900    rounded-xl shadow-sm border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800   text-gray-500 dark:text-gray-400   text-xs uppercase">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Activity Log</h2>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={() => setView('owner')} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: view === 'owner' ? '#6366f1' : '#f1f5f9', color: view === 'owner' ? '#fff' : '#374151', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Owner Activity</button>
+          <button onClick={() => setView('admin')} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: view === 'admin' ? '#6366f1' : '#f1f5f9', color: view === 'admin' ? '#fff' : '#374151', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Admin Actions</button>
+        </div>
+      </div>
+
+      {loading ? <Spinner /> : view === 'owner' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <input
+            placeholder="Filter by owner name or mobile..."
+            value={ownerFilter}
+            onChange={e => setOwnerFilter(e.target.value)}
+            style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, outline: 'none', maxWidth: 320 }}
+          />
+          {Object.keys(grouped).length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#94a3b8', padding: '40px 0' }}>No owner activity recorded yet. Activity will appear after owners log in and take actions.</p>
+          ) : Object.entries(grouped).map(([key, group]) => (
+            <div key={key} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+              {/* Owner header */}
+              <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                  {(group.name || 'O')[0].toUpperCase()}
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{group.name}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>{group.logs.length} actions</p>
+                </div>
+              </div>
+              {/* Timeline */}
+              <div style={{ padding: '4px 0' }}>
+                {group.logs.map((l, i) => {
+                  const meta = ACTION_META[l.action] || { icon: '📋', label: l.action, color: '#64748b' };
+                  return (
+                    <div key={l.id} style={{ display: 'flex', gap: 12, padding: '10px 16px', borderBottom: i < group.logs.length - 1 ? '1px solid #f1f5f9' : 'none', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{meta.icon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: meta.color }}>{meta.label}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#374151' }}>{formatActivityLine(l.action, l.details)}</p>
+                      </div>
+                      <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0, whiteSpace: 'nowrap' }}>{timeSince(l.created_at)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+            <thead style={{ background: '#f8fafc' }}>
               <tr>
-                <th className="px-4 py-3 text-left">Time</th>
-                <th className="px-4 py-3 text-left">Action</th>
-                <th className="px-4 py-3 text-left">Entity</th>
-                <th className="px-4 py-3 text-left">By</th>
-                <th className="px-4 py-3 text-left">Details</th>
+                {['Time', 'Action', 'Entity', 'By', 'Details'].map(h => (
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700 ">
+            <tbody>
               {logs.map(l => {
                 let details = '';
                 try { details = typeof l.details === 'string' ? JSON.stringify(JSON.parse(l.details)) : JSON.stringify(l.details); }
                 catch { details = String(l.details || ''); }
+                const meta = ACTION_META[l.action];
                 return (
-                  <tr key={l.id} className="hover:bg-gray-50 dark:bg-gray-800  :bg-gray-100 dark:bg-gray-700 ">
-                    <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{timeSince(l.created_at)}</td>
-                    <td className={`px-4 py-3 font-medium ${actionColors[l.action] || 'text-gray-700 dark:text-gray-300  '}`}>{l.action}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400  ">{l.entity_type} #{l.entity_id}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400  ">{l.performed_by}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{details}</td>
+                  <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '10px 14px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{timeSince(l.created_at)}</td>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: meta?.color || '#374151' }}>{meta ? `${meta.icon} ${meta.label}` : l.action}</td>
+                    <td style={{ padding: '10px 14px', color: '#64748b' }}>{l.entity_type} #{l.entity_id}</td>
+                    <td style={{ padding: '10px 14px', color: '#64748b' }}>{l.performed_by}</td>
+                    <td style={{ padding: '10px 14px', color: '#94a3b8', fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{details}</td>
                   </tr>
                 );
               })}
+              {logs.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '32px 0' }}>No admin audit events yet</td></tr>}
             </tbody>
           </table>
-          {logs.length === 0 && <p className="text-center text-gray-400 py-8">No audit events yet</p>}
         </div>
       )}
     </div>
@@ -2506,14 +2608,14 @@ function ChatViewer() {
 
   useEffect(() => {
     api('/api/admin/chat/threads')
-      .then(d => { setThreads(Array.isArray(d) ? d : []); setLoading(false); })
+      .then(d => { setThreads(d.data || d.threads || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
   const openThread = (thread) => {
     setSelected(thread); setMsgLoading(true);
-    api(`/api/admin/chat/messages?driver_id=${thread.driver_id}`)
-      .then(d => { setMessages(Array.isArray(d) ? d : []); setMsgLoading(false); })
+    api(`/api/admin/chat/messages?driver_id=${thread.driver_id}&limit=200`)
+      .then(d => { setMessages(d.data || d.messages || []); setMsgLoading(false); })
       .catch(() => setMsgLoading(false));
   };
 
@@ -2521,61 +2623,108 @@ function ChatViewer() {
     !q ||
     t.driver_name?.toLowerCase().includes(q.toLowerCase()) ||
     t.owner_name?.toLowerCase().includes(q.toLowerCase()) ||
-    t.driver_phone?.includes(q)
+    t.mobile_number?.includes(q)
   );
 
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800 dark:text-white  ">Chat Viewer</h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400 ">Read-only view of all owner ↔ driver conversations.</p>
+  // Only show threads that have at least one message, then no-message threads
+  const withMsg    = filtered.filter(t => t.last_message);
+  const withoutMsg = filtered.filter(t => !t.last_message);
+  const sorted = [...withMsg, ...withoutMsg];
 
-      <div className="flex gap-4 h-[600px]">
-        <div className="w-72 flex flex-col bg-white dark:bg-gray-900    rounded-xl border shadow-sm overflow-hidden">
-          <div className="p-3 border-b ">
-            <input type="text" placeholder="Search…" value={q} onChange={e => setQ(e.target.value)}
-              className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Chat Viewer</h2>
+        <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>Read-only view of all owner ↔ driver conversations</p>
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 160px)', overflow: 'hidden' }}>
+        {/* Thread list */}
+        <div style={{ width: 280, flexShrink: 0, background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+            <input type="text" placeholder="Search driver / owner…" value={q} onChange={e => setQ(e.target.value)}
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+            <p style={{ margin: '6px 0 0', fontSize: 11, color: '#94a3b8' }}>{sorted.length} conversation{sorted.length !== 1 ? 's' : ''}</p>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            {loading ? <Spinner /> : filtered.map(t => (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {loading ? <div style={{ padding: 24 }}><Spinner /></div>
+              : sorted.length === 0
+                ? <p style={{ textAlign: 'center', color: '#94a3b8', padding: '32px 0', fontSize: 13 }}>No conversations</p>
+                : sorted.map(t => (
               <button key={t.driver_id} onClick={() => openThread(t)}
-                className={`w-full text-left px-4 py-3 border-b  hover:bg-indigo-50 :bg-gray-100 dark:bg-gray-700  transition ${selected?.driver_id === t.driver_id ? 'bg-indigo-50  border-l-2 border-l-indigo-500' : ''}`}>
-                <p className="font-medium text-gray-800 dark:text-white   text-sm truncate">{t.driver_name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400  truncate">Owner: {t.owner_name || '—'}</p>
-                <p className="text-xs text-gray-400 mt-0.5 truncate">{t.last_message}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400  mt-0.5">{timeSince(t.last_at)}</p>
+                style={{
+                  width: '100%', textAlign: 'left', padding: '12px 14px',
+                  borderBottom: '1px solid #f9fafb', background: selected?.driver_id === t.driver_id ? '#eef2ff' : 'transparent',
+                  borderLeft: selected?.driver_id === t.driver_id ? '3px solid #6366f1' : '3px solid transparent',
+                  border: 'none', cursor: 'pointer', display: 'block',
+                }}
+                onMouseEnter={e => { if (selected?.driver_id !== t.driver_id) e.currentTarget.style.background = '#f8fafc'; }}
+                onMouseLeave={e => { if (selected?.driver_id !== t.driver_id) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                    {(t.driver_name || '?')[0].toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.driver_name}</p>
+                    <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>Owner: {t.owner_name || '—'}</p>
+                  </div>
+                  {t.unread_count > 0 && <span style={{ background: '#6366f1', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 6px' }}>{t.unread_count}</span>}
+                </div>
+                {t.last_message
+                  ? <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.last_sender === 'OWNER' ? '🏢' : '🚗'} {t.last_message}
+                    </p>
+                  : <p style={{ margin: 0, fontSize: 11, color: '#cbd5e1', fontStyle: 'italic' }}>No messages yet</p>
+                }
+                {t.last_message_at && <p style={{ margin: '2px 0 0', fontSize: 10, color: '#cbd5e1' }}>{timeSince(t.last_message_at)}</p>}
               </button>
             ))}
-            {!loading && filtered.length === 0 && (
-              <p className="text-center text-gray-400 py-8 text-sm">No conversations</p>
-            )}
           </div>
         </div>
 
-        <div className="flex-1 bg-white dark:bg-gray-900    rounded-xl border shadow-sm overflow-hidden flex flex-col">
+        {/* Message pane */}
+        <div style={{ flex: 1, background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {!selected ? (
-            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-              Select a conversation to view
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 14 }}>
+              ← Select a conversation
             </div>
           ) : (
             <>
-              <div className="px-4 py-3 border-b  bg-gray-50 dark:bg-gray-800  ">
-                <p className="font-semibold text-gray-800 dark:text-white  ">{selected.driver_name} ↔ {selected.owner_name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 ">{selected.driver_phone}</p>
+              {/* Header */}
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{selected.driver_name} ↔ {selected.owner_name || 'Owner'}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{selected.mobile_number} · {messages.length} messages</p>
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {msgLoading ? <Spinner /> : messages.map(m => (
-                  <div key={m.id} className={`flex ${m.sender_type === 'OWNER' ? 'justify-start' : 'justify-end'}`}>
-                    <div className={`max-w-xs rounded-xl px-4 py-2 text-sm shadow-sm ${m.sender_type === 'OWNER' ? 'bg-gray-100 dark:bg-gray-700   text-gray-800 dark:text-white  ' : 'bg-indigo-600 text-white'}`}>
-                      <p>{m.message}</p>
-                      <p className={`text-xs mt-1 ${m.sender_type === 'OWNER' ? 'text-gray-400' : 'text-indigo-200'}`}>
-                        {m.sender_type === 'OWNER' ? m.owner_name : m.driver_name} · {timeSince(m.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {!msgLoading && messages.length === 0 && (
-                  <p className="text-center text-gray-400 text-sm py-8">No messages</p>
-                )}
+
+              {/* Messages */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {msgLoading ? <Spinner /> : messages.length === 0
+                  ? <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No messages in this conversation</p>
+                  : messages.map(m => {
+                    const isOwner = m.sender_type === 'OWNER';
+                    return (
+                      <div key={m.id} style={{ display: 'flex', justifyContent: isOwner ? 'flex-start' : 'flex-end' }}>
+                        <div style={{
+                          maxWidth: '68%', borderRadius: isOwner ? '4px 16px 16px 16px' : '16px 4px 16px 16px',
+                          padding: '10px 14px',
+                          background: isOwner ? '#f1f5f9' : '#6366f1',
+                          color: isOwner ? '#1e293b' : '#fff',
+                        }}>
+                          <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, opacity: 0.7 }}>
+                            {isOwner ? `🏢 ${selected.owner_name || 'Owner'}` : `🚗 ${selected.driver_name}`}
+                          </p>
+                          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5 }}>{m.message}</p>
+                          <p style={{ margin: '4px 0 0', fontSize: 10, opacity: 0.6, textAlign: 'right' }}>
+                            {new Date(m.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                }
               </div>
             </>
           )}
@@ -2732,6 +2881,213 @@ function DocApprovals() {
   );
 }
 
+// ── DB EXPLORER (fully dynamic) ────────────────────────────────────────────────
+function DbExplorer() {
+  const [tables, setTables]           = useState([]);
+  const [activeTable, setActiveTable] = useState('');
+  const [columns, setColumns]         = useState([]);
+  const [searchCol, setSearchCol]     = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch]           = useState('');
+  const [orderCol, setOrderCol]       = useState('');
+  const [orderDir, setOrderDir]       = useState('DESC');
+  const [data, setData]               = useState(null);
+  const [loading, setLoading]         = useState(false);
+  const [page, setPage]               = useState(1);
+  const [tableSearch, setTableSearch] = useState('');
+
+  // Load all tables once
+  useEffect(() => {
+    api('/api/admin/db/tables').then(d => {
+      const tbls = d.tables || [];
+      setTables(tbls);
+      if (tbls.length) handleTableChange(tbls[0].table_name);
+    });
+  }, []);
+
+  // Load columns when table changes
+  const handleTableChange = (name) => {
+    setActiveTable(name);
+    setColumns([]);
+    setSearchCol('');
+    setOrderCol('');
+    setSearch('');
+    setSearchInput('');
+    setPage(1);
+    setData(null);
+    api(`/api/admin/db/columns?table=${encodeURIComponent(name)}`).then(d => {
+      const cols = (d.columns || []).map(c => c.column_name);
+      setColumns(cols);
+      setSearchCol('');
+      setOrderCol(cols.includes('id') ? 'id' : cols[0] || '');
+    });
+  };
+
+  // Fetch rows
+  useEffect(() => {
+    if (!activeTable) return;
+    setLoading(true);
+    const params = new URLSearchParams({
+      table: activeTable, search, page, limit: 50,
+      ...(searchCol && { col: searchCol }),
+      ...(orderCol  && { order: orderCol, dir: orderDir }),
+    });
+    api(`/api/admin/db/rows?${params}`)
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [activeTable, search, searchCol, orderCol, orderDir, page]);
+
+  const handleSearch = (e) => { e.preventDefault(); setSearch(searchInput); setPage(1); };
+
+  const formatCell = (val) => {
+    if (val === null || val === undefined) return <span style={{ color: '#cbd5e1', fontStyle: 'italic', fontSize: 11 }}>null</span>;
+    if (typeof val === 'boolean') return <span style={{ color: val ? '#10b981' : '#ef4444', fontWeight: 700 }}>{val ? 'true' : 'false'}</span>;
+    if (typeof val === 'object') {
+      const str = JSON.stringify(val);
+      return <span title={str} style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace', cursor: 'help' }}>{str.slice(0, 60)}{str.length > 60 ? '…' : ''}</span>;
+    }
+    const str = String(val);
+    if (/^\d{4}-\d{2}-\d{2}T/.test(str))
+      return <span style={{ whiteSpace: 'nowrap', color: '#475569' }}>{new Date(str).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</span>;
+    if (str.length > 80) return <span title={str} style={{ cursor: 'help' }}>{str.slice(0, 77)}…</span>;
+    return str;
+  };
+
+  const filteredTables = tableSearch
+    ? tables.filter(t => t.table_name.toLowerCase().includes(tableSearch.toLowerCase()))
+    : tables;
+
+  return (
+    <div style={{ display: 'flex', gap: 0, height: 'calc(100vh - 112px)', overflow: 'hidden', background: '#f4f6f9', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+
+      {/* Sidebar — table list */}
+      <div style={{ width: 210, flexShrink: 0, background: '#fff', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', borderRadius: '12px 0 0 12px', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 12px 8px' }}>
+          <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Tables ({tables.length})</p>
+          <input value={tableSearch} onChange={e => setTableSearch(e.target.value)}
+            placeholder="Filter tables..." style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {filteredTables.map(t => (
+            <button key={t.table_name} onClick={() => handleTableChange(t.table_name)}
+              style={{
+                width: '100%', textAlign: 'left', padding: '8px 12px',
+                background: activeTable === t.table_name ? '#eef2ff' : 'transparent',
+                border: 'none', cursor: 'pointer',
+                borderLeft: activeTable === t.table_name ? '3px solid #6366f1' : '3px solid transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+              <span style={{ fontSize: 12, fontWeight: activeTable === t.table_name ? 600 : 400, color: activeTable === t.table_name ? '#4f46e5' : '#374151', fontFamily: 'monospace' }}>{t.table_name}</span>
+              {t.row_count !== null && <span style={{ fontSize: 10, color: '#94a3b8', background: '#f1f5f9', padding: '1px 6px', borderRadius: 10 }}>{t.row_count.toLocaleString()}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        {/* Toolbar */}
+        <div style={{ padding: '10px 14px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>{activeTable || '—'}</span>
+            {data && <span style={{ fontSize: 12, color: '#64748b', marginLeft: 10 }}>{data.total.toLocaleString()} rows{search ? ` · "${search}"` : ''}</span>}
+          </div>
+
+          <form onSubmit={handleSearch} style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Column filter */}
+            {columns.length > 0 && (
+              <select value={searchCol} onChange={e => setSearchCol(e.target.value)}
+                style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, color: '#374151', outline: 'none', background: '#fff' }}>
+                <option value="">All columns</option>
+                {columns.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+            <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
+              placeholder="Search value..." style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, outline: 'none', width: 180 }} />
+            <button type="submit" style={{ padding: '6px 14px', borderRadius: 6, background: '#6366f1', color: '#fff', border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Go</button>
+            {search && <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }}
+              style={{ padding: '6px 10px', borderRadius: 6, background: '#f1f5f9', color: '#374151', border: 'none', fontSize: 12, cursor: 'pointer' }}>✕</button>}
+
+            {/* Sort */}
+            {columns.length > 0 && (<>
+              <select value={orderCol} onChange={e => { setOrderCol(e.target.value); setPage(1); }}
+                style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, color: '#374151', outline: 'none', background: '#fff' }}>
+                {columns.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button type="button" onClick={() => { setOrderDir(d => d === 'DESC' ? 'ASC' : 'DESC'); setPage(1); }}
+                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 600, color: '#374151' }}>
+                {orderDir === 'DESC' ? '↓' : '↑'}
+              </button>
+            </>)}
+          </form>
+        </div>
+
+        {/* Data table */}
+        <div style={{ flex: 1, overflow: 'auto', background: '#fff' }}>
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}><Spinner /></div>
+          ) : !data || !data.rows.length ? (
+            <p style={{ textAlign: 'center', color: '#94a3b8', padding: '60px 0', fontSize: 14 }}>
+              {activeTable ? 'No rows found' : 'Select a table'}
+            </p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+                <tr style={{ background: '#f8fafc' }}>
+                  {data.columns.map(col => (
+                    <th key={col}
+                      onClick={() => { setOrderCol(col); setOrderDir(d => col === orderCol ? (d === 'DESC' ? 'ASC' : 'DESC') : 'DESC'); setPage(1); }}
+                      style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: 11,
+                        textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #e2e8f0',
+                        whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none',
+                        background: orderCol === col ? '#eef2ff' : '#f8fafc' }}>
+                      {col.replace(/_/g, ' ')} {orderCol === col ? (orderDir === 'DESC' ? '↓' : '↑') : ''}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((row, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    {data.columns.map(col => (
+                      <td key={col} style={{ padding: '7px 10px', color: '#1e293b', verticalAlign: 'top', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: typeof row[col] === 'number' ? 'monospace' : 'inherit' }}>
+                        {formatCell(row[col])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {data && data.pages > 1 && (
+          <div style={{ padding: '8px 14px', background: '#fff', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, color: '#64748b' }}>
+              Rows {((page - 1) * 50) + 1}–{Math.min(page * 50, data.total)} of {data.total.toLocaleString()}
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setPage(1)} disabled={page === 1}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: page === 1 ? 'default' : 'pointer', color: page === 1 ? '#cbd5e1' : '#374151', fontSize: 12 }}>«</button>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: page === 1 ? 'default' : 'pointer', color: page === 1 ? '#cbd5e1' : '#374151', fontSize: 12 }}>‹ Prev</button>
+              <span style={{ padding: '4px 12px', fontSize: 12, color: '#475569', fontWeight: 600 }}>Page {page} / {data.pages}</span>
+              <button onClick={() => setPage(p => Math.min(data.pages, p + 1))} disabled={page === data.pages}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: page === data.pages ? 'default' : 'pointer', color: page === data.pages ? '#cbd5e1' : '#374151', fontSize: 12 }}>Next ›</button>
+              <button onClick={() => setPage(data.pages)} disabled={page === data.pages}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: page === data.pages ? 'default' : 'pointer', color: page === data.pages ? '#cbd5e1' : '#374151', fontSize: 12 }}>»</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN ADMIN PANEL ──────────────────────────────────────────────────────────
 function useAdminNotifications() {
   const [notifications, setNotifications] = useState([]);
@@ -2777,6 +3133,7 @@ const NAV_ICONS = {
   audit:        ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
   pins:         ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'M12 8v4', 'M12 16h.01'],
   leads:        ['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', 'M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8', 'M23 21v-2a4 4 0 0 0-3-3.87', 'M20 8a3 3 0 0 1 0 5.83'],
+  database:     ['M12 2a10 5 0 1 0 0 10A10 5 0 0 0 12 2z', 'M2 7c0 2.76 4.48 5 10 5s10-2.24 10-5', 'M2 12c0 2.76 4.48 5 10 5s10-2.24 10-5', 'M2 17c0 2.76 4.48 5 10 5s10-2.24 10-5'],
 };
 
 
@@ -3086,6 +3443,7 @@ function AdminPanelInner() {
   const [tab, setTab]               = useState('dashboard');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [selectedNotif, setSelectedNotif] = useState(null);
   const { notifications, unread, markAllRead } = useAdminNotifications();
 
   if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
@@ -3107,6 +3465,7 @@ function AdminPanelInner() {
     { key: 'chat',         label: 'Chat',           icon: 'chat' },
     { key: 'audit',        label: 'Audit Log',      icon: 'audit' },
     { key: 'pins',         label: 'PIN Management', icon: 'pins' },
+    { key: 'database',     label: 'Database',       icon: 'database' },
   ];
 
   const doLogout = () => { clearToken(); window.location.href = '/login'; };
@@ -3261,21 +3620,88 @@ function AdminPanelInner() {
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>Notifications</span>
                     <button onClick={markAllRead} style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Mark all read</button>
                   </div>
-                  <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                  <div style={{ maxHeight: 360, overflowY: 'auto' }}>
                     {notifications.length === 0 ? (
                       <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '24px 0' }}>No notifications</p>
                     ) : notifications.map(n => (
-                      <div key={n.id} style={{
-                        padding: '12px 16px',
-                        borderBottom: `1px solid ${'#f9fafb'}`,
-                        background: !n.is_read ? '#fafaff' : '#fff'
-                      }}>
-                        {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginRight: 6, verticalAlign: 'middle' }} />}
-                        <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{n.title}</p>
-                        <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0' }}>{n.message}</p>
-                        <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                      <div key={n.id}
+                        onClick={() => { setSelectedNotif(n); setShowNotifs(false); }}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid #f9fafb',
+                          background: !n.is_read ? '#fafaff' : '#fff',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f5f5ff'}
+                        onMouseLeave={e => e.currentTarget.style.background = !n.is_read ? '#fafaff' : '#fff'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                          {!n.is_read && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#6366f1', marginTop: 5, flexShrink: 0 }} />}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', margin: 0 }}>{n.title}</p>
+                            <p style={{ fontSize: 12, color: '#6b7280', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.message}</p>
+                            <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleString('en-IN')}</p>
+                          </div>
+                          <span style={{ fontSize: 10, color: '#c4b5fd', marginTop: 2, flexShrink: 0 }}>›</span>
+                        </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+              {/* Notification detail modal */}
+              {selectedNotif && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+                  onClick={() => setSelectedNotif(null)}>
+                  <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 420, boxShadow: '0 24px 64px rgba(0,0,0,0.2)', overflow: 'hidden' }}
+                    onClick={e => e.stopPropagation()}>
+                    {/* Header */}
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{selectedNotif.title}</span>
+                      <button onClick={() => setSelectedNotif(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 18, lineHeight: 1 }}>✕</button>
+                    </div>
+                    {/* Body */}
+                    <div style={{ padding: '20px' }}>
+                      <p style={{ fontSize: 13, color: '#374151', margin: '0 0 16px', lineHeight: 1.6 }}>{selectedNotif.message}</p>
+                      {/* Metadata rows */}
+                      {(() => {
+                        const meta = selectedNotif.metadata || {};
+                        const rows = [
+                          meta.device && { label: '📱 Device', value: meta.device },
+                          meta.ip     && { label: '🌐 IP Address', value: meta.ip },
+                          meta.mobile && { label: '📞 Mobile', value: meta.mobile },
+                          meta.name   && { label: '👤 User', value: `${meta.name} (${meta.role || ''})` },
+                        ].filter(Boolean);
+                        if (!rows.length) return null;
+                        return (
+                          <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {rows.map(r => (
+                              <div key={r.label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                <span style={{ fontSize: 12, color: '#6b7280', minWidth: 110, flexShrink: 0 }}>{r.label}</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#111827', wordBreak: 'break-all' }}>{r.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: '12px 0 0' }}>
+                        {new Date(selectedNotif.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'medium' })}
+                      </p>
+                    </div>
+                    {/* Footer — link to owner/driver tab if applicable */}
+                    {(selectedNotif.metadata?.role === 'OWNER' || selectedNotif.metadata?.role === 'DRIVER') && (
+                      <div style={{ padding: '0 20px 16px' }}>
+                        <button
+                          onClick={() => {
+                            setTab(selectedNotif.metadata.role === 'OWNER' ? 'owners' : 'drivers');
+                            setSelectedNotif(null);
+                          }}
+                          style={{ width: '100%', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                          View {selectedNotif.metadata.role === 'OWNER' ? 'Owner' : 'Driver'} Profile →
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -3315,6 +3741,7 @@ function AdminPanelInner() {
           {tab === 'audit'        && <AuditLog />}
           {tab === 'pins'         && <PinManagementSection />}
           {tab === 'leads'        && <LeadsSection />}
+          {tab === 'database'     && <DbExplorer />}
         </div>
       </main>
 

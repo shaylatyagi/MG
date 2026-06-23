@@ -1085,6 +1085,10 @@ router.post('/owner/cash-payment', verifyToken, requirePermission('record_cash')
       [driverPhone, `Owner recorded your cash payment of ₹${amount}`]
     ).catch(()=>{});
 
+    logAudit('OWNER_CASH_PAYMENT', 'driver', di.owner_int_id || null,
+      `owner:${ownerId}:unknown`,
+      { driver_name: di.full_name || driverName, driver_phone: driverPhone, amount: parseFloat(amount), vehicle: di.vehicle_number || null, purpose, order_number: orderNumber });
+
     res.json({ success: true, message: 'Cash payment recorded!', order_number: orderNumber });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

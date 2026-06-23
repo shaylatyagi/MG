@@ -759,14 +759,15 @@ router.get('/kyc/all', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ADM-06: GET audit log — most recent 200 entries (filterable by action/entity_type)
+// ADM-06: GET audit log — most recent 200 entries (filterable by action/entity_type/performed_by)
 router.get('/audit-log', async (req, res) => {
   try {
-    const { action, entity_type, limit = 100 } = req.query;
+    const { action, entity_type, performed_by, limit = 100 } = req.query;
     const conditions = [];
     const params = [];
-    if (action)      { params.push(action);      conditions.push(`action = $${params.length}`); }
-    if (entity_type) { params.push(entity_type); conditions.push(`entity_type = $${params.length}`); }
+    if (action)       { params.push(action);       conditions.push(`action = $${params.length}`); }
+    if (entity_type)  { params.push(entity_type);  conditions.push(`entity_type = $${params.length}`); }
+    if (performed_by) { params.push(`%${performed_by}%`); conditions.push(`performed_by ILIKE $${params.length}`); }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     params.push(Math.min(200, parseInt(limit, 10) || 100));
 
@@ -779,6 +780,42 @@ router.get('/audit-log', async (req, res) => {
       params
     );
     res.json({ success: true, logs: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/owner-activity — owner-initiated actions grouped, filterable by owner_id
+router.get('/owner-activity', async (req, res) => {
+  try {
+    const { owner_id, limit = 150 } = req.query;
+    const params = [];
+    let ownerFilter = '';
+    if (owner_id) {
+      params.push(`owner:${owner_id}:%`);
+      ownerFilter = `AND performed_by ILIKE $${params.length}`;
+    } else {
+      ownerFilter = `AND (performed_by ILIKE 'owner:%' OR action ILIKE 'OWNER_%')`;
+    }
+    params.push(Math.min(300, parseInt(limit, 10) || 150));
+
+    const result = await pool.query(
+      `SELECT l.id, l.action, l.entity_type, l.entity_id, l.performed_by, l.details, l.created_at
+       FROM public.admin_audit_log l
+       WHERE 1=1 ${ownerFilter}
+       ORDER BY l.created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    // Parse details JSON for each row
+    const logs = result.rows.map(r => {
+      let details = {};
+      try { details = typeof r.details === 'string' ? JSON.parse(r.details) : (r.details || {}); } catch {}
+      return { ...r, details };
+    });
+
+    res.json({ success: true, logs });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1147,7 +1184,7 @@ router.patch('/vehicles/:vehicleId/branch', async (req, res) => {
 router.get('/notifications', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, title, message, is_read, created_at
+      `SELECT id, title, message, is_read, created_at, metadata
        FROM public.notifications
        WHERE user_type = 'ADMIN'
        ORDER BY created_at DESC LIMIT 50`
@@ -1678,6 +1715,286 @@ router.post('/trigger-midnight-cron', verifyAdmin, async (req, res) => {
     res.json({ success: true, message: 'Cron executed manually', result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── DB EXPLORER (dynamic — reads information_schema) ────────────────────────
+
+// GET /api/admin/db/tables — all tables in public schema with row counts
+router.get('/db/tables', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        t.table_name,
+        obj_description(pgc.oid, 'pg_class') AS description,
+        (SELECT COUNT(*) FROM information_schema.columns c
+         WHERE c.table_schema = 'public' AND c.table_name = t.table_name) AS col_count
+      FROM information_schema.tables t
+      JOIN pg_class pgc ON pgc.relname = t.table_name AND pgc.relnamespace = 'public'::regnamespace
+      WHERE t.table_schema = 'public'
+        AND t.table_type = 'BASE TABLE'
+      ORDER BY t.table_name
+    `);
+
+    // Get row counts in parallel
+    const withCounts = await Promise.all(rows.map(async r => {
+      try {
+        const c = await pool.query(`SELECT COUNT(*) FROM public."${r.table_name}"`);
+        return { ...r, row_count: parseInt(c.rows[0].count, 10) };
+      } catch { return { ...r, row_count: null }; }
+    }));
+
+    res.json({ success: true, tables: withCounts });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/db/columns?table=xxx — all columns for a table
+router.get('/db/columns', async (req, res) => {
+  try {
+    const { table } = req.query;
+    if (!table || !/^[a-zA-Z0-9_]+$/.test(table))
+      return res.status(400).json({ error: 'Invalid table name' });
+
+    const { rows } = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = $1
+      ORDER BY ordinal_position
+    `, [table]);
+
+    if (!rows.length) return res.status(404).json({ error: 'Table not found' });
+    res.json({ success: true, columns: rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/admin/db/rows?table=xxx&search=yyy&col=zzz&page=1&limit=50
+// Fetches all rows from any public schema table, with optional search on a column
+router.get('/db/rows', async (req, res) => {
+  try {
+    const { table, search = '', col = '', page = 1, limit = 50, order = 'id', dir = 'DESC' } = req.query;
+
+    // Validate table name (no SQL injection)
+    if (!table || !/^[a-zA-Z0-9_]+$/.test(table))
+      return res.status(400).json({ error: 'Invalid table name' });
+
+    // Verify table exists in public schema
+    const tableCheck = await pool.query(
+      `SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1`, [table]
+    );
+    if (!tableCheck.rows.length) return res.status(404).json({ error: 'Table not found' });
+
+    // Validate order column
+    const colsRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1`, [table]
+    );
+    const validCols = colsRes.rows.map(r => r.column_name);
+    const orderCol  = validCols.includes(order) ? order : (validCols.includes('id') ? 'id' : validCols[0]);
+    const orderDir  = dir === 'ASC' ? 'ASC' : 'DESC';
+
+    const pageNum  = Math.max(1, parseInt(page, 10) || 1);
+    const pageSize = Math.min(200, parseInt(limit, 10) || 50);
+    const offset   = (pageNum - 1) * pageSize;
+
+    // Optional search across a specific column (or all text columns)
+    const params = [];
+    let whereSql = '';
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      // Search in the specified column if given, otherwise across all text-like columns
+      const searchCols = col && validCols.includes(col)
+        ? [`"${col}"`]
+        : validCols.map(c => `CAST("${c}" AS TEXT)`);
+      whereSql = `WHERE (${searchCols.map(c => `${c} ILIKE $1`).join(' OR ')})`;
+    }
+
+    // Total count
+    const countRes = await pool.query(
+      `SELECT COUNT(*) FROM public."${table}" ${whereSql}`, params
+    );
+    const total = parseInt(countRes.rows[0].count, 10);
+
+    // Data
+    const dataParams = [...params, pageSize, offset];
+    const { rows } = await pool.query(
+      `SELECT * FROM public."${table}" ${whereSql}
+       ORDER BY "${orderCol}" ${orderDir}
+       LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+      dataParams
+    );
+
+    res.json({
+      success: true,
+      table,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / pageSize),
+      limit: pageSize,
+      columns: validCols,
+      rows,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── DB EXPLORER (legacy hardcoded — kept for owner-activity) ────────────────
+const DB_TABLES = {
+  owners: {
+    sql: `SELECT o.id, o.full_name, o.mobile_number, o.owner_code, o.plan, o.status,
+                 o.email, o.created_at,
+                 (SELECT COUNT(*) FROM public.drivers d WHERE d.owner_id = o.id AND d.deleted_at IS NULL) AS driver_count,
+                 (SELECT COUNT(*) FROM public.vehicles v WHERE v.owner_id = o.id) AS vehicle_count
+          FROM public.owners o`,
+    searchCols: ['o.full_name', 'o.mobile_number', 'o.owner_code', 'o.email'],
+    label: 'Owners',
+  },
+  drivers: {
+    sql: `SELECT d.id, d.full_name, d.mobile_number, d.driver_code, d.status, d.kyc_status,
+                 d.wallet_balance, d.owner_id, o.full_name AS owner_name, o.mobile_number AS owner_mobile,
+                 v.vehicle_number AS assigned_vehicle, v.daily_rent,
+                 d.created_at, d.deleted_at
+          FROM public.drivers d
+          LEFT JOIN public.owners o ON o.id = d.owner_id
+          LEFT JOIN public.vehicles v ON v.driver_id = d.id`,
+    searchCols: ['d.full_name', 'd.mobile_number', 'd.driver_code', 'o.full_name'],
+    label: 'Drivers',
+  },
+  vehicles: {
+    sql: `SELECT v.id, v.vehicle_number, v.type, v.daily_rent, v.status,
+                 v.owner_id, o.full_name AS owner_name,
+                 v.driver_id, d.full_name AS driver_name, d.mobile_number AS driver_mobile,
+                 v.created_at
+          FROM public.vehicles v
+          LEFT JOIN public.owners o ON o.id = v.owner_id
+          LEFT JOIN public.drivers d ON d.id = v.driver_id`,
+    searchCols: ['v.vehicle_number', 'v.type', 'o.full_name', 'd.full_name'],
+    label: 'Vehicles',
+  },
+  ledger: {
+    sql: `SELECT l.id, l.entry_type, l.amount, l.description, l.created_by, l.created_at,
+                 d.full_name AS driver_name, d.mobile_number AS driver_mobile,
+                 o.full_name AS owner_name, o.mobile_number AS owner_mobile
+          FROM public.driver_ledger l
+          LEFT JOIN public.drivers d ON d.id = l.driver_id
+          LEFT JOIN public.owners o ON o.id = l.owner_id`,
+    searchCols: ['l.entry_type', 'l.description', 'd.full_name', 'd.mobile_number', 'o.full_name'],
+    label: 'Driver Ledger',
+  },
+  payments: {
+    sql: `SELECT id, order_number, payer_name, payer_mobile, order_amount, payment_mode,
+                 transaction_status, driver_code, owner_code, vehicle_number, purpose,
+                 order_completion_date, order_initiation_date
+          FROM public.ms_orders`,
+    searchCols: ['payer_name', 'payer_mobile', 'order_number', 'driver_code', 'owner_code', 'vehicle_number'],
+    label: 'Payments / Orders',
+  },
+  notifications: {
+    sql: `SELECT n.id, n.user_type, n.title, n.message, n.is_read, n.created_at,
+                 d.full_name AS driver_name, d.mobile_number AS driver_mobile
+          FROM public.notifications n
+          LEFT JOIN public.drivers d ON d.id = n.driver_id`,
+    searchCols: ['n.user_type', 'n.title', 'n.message', 'd.full_name'],
+    label: 'Notifications',
+  },
+  audit_log: {
+    sql: `SELECT id, action, entity_type, entity_id, performed_by, details, created_at
+          FROM public.admin_audit_log`,
+    searchCols: ['action', 'entity_type', 'performed_by'],
+    label: 'Audit Log',
+  },
+  assignments: {
+    sql: `SELECT h.id, h.driver_id, d.full_name AS driver_name, d.mobile_number AS driver_mobile,
+                 h.vehicle_id, v.vehicle_number,
+                 h.assigned_at, h.unassigned_at,
+                 CASE WHEN h.unassigned_at IS NULL THEN 'Active' ELSE 'Ended' END AS assignment_status
+          FROM public.driver_vehicle_history h
+          LEFT JOIN public.drivers d ON d.id = h.driver_id
+          LEFT JOIN public.vehicles v ON v.id = h.vehicle_id`,
+    searchCols: ['d.full_name', 'd.mobile_number', 'v.vehicle_number'],
+    label: 'Assignments History',
+  },
+  otps: {
+    sql: `SELECT id, phone_number, expires_at,
+                 CASE WHEN expires_at > NOW() THEN 'Valid' ELSE 'Expired' END AS status
+          FROM public.otps`,
+    searchCols: ['phone_number'],
+    label: 'OTPs',
+  },
+  waitlist: {
+    sql: `SELECT id, full_name, email, phone, company_name, message, created_at
+          FROM public.waitlist_leads`,
+    searchCols: ['full_name', 'email', 'phone', 'company_name'],
+    label: 'Waitlist Leads',
+  },
+  companies: {
+    sql: `SELECT c.id, c.name, c.status, c.plan, c.created_at,
+                 (SELECT COUNT(*) FROM public.owners o WHERE o.company_id = c.id) AS owner_count
+          FROM public.companies c`,
+    searchCols: ['c.name', 'c.status', 'c.plan'],
+    label: 'Companies',
+  },
+};
+
+router.get('/db-explorer', async (req, res) => {
+  try {
+    const { table = 'owners', search = '', page = 1, limit = 50 } = req.query;
+    const def = DB_TABLES[table];
+    if (!def) return res.status(400).json({ error: 'Unknown table', allowed: Object.keys(DB_TABLES) });
+
+    const pageNum  = Math.max(1, parseInt(page, 10) || 1);
+    const pageSize = Math.min(200, parseInt(limit, 10) || 50);
+    const offset   = (pageNum - 1) * pageSize;
+
+    let whereSql = '';
+    const params = [];
+    if (search && search.trim() && def.searchCols.length) {
+      const term = `%${search.trim()}%`;
+      params.push(term);
+      whereSql = `WHERE (${def.searchCols.map(c => `CAST(${c} AS TEXT) ILIKE $1`).join(' OR ')})`;
+    }
+
+    // Total count
+    const countRes = await pool.query(
+      `SELECT COUNT(*) FROM (${def.sql}) _sub ${whereSql}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0].count, 10);
+
+    // Data
+    params.push(pageSize, offset);
+    const dataRes = await pool.query(
+      `SELECT * FROM (${def.sql}) _sub ${whereSql} ORDER BY id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    res.json({
+      success: true,
+      table,
+      label: def.label,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / pageSize),
+      limit: pageSize,
+      rows: dataRes.rows,
+      columns: dataRes.rows.length ? Object.keys(dataRes.rows[0]) : [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/db-explorer/tables — list available tables with counts
+router.get('/db-explorer/tables', async (req, res) => {
+  try {
+    const counts = await Promise.all(
+      Object.entries(DB_TABLES).map(async ([key, def]) => {
+        try {
+          const r = await pool.query(`SELECT COUNT(*) FROM (${def.sql}) _sub`);
+          return { key, label: def.label, count: parseInt(r.rows[0].count, 10) };
+        } catch { return { key, label: def.label, count: null }; }
+      })
+    );
+    res.json({ success: true, tables: counts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
