@@ -148,7 +148,7 @@ function LandingPage() {
           </div>
           <div className="hero-right">
           <div className="preview-glow" />
-          <div className="browser-mock">
+          <div className="browser-mock" aria-hidden="true">
             <div className="browser-bar">
               <div className="browser-dots">
                 <div className="browser-dot" style={{ background: '#ef4444' }} />

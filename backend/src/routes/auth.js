@@ -310,8 +310,16 @@ router.post('/admin-send-otp', validate(AdminSendOtpSchema), async (req, res) =>
   const adminPhone = process.env.ADMIN_PHONE;
   if (!admin_secret || admin_secret !== expected)
     return res.status(403).json({ success: false, message: 'Invalid admin secret' });
-  if (!phone_number || (adminPhone && phone_number !== adminPhone))
-    return res.status(403).json({ success: false, message: 'Unauthorized phone number' });
+  // Check: phone must match ADMIN_PHONE env var OR be an active row in the admins table
+  const isEnvAdmin = adminPhone && phone_number === adminPhone;
+  if (!isEnvAdmin) {
+    const { rows } = await pool.query(
+      'SELECT 1 FROM public.admins WHERE phone_number=$1 AND is_active=true LIMIT 1',
+      [phone_number]
+    );
+    if (!rows.length)
+      return res.status(403).json({ success: false, message: 'Unauthorized phone number' });
+  }
   try {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpHash = await bcrypt.hash(otp, 10);
@@ -350,8 +358,14 @@ router.post('/admin-verify-otp', validate(AdminVerifyOtpSchema), async (req, res
         return res.status(400).json({ success: false, message: 'OTP invalid or expired' });
       await pool.query('DELETE FROM otps WHERE phone_number = $1', [phone_number]);
     }
-    const token = jwt.sign({ id: 'admin', role: 'admin', phone: phone_number }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.json({ success: true, token, user: { role: 'admin', phone: phone_number } });
+    // Look up name from admins table (falls back gracefully if not found)
+    const adminRow = await pool.query(
+      'SELECT name FROM public.admins WHERE phone_number=$1 AND is_active=true LIMIT 1',
+      [phone_number]
+    );
+    const adminName = adminRow.rows[0]?.name || 'Admin';
+    const token = jwt.sign({ id: 'admin', role: 'admin', phone: phone_number, name: adminName }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    res.json({ success: true, token, user: { role: 'admin', phone: phone_number, name: adminName } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
