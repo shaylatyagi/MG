@@ -818,21 +818,21 @@ router.get('/owner/driver-ledger', verifyToken, async (req, res) => {
         v.vehicle_number,
         v.daily_rent,
         COALESCE(SUM(
-          CASE WHEN dl.entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') 
+          CASE WHEN dl.entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND')
           THEN dl.amount ELSE 0 END
         ), 0) AS total_paid,
         COALESCE(SUM(
-          CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY') 
+          CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY','SECURITY_DEPOSIT')
           THEN dl.amount ELSE 0 END
         ), 0) AS total_charged
       FROM public.drivers d
       LEFT JOIN public.vehicles v ON v.driver_id = d.id
       LEFT JOIN public.driver_ledger dl ON dl.driver_id = d.id
       WHERE d.owner_code = $1 AND d.status = 'ACTIVE'
-      GROUP BY d.id, d.full_name, d.mobile_number, d.advance_balance, 
+      GROUP BY d.id, d.full_name, d.mobile_number, d.advance_balance,
                d.security_deposit, v.vehicle_number, v.daily_rent
       ORDER BY d.full_name
-    `, [ownerCode]);  // ← ownerCode directly use ho raha hai
+    `, [ownerCode]);
 
     const drivers = result.rows.map(d => ({
       id: d.id,
@@ -871,11 +871,11 @@ router.get('/owner/driver-ledger/csv', verifyToken, async (req, res) => {
         COALESCE(v.vehicle_number, 'Not Assigned') AS vehicle_number,
         COALESCE(v.daily_rent, 0) AS daily_rent,
         COALESCE(SUM(
-          CASE WHEN dl.entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND')
+          CASE WHEN dl.entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND')
           THEN dl.amount ELSE 0 END
         ), 0) AS total_paid,
         COALESCE(SUM(
-          CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY')
+          CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY','SECURITY_DEPOSIT')
           THEN dl.amount ELSE 0 END
         ), 0) AS total_charged,
         d.advance_balance,
@@ -1041,7 +1041,7 @@ router.post('/owner/cash-payment', verifyToken, requirePermission('record_cash')
     const orderId = uuidv4();
     const orderNumber = `CASH-${Date.now()}-${Math.random().toString(36).substr(2,6).toUpperCase()}`;
 
-    // Atomic: ms_orders insert + wallet_balance update together
+    // Atomic: ms_orders insert + driver_ledger entry + wallet_balance update
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -1065,6 +1065,15 @@ router.post('/owner/cash-payment', verifyToken, requirePermission('record_cash')
           di.full_name || driverName,
           purpose
         ]
+      );
+      // driver_ledger entry — reduces outstanding balance for driver and owner view
+      await client.query(
+        `INSERT INTO public.driver_ledger (driver_id, owner_id, entry_type, amount, description, created_by, created_at)
+         SELECT d.id, o.id, 'CASH_PAYMENT', $1, $2, 'OWNER', NOW()
+         FROM public.drivers d
+         LEFT JOIN public.owners o ON o.owner_code = d.owner_code
+         WHERE d.mobile_number = $3 LIMIT 1`,
+        [parseFloat(amount), `Cash payment recorded — ${orderNumber}`, driverPhone]
       );
       await client.query(
         `UPDATE public.drivers SET wallet_balance = COALESCE(wallet_balance,0) + $1 WHERE mobile_number = $2`,
@@ -2092,29 +2101,31 @@ if (status === 'SUCCESS' && localOrder.rows[0].transaction_status !== 'SUCCESS')
   const amount = parseFloat(localOrder.rows[0].order_amount || 0);
   const driverPhone = localOrder.rows[0].payer_mobile;
   const driverUser = await pool.query(
-  'SELECT id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
+  'SELECT id, owner_id FROM public.drivers WHERE mobile_number = $1', [driverPhone]
 );
 if (driverUser.rows.length === 0) {
   console.log('Driver not found for phone:', driverPhone);
 } else {
-  const driverUserId = driverUser.rows[0].id;    
-    // Update drivers wallet
-    await pool.query(
-      `UPDATE public.drivers
-       SET wallet_balance = COALESCE(wallet_balance, 0) + $1,
-           amount_paid_today = COALESCE(amount_paid_today, 0) + $1,
-           updated_at = NOW()
-       WHERE mobile_number = (SELECT phone_number FROM users WHERE id = $2 LIMIT 1)`,
-      [amount, driverUserId]
+  const driverUserId = driverUser.rows[0].id;
+  const driverOwnerId = driverUser.rows[0].owner_id;
+
+    // 1. Insert into driver_ledger — this is what updates outstanding balance
+    // Idempotent: skip if ledger entry already exists for this order
+    const orderRef = localOrder.rows[0].order_id || localOrder.rows[0].order_number;
+    const existingLedger = await pool.query(
+      `SELECT id FROM public.driver_ledger
+       WHERE driver_id = $1 AND entry_type = 'UPI_PAYMENT'
+         AND description = $2 LIMIT 1`,
+      [driverUserId, `Online payment via PayYantra — ${orderRef}`]
     );
-    
-    // Also update public.drivers table if exists
-    await pool.query(
-      `UPDATE public.drivers 
-       SET wallet_balance = COALESCE(wallet_balance, 0) + $1
-       WHERE mobile_number = $2`,
-      [amount, driverPhone]
-    ).catch(() => {});
+    if (existingLedger.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO public.driver_ledger
+           (driver_id, owner_id, entry_type, amount, description, created_by, created_at)
+         VALUES ($1, $2, 'UPI_PAYMENT', $3, $4, 'DRIVER', NOW())`,
+        [driverUserId, driverOwnerId, amount, `Online payment via PayYantra — ${orderRef}`]
+      ).catch(() => {});
+    }
     
     // ============================================
     // 2. SEND NOTIFICATION TO DRIVER
@@ -2142,11 +2153,11 @@ if (driverUser.rows.length === 0) {
     if (ownerData.rows.length > 0) {
       const ownerId = ownerData.rows[0].owner_id;
       
-      // ✅ FIXED — user_id nahi, driver_id use karo
+      // Owner notification — driver_id links to driver so owner query picks it up
 await pool.query(
   `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
-   SELECT d.id, 'OWNER', '💰 Rent Payment Received',
-          d.full_name || ' ne ₹' || $1 || ' pay kiya', NOW()
+   SELECT d.id, 'OWNER', '💰 Payment Received',
+          'Payment of ₹' || $1 || ' received from ' || d.full_name, NOW()
    FROM public.drivers d WHERE d.mobile_number = $2`,
   [amount, driverPhone]
 ).catch(()=>{});
@@ -2314,12 +2325,12 @@ if (p.vehicle_number && p.vehicle_daily_rent) {
 
   // ---- NEW: Compute cumulative outstanding from ledger ----
   const ledgerBal = await pool.query(
-    `SELECT 
-       COALESCE(SUM(CASE 
-         WHEN entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','PENALTY','DEPOSIT_CHARGE') 
+    `SELECT
+       COALESCE(SUM(CASE
+         WHEN entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','PENALTY','SECURITY_DEPOSIT','DEPOSIT_CHARGE')
          THEN amount ELSE 0 END), 0) AS total_charged,
-       COALESCE(SUM(CASE 
-         WHEN entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') 
+       COALESCE(SUM(CASE
+         WHEN entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND')
          THEN amount ELSE 0 END), 0) AS total_paid
      FROM public.driver_ledger
      WHERE driver_id = $1`,

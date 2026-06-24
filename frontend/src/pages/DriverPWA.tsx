@@ -24,6 +24,28 @@ import DocumentSection from '../components/DocumentSection';
 
 const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
 
+// ── Web Audio chime — no external files needed ────────────────────────────────
+function playChime(type: 'success' | 'notification' = 'success') {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const notes: [number, number][] =
+      type === 'success'
+        ? [[523, 0], [659, 0.13], [784, 0.26]]  // C5 E5 G5 — ascending major
+        : [[880, 0], [1046, 0.14]];               // A5 C6 — ding dong
+    notes.forEach(([freq, delay]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.28, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.55);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.6);
+    });
+  } catch {}
+}
+
 // ── QR Pay Modal — polls for payment success every 5s, times out after 5min ──
 function QRPayModal({ qr, apiBase, token, onSuccess, onClose }) {
   const [status, setStatus] = React.useState('pending'); // pending | success | failed | timeout
@@ -233,6 +255,8 @@ export default function DriverPWA() {
   // AccountTab upload state lifted here to prevent remount-on-rerender scroll bug
   const [uploadPreview, setUploadPreview] = useState<any>(null);
   const [uploading, setUploading]         = useState(false);
+  const [driverProfilePhoto, setDriverProfilePhoto] = useState<string|null>(null);
+  const [driverPhotoUploading, setDriverPhotoUploading] = useState(false);
   const [uploadDone, setUploadDone]       = useState('');
   const [ocrLoading, setOcrLoading]       = useState(false);
 
@@ -431,6 +455,7 @@ export default function DriverPWA() {
       setShowPaying(false);
       fetchAll();
       const amt = p.get('amount') || p.get('order_amount') || null;
+      playChime('success');
       setPaymentSuccess({ amount: amt, timestamp: new Date() });
       window.history.replaceState(null, '', window.location.pathname);
     } else if (p.get('refresh') === 'true') {
@@ -1284,9 +1309,26 @@ export default function DriverPWA() {
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="bg-indigo-600 px-5 pt-6 pb-5">
             <div className="flex flex-col items-center text-white text-center">
-              <div className="w-16 h-16 rounded-full bg-white/15 border-2 border-white/30 flex items-center justify-center text-2xl font-black mb-3">
-                {driverName.charAt(0).toUpperCase()}
-              </div>
+              <label className="w-16 h-16 rounded-full bg-white/15 border-2 border-white/30 flex items-center justify-center text-2xl font-black mb-3 cursor-pointer hover:bg-white/25 transition relative overflow-hidden">
+                {driverProfilePhoto
+                  ? <img src={driverProfilePhoto} alt="profile" className="w-full h-full object-cover rounded-full" />
+                  : driverPhotoUploading
+                    ? <span className="text-white text-xs animate-pulse">...</span>
+                    : <><Camera size={18} className="text-white/80 absolute" /><span className="opacity-0">{driverName.charAt(0).toUpperCase()}</span></>
+                }
+                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                  const file = e.target.files?.[0]; if (!file) return;
+                  setDriverPhotoUploading(true);
+                  setDriverProfilePhoto(URL.createObjectURL(file));
+                  const fd = new FormData();
+                  fd.append('file', file); fd.append('doc_type', 'PROFILE');
+                  fd.append('user_type', 'DRIVER'); fd.append('user_id', String(user?.id));
+                  try {
+                    await fetch(`${API}/api/uploads/upload`, { method: 'POST', headers: { Authorization: `Bearer ${tk()}` }, body: fd });
+                  } catch {}
+                  setDriverPhotoUploading(false);
+                }} />
+              </label>
               <h2 className="text-lg font-black tracking-tight">{driverName}</h2>
               <p className="text-sm text-indigo-100 mt-0.5">{phone()}</p>
               <p className="text-[10px] text-indigo-200 font-mono mt-0.5">{driverCode}</p>
@@ -1315,16 +1357,6 @@ export default function DriverPWA() {
               <span className="text-[9px] text-indigo-600 font-black bg-indigo-50 px-2 py-1 rounded">OWNER</span>
             </div>
           )}
-        </div>
-
-        {/* Documents via DocumentSection */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.verifiedDocs}</h3>
-          </div>
-          <div className="p-4">
-            <DocumentSection userId={user?.id} userType="DRIVER" token={tk()}/>
-          </div>
         </div>
 
         {/* KYC Verification */}
@@ -1847,7 +1879,7 @@ export default function DriverPWA() {
             qr={showQR}
             apiBase={API}
             token={tk()}
-            onSuccess={() => { setShowQR(null); toast.success('Payment successful!'); fetchAll(); }}
+            onSuccess={() => { setShowQR(null); playChime('success'); setPaymentSuccess({ amount: showQR?.amount, timestamp: new Date() }); fetchAll(); }}
             onClose={() => setShowQR(null)}
           />
         )}

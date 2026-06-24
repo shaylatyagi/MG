@@ -31,12 +31,33 @@ import PaymentLinks from './owner/PaymentLinks';
 const API = process.env.REACT_APP_API_URL || 'https://mg-qw5s.onrender.com';
 const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
   const [ledgerData, setLedgerData] = useState([]);
+  const [ledgerSearch, setLedgerSearch] = useState('');
   const [expandedDriver, setExpandedDriver] = useState(null);
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [selectedDriver, setSelectedEntryDriver] = useState(null);
-  const [entryType, setEntryType] = useState('ADVANCE_CREDIT');
+  const [entrySign, setEntrySign] = useState<'+' | '-'>('-');
   const [entryAmount, setEntryAmount] = useState('');
   const [entryDesc, setEntryDesc] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const DEFAULT_SUGGESTIONS = [
+    'Driver overpaid', 'Advance given', 'Battery damage', 'Tyre puncture',
+    'Accident repair', 'Late return penalty', 'Extra distance charge', 'Refund for holiday'
+  ];
+  const getSuggestions = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ledger_desc_suggestions') || '[]');
+      return [...new Set([...saved, ...DEFAULT_SUGGESTIONS])];
+    } catch { return DEFAULT_SUGGESTIONS; }
+  };
+  const saveSuggestion = (desc: string) => {
+    if (!desc.trim()) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem('ledger_desc_suggestions') || '[]');
+      const updated = [desc.trim(), ...saved.filter((s: string) => s !== desc.trim())].slice(0, 20);
+      localStorage.setItem('ledger_desc_suggestions', JSON.stringify(updated));
+    } catch {}
+  };
   const downloadCSV = async (driver) => {
     try {
       const res = await fetch(
@@ -82,6 +103,9 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
 
   const addEntry = async () => {
     if (!entryAmount || parseFloat(entryAmount) <= 0) return toast.warn('Amount daalen');
+    if (!entryDesc.trim()) return toast.warn('Reason likhein');
+    // + = charge driver (adds to dues), - = credit driver (reduces dues)
+    const entryType = entrySign === '+' ? 'DAMAGE_CHARGE' : 'ADVANCE_CREDIT';
     const res = await fetch(`${API}/api/payment/owner/ledger-entry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenVal}` },
@@ -90,14 +114,15 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
         ownerId: ownerIdVal,
         entryType,
         amount: parseFloat(entryAmount),
-        description: entryDesc
+        description: entryDesc.trim()
       })
     });
     const d = await res.json();
     if (d.success) {
+      saveSuggestion(entryDesc);
       toast.success('Entry recorded!');
       setShowEntryModal(false);
-      setEntryAmount(''); setEntryDesc('');
+      setEntryAmount(''); setEntryDesc(''); setEntrySign('-');
       fetchLedger();
     } else toast.error(d.error || 'Failed');
   };
@@ -111,11 +136,38 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
         <span className="text-[9px] text-slate-600">{ledgerData.length} drivers</span>
       </div>
 
+      <div className="px-4 py-2 border-b bg-white">
+        <div className="flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-1.5">
+          <Search size={12} className="text-slate-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search by name or phone..."
+            value={ledgerSearch}
+            onChange={e => setLedgerSearch(e.target.value)}
+            className="bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none w-full"
+          />
+          {ledgerSearch && (
+            <button onClick={() => setLedgerSearch('')} className="text-slate-400 hover:text-slate-600">
+              <X size={11} />
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="divide-y">
-        {ledgerData.length === 0 && (
-          <div className="p-6 text-center text-slate-600 text-xs">No ledger data yet — record a cash payment or wait for online payments.</div>
-        )}
-        {ledgerData.map((d, i) => (
+        {(() => {
+          const filtered = ledgerSearch.trim()
+            ? ledgerData.filter(d =>
+                d.full_name?.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
+                d.mobile_number?.includes(ledgerSearch)
+              )
+            : ledgerData;
+          if (filtered.length === 0) return (
+            <div className="p-6 text-center text-slate-600 text-xs">
+              {ledgerSearch ? 'No drivers match your search.' : 'No ledger data yet — record a cash payment or wait for online payments.'}
+            </div>
+          );
+          return filtered.map((d, i) => (
           <div key={i}>
             {/* ─── COLLAPSED ROW ─── */}
             <div
@@ -233,7 +285,8 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
               </div>
             )}
           </div>
-        ))}
+        ));
+        })()}
       </div>
 
       {/* Entry Modal */}
@@ -243,26 +296,76 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
           onClick={e => { if (e.target === e.currentTarget) setShowEntryModal(false); }}
         >
           <div className="bg-white rounded-3xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="font-black text-lg mb-1">Add Entry</h3>
-            <p className="text-sm text-slate-500 mb-4">{selectedDriver.full_name}</p>
-            <label className="text-xs font-black text-slate-600 block mb-2">Entry Type</label>
-            <select value={entryType} onChange={e => setEntryType(e.target.value)}
-              className="w-full border rounded-xl p-3 mb-3 text-sm bg-white">
-              <option value="ADVANCE_CREDIT">💰 Advance Credit (driver overpaid)</option>
-              <option value="REPAIR_CREDIT">🔧 Repair Compensation</option>
-              <option value="DAMAGE_CHARGE">⚠️ Damage Charge</option>
-              <option value="PENALTY">🚫 Penalty</option>
-              <option value="REFUND">↩️ Refund to Driver</option>
-              <option value="DEPOSIT_CHARGE">🔒 Security Deposit Charge</option>
-            </select>
-            <input type="number" placeholder="Amount (₹)" value={entryAmount}
-              onChange={e => setEntryAmount(e.target.value)}
-              className="w-full border rounded-xl p-3 mb-3 text-sm" />
-            <input type="text" placeholder="Description (optional)" value={entryDesc}
-              onChange={e => setEntryDesc(e.target.value)}
-              className="w-full border rounded-xl p-3 mb-4 text-sm" />
+            <h3 className="font-black text-lg mb-0.5">Ledger Entry</h3>
+            <p className="text-sm text-slate-500 mb-5">{selectedDriver.full_name}</p>
+
+            {/* +/- Toggle */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setEntrySign('-')}
+                className={`flex-1 py-3 rounded-xl text-sm font-black transition ${entrySign === '-' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}
+              >
+                − Reduce dues
+              </button>
+              <button
+                onClick={() => setEntrySign('+')}
+                className={`flex-1 py-3 rounded-xl text-sm font-black transition ${entrySign === '+' ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-500'}`}
+              >
+                + Add to dues
+              </button>
+            </div>
+
+            {/* Amount */}
+            <div className="flex items-center border rounded-xl mb-3 overflow-hidden focus-within:ring-2 focus-within:ring-indigo-300">
+              <span className="px-3 text-slate-500 font-black text-sm">₹</span>
+              <input
+                type="number"
+                placeholder="0"
+                value={entryAmount}
+                onChange={e => setEntryAmount(e.target.value)}
+                className="flex-1 p-3 text-sm outline-none"
+              />
+            </div>
+
+            {/* Description with suggestions */}
+            <div className="relative mb-4">
+              <input
+                type="text"
+                placeholder="What's this for? e.g. Battery damage"
+                value={entryDesc}
+                onChange={e => { setEntryDesc(e.target.value); setShowSuggestions(true); }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                className="w-full border rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+              {showSuggestions && (() => {
+                const q = entryDesc.toLowerCase();
+                const hits = getSuggestions().filter(s => !q || s.toLowerCase().includes(q)).slice(0, 5);
+                return hits.length > 0 ? (
+                  <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border rounded-xl shadow-lg overflow-hidden">
+                    {hits.map((s, i) => (
+                      <button
+                        key={i}
+                        onMouseDown={() => { setEntryDesc(s); setShowSuggestions(false); }}
+                        className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 text-slate-700 border-b last:border-0"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Preview */}
+            {entryAmount && parseFloat(entryAmount) > 0 && (
+              <div className={`rounded-xl p-3 mb-4 text-xs font-black text-center ${entrySign === '+' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                {entrySign === '+' ? `₹${entryAmount} dues mein add honge` : `₹${entryAmount} dues mein se minus honge`}
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button onClick={() => setShowEntryModal(false)}
+              <button onClick={() => { setShowEntryModal(false); setEntryAmount(''); setEntryDesc(''); setEntrySign('-'); }}
                 className="flex-1 py-3 bg-slate-100 rounded-xl text-sm font-black">Cancel</button>
               <button onClick={addEntry}
                 className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black">Record</button>
@@ -492,6 +595,18 @@ const [ownerBankStatus, setOwnerBankStatus] = useState<null|'loading'|'verified'
 const [ownerBankName, setOwnerBankName] = useState<string|null>(null);
 const [ownerAadhaarStatus, setOwnerAadhaarStatus] = useState<null|'loading'|'sent'|'verified'|'failed'>(null);
 const [ownerAadhaarPublicId, setOwnerAadhaarPublicId] = useState<string|null>(null);
+const [ownerGstInput, setOwnerGstInput] = useState('');
+const [ownerGstStatus, setOwnerGstStatus] = useState<null|'loading'|'verified'|'failed'>(null);
+const [ownerGstBizName, setOwnerGstBizName] = useState<string|null>(null);
+const [ownerVoterInput, setOwnerVoterInput] = useState('');
+const [ownerVoterStatus, setOwnerVoterStatus] = useState<null|'loading'|'verified'|'failed'>(null);
+const [ownerVoterName, setOwnerVoterName] = useState<string|null>(null);
+const [ownerDlInput, setOwnerDlInput] = useState('');
+const [ownerDlDob, setOwnerDlDob] = useState('');
+const [ownerDlStatus, setOwnerDlStatus] = useState<null|'loading'|'verified'|'failed'>(null);
+const [ownerDlName, setOwnerDlName] = useState<string|null>(null);
+const [ownerProfilePhoto, setOwnerProfilePhoto] = useState<string|null>(null);
+const [ownerPhotoUploading, setOwnerPhotoUploading] = useState(false);
 const [showChangeRent, setShowChangeRent] = useState(false);
 const [changeRentDriver, setChangeRentDriver] = useState(null); // { driverId, vehicleId, vehicleNumber, currentRent }
 const [changeRentAmt, setChangeRentAmt] = useState('');
@@ -503,6 +618,7 @@ const vehicleModalScrollRef = React.useRef<HTMLDivElement>(null);
   const knownPaymentIdsRef = React.useRef<Set<string>>(new Set(
     JSON.parse(localStorage.getItem('mg_known_payment_ids') || '[]')
   ));
+  const prevUnreadRef = React.useRef<number>(0);
   const audioCtxRef = React.useRef<AudioContext | null>(null);
 
   const playPaymentSound = React.useCallback((status: string) => {
@@ -1567,8 +1683,14 @@ useEffect(() => {
         if (Array.isArray(data)) {
           const ownerReadIds2 = JSON.parse(localStorage.getItem('mg_owner_read_notif_ids') || '[]');
           const mergedData = data.map(x => ownerReadIds2.includes(x.id) ? { ...x, is_read: true } : x);
+          const newUnread = mergedData.filter(n => !n.is_read).length;
+          // Play notification sound only when unread count increases (new notification arrived)
+          if (newUnread > prevUnreadRef.current && prevUnreadRef.current >= 0) {
+            playPaymentSound('PENDING'); // soft single beep for new notification
+          }
+          prevUnreadRef.current = newUnread;
           setNotifications(mergedData);
-          setUnreadCount(mergedData.filter(n => !n.is_read).length);
+          setUnreadCount(newUnread);
         }
       } catch (err) {
         console.log('Polling error:', err);
@@ -3735,9 +3857,27 @@ const ProfileTab = () => {
   return (
   <div className="space-y-4 pb-4">
     <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white text-center">
-      <div className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center text-3xl font-black mb-3 cursor-pointer hover:bg-white/30 transition">
-        <Camera size={24} className="text-white" />
-      </div>
+      <label className="w-20 h-20 rounded-full bg-white/20 mx-auto flex items-center justify-center mb-3 cursor-pointer hover:bg-white/30 transition relative overflow-hidden block">
+        {ownerProfilePhoto
+          ? <img src={ownerProfilePhoto} alt="profile" className="w-full h-full object-cover rounded-full" />
+          : ownerPhotoUploading
+            ? <span className="text-white text-xs font-black animate-pulse">...</span>
+            : <Camera size={24} className="text-white" />
+        }
+        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+          const file = e.target.files?.[0]; if (!file) return;
+          setOwnerPhotoUploading(true);
+          const preview = URL.createObjectURL(file);
+          setOwnerProfilePhoto(preview);
+          const fd = new FormData();
+          fd.append('file', file); fd.append('doc_type', 'PROFILE');
+          fd.append('user_type', 'OWNER'); fd.append('user_id', String(ownerId()));
+          try {
+            await fetch(`${API}/api/uploads/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd });
+          } catch {}
+          setOwnerPhotoUploading(false);
+        }} />
+      </label>
       <h2 className="text-lg font-black">{owner?.full_name || owner?.name || '—'}</h2>
       <p className="text-xs text-indigo-200">Owner Code: {owner?.owner_code || '—'}</p>
       <p className="text-[10px] text-indigo-200 mt-1">Member since {new Date().toLocaleDateString()}</p>
@@ -3905,6 +4045,129 @@ const ProfileTab = () => {
             </button>
           )}
         </div>
+
+        {/* GST */}
+        <div>
+          <label className="text-xs font-black text-slate-600 block mb-1">GSTIN</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="09ABCDE1234F1Z5"
+              maxLength={15}
+              value={ownerGstInput}
+              onChange={e => setOwnerGstInput(e.target.value.toUpperCase())}
+              style={{ background: '#fff', color: '#1e293b' }}
+              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-400"
+            />
+            <button
+              onClick={async () => {
+                if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(ownerGstInput)) { toast.warn('Invalid GSTIN format'); return; }
+                setOwnerGstStatus('loading');
+                try {
+                  const r = await fetch(`${API}/api/kyc/owner/verify-gst`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                    body: JSON.stringify({ gst_number: ownerGstInput }),
+                  });
+                  const d = await r.json();
+                  if (d.verified) { setOwnerGstStatus('verified'); setOwnerGstBizName(d.businessName || null); toast.success('GST Verified ✅'); }
+                  else { setOwnerGstStatus('failed'); toast.error('GST could not be verified'); }
+                } catch { setOwnerGstStatus('failed'); toast.error('Network error'); }
+              }}
+              disabled={ownerGstStatus === 'loading'}
+              className="px-3 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl disabled:opacity-50"
+            >
+              {ownerGstStatus === 'loading' ? '...' : ownerGstStatus === 'verified' ? '✅' : 'Verify'}
+            </button>
+          </div>
+          {ownerGstStatus === 'verified' && ownerGstBizName && <p className="text-[11px] text-emerald-600 mt-1 font-black">✅ {ownerGstBizName}</p>}
+          {ownerGstStatus === 'failed' && <p className="text-[11px] text-red-500 mt-1">❌ Verification failed</p>}
+        </div>
+
+        {/* Voter ID */}
+        <div>
+          <label className="text-xs font-black text-slate-600 block mb-1">Voter ID (EPIC Number)</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="JSH8223786"
+              maxLength={10}
+              value={ownerVoterInput}
+              onChange={e => setOwnerVoterInput(e.target.value.toUpperCase())}
+              style={{ background: '#fff', color: '#1e293b' }}
+              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-400"
+            />
+            <button
+              onClick={async () => {
+                if (!ownerVoterInput) { toast.warn('EPIC number required'); return; }
+                setOwnerVoterStatus('loading');
+                try {
+                  const r = await fetch(`${API}/api/kyc/verify-voter-id`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                    body: JSON.stringify({ epic_number: ownerVoterInput, phone: owner?.mobile_number }),
+                  });
+                  const d = await r.json();
+                  if (d.verified) { setOwnerVoterStatus('verified'); setOwnerVoterName(d.name || null); toast.success('Voter ID Verified ✅'); }
+                  else { setOwnerVoterStatus('failed'); toast.error('Voter ID could not be verified'); }
+                } catch { setOwnerVoterStatus('failed'); toast.error('Network error'); }
+              }}
+              disabled={ownerVoterStatus === 'loading'}
+              className="px-3 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl disabled:opacity-50"
+            >
+              {ownerVoterStatus === 'loading' ? '...' : ownerVoterStatus === 'verified' ? '✅' : 'Verify'}
+            </button>
+          </div>
+          {ownerVoterStatus === 'verified' && ownerVoterName && <p className="text-[11px] text-emerald-600 mt-1 font-black">✅ {ownerVoterName}</p>}
+          {ownerVoterStatus === 'failed' && <p className="text-[11px] text-red-500 mt-1">❌ Verification failed</p>}
+        </div>
+
+        {/* Driving Licence */}
+        <div>
+          <label className="text-xs font-black text-slate-600 block mb-1">Driving Licence</label>
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder="DL number (e.g. DL0420110149646)"
+              value={ownerDlInput}
+              onChange={e => setOwnerDlInput(e.target.value.toUpperCase())}
+              style={{ background: '#fff', color: '#1e293b' }}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-400"
+            />
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={ownerDlDob}
+                onChange={e => setOwnerDlDob(e.target.value)}
+                style={{ background: '#fff', color: '#1e293b' }}
+                className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+              />
+              <button
+                onClick={async () => {
+                  if (!ownerDlInput || !ownerDlDob) { toast.warn('DL number and date of birth required'); return; }
+                  setOwnerDlStatus('loading');
+                  try {
+                    const r = await fetch(`${API}/api/kyc/verify-dl`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                      body: JSON.stringify({ dl_number: ownerDlInput, dob: ownerDlDob, phone: owner?.mobile_number }),
+                    });
+                    const d = await r.json();
+                    if (d.verified) { setOwnerDlStatus('verified'); setOwnerDlName(d.name || null); toast.success('DL Verified ✅'); }
+                    else { setOwnerDlStatus('failed'); toast.error('DL could not be verified'); }
+                  } catch { setOwnerDlStatus('failed'); toast.error('Network error'); }
+                }}
+                disabled={ownerDlStatus === 'loading'}
+                className="px-3 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl disabled:opacity-50"
+              >
+                {ownerDlStatus === 'loading' ? '...' : ownerDlStatus === 'verified' ? '✅' : 'Verify'}
+              </button>
+            </div>
+          </div>
+          {ownerDlStatus === 'verified' && ownerDlName && <p className="text-[11px] text-emerald-600 mt-1 font-black">✅ {ownerDlName}</p>}
+          {ownerDlStatus === 'failed' && <p className="text-[11px] text-red-500 mt-1">❌ Verification failed</p>}
+        </div>
+
       </div>
     </div>
 
@@ -4273,11 +4536,6 @@ const ProfileTab = () => {
         </div>
       )}
     </div>
-    <DocumentSection
-  userId={ownerId()}
-  userType="OWNER"
-  token={token()}
-/>
     <button onClick={confirmLogout} className="w-full bg-red-50 text-red-600 py-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2 border border-red-100">
       <LogOut size={14} /> {t.logout}
     </button>

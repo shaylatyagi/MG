@@ -38,8 +38,8 @@ router.get('/profile', async (req, res) => {
       const [ledgerRes, todayPaidRes] = await Promise.all([
         pool.query(`
           SELECT
-            COALESCE(SUM(CASE WHEN entry_type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT','DAMAGE_CHARGE') THEN amount ELSE 0 END), 0) AS total_charged,
-            COALESCE(SUM(CASE WHEN entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REFUND') THEN amount ELSE 0 END), 0) AS total_paid
+            COALESCE(SUM(CASE WHEN entry_type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT','DAMAGE_CHARGE','DEPOSIT_CHARGE') THEN amount ELSE 0 END), 0) AS total_charged,
+            COALESCE(SUM(CASE WHEN entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') THEN amount ELSE 0 END), 0) AS total_paid
           FROM public.driver_ledger
           WHERE driver_id = $1`, [p.id]),
         pool.query(`
@@ -52,8 +52,9 @@ router.get('/profile', async (req, res) => {
 
       const totalCharged = parseFloat(ledgerRes.rows[0].total_charged);
       const totalPaid    = parseFloat(ledgerRes.rows[0].total_paid);
-      const advance      = parseFloat(p.advance_balance || 0);
-      total_outstanding  = Math.max(0, totalCharged - totalPaid - advance);
+      // ADVANCE_CREDIT is already included in totalPaid from driver_ledger
+      // Do NOT subtract advance_balance separately — owner stats use the same ledger formula
+      total_outstanding  = Math.max(0, totalCharged - totalPaid);
       amount_paid_today  = parseFloat(todayPaidRes.rows[0].total);
     }
 

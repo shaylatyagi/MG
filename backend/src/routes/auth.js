@@ -263,22 +263,7 @@ router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
     };
 
     if (user.session_token) {
-      const alertTitle = '⚠️ New Login Detected';
-      const alertMsg = `Someone just logged into your account (${user.mobile_number}) from a new device. If this wasn't you, contact support immediately.`;
-      if (user.role === 'DRIVER') {
-        pool.query(
-          `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
-           VALUES ($1, 'DRIVER', $2, $3, NOW())`,
-          [user.id, alertTitle, alertMsg]
-        ).catch(() => {});
-      } else if (user.role === 'OWNER') {
-        pool.query(
-          `INSERT INTO public.notifications (user_id, user_type, title, message, created_at)
-           VALUES ($1, 'OWNER', $2, $3, NOW())`,
-          [user.id, alertTitle, alertMsg]
-        ).catch(() => {});
-      }
-      // Also alert admin — with full device/IP metadata
+      // Alert admin about concurrent login — do NOT send to driver/owner themselves
       pool.query(
         `INSERT INTO public.notifications (user_type, title, message, metadata, created_at)
          VALUES ('ADMIN', $1, $2, $3, NOW())`,
