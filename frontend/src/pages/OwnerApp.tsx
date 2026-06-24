@@ -4550,7 +4550,6 @@ const TrackFleetTab = () => {
   const mapRef = React.useRef(null);
   const mapInstanceRef = React.useRef(null);
   const markersRef = React.useRef([]);
-  const mapsKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
   const timeAgo = (ts) => {
     if (!ts) return 'Unknown';
@@ -4579,102 +4578,87 @@ const TrackFleetTab = () => {
   }, []);
 
   const placeMarkers = React.useCallback((map, driversArr) => {
-    markersRef.current.forEach(m => m.setMap(null));
+    markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
-
     driversArr.forEach(d => {
       const initial = (d.full_name || 'D')[0].toUpperCase();
-      const svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="52" height="62" viewBox="0 0 52 62">
-          <circle cx="26" cy="26" r="24" fill="var(--color-primary)" stroke="white" stroke-width="3"/>
-          <text x="26" y="32" text-anchor="middle" fill="white" font-size="18" font-weight="900" font-family="Arial">${initial}</text>
-          <polygon points="20,48 26,62 32,48" fill="var(--color-primary)"/>
-        </svg>`;
-      const marker = new window.google.maps.Marker({
-        position: { lat: parseFloat(d.last_lat), lng: parseFloat(d.last_lng) },
-        map,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-          scaledSize: new window.google.maps.Size(52, 62),
-          anchor: new window.google.maps.Point(26, 62),
-        },
-        title: d.full_name,
+      const icon = window.L.divIcon({
+        html: `<div style="position:relative;width:40px;height:52px">
+          <div style="width:40px;height:40px;border-radius:50%;background:#4f46e5;border:3px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:16px;font-family:Arial;box-shadow:0 2px 8px rgba(0,0,0,0.35)">${initial}</div>
+          <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:12px solid #4f46e5;margin:0 auto"></div>
+        </div>`,
+        className: '',
+        iconSize: [40, 52],
+        iconAnchor: [20, 52],
       });
-      marker.addListener('click', () => setSelectedDriver(d));
+      const marker = window.L.marker([parseFloat(d.last_lat), parseFloat(d.last_lng)], { icon });
+      marker.on('click', () => setSelectedDriver(d));
+      marker.addTo(map);
       markersRef.current.push(marker);
     });
-
     if (driversArr.length > 1) {
-      const bounds = new window.google.maps.LatLngBounds();
-      driversArr.forEach(d => bounds.extend({ lat: parseFloat(d.last_lat), lng: parseFloat(d.last_lng) }));
-      map.fitBounds(bounds, { top: 80, bottom: 120, left: 40, right: 40 });
+      const coords = driversArr.map(d => [parseFloat(d.last_lat), parseFloat(d.last_lng)]);
+      map.fitBounds(coords, { padding: [60, 40] });
     } else if (driversArr.length === 1) {
-      map.setCenter({ lat: parseFloat(driversArr[0].last_lat), lng: parseFloat(driversArr[0].last_lng) });
-      map.setZoom(15);
+      map.setView([parseFloat(driversArr[0].last_lat), parseFloat(driversArr[0].last_lng)], 15);
     }
   }, []);
 
-  const initMap = React.useCallback(() => {
+  const initMap = React.useCallback((driversArr) => {
     if (!mapRef.current || mapInstanceRef.current) return;
-    const defaultCenter = drivers.length
-      ? { lat: parseFloat(drivers[0].last_lat), lng: parseFloat(drivers[0].last_lng) }
-      : { lat: 28.6139, lng: 77.2090 };
-    const map = new window.google.maps.Map(mapRef.current, {
-      center: defaultCenter,
-      zoom: 14,
-      disableDefaultUI: true,
-      gestureHandling: 'greedy',
-      styles: [
-        { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-        { featureType: 'transit', stylers: [{ visibility: 'simplified' }] },
-      ],
-    });
+    const center = driversArr.length
+      ? [parseFloat(driversArr[0].last_lat), parseFloat(driversArr[0].last_lng)]
+      : [28.6139, 77.2090];
+    const map = window.L.map(mapRef.current, { center, zoom: 14, zoomControl: false });
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19,
+    }).addTo(map);
     mapInstanceRef.current = map;
-    if (drivers.length) placeMarkers(map, drivers);
-  }, [drivers, placeMarkers]);
+    if (driversArr.length) placeMarkers(map, driversArr);
+  }, [placeMarkers]);
 
+  // Load Leaflet from CDN, then init/update map
   React.useEffect(() => {
-    if (!mapsKey) return;
-    const loadMap = () => {
+    const run = async () => {
+      if (!document.getElementById('leaflet-css')) {
+        const link = document.createElement('link');
+        link.id = 'leaflet-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+      }
+      if (!window.L) {
+        await new Promise<void>((resolve) => {
+          const s = document.createElement('script');
+          s.id = 'leaflet-js';
+          s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          s.onload = () => resolve();
+          document.head.appendChild(s);
+        });
+      }
       if (mapInstanceRef.current) {
         placeMarkers(mapInstanceRef.current, drivers);
-        return;
+        mapInstanceRef.current.invalidateSize();
+      } else {
+        initMap(drivers);
       }
-      initMap();
     };
-    if (window.google && window.google.maps) {
-      loadMap();
-    } else if (!document.getElementById('gmap-script')) {
-      const script = document.createElement('script');
-      script.id = 'gmap-script';
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}`;
-      script.async = true;
-      script.onload = loadMap;
-      document.head.appendChild(script);
-    } else {
-      const check = setInterval(() => {
-        if (window.google && window.google.maps) { clearInterval(check); loadMap(); }
-      }, 200);
-    }
-  }, [drivers, mapsKey, initMap, placeMarkers]);
+    run();
+  }, [drivers, initMap, placeMarkers]);
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+    };
+  }, []);
 
   React.useEffect(() => {
     fetchLocations();
     const id = setInterval(fetchLocations, 60000);
     return () => clearInterval(id);
   }, [fetchLocations]);
-
-  React.useEffect(() => {
-    const resizeMap = () => {
-      if (mapInstanceRef.current && window.google?.maps) {
-        window.google.maps.event.trigger(mapInstanceRef.current, 'resize');
-        if (drivers.length) placeMarkers(mapInstanceRef.current, drivers);
-      }
-    };
-    const t1 = setTimeout(resizeMap, 100);
-    const t2 = setTimeout(resizeMap, 500);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [drivers, placeMarkers]);
 
   // ─── RENDER ──────────────────────────────────────────────────────────
   return (
@@ -4696,7 +4680,7 @@ const TrackFleetTab = () => {
       </button>
     </div>
 
-    {/* Map container – absolute top-0 left-0 right-0 bottom-0 */}
+    {/* Map container */}
     {apiError ? (
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center">
@@ -4705,25 +4689,8 @@ const TrackFleetTab = () => {
           <button onClick={fetchLocations} className="mt-4 bg-indigo-600 text-white font-black px-6 py-2 rounded-xl">Retry</button>
         </div>
       </div>
-    ) : !mapsKey ? (
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center">
-          <span className="text-4xl block mb-4">🗺️</span>
-          <span className="text-white font-black text-sm">{drivers.length} driver{drivers.length !== 1 ? 's' : ''} online</span>
-          {drivers.map(d => (
-            <button key={d.id} onClick={() => setSelectedDriver(d)}
-              className="mt-2 bg-white/10 text-white text-xs font-black px-4 py-2 rounded-xl w-full max-w-xs block mx-auto">
-              {(d.full_name||'Driver')[0]} {d.full_name} — {timeAgo(d.last_location_at)}
-            </button>
-          ))}
-        </div>
-      </div>
     ) : (
-      <div 
-        ref={mapRef} 
-        className="absolute inset-0"
-        style={{ height: '100%', width: '100%' }}
-      />
+      <div ref={mapRef} className="absolute inset-0" style={{ height: '100%', width: '100%' }} />
     )}
 
     {/* Bottom sheet */}
