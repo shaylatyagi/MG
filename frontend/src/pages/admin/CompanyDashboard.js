@@ -2643,7 +2643,7 @@ function ChatViewer() {
         <div style={{ width: 280, flexShrink: 0, background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
             <input type="text" placeholder="Search driver / owner…" value={q} onChange={e => setQ(e.target.value)}
-              style={{ width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box', background: '#fff', color: '#1e293b' }} />
             <p style={{ margin: '6px 0 0', fontSize: 11, color: '#94a3b8' }}>{sorted.length} conversation{sorted.length !== 1 ? 's' : ''}</p>
           </div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -2965,7 +2965,7 @@ function DbExplorer() {
         <div style={{ padding: '12px 12px 8px' }}>
           <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Tables ({tables.length})</p>
           <input value={tableSearch} onChange={e => setTableSearch(e.target.value)}
-            placeholder="Filter tables..." style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, outline: 'none', boxSizing: 'border-box' }} />
+            placeholder="Filter tables..." style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, outline: 'none', boxSizing: 'border-box', background: '#fff', color: '#1e293b' }} />
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {filteredTables.map(t => (
@@ -3004,7 +3004,7 @@ function DbExplorer() {
               </select>
             )}
             <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
-              placeholder="Search value..." style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, outline: 'none', width: 180 }} />
+              placeholder="Search value..." style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, outline: 'none', width: 180, background: '#fff', color: '#1e293b' }} />
             <button type="submit" style={{ padding: '6px 14px', borderRadius: 6, background: '#6366f1', color: '#fff', border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Go</button>
             {search && <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }}
               style={{ padding: '6px 10px', borderRadius: 6, background: '#f1f5f9', color: '#374151', border: 'none', fontSize: 12, cursor: 'pointer' }}>✕</button>}

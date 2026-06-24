@@ -20,10 +20,12 @@ const SETU_BASE   = process.env.SETU_BASE_URL     || 'https://dg-sandbox.setu.co
 const SETU_ID     = process.env.SETU_CLIENT_ID;
 const SETU_SECRET = process.env.SETU_CLIENT_SECRET;
 const SETU_PID    = process.env.SETU_PRODUCT_ID;
-// ── Payyantra UAT KYC provider ────────────────────────────────────────────────
-// Base URL: https://secure-api-uat.payyantra.com
-// Switch to prod by changing PAYYANTRA_KYC_BASE_URL env var
-const PY_BASE   = process.env.PAYYANTRA_KYC_BASE_URL || 'https://secure-api-uat.payyantra.com';
+// ── Payyantra / Validatey KYC providers ──────────────────────────────────────
+// PAN, Aadhaar, DL, Bank  → secure-api-uat (existing, working)
+// GST, Voter ID           → validatey-api   (Validatey / Secure Grid product)
+// Switch to prod by changing env vars on Render.
+const PY_BASE        = process.env.PAYYANTRA_KYC_BASE_URL  || 'https://secure-api-uat.payyantra.com';
+const VALIDATEY_BASE = process.env.VALIDATEY_BASE_URL      || 'https://validatey-api.payyantra.com';
 const PY_HEADERS = () => ({
   'x-api-key':    process.env.PAYYANTRA_KYC_API_KEY,
   'x-secret-key': process.env.PAYYANTRA_KYC_SECRET_KEY,
@@ -32,9 +34,9 @@ const PY_HEADERS = () => ({
 
 const kycProviders = {
   payyantra: {
-    // ── PAN ──────────────────────────────────────────────────────────────────
+    // ── PAN (Validatey — validatey-api.payyantra.com) ─────────────────────────
     verifyPAN: async (panNumber, clientRef) => {
-      const res  = await fetch(`${PY_BASE}/api/v1/pans/details`, {
+      const res  = await fetch(`${VALIDATEY_BASE}/api/v1/pans/details`, {
         method: 'POST',
         headers: PY_HEADERS(),
         body: JSON.stringify({ pan: panNumber, client_ref_num: clientRef, consent: true }),
@@ -49,13 +51,13 @@ const kycProviders = {
       };
     },
 
-    // ── Aadhaar DigiLocker — step 1: create session ──────────────────────────
+    // ── Aadhaar DigiLocker — step 1: create session (Validatey) ─────────────
     initiateAadhaarDigilocker: async ({ clientRef, name, mobile, emailId, redirectionUrl, notifyUrl }) => {
       const body = { client_ref_num: clientRef, name, mobile };
       if (emailId)        body.emailId        = emailId;
       if (redirectionUrl) body.redirectionUrl = redirectionUrl;
       if (notifyUrl)      body.notifyUrl      = notifyUrl;
-      const res  = await fetch(`${PY_BASE}/api/v1/aadhaar/digilocker/sessions`, {
+      const res  = await fetch(`${VALIDATEY_BASE}/api/v1/aadhaar/digilocker/sessions`, {
         method: 'POST',
         headers: PY_HEADERS(),
         body: JSON.stringify(body),
@@ -71,9 +73,9 @@ const kycProviders = {
       };
     },
 
-    // ── Aadhaar DigiLocker — step 2: poll session status ─────────────────────
+    // ── Aadhaar DigiLocker — step 2: poll session status (Validatey) ────────
     checkAadhaarStatus: async (publicId) => {
-      const res  = await fetch(`${PY_BASE}/api/v1/aadhaar/digilocker/sessions/${publicId}?sync=true`, {
+      const res  = await fetch(`${VALIDATEY_BASE}/api/v1/aadhaar/digilocker/sessions/${publicId}?sync=true`, {
         headers: PY_HEADERS(),
       });
       const data = await res.json();
@@ -90,27 +92,36 @@ const kycProviders = {
       };
     },
 
-    // ── Driving License ───────────────────────────────────────────────────────
+    // ── Driving Licence (Validatey — validatey-api.payyantra.com) ────────────
+    // Endpoint: POST /api/v1/driving-licences/details
+    // dob must be DD/MM/YYYY — convert from YYYY-MM-DD if needed
     verifyDL: async (dlNumber, dob) => {
-      const res  = await fetch(`${PY_BASE}/api/v1/driving-license/details`, {
+      // Normalize DOB: accept YYYY-MM-DD or DD/MM/YYYY, always send DD/MM/YYYY
+      let dobFormatted = dob || '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dobFormatted)) {
+        const [y, m, d] = dobFormatted.split('-');
+        dobFormatted = `${d}/${m}/${y}`;
+      }
+      const res  = await fetch(`${VALIDATEY_BASE}/api/v1/driving-licences/details`, {
         method: 'POST',
         headers: PY_HEADERS(),
-        body: JSON.stringify({ dl_number: dlNumber, dob, consent: true }),
+        body: JSON.stringify({ dlNumber, dob: dobFormatted, client_ref_num: require('crypto').randomUUID(), consent: true }),
       });
       const data = await res.json();
-      const r    = data?.data?.result || {};
+      const d    = data?.data || {};
+      const r    = d.result || {};
       return {
-        verified: res.ok && data?.data?.verificationStatus === 'SUCCESS',
-        name:     r.name || null,
-        expiry:   r.validity_to || null,
-        status:   data?.data?.verificationStatus,
+        verified: res.ok && d.verificationStatus === 'SUCCESS',
+        name:     r.name    || d.name   || null,
+        expiry:   r.validity?.to || r.validity_to || null,
+        status:   d.verificationStatus,
         raw:      data,
       };
     },
 
-    // ── Bank Account Penny Drop ───────────────────────────────────────────────
+    // ── Bank Account Penny Drop (Validatey — validatey-api.payyantra.com) ────
     verifyBank: async (accountNumber, ifsc, beneficiaryName, clientRef) => {
-      const res  = await fetch(`${PY_BASE}/api/v1/bank-accounts/verify`, {
+      const res  = await fetch(`${VALIDATEY_BASE}/api/v1/bank-accounts/verify`, {
         method: 'POST',
         headers: PY_HEADERS(),
         body: JSON.stringify({
@@ -127,6 +138,46 @@ const kycProviders = {
         accountName: data?.data?.result?.beneficiaryName || null,
         bankName:    data?.data?.result?.bankName || null,
         raw:         data,
+      };
+    },
+
+    // ── GST Verification (Validatey — validatey-api.payyantra.com) ───────────
+    // Endpoint: POST /api/v1/gstins/details
+    // Fields in data.data directly: legalName, tradeName, verificationStatus
+    verifyGST: async (gstin, clientRef) => {
+      const res  = await fetch(`${VALIDATEY_BASE}/api/v1/gstins/details`, {
+        method: 'POST',
+        headers: PY_HEADERS(),
+        body: JSON.stringify({ gstin, client_ref_num: clientRef, consent: true }),
+      });
+      const data = await res.json();
+      const d    = data?.data || {};
+      return {
+        verified:     res.ok && d.verificationStatus === 'SUCCESS',
+        businessName: d.legalName || d.tradeName || null,
+        regStatus:    d.registrationStatus || null,
+        status:       d.verificationStatus,
+        raw:          data,
+      };
+    },
+
+    // ── Voter ID Verification (Validatey — validatey-api.payyantra.com) ──────
+    // Endpoint: POST /api/v1/voters/details
+    // Field: epicNumber (the EPIC number printed on the voter ID card)
+    verifyVoterID: async (epicNumber, clientRef) => {
+      const res  = await fetch(`${VALIDATEY_BASE}/api/v1/voters/details`, {
+        method: 'POST',
+        headers: PY_HEADERS(),
+        body: JSON.stringify({ epicNumber, client_ref_num: clientRef, consent: true }),
+      });
+      const data = await res.json();
+      const d    = data?.data || {};
+      return {
+        verified:   res.ok && d.verificationStatus === 'SUCCESS',
+        name:       d.name || d.result?.name || null,
+        epicStatus: d.epicStatus || null,
+        status:     d.verificationStatus,
+        raw:        data,
       };
     },
   },
@@ -290,7 +341,7 @@ router.post('/verify-dl', async (req, res) => {
     const { phone, dl_number, dob } = req.body;
     if (!dl_number) return res.status(400).json({ success: false, message: 'DL number required' });
 
-    const result = await kyc.verifyDL(dl_number.toUpperCase(), dob);
+    const result = await kyc.verifyDL(dl_number.toUpperCase(), dob || '');
     if (phone && result.verified) await saveKycResult(phone, 'dl', result.verified, dl_number.toUpperCase());
 
     res.json({
@@ -572,6 +623,460 @@ router.get('/status', async (req, res) => {
         bank_acc: row.bank_account_number || '',
         bank_ifsc: row.bank_ifsc || '',
       }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/verify-voter-id
+// Body: { phone, voter_id }
+// ─────────────────────────────────────────────────────────────────────
+router.post('/verify-voter-id', async (req, res) => {
+  try {
+    const { phone, epic_number } = req.body;
+    if (!epic_number) return res.status(400).json({ success: false, message: 'epic_number required (EPIC / Voter ID number as printed on card)' });
+
+    const crypto = require('crypto');
+    const result = await kyc.verifyVoterID(epic_number.toUpperCase(), crypto.randomUUID());
+
+    if (phone && result.verified) {
+      await pool.query(
+        `UPDATE public.drivers SET voter_id=$1, updated_at=NOW() WHERE mobile_number=$2 OR phone_number=$2`,
+        [epic_number.toUpperCase(), phone]
+      ).catch(() => {});
+    }
+
+    res.json({
+      success:    result.verified,
+      verified:   result.verified,
+      name:       result.name,
+      epicStatus: result.epicStatus,
+      status:     result.status,
+      message:    result.verified ? '✅ Voter ID Verified' : '❌ Voter ID verification failed',
+    });
+  } catch (err) {
+    console.error('Voter ID verify error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed: ' + err.message });
+  }
+});
+
+
+// =====================================================================
+// OWNER KYC ROUTES  —  /api/kyc/owner/*
+// All routes accept owner_id (admin use) or owner JWT (verifyToken)
+// =====================================================================
+
+// Helper: resolve owner_id from JWT or body
+function resolveOwnerId(req) {
+  if (req.user?.role === 'OWNER') return req.user.id;
+  if (req.body?.owner_id) return parseInt(req.body.owner_id);
+  return null;
+}
+
+// Helper: update owner KYC flags and kyc_status
+async function updateOwnerKyc(ownerId, fields) {
+  const sets = Object.entries(fields)
+    .map(([k], i) => `${k}=$${i + 2}`)
+    .join(', ');
+  const vals = Object.values(fields);
+  await pool.query(
+    `UPDATE public.owners SET ${sets}, updated_at=NOW() WHERE id=$1`,
+    [ownerId, ...vals]
+  );
+  // Recalculate kyc_status
+  const r = await pool.query(
+    `SELECT gst_verified, pan_verified, aadhaar_verified, bank_verified FROM public.owners WHERE id=$1`,
+    [ownerId]
+  );
+  if (r.rows[0]) {
+    const row = r.rows[0];
+    const verified = [row.gst_verified, row.pan_verified, row.aadhaar_verified, row.bank_verified];
+    const status = verified.every(Boolean) ? 'VERIFIED'
+                 : verified.some(Boolean)  ? 'PARTIAL'
+                 : 'PENDING';
+    await pool.query(
+      `UPDATE public.owners SET kyc_status=$1 WHERE id=$2`,
+      [status, ownerId]
+    );
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/owner/verify-pan
+// Body: { owner_id, pan_number }  — or owner JWT
+// ─────────────────────────────────────────────────────────────────────
+router.post('/owner/verify-pan', async (req, res) => {
+  try {
+    const ownerId = resolveOwnerId(req);
+    if (!ownerId) return res.status(400).json({ success: false, message: 'owner_id required' });
+
+    const { pan_number } = req.body;
+    if (!pan_number || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan_number.toUpperCase()))
+      return res.status(400).json({ success: false, message: 'Invalid PAN format (e.g. ABCDE1234F)' });
+
+    const crypto = require('crypto');
+    const result = await kyc.verifyPAN(pan_number.toUpperCase(), crypto.randomUUID());
+
+    if (result.verified) {
+      await pool.query(
+        `UPDATE public.owners SET pan_number=$1, pan_verified=true, updated_at=NOW() WHERE id=$2`,
+        [pan_number.toUpperCase(), ownerId]
+      );
+      await updateOwnerKyc(ownerId, {});
+    }
+
+    res.json({
+      success: result.verified, verified: result.verified,
+      name: result.name, status: result.status,
+      message: result.verified ? '✅ PAN Verified' : '❌ PAN could not be verified',
+    });
+  } catch (err) {
+    console.error('Owner PAN verify error:', err.message);
+    res.status(500).json({ success: false, message: 'Verification failed: ' + err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/owner/verify-gst
+// Body: { owner_id, gst_number }
+// ─────────────────────────────────────────────────────────────────────
+router.post('/owner/verify-gst', async (req, res) => {
+  try {
+    const ownerId = resolveOwnerId(req);
+    if (!ownerId) return res.status(400).json({ success: false, message: 'owner_id required' });
+
+    const { gst_number } = req.body;
+    if (!gst_number || !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gst_number.toUpperCase()))
+      return res.status(400).json({ success: false, message: 'Invalid GSTIN format (e.g. 09ABCDE1234F1Z5)' });
+
+    const crypto = require('crypto');
+    const result = await kyc.verifyGST(gst_number.toUpperCase(), crypto.randomUUID());
+
+    if (result.verified) {
+      await pool.query(
+        `UPDATE public.owners SET gst_number=$1, gst_verified=true, updated_at=NOW() WHERE id=$2`,
+        [gst_number.toUpperCase(), ownerId]
+      );
+      await updateOwnerKyc(ownerId, {});
+    }
+
+    res.json({
+      success: result.verified, verified: result.verified,
+      businessName: result.businessName, status: result.status,
+      message: result.verified ? '✅ GST Verified' : '❌ GST could not be verified',
+    });
+  } catch (err) {
+    console.error('Owner GST verify error:', err.message);
+    res.status(500).json({ success: false, message: 'Verification failed: ' + err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/owner/verify-bank
+// Body: { owner_id, account_number, ifsc }
+// ─────────────────────────────────────────────────────────────────────
+router.post('/owner/verify-bank', async (req, res) => {
+  try {
+    const ownerId = resolveOwnerId(req);
+    if (!ownerId) return res.status(400).json({ success: false, message: 'owner_id required' });
+
+    const { account_number, ifsc } = req.body;
+    if (!account_number || !ifsc)
+      return res.status(400).json({ success: false, message: 'account_number and ifsc required' });
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc.toUpperCase()))
+      return res.status(400).json({ success: false, message: 'Invalid IFSC format' });
+
+    const crypto = require('crypto');
+    const result = await kyc.verifyBank(account_number, ifsc.toUpperCase(), '', crypto.randomUUID());
+
+    if (result.verified) {
+      await pool.query(
+        `UPDATE public.owners SET bank_account_number=$1, bank_ifsc=$2, bank_verified=true, updated_at=NOW() WHERE id=$3`,
+        [account_number, ifsc.toUpperCase(), ownerId]
+      );
+      await updateOwnerKyc(ownerId, {});
+    }
+
+    res.json({
+      success: result.verified, verified: result.verified,
+      accountName: result.accountName, bankName: result.bankName,
+      message: result.verified ? '✅ Bank Account Verified' : '❌ Bank verification failed',
+    });
+  } catch (err) {
+    console.error('Owner bank verify error:', err.message);
+    res.status(500).json({ success: false, message: 'Verification failed: ' + err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/owner/aadhaar-initiate
+// Body: { owner_id, name, mobile, email?, redirect_url? }
+// ─────────────────────────────────────────────────────────────────────
+router.post('/owner/aadhaar-initiate', async (req, res) => {
+  try {
+    const ownerId = resolveOwnerId(req);
+    if (!ownerId) return res.status(400).json({ success: false, message: 'owner_id required' });
+
+    const { name, mobile, email, redirect_url } = req.body;
+    if (!name || !mobile)
+      return res.status(400).json({ success: false, message: 'name and mobile required' });
+
+    const crypto    = require('crypto');
+    const clientRef = crypto.randomUUID();
+    const notifyUrl = `${process.env.BACKEND_URL || 'https://mg-qw5s.onrender.com'}/api/kyc/owner/aadhaar-webhook`;
+
+    const result = await kyc.initiateAadhaarDigilocker({
+      clientRef, name, mobile,
+      emailId:        email        || undefined,
+      redirectionUrl: redirect_url || undefined,
+      notifyUrl,
+    });
+
+    // Store ownerId in a lightweight in-memory map for webhook correlation
+    // (in prod, store publicId→ownerId in DB for reliability)
+    if (result.publicId) {
+      global._ownerAadhaarSessions = global._ownerAadhaarSessions || {};
+      global._ownerAadhaarSessions[result.publicId] = ownerId;
+    }
+
+    res.json({
+      success: result.success, publicId: result.publicId,
+      kycUrl: result.kycUrl, sessionCode: result.sessionCode,
+      message: result.success ? result.message : (result.raw?.message || result.message),
+    });
+  } catch (err) {
+    console.error('Owner aadhaar initiate error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed: ' + err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// GET /api/kyc/owner/aadhaar-status/:publicId?owner_id=xxx
+// ─────────────────────────────────────────────────────────────────────
+router.get('/owner/aadhaar-status/:publicId', async (req, res) => {
+  try {
+    const { publicId } = req.params;
+    const ownerId = req.query.owner_id
+      ? parseInt(req.query.owner_id)
+      : (global._ownerAadhaarSessions || {})[publicId] || null;
+
+    const result = await kyc.checkAadhaarStatus(publicId);
+
+    if (result.verified && ownerId) {
+      const last4 = result.maskedAadhaar?.replace(/\D/g, '').slice(-4) || null;
+      await pool.query(
+        `UPDATE public.owners SET aadhaar_last4=$1, aadhaar_verified=true, updated_at=NOW() WHERE id=$2`,
+        [last4, ownerId]
+      ).catch(() => {});
+      await updateOwnerKyc(ownerId, {}).catch(() => {});
+    }
+
+    res.json({
+      success: result.success, status: result.status, verified: result.verified,
+      name: result.name, maskedAadhaar: result.maskedAadhaar,
+      message: result.verified ? '✅ Aadhaar Verified'
+             : result.status === 'FAILED' ? '❌ Aadhaar verification failed'
+             : 'Verification in progress...',
+    });
+  } catch (err) {
+    console.error('Owner aadhaar status error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/owner/aadhaar-webhook
+// ─────────────────────────────────────────────────────────────────────
+router.post('/owner/aadhaar-webhook', async (req, res) => {
+  try {
+    const { publicId, status } = req.body;
+    console.log('[KYC Owner Webhook] received:', { publicId, status });
+    if (status === 'SUCCESS' && publicId) {
+      const ownerId = (global._ownerAadhaarSessions || {})[publicId] || null;
+      const result  = await kyc.checkAadhaarStatus(publicId);
+      if (result.verified && ownerId) {
+        const last4 = result.maskedAadhaar?.replace(/\D/g, '').slice(-4) || null;
+        await pool.query(
+          `UPDATE public.owners SET aadhaar_last4=$1, aadhaar_verified=true, updated_at=NOW() WHERE id=$2`,
+          [last4, ownerId]
+        ).catch(() => {});
+        await updateOwnerKyc(ownerId, {}).catch(() => {});
+      }
+    }
+    res.json({ received: true });
+  } catch (err) {
+    console.error('[KYC Owner Webhook] error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// GET /api/kyc/owner/status?owner_id=xxx
+// ─────────────────────────────────────────────────────────────────────
+router.get('/owner/status', async (req, res) => {
+  try {
+    const ownerId = req.query.owner_id ? parseInt(req.query.owner_id)
+                  : req.user?.role === 'OWNER' ? req.user.id : null;
+    if (!ownerId) return res.status(400).json({ success: false, message: 'owner_id required' });
+
+    const r = await pool.query(
+      `SELECT gst_number, gst_verified, pan_number, pan_verified,
+              aadhaar_last4, aadhaar_verified, bank_account_number, bank_ifsc, bank_verified,
+              kyc_status
+       FROM public.owners WHERE id=$1`,
+      [ownerId]
+    );
+    if (!r.rows[0]) return res.status(404).json({ success: false, message: 'Owner not found' });
+    const row = r.rows[0];
+    res.json({
+      success: true,
+      kyc_status: row.kyc_status,
+      status: {
+        gst:    row.gst_verified    ? 'verified' : 'pending',
+        pan:    row.pan_verified    ? 'verified' : 'pending',
+        aadhaar: row.aadhaar_verified ? 'verified' : 'pending',
+        bank:   row.bank_verified   ? 'verified' : 'pending',
+      },
+      values: {
+        gst:      row.gst_number          || '',
+        pan:      row.pan_number          || '',
+        aadhaar:  row.aadhaar_last4       || '',
+        bank_acc: row.bank_account_number || '',
+        bank_ifsc: row.bank_ifsc          || '',
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
+// =====================================================================
+// COMPANY KYC ROUTES  —  /api/kyc/company/*
+// =====================================================================
+
+async function updateCompanyKyc(companyId) {
+  const r = await pool.query(
+    `SELECT gst_verified, pan_verified FROM public.companies WHERE id=$1`,
+    [companyId]
+  );
+  if (r.rows[0]) {
+    const row = r.rows[0];
+    const status = (row.gst_verified && row.pan_verified) ? 'VERIFIED'
+                 : (row.gst_verified || row.pan_verified) ? 'PARTIAL'
+                 : 'PENDING';
+    await pool.query(
+      `UPDATE public.companies SET kyc_status=$1 WHERE id=$2`,
+      [status, companyId]
+    );
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/company/verify-gst
+// Body: { company_id, gst_number }
+// ─────────────────────────────────────────────────────────────────────
+router.post('/company/verify-gst', async (req, res) => {
+  try {
+    const { company_id, gst_number } = req.body;
+    if (!company_id) return res.status(400).json({ success: false, message: 'company_id required' });
+    if (!gst_number || !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gst_number.toUpperCase()))
+      return res.status(400).json({ success: false, message: 'Invalid GSTIN format' });
+
+    const crypto = require('crypto');
+    const result = await kyc.verifyGST(gst_number.toUpperCase(), crypto.randomUUID());
+
+    if (result.verified) {
+      await pool.query(
+        `UPDATE public.companies SET gst_number=$1, gst_verified=true WHERE id=$2`,
+        [gst_number.toUpperCase(), company_id]
+      );
+      await updateCompanyKyc(company_id);
+    }
+
+    res.json({
+      success: result.verified, verified: result.verified,
+      businessName: result.businessName, status: result.status,
+      message: result.verified ? '✅ GST Verified' : '❌ GST could not be verified',
+    });
+  } catch (err) {
+    console.error('Company GST verify error:', err.message);
+    res.status(500).json({ success: false, message: 'Verification failed: ' + err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// POST /api/kyc/company/verify-pan
+// Body: { company_id, pan_number }
+// ─────────────────────────────────────────────────────────────────────
+router.post('/company/verify-pan', async (req, res) => {
+  try {
+    const { company_id, pan_number } = req.body;
+    if (!company_id) return res.status(400).json({ success: false, message: 'company_id required' });
+    if (!pan_number || !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan_number.toUpperCase()))
+      return res.status(400).json({ success: false, message: 'Invalid PAN format' });
+
+    const crypto = require('crypto');
+    const result = await kyc.verifyPAN(pan_number.toUpperCase(), crypto.randomUUID());
+
+    if (result.verified) {
+      await pool.query(
+        `UPDATE public.companies SET pan_number=$1, pan_verified=true WHERE id=$2`,
+        [pan_number.toUpperCase(), company_id]
+      );
+      await updateCompanyKyc(company_id);
+    }
+
+    res.json({
+      success: result.verified, verified: result.verified,
+      name: result.name, status: result.status,
+      message: result.verified ? '✅ PAN Verified' : '❌ PAN could not be verified',
+    });
+  } catch (err) {
+    console.error('Company PAN verify error:', err.message);
+    res.status(500).json({ success: false, message: 'Verification failed: ' + err.message });
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────────────────
+// GET /api/kyc/company/status?company_id=xxx
+// ─────────────────────────────────────────────────────────────────────
+router.get('/company/status', async (req, res) => {
+  try {
+    const { company_id } = req.query;
+    if (!company_id) return res.status(400).json({ success: false, message: 'company_id required' });
+
+    const r = await pool.query(
+      `SELECT gst_number, gst_verified, pan_number, pan_verified, kyc_status
+       FROM public.companies WHERE id=$1`,
+      [company_id]
+    );
+    if (!r.rows[0]) return res.status(404).json({ success: false, message: 'Company not found' });
+    const row = r.rows[0];
+    res.json({
+      success: true,
+      kyc_status: row.kyc_status,
+      status: {
+        gst: row.gst_verified ? 'verified' : 'pending',
+        pan: row.pan_verified ? 'verified' : 'pending',
+      },
+      values: {
+        gst: row.gst_number || '',
+        pan: row.pan_number || '',
+      },
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
