@@ -4547,9 +4547,6 @@ const TrackFleetTab = () => {
   const [loading, setLoading] = React.useState(true);
   const [apiError, setApiError] = React.useState(null);
   const [selectedDriver, setSelectedDriver] = React.useState(null);
-  const mapRef = React.useRef(null);
-  const mapInstanceRef = React.useRef(null);
-  const markersRef = React.useRef([]);
 
   const timeAgo = (ts) => {
     if (!ts) return 'Unknown';
@@ -4565,93 +4562,10 @@ const TrackFleetTab = () => {
         headers: { Authorization: `Bearer ${token()}` }
       });
       const d = await r.json();
-      if (d.success) {
-        setDrivers(d.drivers || []);
-        setApiError(null);
-      } else {
-        setApiError(d.error || 'Failed to load');
-      }
-    } catch (err) {
-      setApiError(err.message);
-    }
+      if (d.success) { setDrivers(d.drivers || []); setApiError(null); }
+      else setApiError(d.error || 'Failed to load');
+    } catch (err) { setApiError(err.message); }
     setLoading(false);
-  }, []);
-
-  const placeMarkers = React.useCallback((map, driversArr) => {
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-    driversArr.forEach(d => {
-      const initial = (d.full_name || 'D')[0].toUpperCase();
-      const icon = window.L.divIcon({
-        html: `<div style="position:relative;width:40px;height:52px">
-          <div style="width:40px;height:40px;border-radius:50%;background:#4f46e5;border:3px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:16px;font-family:Arial;box-shadow:0 2px 8px rgba(0,0,0,0.35)">${initial}</div>
-          <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:12px solid #4f46e5;margin:0 auto"></div>
-        </div>`,
-        className: '',
-        iconSize: [40, 52],
-        iconAnchor: [20, 52],
-      });
-      const marker = window.L.marker([parseFloat(d.last_lat), parseFloat(d.last_lng)], { icon });
-      marker.on('click', () => setSelectedDriver(d));
-      marker.addTo(map);
-      markersRef.current.push(marker);
-    });
-    if (driversArr.length > 1) {
-      const coords = driversArr.map(d => [parseFloat(d.last_lat), parseFloat(d.last_lng)]);
-      map.fitBounds(coords, { padding: [60, 40] });
-    } else if (driversArr.length === 1) {
-      map.setView([parseFloat(driversArr[0].last_lat), parseFloat(driversArr[0].last_lng)], 15);
-    }
-  }, []);
-
-  const initMap = React.useCallback((driversArr) => {
-    if (!mapRef.current || mapInstanceRef.current) return;
-    const center = driversArr.length
-      ? [parseFloat(driversArr[0].last_lat), parseFloat(driversArr[0].last_lng)]
-      : [28.6139, 77.2090];
-    const map = window.L.map(mapRef.current, { center, zoom: 14, zoomControl: false });
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(map);
-    mapInstanceRef.current = map;
-    if (driversArr.length) placeMarkers(map, driversArr);
-  }, [placeMarkers]);
-
-  // Load Leaflet from CDN, then init/update map
-  React.useEffect(() => {
-    const run = async () => {
-      if (!document.getElementById('leaflet-css')) {
-        const link = document.createElement('link');
-        link.id = 'leaflet-css';
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        document.head.appendChild(link);
-      }
-      if (!window.L) {
-        await new Promise<void>((resolve) => {
-          const s = document.createElement('script');
-          s.id = 'leaflet-js';
-          s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-          s.onload = () => resolve();
-          document.head.appendChild(s);
-        });
-      }
-      if (mapInstanceRef.current) {
-        placeMarkers(mapInstanceRef.current, drivers);
-        mapInstanceRef.current.invalidateSize();
-      } else {
-        initMap(drivers);
-      }
-    };
-    run();
-  }, [drivers, initMap, placeMarkers]);
-
-  // Cleanup on unmount
-  React.useEffect(() => {
-    return () => {
-      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
-    };
   }, []);
 
   React.useEffect(() => {
@@ -4659,6 +4573,50 @@ const TrackFleetTab = () => {
     const id = setInterval(fetchLocations, 60000);
     return () => clearInterval(id);
   }, [fetchLocations]);
+
+  // Listen for marker clicks from the iframe
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === 'driver') {
+        const d = drivers.find(dr => dr.id === e.data.id);
+        if (d) setSelectedDriver(d);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [drivers]);
+
+  // Build self-contained Leaflet HTML for the iframe
+  const mapHtml = React.useMemo(() => {
+    const markers = drivers.map(d => {
+      const initial = (d.full_name || 'D')[0].toUpperCase();
+      return `L.marker([${parseFloat(d.last_lat)},${parseFloat(d.last_lng)}],{
+        icon:L.divIcon({
+          html:'<div style="width:38px;height:38px;border-radius:50%;background:#4f46e5;border:3px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;font-family:Arial;box-shadow:0 2px 8px rgba(0,0,0,0.3)">${initial}</div>',
+          className:'',iconSize:[38,38],iconAnchor:[19,19]
+        })
+      }).addTo(map).on('click',function(){parent.postMessage({type:'driver',id:${d.id}},'*');});`;
+    }).join('\n');
+
+    const fit = drivers.length > 1
+      ? `map.fitBounds([${drivers.map(d=>`[${parseFloat(d.last_lat)},${parseFloat(d.last_lng)}]`).join(',')}],{padding:[70,40]});`
+      : drivers.length === 1
+      ? `map.setView([${parseFloat(drivers[0].last_lat)},${parseFloat(drivers[0].last_lng)}],15);`
+      : '';
+
+    return `<!DOCTYPE html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>*{margin:0;padding:0}html,body{width:100%;height:100%}#map{width:100%;height:100%}</style>
+</head><body><div id="map"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+var map=L.map('map',{zoomControl:false}).setView([28.6139,77.2090],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+${markers}
+${fit}
+</script></body></html>`;
+  }, [drivers]);
 
   // ─── RENDER ──────────────────────────────────────────────────────────
   return (
@@ -4680,7 +4638,7 @@ const TrackFleetTab = () => {
       </button>
     </div>
 
-    {/* Map container */}
+    {/* Map — self-contained iframe with Leaflet + OpenStreetMap */}
     {apiError ? (
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center">
@@ -4690,7 +4648,13 @@ const TrackFleetTab = () => {
         </div>
       </div>
     ) : (
-      <div ref={mapRef} className="absolute inset-0" style={{ height: '100%', width: '100%' }} />
+      <iframe
+        srcDoc={mapHtml}
+        sandbox="allow-scripts"
+        className="absolute inset-0"
+        style={{ width: '100%', height: '100%', border: 'none' }}
+        title="Fleet Map"
+      />
     )}
 
     {/* Bottom sheet */}
