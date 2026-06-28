@@ -3188,6 +3188,7 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
          (SELECT dvh.assigned_at FROM public.driver_vehicle_history dvh
           WHERE dvh.driver_id = $1 AND dvh.unassigned_at IS NULL
           ORDER BY dvh.assigned_at DESC LIMIT 1),
+         v.updated_at,
          v.created_at
        ) AS assigned_at
        FROM public.vehicles v

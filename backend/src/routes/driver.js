@@ -556,15 +556,14 @@ router.get('/company-config', verifyToken, async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-// POST /api/driver/location — driver pings GPS every 30s
-router.post('/location', verifyToken, validate(UpdateLocationSchema), async (req, res) => {
+router.post('/location', verifyToken, async (req, res) => {
   try {
-    const { lat, lng } = req.body;
-    if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
+    const lat = parseFloat(req.body.latitude ?? req.body.lat);
+    const lng = parseFloat(req.body.longitude ?? req.body.lng);
+    if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'Valid coordinates required' });
     await pool.query(
       `UPDATE public.drivers SET last_lat=$1, last_lng=$2, last_location_at=NOW() WHERE id=$3`,
-      [parseFloat(lat), parseFloat(lng), req.user.id]
+      [lat, lng, req.user.id]
     );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
