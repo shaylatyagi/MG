@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
+import AdminPanelInner from './pages/admin/CompanyDashboard';
 // ── Scroll to top on every route change ───────────────────────────────────────
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -113,7 +113,7 @@ function AdminRoot() {
 function App() {
   const host = window.location.hostname;
   const isPartnersSubdomain = host === 'partners.mobilitygrid.in';
-  const isAdminSubdomain = host === 'admin.mobilitygrid.in';
+  const isAdminSubdomain = host === 'admin.mobilitygrid.in' || process.env.REACT_APP_ADMIN_MODE === 'true';
 
   return (
     <main role="main">

@@ -962,11 +962,11 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
       GREATEST(0,
         (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger
          WHERE driver_id = d.id
-           AND entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','PENALTY','SECURITY_DEPOSIT'))
+           AND entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','PENALTY','SECURITY_DEPOSIT','DEPOSIT_CHARGE'))
         -
         (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger
          WHERE driver_id = d.id
-           AND entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REFUND','PAYMENT'))
+           AND entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND'))
       ) AS balance
       FROM public.drivers d
       LEFT JOIN public.vehicles v ON v.driver_id = d.id

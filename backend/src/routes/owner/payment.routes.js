@@ -114,8 +114,8 @@ router.get('/driver-ledger', async (req, res) => {
     const result = await pool.query(`
       SELECT d.id, d.full_name, d.mobile_number, d.advance_balance, d.security_deposit,
              v.vehicle_number, v.daily_rent,
-             COALESCE(SUM(CASE WHEN dl.entry_type IN ('CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') THEN dl.amount ELSE 0 END), 0) AS total_paid,
-             COALESCE(SUM(CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY') THEN dl.amount ELSE 0 END), 0) AS total_charged
+             COALESCE(SUM(CASE WHEN dl.entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') THEN dl.amount ELSE 0 END), 0) AS total_paid,
+             COALESCE(SUM(CASE WHEN dl.entry_type IN ('RENT_CHARGE','DAMAGE_CHARGE','DEPOSIT_CHARGE','PENALTY','SECURITY_DEPOSIT') THEN dl.amount ELSE 0 END), 0) AS total_charged
       FROM public.drivers d
       LEFT JOIN public.vehicles v ON v.driver_id = d.id
       LEFT JOIN public.driver_ledger dl ON dl.driver_id = d.id
