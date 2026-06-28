@@ -438,7 +438,7 @@ export default function DriverPWA() {
           fetch(`${API}/api/driver/location`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
-            body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            body: JSON.stringify({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
           }).catch(() => {});
         },
         () => {}, // silent fail if permission denied
