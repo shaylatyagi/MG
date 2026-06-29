@@ -9,7 +9,7 @@ export default function OwnerHandoverTab({ lang }) {
   const [error, setError]       = useState('');
   const [success, setSuccess]   = useState('');
 
-  const [vForm, setVForm] = useState({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '' });
+  const [vForm, setVForm] = useState({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '', mva_applicable: false });
   const [dForm, setDForm] = useState({ name: '', phone_number: '', emergency_contact: '' });
   const [aForm, setAForm] = useState({ driver_id: '', vehicle_id: '', deposit_amount: '0' });
   const [agreementFile, setAgreementFile] = useState(null);
@@ -36,9 +36,10 @@ export default function OwnerHandoverTab({ lang }) {
         reg_number: vForm.reg_number.toUpperCase(), type: vForm.type,
         rent_type: vForm.rent_type, daily_rent: parseFloat(vForm.daily_rent) || 0,
         model: vForm.model || undefined,
+        mva_applicable: vForm.mva_applicable,
       });
       setSuccess(lang === 'en' ? '✓ Vehicle registered!' : '✓ वाहन पंजीकृत!');
-      setVForm({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '' });
+      setVForm({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '', mva_applicable: false });
     } catch (e) { setError(e.response?.data?.message || 'Failed'); }
     finally { setLoading(false); }
   };

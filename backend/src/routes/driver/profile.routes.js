@@ -17,7 +17,7 @@ router.get('/profile', async (req, res) => {
       SELECT d.id, d.full_name as name, d.mobile_number as phone,
              d.driver_code, d.wallet_balance, d.status, d.advance_balance, d.security_deposit,
              v.id as vehicle_id, v.vehicle_number, v.vehicle_model,
-             v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,
+             v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,v.mva_applicable,
              v.created_at as assigned_since
       FROM public.drivers d LEFT JOIN public.vehicles v ON v.driver_id = d.id
       WHERE d.mobile_number = $1`, [phone]

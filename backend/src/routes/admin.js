@@ -868,7 +868,31 @@ router.get('/vehicles/:vehicleId', async (req, res) => {
 });
 
 // ─── USER DOCUMENTS ───────────────────────────────────────────────────────────
-
+// GET /api/admin/login-logs
+router.get('/login-logs', async (req, res) => {
+  try {
+    const { role, search, limit = 100 } = req.query;
+    let where = []; let params = []; let p = 1;
+    if (role && ['DRIVER','OWNER','ADMIN'].includes(role.toUpperCase())) {
+      where.push(`user_role = $${p++}`); params.push(role.toUpperCase());
+    }
+    if (search) {
+      where.push(`(full_name ILIKE $${p} OR phone_number ILIKE $${p})`);
+      params.push(`%${search}%`); p++;
+    }
+    const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const result = await pool.query(
+      `SELECT id, user_id, user_role, full_name, phone_number,
+              latitude, longitude, ip_address, device_info, logged_in_at
+       FROM public.login_location_log
+       ${w} ORDER BY logged_in_at DESC LIMIT $${p}`,
+      [...params, Math.min(parseInt(limit), 500)]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 // GET all docs for a user (admin view)
 router.get('/user-docs/:userType/:userId', async (req, res) => {
   try {

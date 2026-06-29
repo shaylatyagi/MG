@@ -13,7 +13,7 @@
 const cron   = require('node-cron');
 const pool   = require('../config/db');
 const logger = require('../utils/logger');
-
+const fcm = require('./fcm');
 // ─────────────────────────────────────────────────────────────────────────────
 // Core rent deduction logic — exported so admin can trigger manually for testing
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,10 +77,42 @@ async function runMidnightRentDeduction() {
     client.release();
   }
 }
+// ─── 12AM IST — Driver reminder notification ───────────────────────────────
+async function sendMidnightDriverReminders() {
+  logger.info('CRON: midnight driver reminders — starting');
+  try {
+    const { rows: drivers } = await pool.query(`
+      SELECT d.id, d.full_name, COALESCE(v.daily_rent, 0) AS daily_rent
+      FROM public.drivers d
+      JOIN public.vehicles v ON v.driver_id = d.id
+      WHERE d.deleted_at IS NULL
+        AND v.driver_id IS NOT NULL
+        AND d.owner_id IS NOT NULL
+    `);
 
-// Schedule at 18:30 UTC = 00:00 IST daily
-cron.schedule('30 18 * * *', runMidnightRentDeduction, { timezone: 'UTC' });
+    logger.info(`CRON: sending midnight reminders to ${drivers.length} drivers`);
 
-logger.info('CRON: midnight rent deduction scheduled (18:30 UTC = 00:00 IST)');
+    for (const driver of drivers) {
+      try {
+        await fcm.sendToUser(
+          pool,
+          driver.id,
+          'driver',
+          '🌙 Nayi Shuruat!',
+          `Aaj ka din accha ho. Aapka daily rent ₹${driver.daily_rent} hai. Safe drive karo! 🚗`
+        );
+      } catch (e) {
+        // silent — one driver failure shouldn't stop others
+      }
+    }
 
+    logger.info('CRON: midnight reminders done');
+  } catch (err) {
+    logger.error('CRON: midnight reminder error', { error: err.message });
+  }
+}
+
+// 00:00 IST = 18:30 UTC
+cron.schedule('30 18 * * *', sendMidnightDriverReminders, { timezone: 'UTC' });
+logger.info('CRON: midnight driver reminder scheduled (00:00 IST)');
 module.exports = { runMidnightRentDeduction };

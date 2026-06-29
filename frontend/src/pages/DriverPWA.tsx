@@ -403,7 +403,7 @@ export default function DriverPWA() {
         const d = p.vehicle_number ? parseFloat(p.total_outstanding || p.current_dues || 0) : 0;
         setDues(d); setPayAmt(d > 0 ? d : 0);
         setTelemetry({ vehicleNumber: p.vehicle_number || '', vehicleModel: p.vehicle_model || '', dailyRent: parseFloat(p.vehicle_daily_rent || 0), dailyDepositRecovery: parseFloat(p.daily_deposit_recovery || 0) });
-        if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, type: p.vehicle_type, dailyRent: p.vehicle_daily_rent, status: 'Assigned', assignedSince: p.assigned_since });
+        if (p.vehicle_number) setAssignedVehicle({ number: p.vehicle_number, model: p.vehicle_model, type: p.vehicle_type, dailyRent: p.vehicle_daily_rent, status: 'Assigned', assignedSince: p.assigned_since, mva: p.mva_applicable });
         if (p.owner_name) setFleetOwner(p.owner_name);
         if (p.company_name) setFleetCompany(p.company_name);
       }
@@ -917,7 +917,10 @@ export default function DriverPWA() {
             </div>
             <div>
               <p className="text-sm font-black text-slate-800">{assignedVehicle.number}</p>
-              <p className="text-[9px] text-slate-400">{vehicleTypeLabel(assignedVehicle.type)}{assignedVehicle.model ? ` · ${assignedVehicle.model}` : ''}</p>
+              <p className="text-[9px] text-slate-400">{assignedVehicle.type}{assignedVehicle.model ? ` · ${assignedVehicle.model}` : ''}</p>
+              {assignedVehicle.mva && (
+                <span className="text-[8px] font-black text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">⚖️ MVA</span>
+              )}
             </div>
           </div>
           <div className="text-right">

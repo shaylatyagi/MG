@@ -259,7 +259,16 @@ useEffect(() => {
 const loginWithPin = async function() {
     setLoading(true); setError('');
     var role = selectedRole.type === 'driver' ? 'DRIVER' : 'OWNER';
+    let gpsCoords = { latitude: null, longitude: null };
     try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) { reject(); return; }
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+      });
+      gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+    } catch {}
+    try {
+      
       var res = await fetch(API + '/api/auth/login-pin', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone_number: phone, pin: pin, role: role }),

@@ -2473,7 +2473,134 @@ function formatActivityLine(action, details) {
       return Object.entries(d).filter(([k]) => !['owner_name'].includes(k)).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—';
   }
 }
+function LoginActivity() {
+  const [logs, setLogs] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [role, setRole] = React.useState('');
+  const [search, setSearch] = React.useState('');
+  const mapRef = React.useRef(null);
+  const mapInst = React.useRef(null);
 
+  const fetch_ = async () => {
+    setLoading(true);
+    try {
+      const p = new URLSearchParams({ limit: 200 });
+      if (role) p.set('role', role);
+      if (search) p.set('search', search);
+      const d = await api('/api/admin/login-logs?' + p);
+      setLogs(d.data || []);
+    } catch { setLogs([]); }
+    setLoading(false);
+  };
+
+  React.useEffect(() => { fetch_(); }, [role, search]);
+
+  React.useEffect(() => {
+    if (!mapRef.current || mapInst.current) return;
+    const init = () => {
+      if (!window.L || !mapRef.current) return;
+      const map = window.L.map(mapRef.current).setView([20.5937, 78.9629], 5);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: '© OpenStreetMap' }).addTo(map);
+      mapInst.current = { map, layer: window.L.layerGroup().addTo(map) };
+    };
+    if (window.L) { init(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = init;
+    document.head.appendChild(s);
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(l);
+  }, []);
+
+  React.useEffect(() => {
+    if (!mapInst.current) return;
+    const { map, layer } = mapInst.current;
+    layer.clearLayers();
+    const colors = { DRIVER: '#16a34a', OWNER: '#4f46e5', ADMIN: '#dc2626' };
+    logs.forEach(log => {
+      if (!log.latitude || !log.longitude) return;
+      const c = colors[log.user_role] || '#64748b';
+      window.L.marker([log.latitude, log.longitude], {
+        icon: window.L.divIcon({
+          className: '',
+          html: `<div style="width:12px;height:12px;border-radius:50%;background:${c};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+          iconSize: [12,12], iconAnchor: [6,6]
+        })
+      }).bindPopup(`<b>${log.full_name||'—'}</b><br/>${log.phone_number||''}<br/>
+        <span style="font-size:11px">${log.user_role} · ${new Date(log.logged_in_at).toLocaleString('en-IN')}</span><br/>
+        <span style="font-size:11px">IP: ${log.ip_address||'—'}</span>`
+      ).addTo(layer);
+    });
+    const pts = logs.filter(l=>l.latitude&&l.longitude).map(l=>[l.latitude,l.longitude]);
+    if (pts.length > 1) map.fitBounds(pts, { padding: [40, 40] });
+  }, [logs]);
+
+  const roleColor = r => ({ DRIVER:'#16a34a', OWNER:'#4f46e5', ADMIN:'#dc2626' }[r]||'#64748b');
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+        <div>
+          <h2 style={{ fontSize:18, fontWeight:700, margin:0, color:'#0f172a' }}>Login Activity</h2>
+          <p style={{ fontSize:12, color:'#64748b', margin:'2px 0 0' }}>
+            {logs.length} logins · {logs.filter(l=>l.latitude).length} with GPS
+          </p>
+        </div>
+        <button onClick={fetch_} style={{ fontSize:12, color:'#4f46e5', background:'#eef2ff', border:'none', padding:'6px 14px', borderRadius:8, cursor:'pointer', fontWeight:600 }}>↻ Refresh</button>
+      </div>
+      <div style={{ display:'flex', gap:10, marginBottom:16 }}>
+        <input placeholder="Search name or phone…" value={search} onChange={e=>setSearch(e.target.value)}
+          style={{ flex:1, border:'1px solid #e2e8f0', borderRadius:8, padding:'7px 12px', fontSize:13 }} />
+        <select value={role} onChange={e=>setRole(e.target.value)}
+          style={{ border:'1px solid #e2e8f0', borderRadius:8, padding:'7px 12px', fontSize:13, background:'#fff' }}>
+          <option value="">All Roles</option>
+          <option value="DRIVER">Driver</option>
+          <option value="OWNER">Owner</option>
+          <option value="ADMIN">Admin</option>
+        </select>
+      </div>
+      <div style={{ border:'1px solid #e2e8f0', borderRadius:12, overflow:'hidden', marginBottom:20 }}>
+        <div ref={mapRef} style={{ height:320, background:'#e5e7eb' }} />
+      </div>
+      {loading ? <div style={{ textAlign:'center', padding:40, color:'#94a3b8' }}>Loading…</div> : (
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead>
+              <tr style={{ background:'#f8fafc', borderBottom:'1px solid #e2e8f0' }}>
+                {['Time','Name','Phone','Role','GPS','IP'].map(h=>(
+                  <th key={h} style={{ padding:'8px 12px', textAlign:'left', fontWeight:600, color:'#64748b' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log,i)=>(
+                <tr key={log.id} style={{ borderBottom:'1px solid #f1f5f9', background: i%2===0?'#fff':'#fafafa' }}>
+                  <td style={{ padding:'8px 12px', color:'#374151', whiteSpace:'nowrap' }}>
+                    {new Date(log.logged_in_at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})}
+                  </td>
+                  <td style={{ padding:'8px 12px', fontWeight:600, color:'#0f172a' }}>{log.full_name||'—'}</td>
+                  <td style={{ padding:'8px 12px', color:'#374151', fontFamily:'monospace' }}>{log.phone_number||'—'}</td>
+                  <td style={{ padding:'8px 12px' }}>
+                    <span style={{ fontSize:10, fontWeight:700, color:'#fff', background:roleColor(log.user_role), padding:'2px 8px', borderRadius:10 }}>
+                      {log.user_role}
+                    </span>
+                  </td>
+                  <td style={{ padding:'8px 12px', color:log.latitude?'#16a34a':'#94a3b8', fontSize:12 }}>
+                    {log.latitude ? `${parseFloat(log.latitude).toFixed(4)}, ${parseFloat(log.longitude).toFixed(4)}` : '—'}
+                  </td>
+                  <td style={{ padding:'8px 12px', color:'#64748b', fontSize:12, fontFamily:'monospace' }}>{log.ip_address||'—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 function AuditLog() {
   const [view, setView]         = useState('owner'); // 'owner' | 'admin'
   const [logs, setLogs]         = useState([]);
@@ -3131,6 +3258,7 @@ const NAV_ICONS = {
   audit:        ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
   pins:         ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'M12 8v4', 'M12 16h.01'],
   leads:        ['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2', 'M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8', 'M23 21v-2a4 4 0 0 0-3-3.87', 'M20 8a3 3 0 0 1 0 5.83'],
+  location: ['M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z', 'M12 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4'],
   database:     ['M12 2a10 5 0 1 0 0 10A10 5 0 0 0 12 2z', 'M2 7c0 2.76 4.48 5 10 5s10-2.24 10-5', 'M2 12c0 2.76 4.48 5 10 5s10-2.24 10-5', 'M2 17c0 2.76 4.48 5 10 5s10-2.24 10-5'],
 };
 
@@ -3437,6 +3565,7 @@ function PinManagementSection() {
 
 
 function AdminPanelInner() {
+  useEffect(() => { document.documentElement.classList.remove('dark'); }, []);
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [tab, setTab]               = useState('dashboard');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -3464,6 +3593,7 @@ function AdminPanelInner() {
     { key: 'audit',        label: 'Audit Log',      icon: 'audit' },
     { key: 'pins',         label: 'PIN Management', icon: 'pins' },
     { key: 'database',     label: 'Database',       icon: 'database' },
+    { key: 'login-activity', label: 'Login Activity', icon: 'location' },
   ];
 
   const doLogout = () => { clearToken(); window.location.href = '/login'; };
@@ -3740,6 +3870,7 @@ function AdminPanelInner() {
           {tab === 'pins'         && <PinManagementSection />}
           {tab === 'leads'        && <LeadsSection />}
           {tab === 'database'     && <DbExplorer />}
+          {tab === 'login-activity' && <LoginActivity />}
         </div>
       </main>
 

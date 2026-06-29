@@ -57,7 +57,7 @@ router.get('/stats', async (req, res) => {
 
     const oid = owner.id;
 
-    const [vehicles, drivers, contracts, pendingKyc, today, month, total] = await Promise.all([
+    const [vehicles, drivers, contracts, pendingKyc, today, month, total, activeToday] = await Promise.all([
       // vehicles owned directly OR assigned to drivers who belong to this owner
       pool.query(
         `SELECT COUNT(*) FROM vehicles v WHERE v.owner_id = $1
@@ -104,6 +104,15 @@ router.get('/stats', async (req, res) => {
          ) AND transaction_status = 'SUCCESS'`,
         [oid]
       ),
+      // Active vehicles today + total rent due
+      pool.query(
+        `SELECT COUNT(*) AS cnt, COALESCE(SUM(v.daily_rent), 0) AS rent_total
+         FROM public.vehicles v
+         WHERE v.owner_id = $1
+           AND v.driver_id IS NOT NULL
+           AND v.status = 'ASSIGNED'`,
+        [oid]
+      ),
     ]);
 
     const totalDrivers  = parseInt(drivers.rows[0].count);
@@ -138,6 +147,8 @@ router.get('/stats', async (req, res) => {
         collection_total: parseFloat(total.rows[0].total),
         outstanding,
         collection_efficiency: parseFloat(efficiency),
+        active_vehicles_today: parseInt(activeToday.rows[0].cnt),
+        rent_due_today:        parseFloat(activeToday.rows[0].rent_total),
       },
     });
   } catch (err) {
@@ -155,6 +166,7 @@ router.get('/vehicles', async (req, res) => {
 
     const result = await pool.query(
       `SELECT v.id, v.vehicle_number, v.vehicle_type, v.status, v.daily_rent, v.rent_type,
+              v.mva_applicable,
               v.created_at,
               d.id   AS driver_id,
               d.full_name AS driver_name,
@@ -174,9 +186,20 @@ router.get('/vehicles', async (req, res) => {
 });
 
 // POST /api/owner/vehicles
-// Body: { reg_number, type, rent_type, daily_rent, model? }
+// Body: { reg_number, type, rent_type, daily_rent, model? }// Body: { reg_number, type, rent_type, daily_rent, model? }
+// mva_applicable is AUTO-COMPUTED from vehicle type
 router.post('/vehicles', validate(AddVehicleSchema), async (req, res) => {
   const { reg_number, type, rent_type = 'DAILY', daily_rent, model } = req.body;
+  // Auto-detect MVA: almost all motor vehicles qualify except pure bicycles/e-cycles
+  const mva_applicable = (() => {
+    if (!type) return true;
+    const t = type.toLowerCase();
+    if ((t.includes('bicycle') || t.includes('e-cycle') || t.includes('ecycle')) &&
+        !t.includes('tricycle') && !t.includes('auto') && !t.includes('rickshaw')) {
+      return false;
+    }
+    return true;
+  })();
   if (!reg_number || !type)
     return res.status(400).json({ success: false, message: 'reg_number and type are required' });
 
@@ -190,11 +213,13 @@ router.post('/vehicles', validate(AddVehicleSchema), async (req, res) => {
     if (existing.rows.length)
       return res.status(409).json({ success: false, message: 'Vehicle already registered' });
 
+    const vSeq = await pool.query("SELECT nextval('vh_seq') AS n");
+    const vehicleCode = 'VH' + vSeq.rows[0].n;
     const result = await pool.query(
-      `INSERT INTO vehicles (owner_id, vehicle_number, vehicle_type, vehicle_model, rent_type, daily_rent, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'AVAILABLE',NOW(),NOW()) RETURNING *`,
+      `INSERT INTO vehicles (owner_id, vehicle_number, vehicle_type, vehicle_model, rent_type, daily_rent, mva_applicable, vehicle_code, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'AVAILABLE',NOW(),NOW()) RETURNING *`,
       [owner.id, reg_number, type, model || null,
-       rent_type, parseFloat(daily_rent) || 0]
+       rent_type, parseFloat(daily_rent) || 0, !!mva_applicable, vehicleCode]
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
@@ -278,12 +303,14 @@ router.post('/drivers', validate(AddDriverSchema), async (req, res) => {
     if (existing.rows.length)
       return res.status(409).json({ success: false, message: 'Driver with this phone already exists' });
 
+    const seqRes = await pool.query("SELECT nextval('drv_seq') AS n");
+    const driverCode = 'DRV' + seqRes.rows[0].n;
     const result = await pool.query(
       `INSERT INTO drivers (owner_id, company_id, full_name, phone_number, emergency_contact,
-                            wallet_balance, status, kyc_status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5, 0,'ACTIVE','PENDING',NOW(),NOW()) RETURNING *`,
+                            driver_code, wallet_balance, status, kyc_status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6, 0,'ACTIVE','PENDING',NOW(),NOW()) RETURNING *`,
       [owner.id, owner.company_id, name.trim(), phone_number,
-       emergency_contact || null]
+       emergency_contact || null, driverCode]
     );
 
     // Notify admin of new driver onboarding — fire-and-forget
@@ -685,7 +712,25 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
     res.json({ success: true, message: `Rent updated to ₹${rent}/day`, daily_rent: rent });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
-
+router.patch('/vehicles/:id/mva', verifyToken, async (req, res) => {
+  try {
+    const { mva_applicable } = req.body;
+    if (typeof mva_applicable !== 'boolean')
+      return res.status(400).json({ success: false, message: 'mva_applicable must be true or false' });
+    const owner = await getOwner(req.user.id);
+    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
+    const result = await pool.query(
+      `UPDATE public.vehicles SET mva_applicable = $1, updated_at = NOW()
+       WHERE id = $2 AND owner_id = $3
+       RETURNING id, vehicle_number, mva_applicable`,
+      [mva_applicable, req.params.id, owner.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 router.put('/vehicles/:id/maintenance', async (req, res) => {
   const { reason = '', under_maintenance = true } = req.body;
   try {

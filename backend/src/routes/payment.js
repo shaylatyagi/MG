@@ -3164,87 +3164,97 @@ router.post('/owner/driver-incentive-rule', verifyToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-
-// ─── DRIVER ATTENDANCE (from vehicle assignment history) ─────────────────────
-// Driver's own monthly attendance
 router.get('/driver/my-attendance', verifyToken, async (req, res) => {
   try {
-    const { phone, month } = req.query; // month = 'YYYY-MM'
-    const dr = await pool.query(`SELECT id FROM public.drivers WHERE mobile_number = $1`, [phone]);
-    if (!dr.rows[0]) return res.json({ success: false });
-    const driverId = dr.rows[0].id;
+    const { phone, month } = req.query;
+    if (!phone) return res.json({ success: false, message: 'phone required' });
 
     const target = month || new Date().toISOString().slice(0, 7);
-    const monthStart = new Date(`${target}-01T00:00:00Z`);
-    const monthEnd = new Date(monthStart);
-    monthEnd.setMonth(monthEnd.getMonth() + 1);
-    const daysInMonth = new Date(monthEnd - 1).getDate();
+    const [yr, mo] = target.split('-').map(Number);
+    const monthStart = `${target}-01`;
+    const monthEnd   = `${yr}-${String(mo).padStart(2,'0')}-${new Date(yr, mo, 0).getDate()}`;
+    const todayStr   = new Date().toISOString().slice(0, 10);
+    const effectiveEnd = todayStr < monthEnd ? todayStr : monthEnd;
 
-    // Get vehicle assignment date — prefer driver_vehicle_history, fall back to vehicles.created_at
-    // (history table may be empty if vehicle was assigned directly in DB without going through API)
-    const assignRes = await pool.query(
-      `SELECT COALESCE(
-         (SELECT dvh.assigned_at FROM public.driver_vehicle_history dvh
-          WHERE dvh.driver_id = $1 AND dvh.unassigned_at IS NULL
-          ORDER BY dvh.assigned_at DESC LIMIT 1),
-         v.updated_at,
-         v.created_at
-       ) AS assigned_at
-       FROM public.vehicles v
-       WHERE v.driver_id = $1
-       LIMIT 1`,
-      [driverId]
+    // Find driver
+    const dr = await pool.query(
+      `SELECT id FROM public.drivers WHERE mobile_number = $1`, [phone]
     );
-    const assignedAt = assignRes.rows[0]?.assigned_at ? new Date(assignRes.rows[0].assigned_at) : null;
+    if (!dr.rows[0]) return res.json({ success: false, message: 'Driver not found' });
+    const driverId = dr.rows[0].id;
 
-    // Effective start = max(monthStart, assignedAt) — only count days since assignment
-    const effectiveStart = assignedAt && assignedAt > monthStart ? assignedAt : monthStart;
-
-    // UNION: driver_activity (ping-based, has historical data) + driver_daily_log (login-based)
-    const effectiveStartDate = effectiveStart.toISOString().slice(0, 10);
-    const logs = await pool.query(
-      `SELECT EXTRACT(DAY FROM activity_date)::INTEGER as day, activity_date::date as log_date
-       FROM public.driver_activity
-       WHERE driver_id = $1
-         AND activity_date >= $3::date
-         AND DATE_TRUNC('month', activity_date) = $2::date
-       UNION
-       SELECT EXTRACT(DAY FROM log_date)::INTEGER as day, log_date
-       FROM public.driver_daily_log
-       WHERE driver_id = $1
-         AND log_date >= $3::date
-         AND DATE_TRUNC('month', log_date) = $2::date
-       ORDER BY log_date`,
-      [driverId, target + '-01', effectiveStartDate]
+    // All assignment windows for this driver in this month
+    const windowsRes = await pool.query(
+      `SELECT
+         GREATEST(dvh.assigned_at::date, $2::date)  AS win_start,
+         LEAST(COALESCE(dvh.unassigned_at::date, $3::date), $3::date) AS win_end
+       FROM public.driver_vehicle_history dvh
+       WHERE dvh.driver_id = $1
+         AND dvh.assigned_at::date <= $3::date
+         AND (dvh.unassigned_at IS NULL OR dvh.unassigned_at::date >= $2::date)`,
+      [driverId, monthStart, effectiveEnd]
     );
 
-    const presentDays = new Set(logs.rows.map(r => Number(r.day)));
-    const today = new Date();
-    const isCurrentMonth = target === today.toISOString().slice(0, 7);
-    // daysElapsed counts from effectiveStart, not month start
-    let daysElapsed;
-    if (isCurrentMonth) {
-      daysElapsed = Math.floor((today - effectiveStart) / 86400000) + 1;
-      daysElapsed = Math.max(1, Math.min(daysElapsed, today.getDate()));
-    } else {
-      daysElapsed = daysInMonth;
-    }
+    const windows = windowsRes.rows;
+
+    // daysElapsed = sum of all window lengths
+    const daysElapsed = windows.reduce((sum, w) => {
+      const diff = Math.floor(
+        (new Date(w.win_end) - new Date(w.win_start)) / 86400000
+      ) + 1;
+      return sum + Math.max(0, diff);
+    }, 0);
+
+    // Login days within any assignment window
+    const loginRes = await pool.query(
+      `SELECT DISTINCT day_col::date AS login_date
+       FROM (
+         SELECT log_date AS day_col FROM public.driver_daily_log
+         WHERE driver_id = $1
+           AND log_date BETWEEN $2::date AND $3::date
+         UNION
+         SELECT activity_date AS day_col FROM public.driver_activity
+         WHERE driver_id = $1
+           AND activity_date BETWEEN $2::date AND $3::date
+       ) t
+       WHERE EXISTS (
+         SELECT 1 FROM public.driver_vehicle_history dvh
+         WHERE dvh.driver_id = $1
+           AND t.day_col::date >= GREATEST(dvh.assigned_at::date, $2::date)
+           AND t.day_col::date <= LEAST(
+               COALESCE(dvh.unassigned_at::date, $3::date), $3::date
+             )
+       )
+       ORDER BY login_date`,
+      [driverId, monthStart, effectiveEnd]
+    );
+
+    const presentDays  = loginRes.rows.map(r =>
+      new Date(r.login_date).getDate()
+    );
+    const daysPresent  = presentDays.length;
+    const isToday      = presentDays.includes(new Date().getDate())
+                         && target === todayStr.slice(0, 7);
 
     res.json({
       success: true,
       month: target,
-      daysInMonth,
+      daysInMonth: new Date(yr, mo, 0).getDate(),
       daysElapsed,
-      assignedFrom: assignedAt ? assignedAt.toISOString().slice(0, 10) : null,
-      daysPresent: presentDays.size,
-      attendancePct: daysElapsed > 0 ? Math.round((presentDays.size / daysElapsed) * 100) : 0,
-      todayPresent: isCurrentMonth && presentDays.has(today.getDate()),
-      logs: Array.from(presentDays).sort((a, b) => a - b).map(day => ({ day, minutes: 0 }))
+      daysPresent,
+      attendancePct: daysElapsed > 0
+        ? Math.round((daysPresent / daysElapsed) * 100) : 0,
+      todayPresent: isToday,
+      windows: windows.map(w => ({
+        from: String(w.win_start).slice(0,10),
+        to:   String(w.win_end).slice(0,10),
+      })),
+      logs: presentDays.map(day => ({ day, minutes: 0 })),
     });
+
   } catch (err) {
-    console.error('Driver attendance error:', err);
-    res.status(500).json({ success: false });
+    console.error('Driver attendance error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -3460,78 +3470,7 @@ router.delete('/owner/managers/:managerId', verifyToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
-// Driver attendance for a given month
-router.get('/driver/my-attendance', verifyToken, async (req, res) => {
-  try {
-    const { phone, month } = req.query; // month = "2026-06"
-    if (!phone || !month) return res.status(400).json({ message: 'phone and month required' });
-    if (req.user.role === 'DRIVER' && req.user.mobile_number && req.user.mobile_number !== phone)
-      return res.status(403).json({ error: 'Not authorized' });
-
-    // Get driver id
-    const dr = await pool.query(`SELECT id FROM public.drivers WHERE mobile_number=$1`, [phone]);
-    if (!dr.rows[0]) return res.status(404).json({ message: 'Driver not found' });
-    const driverId = dr.rows[0].id;
-
-    // Get assignment date for this month (most recent active assignment)
-    const asgn = await pool.query(
-      `SELECT assigned_at FROM public.driver_vehicle_history
-       WHERE driver_id=$1 AND (unassigned_at IS NULL OR DATE_TRUNC('month', assigned_at) <= $2::date)
-       ORDER BY assigned_at DESC LIMIT 1`,
-      [driverId, month + '-01']
-    );
-    const assignedAt = asgn.rows[0]?.assigned_at ? new Date(asgn.rows[0].assigned_at) : null;
-
-    const monthStart = new Date(month + '-01T00:00:00.000Z');
-    const now = new Date();
-    const isCurrentMonth = now.toISOString().slice(0, 7) === month;
-    const monthEnd = isCurrentMonth ? now : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-
-    // Effective start = max(monthStart, assignedAt)
-    const effectiveStart = assignedAt && assignedAt > monthStart ? assignedAt : monthStart;
-
-    const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
-    const daysElapsed = Math.max(1, Math.ceil((monthEnd - effectiveStart) / (1000 * 60 * 60 * 24)) + (isCurrentMonth ? 0 : 1));
-
-    // Get present days from driver_activity (ping-based) OR driver_daily_log (login-based)
-    const logs = await pool.query(
-      `SELECT EXTRACT(DAY FROM activity_date)::INTEGER as day, activity_date as log_date
-       FROM public.driver_activity
-       WHERE driver_id=$1 AND DATE_TRUNC('month', activity_date) = $2::date
-       UNION
-       SELECT EXTRACT(DAY FROM log_date)::INTEGER as day, log_date
-       FROM public.driver_daily_log
-       WHERE driver_id=$1 AND DATE_TRUNC('month', log_date) = $2::date
-       ORDER BY log_date`,
-      [driverId, month + '-01']
-    );
-
-    const daysPresent = logs.rows.length;
-    const todayPresent = logs.rows.some(l => {
-      const d = new Date(l.log_date);
-      const t = new Date();
-      return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
-    });
-    const attendancePct = daysElapsed > 0 ? Math.round((daysPresent / daysElapsed) * 100) : 0;
-
-    res.json({
-      month,
-      daysPresent,
-      daysElapsed,
-      daysInMonth,
-      attendancePct,
-      todayPresent,
-      assignedFrom: assignedAt ? assignedAt.toISOString().slice(0, 10) : null,
-      logs: logs.rows.map(l => ({ day: l.day })),
-    });
-  } catch (err) {
-    console.error('Attendance error:', err);
-    res.status(500).json({ message: 'Failed' });
-  }
-});
-
-// Manager login check
+//Manager login check
 router.get('/manager/profile', async (req, res) => {
   try {
     const { phone } = req.query;

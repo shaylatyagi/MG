@@ -754,7 +754,7 @@ const vehicleModalScrollRef = React.useRef<HTMLDivElement>(null);
   
   // Form states
   const [newVehicle, setNewVehicle] = useState({
-  vehicleNumber: '', vehicleModel: '', vehicleType: DEFAULT_VEHICLE_TYPE, dailyRent: '',
+  vehicleNumber: '', vehicleModel: '', vehicleType: '', dailyRent: '',
   insuranceExpiry: '', fitnessExpiry: '', chassisNumber: ''
 });
   const [vehiclePhotos, setVehiclePhotos] = React.useState<Record<string,File|null>>({ front: null, back: null, left: null, right: null });
@@ -1308,7 +1308,7 @@ const openAddVehicleModal = () => {
   setShowAddVehicle(true);
   fetchAvailableDrivers(); // no vehicleId — fetches unassigned drivers for owner
   setSelectedDriverId('');
-  setNewVehicle({ vehicleNumber: '', vehicleModel: '', vehicleType: DEFAULT_VEHICLE_TYPE, dailyRent: '', insuranceExpiry: '', fitnessExpiry: '', chassisNumber: '' });
+  setNewVehicle({ vehicleNumber: '', vehicleModel: '', vehicleType: '', dailyRent: '', insuranceExpiry: '', fitnessExpiry: '', chassisNumber: '' });
 };
 const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, customRent) => {
   setAssigning(true);
@@ -1418,7 +1418,7 @@ const addVehicle = async () => {
       }
       toast.success('Vehicle added successfully!');
       setShowAddVehicle(false);
-      setNewVehicle({ vehicleNumber: '', vehicleModel: '', vehicleType: DEFAULT_VEHICLE_TYPE, dailyRent: 850, insuranceExpiry: '', fitnessExpiry: '', chassisNumber: '' });
+      setNewVehicle({ vehicleNumber: '', vehicleModel: '', vehicleType: '', dailyRent: 850, insuranceExpiry: '', fitnessExpiry: '', chassisNumber: '' });
       setVehiclePhotos({ front: null, back: null, left: null, right: null });
       setVehiclePhotoPreviews({});
       setSelectedDriverId('');
@@ -4578,7 +4578,7 @@ const TrackFleetTab = () => {
   React.useEffect(() => {
     const handler = (e) => {
       if (e.data?.type === 'driver') {
-        const d = drivers.find(dr => dr.id === e.data.id);
+        const d = drivers.find(dr => Number(dr.id) === Number(e.data.id));
         if (d) setSelectedDriver(d);
       }
     };
@@ -5166,19 +5166,13 @@ ${fit}
         {/* Vehicle Type */}
         <div>
           <label className="text-xs font-semibold text-slate-500 block mb-1">Vehicle Type *</label>
-          <select
+          <input
+            type="text"
+            placeholder="e.g. Electric Scooter, CNG Auto, E-Rickshaw..."
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-800 bg-slate-50 focus:bg-white focus:border-indigo-400 outline-none transition"
-            value={newVehicle.vehicleType || DEFAULT_VEHICLE_TYPE}
+            value={newVehicle.vehicleType}
             onChange={e => setNewVehicle({...newVehicle, vehicleType: e.target.value})}
-          >
-            {VEHICLE_TYPE_GROUPS.map(g => (
-              <optgroup key={g.group} label={g.group}>
-                {g.types.map(t => (
-                  <option key={t.code} value={t.code}>{t.icon} {t.label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          />
         </div>
 
         {/* Rent Type + Amount — side by side */}

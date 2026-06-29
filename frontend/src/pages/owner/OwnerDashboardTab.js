@@ -17,6 +17,7 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
   const [stats, setStats] = useState({
     total_vehicles: 0, total_drivers: 0, active_contracts: 0, pending_kyc: 0,
     collection_today: 0, collection_month: 0, collection_total: 0, outstanding: 0, collection_efficiency: 0,
+    active_vehicles_today: 0, rent_due_today: 0,
   });
   const [vehicles, setVehicles]   = useState([]);
   const [sosAlerts, setSosAlerts] = useState([]);
@@ -82,6 +83,8 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
           {[
             { label: L('Today', 'आज'), value: fmt(stats.collection_today) },
             { label: L('This Month', 'इस माह'), value: fmt(stats.collection_month) },
+            { label: L('Active Vehicles Today', 'आज सक्रिय वाहन'), value: stats.active_vehicles_today },
+            { label: L('Rent Due Today', 'आज का किराया'), value: fmt(stats.rent_due_today) },
             { label: L('Outstanding', 'बकाया'), value: fmt(stats.outstanding) },
           ].map((c) => (
             <div key={c.label} style={{ flex: 1, background: 'rgba(255,255,255,0.12)', borderRadius: '10px', padding: '10px 8px', backdropFilter: 'blur(4px)' }}>

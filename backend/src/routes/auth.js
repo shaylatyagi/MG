@@ -723,6 +723,8 @@ router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
   var phone = (req.body.phone_number || '').trim();
   var pin   = (req.body.pin || '').trim();
   var role  = (req.body.role || '').toUpperCase();
+  var lat   = parseFloat(req.body.latitude)  || null;
+  var lng   = parseFloat(req.body.longitude) || null;
   if (!phone || !pin || !role)
     return res.status(400).json({ success: false, message: 'phone_number, pin and role required' });
 
@@ -747,13 +749,7 @@ router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
     if (user.session_token) {
       const alertTitle = '⚠️ New Login Detected';
       const alertMsg = `Someone just logged into your account (${user.mobile_number}) from a new device. If this wasn't you, contact support immediately.`;
-      if (role === 'DRIVER') {
-        pool.query(
-          `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
-           VALUES ($1, 'DRIVER', $2, $3, NOW())`,
-          [user.id, alertTitle, alertMsg]
-        ).catch(() => {});
-      } else if (role === 'OWNER') {
+      if (role === 'OWNER') {
         pool.query(
           `INSERT INTO public.notifications (user_id, user_type, title, message, created_at)
            VALUES ($1, 'OWNER', $2, $3, NOW())`,
@@ -792,6 +788,15 @@ router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
         driver_code: user.driver_code || null,
       }
     });
+    // Save login location — async, non-blocking
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+    pool.query(
+      `INSERT INTO public.login_location_log
+         (user_id, user_role, full_name, phone_number, latitude, longitude, ip_address, device_info)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [user.id, role, user.full_name || null, phone, lat, lng, clientIp,
+       req.headers['user-agent'] || null]
+    ).catch(() => {});
   } catch (err) {
     console.error('login-pin error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -1088,15 +1093,8 @@ router.post('/owner-signup/verify', validate(OwnerSignupVerifySchema), async (re
     if (existing.rows[0])
       return res.status(409).json({ success: false, message: 'Account already exists. Please login.' });
 
-    // Generate owner_code — ensure uniqueness by appending suffix if collision
-    var namePrefix = full_name.replace(/\s+/g,'').toUpperCase().slice(0,3);
-    var phoneEnd   = mobile_number.slice(-4);
-    var owner_code = 'MG-OWN-' + namePrefix + phoneEnd;
-    var codeCheck  = await pool.query('SELECT id FROM public.owners WHERE owner_code=$1', [owner_code]);
-    if (codeCheck.rows[0]) {
-      // collision — append last 2 digits of timestamp to make unique
-      owner_code = owner_code + Date.now().toString().slice(-2);
-    }
+    var seqRes = await pool.query("SELECT nextval('own_seq') AS n");
+var owner_code = 'OWN' + seqRes.rows[0].n;
 
     // Create company if provided
     var company_id = null;

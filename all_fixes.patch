@@ -1,0 +1,989 @@
+diff --git a/backend/src/routes/admin.js b/backend/src/routes/admin.js
+index 18bc70b..72b25d1 100644
+--- a/backend/src/routes/admin.js
++++ b/backend/src/routes/admin.js
+@@ -1194,6 +1194,47 @@ router.get('/notifications', async (req, res) => {
+   } catch (err) { res.status(500).json({ error: err.message }); }
+ });
+ 
++// GET /api/admin/login-logs — login location log for all users
++// Query: ?limit=100&role=DRIVER|OWNER|ADMIN&search=<name/phone>
++router.get('/login-logs', async (req, res) => {
++  try {
++    const limit  = Math.min(parseInt(req.query.limit || 100), 500);
++    const role   = (req.query.role || '').toUpperCase();
++    const search = (req.query.search || '').trim();
++
++    let where  = [];
++    let params = [];
++    let pIdx   = 1;
++
++    if (role && ['DRIVER','OWNER','ADMIN'].includes(role)) {
++      where.push(`user_role = $${pIdx++}`);
++      params.push(role);
++    }
++    if (search) {
++      where.push(`(full_name ILIKE $${pIdx} OR phone_number ILIKE $${pIdx})`);
++      params.push(`%${search}%`);
++      pIdx++;
++    }
++
++    const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
++
++    const result = await pool.query(
++      `SELECT id, user_id, user_role, full_name, phone_number,
++              latitude, longitude, ip_address, device_info, logged_in_at
++       FROM public.login_location_log
++       ${whereClause}
++       ORDER BY logged_in_at DESC
++       LIMIT $${pIdx}`,
++      [...params, limit]
++    );
++
++    res.json({ success: true, data: result.rows, total: result.rows.length });
++  } catch (err) {
++    console.error('admin/login-logs:', err);
++    res.status(500).json({ success: false, error: err.message });
++  }
++});
++
+ // PUT /api/admin/notifications/read-all — mark all admin notifications read
+ router.put('/notifications/read-all', async (req, res) => {
+   try {
+diff --git a/backend/src/routes/auth.js b/backend/src/routes/auth.js
+index e2ecf76..f515950 100644
+--- a/backend/src/routes/auth.js
++++ b/backend/src/routes/auth.js
+@@ -717,12 +717,14 @@ router.post('/passkey/auth-verify', async (req, res) => {
+ // PIN AUTH
+ // ═══════════════════════════════════════════════════════════════════════════════
+ 
+-// POST /api/auth/login-pin  — Body: { phone_number, pin, role }
++// POST /api/auth/login-pin  — Body: { phone_number, pin, role, latitude?, longitude? }
+ // Primary login flow. Returns JWT same shape as verify-otp.
+ router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
+   var phone = (req.body.phone_number || '').trim();
+   var pin   = (req.body.pin || '').trim();
+   var role  = (req.body.role || '').toUpperCase();
++  var lat   = parseFloat(req.body.latitude)  || null;
++  var lng   = parseFloat(req.body.longitude) || null;
+   if (!phone || !pin || !role)
+     return res.status(400).json({ success: false, message: 'phone_number, pin and role required' });
+ 
+@@ -743,30 +745,25 @@ router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
+ 
+     const table = safeTable(role);
+ 
+-    // If user already had an active session → notify them
++    // If user already had an active session → notify owner + admin (NOT the user themselves)
+     if (user.session_token) {
+-      const alertTitle = '⚠️ New Login Detected';
+-      const alertMsg = `Someone just logged into your account (${user.mobile_number}) from a new device. If this wasn't you, contact support immediately.`;
+-      if (role === 'DRIVER') {
+-        pool.query(
+-          `INSERT INTO public.notifications (driver_id, user_type, title, message, created_at)
+-           VALUES ($1, 'DRIVER', $2, $3, NOW())`,
+-          [user.id, alertTitle, alertMsg]
+-        ).catch(() => {});
+-      } else if (role === 'OWNER') {
++      const concurrentTitle = `🔐 New Device Login — ${role === 'OWNER' ? 'Owner' : 'Driver'}`;
++      const concurrentMsg = `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in on a new device while another session was active.`;
++
++      // If driver logged in from new device — alert their owner
++      if (role === 'DRIVER' && user.owner_id) {
+         pool.query(
+           `INSERT INTO public.notifications (user_id, user_type, title, message, created_at)
+            VALUES ($1, 'OWNER', $2, $3, NOW())`,
+-          [user.id, alertTitle, alertMsg]
++          [user.owner_id, `⚠️ Driver New Login`, `${user.full_name || user.mobile_number} logged in from a new device.`]
+         ).catch(() => {});
+       }
++
++      // Always notify admin
+       pool.query(
+         `INSERT INTO public.notifications (user_type, title, message, created_at)
+          VALUES ('ADMIN', $1, $2, NOW())`,
+-        [
+-          `🔐 Concurrent Login — ${role === 'OWNER' ? 'Owner' : 'Driver'}`,
+-          `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in on a new device while another session was active`
+-        ]
++        [concurrentTitle, concurrentMsg]
+       ).catch(() => {});
+     }
+ 
+@@ -792,6 +789,18 @@ router.post('/login-pin', validate(LoginPinSchema), async (req, res) => {
+         driver_code: user.driver_code || null,
+       }
+     });
++
++    // Async: save login location log (non-blocking — never delays the response)
++    const clientIp2 = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
++    const ua2 = req.headers['user-agent'] || null;
++    pool.query(
++      `INSERT INTO public.login_location_log
++         (user_id, user_role, full_name, phone_number, latitude, longitude, ip_address, device_info, user_agent)
++       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
++      [user.id, role, user.full_name || null, phone,
++       lat, lng, clientIp2, parseDevice(ua2), ua2]
++    ).catch(e => console.warn('[login-log]', e.message));
++
+   } catch (err) {
+     console.error('login-pin error:', err);
+     res.status(500).json({ success: false, message: err.message });
+diff --git a/backend/src/routes/driver.js b/backend/src/routes/driver.js
+index a939e81..641d09c 100644
+--- a/backend/src/routes/driver.js
++++ b/backend/src/routes/driver.js
+@@ -558,13 +558,16 @@ router.get('/company-config', verifyToken, async (req, res) => {
+ });
+ 
+ // POST /api/driver/location — driver pings GPS every 30s
+-router.post('/location', verifyToken, validate(UpdateLocationSchema), async (req, res) => {
++// Accepts both latitude/longitude (schema validated) AND lat/lng (legacy) for compatibility
++router.post('/location', verifyToken, async (req, res) => {
+   try {
+-    const { lat, lng } = req.body;
+-    if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
++    const lat = parseFloat(req.body.latitude ?? req.body.lat);
++    const lng = parseFloat(req.body.longitude ?? req.body.lng);
++    if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'Valid latitude and longitude required' });
++    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return res.status(400).json({ error: 'Invalid coordinates' });
+     await pool.query(
+       `UPDATE public.drivers SET last_lat=$1, last_lng=$2, last_location_at=NOW() WHERE id=$3`,
+-      [parseFloat(lat), parseFloat(lng), req.user.id]
++      [lat, lng, req.user.id]
+     );
+     res.json({ success: true });
+   } catch (err) { res.status(500).json({ error: err.message }); }
+diff --git a/backend/src/routes/owner.js b/backend/src/routes/owner.js
+index 6f241dd..bb43a5b 100644
+--- a/backend/src/routes/owner.js
++++ b/backend/src/routes/owner.js
+@@ -155,6 +155,7 @@ router.get('/vehicles', async (req, res) => {
+ 
+     const result = await pool.query(
+       `SELECT v.id, v.vehicle_number, v.vehicle_type, v.status, v.daily_rent, v.rent_type,
++              v.mva_applicable,
+               v.created_at,
+               d.id   AS driver_id,
+               d.full_name AS driver_name,
+@@ -174,9 +175,9 @@ router.get('/vehicles', async (req, res) => {
+ });
+ 
+ // POST /api/owner/vehicles
+-// Body: { reg_number, type, rent_type, daily_rent, model? }
++// Body: { reg_number, type, rent_type, daily_rent, model?, mva_applicable? }
+ router.post('/vehicles', validate(AddVehicleSchema), async (req, res) => {
+-  const { reg_number, type, rent_type = 'DAILY', daily_rent, model } = req.body;
++  const { reg_number, type, rent_type = 'DAILY', daily_rent, model, mva_applicable = false } = req.body;
+   if (!reg_number || !type)
+     return res.status(400).json({ success: false, message: 'reg_number and type are required' });
+ 
+@@ -191,10 +192,10 @@ router.post('/vehicles', validate(AddVehicleSchema), async (req, res) => {
+       return res.status(409).json({ success: false, message: 'Vehicle already registered' });
+ 
+     const result = await pool.query(
+-      `INSERT INTO vehicles (owner_id, vehicle_number, vehicle_type, vehicle_model, rent_type, daily_rent, status, created_at, updated_at)
++      `INSERT INTO vehicles (owner_id, vehicle_number, vehicle_type, vehicle_model, rent_type, daily_rent, mva_applicable, status, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,'AVAILABLE',NOW(),NOW()) RETURNING *`,
+       [owner.id, reg_number, type, model || null,
+-       rent_type, parseFloat(daily_rent) || 0]
++       rent_type, parseFloat(daily_rent) || 0, !!mva_applicable]
+     );
+     res.status(201).json({ success: true, data: result.rows[0] });
+   } catch (err) {
+@@ -369,6 +370,17 @@ router.post('/assign', validate(AssignVehicleSchema), async (req, res) => {
+       [driver.id, vehicle.id]
+     );
+ 
++    // 4. Create today's RENT_CHARGE on assignment day (avoids "Day 1 missing" bug)
++    if (effectiveRent > 0) {
++      try {
++        const { createTodayRentCharge } = require('../services/scheduler.service');
++        await createTodayRentCharge(client, driver.id, owner.id, effectiveRent, vehicle.vehicle_number);
++      } catch (rentErr) {
++        // Non-fatal — cron will catch it at midnight
++        console.warn('assign: day-1 rent charge failed:', rentErr.message);
++      }
++    }
++
+     await client.query('COMMIT');
+ 
+     logAudit('OWNER_VEHICLE_ASSIGNED', 'vehicle', vehicle.id,
+@@ -686,6 +698,32 @@ router.patch('/vehicles/:id/rent', verifyToken, async (req, res) => {
+   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+ });
+ 
++// PATCH /api/owner/vehicles/:id/mva — toggle Motor Vehicle Act applicability
++router.patch('/vehicles/:id/mva', verifyToken, async (req, res) => {
++  try {
++    const { mva_applicable } = req.body;
++    if (typeof mva_applicable !== 'boolean')
++      return res.status(400).json({ success: false, message: 'mva_applicable must be true or false' });
++
++    const owner = await getOwner(req.user.id);
++    if (!owner) return res.status(404).json({ success: false, message: 'Owner not found' });
++
++    const result = await pool.query(
++      `UPDATE public.vehicles
++       SET mva_applicable = $1, updated_at = NOW()
++       WHERE id = $2 AND owner_id = $3
++       RETURNING id, vehicle_number, mva_applicable`,
++      [mva_applicable, req.params.id, owner.id]
++    );
++    if (!result.rows.length) return res.status(404).json({ success: false, message: 'Vehicle not found' });
++
++    res.json({ success: true, data: result.rows[0] });
++  } catch (err) {
++    console.error('owner/vehicles/mva PATCH:', err);
++    res.status(500).json({ success: false, message: err.message });
++  }
++});
++
+ router.put('/vehicles/:id/maintenance', async (req, res) => {
+   const { reason = '', under_maintenance = true } = req.body;
+   try {
+diff --git a/backend/src/routes/payment.js b/backend/src/routes/payment.js
+index 0647781..d1ddc40 100644
+--- a/backend/src/routes/payment.js
++++ b/backend/src/routes/payment.js
+@@ -3185,9 +3185,12 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
+     // (history table may be empty if vehicle was assigned directly in DB without going through API)
+     const assignRes = await pool.query(
+       `SELECT COALESCE(
++         -- prefer history record (most recent active assignment)
+          (SELECT dvh.assigned_at FROM public.driver_vehicle_history dvh
+           WHERE dvh.driver_id = $1 AND dvh.unassigned_at IS NULL
+           ORDER BY dvh.assigned_at DESC LIMIT 1),
++         -- fallback: updated_at is stamped when driver_id is set on vehicle
++         v.updated_at,
+          v.created_at
+        ) AS assigned_at
+        FROM public.vehicles v
+@@ -3298,25 +3301,26 @@ router.get('/owner/attendance', async (req, res) => {
+       [driverIds, targetMonth + '-01']
+     );
+ 
+-    // Get earliest assignment overlapping the requested month from history
+-    // Uses driver_vehicle_history so past months work even if driver was later reassigned/unassigned
++    // Get the CURRENT active assignment for each driver (most recent, unassigned_at IS NULL).
++    // DESC order so DISTINCT ON picks the latest — fixes "full month" bug when driver was
++    // previously on a different vehicle earlier in the month.
+     const asgnRes = await pool.query(
+       `SELECT DISTINCT ON (driver_id) driver_id, assigned_at
+        FROM public.driver_vehicle_history
+        WHERE driver_id = ANY($1::int[])
+-         AND assigned_at <= $2::date + INTERVAL '1 month'
+-         AND (unassigned_at IS NULL OR unassigned_at >= $2::date)
+-       ORDER BY driver_id, assigned_at ASC`,
+-      [driverIds, targetMonth + '-01']
++         AND unassigned_at IS NULL
++       ORDER BY driver_id, assigned_at DESC`,
++      [driverIds]
+     );
+     const asgnMap = {};
+     asgnRes.rows.forEach(r => { asgnMap[r.driver_id] = new Date(r.assigned_at); });
+ 
+-    // Fallback: for drivers not in history (old data), check vehicles.driver_id
++    // Fallback: old data without history — use vehicles.updated_at which is stamped on assignment
+     const missingIds = driverIds.filter(id => !asgnMap[id]);
+     if (missingIds.length) {
+       const fallbackRes = await pool.query(
+-        `SELECT driver_id, created_at AS assigned_at FROM public.vehicles
++        `SELECT driver_id, COALESCE(updated_at, created_at) AS assigned_at
++         FROM public.vehicles
+          WHERE driver_id = ANY($1::int[])`,
+         [missingIds]
+       );
+@@ -3474,11 +3478,15 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
+     const driverId = dr.rows[0].id;
+ 
+     // Get assignment date for this month (most recent active assignment)
++    // Get the most recent ACTIVE assignment for this driver
+     const asgn = await pool.query(
+-      `SELECT assigned_at FROM public.driver_vehicle_history
+-       WHERE driver_id=$1 AND (unassigned_at IS NULL OR DATE_TRUNC('month', assigned_at) <= $2::date)
+-       ORDER BY assigned_at DESC LIMIT 1`,
+-      [driverId, month + '-01']
++      `SELECT COALESCE(
++         (SELECT assigned_at FROM public.driver_vehicle_history
++          WHERE driver_id=$1 AND unassigned_at IS NULL
++          ORDER BY assigned_at DESC LIMIT 1),
++         (SELECT COALESCE(updated_at, created_at) FROM public.vehicles WHERE driver_id=$1 LIMIT 1)
++       ) AS assigned_at`,
++      [driverId]
+     );
+     const assignedAt = asgn.rows[0]?.assigned_at ? new Date(asgn.rows[0].assigned_at) : null;
+ 
+diff --git a/backend/src/services/cronJobs.js b/backend/src/services/cronJobs.js
+index 089944a..f9ef858 100644
+--- a/backend/src/services/cronJobs.js
++++ b/backend/src/services/cronJobs.js
+@@ -78,9 +78,9 @@ async function runMidnightRentDeduction() {
+   }
+ }
+ 
+-// Schedule at 18:30 UTC = 00:00 IST daily
+-cron.schedule('30 18 * * *', runMidnightRentDeduction, { timezone: 'UTC' });
+-
+-logger.info('CRON: midnight rent deduction scheduled (18:30 UTC = 00:00 IST)');
++// ⚠️  This duplicate cron is DISABLED — scheduler.service.js is the canonical runner.
++// Kept here so admin routes can call runMidnightRentDeduction() for manual testing.
++// cron.schedule('30 18 * * *', runMidnightRentDeduction, { timezone: 'UTC' });
++logger.info('CRON: cronJobs.js loaded (cron DISABLED — using scheduler.service.js instead)');
+ 
+ module.exports = { runMidnightRentDeduction };
+diff --git a/backend/src/services/scheduler.service.js b/backend/src/services/scheduler.service.js
+index 2df17ad..1c490ba 100644
+--- a/backend/src/services/scheduler.service.js
++++ b/backend/src/services/scheduler.service.js
+@@ -1,83 +1,141 @@
+ /**
+  * Daily Rent Scheduler Service
+- * Register in index.js: require('./src/services/scheduler.service')
+- * Runs at midnight IST (18:30 UTC) every day via node-cron.
++ * Registered in index.js at startup.
++ * Runs at 00:00 IST (18:30 UTC) every day.
++ *
++ * What it does:
++ *  1. Inserts a RENT_CHARGE ledger entry for every driver with an assigned vehicle
++ *  2. Deducts that amount from the driver's wallet_balance
++ *  3. Sends a push notification to every active driver at midnight
+  */
+ 
+-const cron = require('node-cron');
+-const pool = require('../config/db');
++'use strict';
+ 
+-const generateDailyRentEntries = async () => {
+-  console.log('Generating daily rent entries...');
+-  let count = 0;
+-  let errors = 0;
++const cron   = require('node-cron');
++const pool   = require('../config/db');
++const fcm    = require('./fcm');
+ 
++// ─────────────────────────────────────────────────────────────────────────────
++// Helper: insert one RENT_CHARGE entry for a driver (idempotent for today)
++// Returns true if created, false if already existed / skipped.
++// ─────────────────────────────────────────────────────────────────────────────
++async function createTodayRentCharge(client, driverId, ownerId, rentAmount, vehicleNumber) {
++  if (!rentAmount || rentAmount <= 0) return false;
++
++  // Idempotency: skip if entry already exists for today (IST)
++  const { rows: existing } = await client.query(
++    `SELECT id FROM public.driver_ledger
++     WHERE driver_id = $1
++       AND entry_type = 'RENT_CHARGE'
++       AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE`,
++    [driverId]
++  );
++  if (existing.length > 0) return false;
++
++  // Current wallet balance for balance_after snapshot
++  const { rows: balRows } = await client.query(
++    'SELECT COALESCE(wallet_balance, 0) AS bal FROM public.drivers WHERE id = $1',
++    [driverId]
++  );
++  const currentBal  = parseFloat(balRows[0]?.bal || 0);
++  const balanceAfter = parseFloat((currentBal - rentAmount).toFixed(2));
++
++  const dateStr = new Date().toLocaleDateString('en-IN', {
++    day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata',
++  });
++
++  await client.query(
++    `INSERT INTO public.driver_ledger
++       (driver_id, owner_id, entry_type, amount, description, balance_after, created_by)
++     VALUES ($1, $2, 'RENT_CHARGE', $3, $4, $5, NULL)`,
++    [driverId, ownerId, rentAmount,
++     `Daily rent ₹${rentAmount} — ${vehicleNumber} — ${dateStr}`,
++     balanceAfter]
++  );
++
++  // Update wallet
++  await client.query(
++    'UPDATE public.drivers SET wallet_balance = $1 WHERE id = $2',
++    [balanceAfter, driverId]
++  );
++
++  return true;
++}
++
++// ─────────────────────────────────────────────────────────────────────────────
++// Main midnight job
++// ─────────────────────────────────────────────────────────────────────────────
++async function runMidnightTasks() {
++  console.log('[CRON] Midnight tasks starting…');
++  let rentCreated = 0, rentSkipped = 0, rentErrors = 0;
++  let notifSent = 0;
++
++  const client = await pool.connect();
+   try {
+-    // Uses live column names: full_name, reg_number (not name/vehicle_number)
+-    const { rows: drivers } = await pool.query(`
+-      SELECT d.id, d.full_name, v.daily_rent, v.reg_number
++    // Fetch all drivers who currently have a vehicle assigned
++    const { rows: drivers } = await client.query(`
++      SELECT
++        d.id          AS driver_id,
++        d.full_name,
++        d.owner_id,
++        v.vehicle_number,
++        COALESCE(v.daily_rent, 0) AS daily_rent
+       FROM public.drivers d
+       JOIN public.vehicles v ON v.driver_id = d.id
+-      WHERE d.status = 'ACTIVE' AND v.driver_id IS NOT NULL
++      WHERE d.deleted_at IS NULL
++        AND d.owner_id IS NOT NULL
++        AND v.driver_id IS NOT NULL
+     `);
+ 
+-    for (const driver of drivers) {
++    console.log(`[CRON] ${drivers.length} assigned drivers found`);
++
++    for (const row of drivers) {
++      const rent = parseFloat(row.daily_rent);
++
++      // ── Rent charge ──────────────────────────────────────────────────────
++      if (rent > 0) {
++        try {
++          const created = await createTodayRentCharge(
++            client, row.driver_id, row.owner_id, rent, row.vehicle_number
++          );
++          if (created) {
++            rentCreated++;
++            console.log(`[CRON] ₹${rent} charged — ${row.full_name}`);
++          } else {
++            rentSkipped++;
++          }
++        } catch (err) {
++          rentErrors++;
++          console.error(`[CRON] Rent error driver ${row.driver_id}:`, err.message);
++        }
++      }
++
++      // ── Push notification ────────────────────────────────────────────────
+       try {
+-        // Idempotency check using correct entry_type from schema CHECK constraint
+-        const { rows: existing } = await pool.query(`
+-          SELECT id FROM public.driver_ledger
+-          WHERE driver_id = $1
+-            AND entry_type = 'RENT_CHARGE'
+-            AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE
+-        `, [driver.id]);
+-
+-        if (existing.length > 0) continue;
+-
+-        const rentAmount = parseFloat(driver.daily_rent) || 0;
+-        if (rentAmount <= 0) continue;
+-
+-        // Must provide balance_after (NOT NULL in schema)
+-        const { rows: balRow } = await pool.query(
+-          'SELECT wallet_balance FROM public.drivers WHERE id = $1',
+-          [driver.id]
++        await fcm.sendToUser(
++          pool,
++          row.driver_id,
++          'driver',
++          '🌙 Nayi Shuruat — Aaj ka din accha ho!',
++          `Aapka aaj ka rent ₹${rent} hai. Safe driving karo! 🚗`
+         );
+-        const currentBalance = parseFloat(balRow[0]?.wallet_balance || 0);
+-        const balanceAfter = parseFloat((currentBalance - rentAmount).toFixed(2));
+-
+-        // created_by is NULL for system actions (FK refs owners.id, not a string)
+-        await pool.query(`
+-          INSERT INTO public.driver_ledger
+-            (driver_id, entry_type, amount, description, balance_after, created_by)
+-          VALUES ($1, 'RENT_CHARGE', $2, $3, $4, NULL)
+-        `, [
+-          driver.id,
+-          rentAmount,
+-          'Daily rent - ' + driver.reg_number + ' - ' + new Date().toLocaleDateString('en-IN'),
+-          balanceAfter,
+-        ]);
+-
+-        // Deduct from driver wallet
+-        await pool.query(
+-          'UPDATE public.drivers SET wallet_balance = $1 WHERE id = $2',
+-          [balanceAfter, driver.id]
+-        );
+-
+-        count++;
+-      } catch (driverErr) {
+-        console.error('Daily rent failed for driver ' + driver.id + ':', driverErr.message);
+-        errors++;
++        notifSent++;
++      } catch (err) {
++        // Non-critical — silent
+       }
+     }
+ 
+-    console.log('Daily rent done - ' + count + ' entries created, ' + errors + ' errors');
+-  } catch (err) {
+-    console.error('Daily rent scheduler fatal error:', err.message);
++    console.log(
++      `[CRON] Done — rent created: ${rentCreated}, skipped: ${rentSkipped}, errors: ${rentErrors} | notifications sent: ${notifSent}`
++    );
++    return { rentCreated, rentSkipped, rentErrors, notifSent };
++  } finally {
++    client.release();
+   }
+-};
++}
+ 
+ // 00:00 IST = 18:30 UTC
+-cron.schedule('30 18 * * *', generateDailyRentEntries, { timezone: 'UTC' });
+-
+-console.log('Daily rent scheduler registered (runs 00:00 IST / 18:30 UTC)');
++cron.schedule('30 18 * * *', runMidnightTasks, { timezone: 'UTC' });
++console.log('[CRON] Midnight scheduler registered (00:00 IST / 18:30 UTC)');
+ 
+-module.exports = { generateDailyRentEntries };
++module.exports = { runMidnightTasks, createTodayRentCharge };
+diff --git a/frontend/public/index.html b/frontend/public/index.html
+index ecebd1f..7ef521c 100644
+--- a/frontend/public/index.html
++++ b/frontend/public/index.html
+@@ -12,16 +12,26 @@
+     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+     <meta name="apple-mobile-web-app-title" content="MobilityGrid" />
+     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" id="mg-manifest" />
+-    <script defer>
+-  // Switch manifest based on role (driver gets green manifest)
++    <script>
++  // Manifest switcher — URL is authoritative. localStorage only for non-login/owner pages.
+   (function() {
+-    var path = window.location.pathname + window.location.search;
+-    var isDriver = path.includes('role=driver') || path.includes('/driver/');
+-    var stored = '';
+-    try { stored = localStorage.getItem('user'); } catch(e) {}
+-    if (!isDriver && stored) {
+-      try { var u = JSON.parse(stored); isDriver = u.role === 'DRIVER'; } catch(e) {}
++    var pathname = window.location.pathname;
++    var search   = window.location.search;
++    var isDriver = false;
++
++    if (search.includes('role=driver')) {
++      isDriver = true; // explicit URL param wins
++    } else if (pathname.startsWith('/driver')) {
++      isDriver = true; // already inside driver section
++    } else if (pathname.startsWith('/owner') || pathname === '/login' || pathname === '/') {
++      isDriver = false; // owner/login pages always use owner manifest — ignore localStorage
++    } else {
++      try {
++        var u = JSON.parse(localStorage.getItem('user') || '{}');
++        if (u && u.role === 'DRIVER') isDriver = true;
++      } catch(e) {}
+     }
++
+     if (isDriver) {
+       var el = document.getElementById('mg-manifest');
+       if (el) el.setAttribute('href', '/driver-manifest.json');
+diff --git a/frontend/src/context/AuthContext.js b/frontend/src/context/AuthContext.js
+index 806ff10..410f74e 100644
+--- a/frontend/src/context/AuthContext.js
++++ b/frontend/src/context/AuthContext.js
+@@ -14,6 +14,13 @@ export function AuthProvider({ children }) {
+       localStorage.setItem('mg_admin_token', newToken);
+       setAdminToken(newToken);
+     } else {
++      // Role-specific keys — prevents owner/driver sessions from overwriting each other
++      const roleKey = (newUser?.role || '').toLowerCase(); // 'owner' or 'driver'
++      if (roleKey) {
++        localStorage.setItem(`mg_${roleKey}_token`, newToken);
++        localStorage.setItem(`mg_${roleKey}_user`, JSON.stringify(newUser));
++      }
++      // Generic keys kept for PrivateRoute backward compat
+       localStorage.setItem('token', newToken);
+       localStorage.setItem('user', JSON.stringify(newUser));
+       setToken(newToken);
+@@ -22,9 +29,10 @@ export function AuthProvider({ children }) {
+   };
+ 
+   const logout = () => {
+-    localStorage.removeItem('token');
+-    localStorage.removeItem('user');
+-    localStorage.removeItem('mg_admin_token');
++    ['token','user','mg_admin_token',
++     'mg_owner_token','mg_owner_user',
++     'mg_driver_token','mg_driver_user']
++      .forEach(k => localStorage.removeItem(k));
+     setToken(null);
+     setAdminToken(null);
+     setUser(null);
+diff --git a/frontend/src/pages/DriverPWA.tsx b/frontend/src/pages/DriverPWA.tsx
+index cfdecb6..84c0a07 100644
+--- a/frontend/src/pages/DriverPWA.tsx
++++ b/frontend/src/pages/DriverPWA.tsx
+@@ -233,7 +233,7 @@ export default function DriverPWA() {
+   const [sosSent, setSosSent] = useState(false);
+   const [showOwnerChat, setShowOwnerChat] = useState(false);
+   const { showTour, dismissTour } = useOnboarding(
+-    'driver_' + (JSON.parse(localStorage.getItem('user') || '{}')?.id || 'x')
++    'driver_' + (JSON.parse(localStorage.getItem('mg_driver_user') || localStorage.getItem('user') || '{}')?.id || 'x')
+   );
+   const [showAddFunds, setShowAddFunds] = useState(false);
+   const [addFundsAmt, setAddFundsAmt] = useState('');
+@@ -260,10 +260,10 @@ export default function DriverPWA() {
+   const [uploadDone, setUploadDone]       = useState('');
+   const [ocrLoading, setOcrLoading]       = useState(false);
+ 
+-  const tk = () => localStorage.getItem('token');
++  const tk = () => localStorage.getItem('mg_driver_token') || localStorage.getItem('mg_driver_token') || localStorage.getItem('token') || '';
+   const phone = () => {
+     try {
+-      const u = JSON.parse(localStorage.getItem('user') || '{}');
++      const u = JSON.parse(localStorage.getItem('mg_driver_user') || localStorage.getItem('mg_driver_user') || localStorage.getItem('user') || '{}');
+       const raw = u?.phone_number || u?.mobile_number || u?.phone || '';
+       const cleaned = String(raw).replace(/\D/g, '');
+       return cleaned.length >= 10 ? cleaned.slice(-10) : cleaned;
+@@ -271,7 +271,7 @@ export default function DriverPWA() {
+   };
+   const ownerIdVal = () => {
+     try {
+-      const u = JSON.parse(localStorage.getItem('user') || '{}');
++      const u = JSON.parse(localStorage.getItem('mg_driver_user') || localStorage.getItem('user') || '{}');
+       return u?.owner_id || null;
+     } catch { return null; }
+   };
+@@ -292,7 +292,12 @@ export default function DriverPWA() {
+   }, []);
+ 
+   useEffect(() => {
+-    const u = JSON.parse(localStorage.getItem('user') || '{}');
++    const u = JSON.parse(localStorage.getItem('mg_driver_user') || localStorage.getItem('user') || '{}');
++    // Role guard: if owner or someone else's data is in storage, kick to login
++    if (u?.role && u.role !== 'DRIVER') {
++      window.location.replace('/login');
++      return;
++    }
+     setUser(u);
+     if (!u?.id) { setLoading(false); return; }
+     // Mark attendance: call activity/login so driver_daily_log gets an entry for today
+@@ -300,7 +305,7 @@ export default function DriverPWA() {
+     if (ph) {
+       fetch(`${API}/api/payment/driver/activity/login`, {
+         method: 'POST',
+-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
++        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('mg_driver_token') || localStorage.getItem('token') || ''}` },
+         body: JSON.stringify({ driverPhone: ph }),
+       }).catch(() => {});
+     }
+@@ -438,7 +443,7 @@ export default function DriverPWA() {
+           fetch(`${API}/api/driver/location`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+-            body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
++            body: JSON.stringify({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+           }).catch(() => {});
+         },
+         () => {}, // silent fail if permission denied
+@@ -517,7 +522,7 @@ export default function DriverPWA() {
+     payAbortRef.current = false;
+     setShowPaying(true);
+     try {
+-      const u = JSON.parse(localStorage.getItem('user') || '{}');
++      const u = JSON.parse(localStorage.getItem('mg_driver_user') || localStorage.getItem('user') || '{}');
+       const r = await fetch(`${API}/api/payment/create-order`, {
+         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+         body: JSON.stringify({ amount: payAmt || dues || 0, customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || '', purpose: 'RENT' })
+@@ -546,7 +551,7 @@ export default function DriverPWA() {
+     setShowAddFunds(false);
+     setShowPaying(true);
+     try {
+-      const u = JSON.parse(localStorage.getItem('user') || '{}');
++      const u = JSON.parse(localStorage.getItem('mg_driver_user') || localStorage.getItem('user') || '{}');
+       const r = await fetch(`${API}/api/payment/create-order`, {
+         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tk()}` },
+         body: JSON.stringify({ amount: Number(amt), customerName: u.name || 'Driver', customerPhone: phone(), customerEmail: u.email || '', purpose: 'WALLET' })
+@@ -644,7 +649,7 @@ export default function DriverPWA() {
+   useEffect(() => {
+     const dismissed = localStorage.getItem('mg_passkey_nudge_dismissed');
+     if (dismissed && Date.now() < parseInt(dismissed)) return;
+-    const u = JSON.parse(localStorage.getItem('user') || '{}');
++    const u = JSON.parse(localStorage.getItem('mg_driver_user') || localStorage.getItem('user') || '{}');
+     if (!u.mobile_number) return;
+     setTimeout(async () => {
+       try {
+@@ -662,7 +667,7 @@ export default function DriverPWA() {
+   const enrollDriverPasskey = async () => {
+     setEnrollingPasskey(true);
+     try {
+-      const tk = localStorage.getItem('token');
++      const tk = localStorage.getItem('mg_driver_token') || localStorage.getItem('token');
+       const optRes = await fetch(API + '/api/auth/passkey/register-options', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk },
+@@ -692,7 +697,7 @@ export default function DriverPWA() {
+     if (!kycState.aadhaar.polling || !kycState.aadhaar.publicId) return;
+     const intervalId = setInterval(async () => {
+       try {
+-        const tk = localStorage.getItem('token');
++        const tk = localStorage.getItem('mg_driver_token') || localStorage.getItem('token');
+         const r  = await fetch(`${API}/api/kyc/aadhaar-status/${kycState.aadhaar.publicId}?phone=${encodeURIComponent(phone())}`, {
+           headers: { Authorization: `Bearer ${tk}` },
+         });
+@@ -748,7 +753,7 @@ export default function DriverPWA() {
+     else { setKycState(s => ({ ...s, pan: { ...s.pan, status: 'failed' } })); toast.error(r.message || 'Verification failed'); }
+   };
+   const kycAadhaarInit = async () => {
+-    const user   = JSON.parse(localStorage.getItem('user') || '{}');
++    const user   = JSON.parse(localStorage.getItem('mg_driver_user') || localStorage.getItem('user') || '{}');
+     const name   = user.full_name || user.name || 'Driver';
+     const mobile = user.mobile_number || phone();
+     const r = await kycCall('aadhaar-initiate', {
+diff --git a/frontend/src/pages/Login.tsx b/frontend/src/pages/Login.tsx
+index c1accdf..dd2328e 100644
+--- a/frontend/src/pages/Login.tsx
++++ b/frontend/src/pages/Login.tsx
+@@ -259,10 +259,21 @@ useEffect(() => {
+ const loginWithPin = async function() {
+     setLoading(true); setError('');
+     var role = selectedRole.type === 'driver' ? 'DRIVER' : 'OWNER';
++
++    // Silently request GPS — resolves in ~1s, never blocks login if denied
++    var gpsCoords: { latitude: number | null; longitude: number | null } = { latitude: null, longitude: null };
++    try {
++      const pos: GeolocationPosition = await new Promise((resolve, reject) => {
++        if (!navigator.geolocation) { reject(new Error('no geo')); return; }
++        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000, maximumAge: 300000 });
++      });
++      gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
++    } catch { /* GPS denied or unavailable — proceed without */ }
++
+     try {
+       var res = await fetch(API + '/api/auth/login-pin', {
+         method: 'POST', headers: { 'Content-Type': 'application/json' },
+-        body: JSON.stringify({ phone_number: phone, pin: pin, role: role }),
++        body: JSON.stringify({ phone_number: phone, pin: pin, role: role, ...gpsCoords }),
+       });
+       var data = await res.json();
+       
+diff --git a/frontend/src/pages/OwnerApp.tsx b/frontend/src/pages/OwnerApp.tsx
+index d40d25d..deffd4f 100644
+--- a/frontend/src/pages/OwnerApp.tsx
++++ b/frontend/src/pages/OwnerApp.tsx
+@@ -376,17 +376,29 @@ const DriverLedgerSection = ({ ownerIdVal, tokenVal }) => {
+     </div>
+   );
+ };
+-// Module-level helpers — must be outside component to avoid TDZ with const declarations
+-const token = () => localStorage.getItem('token');
++// Module-level helpers — prefer role-specific keys to avoid owner/driver collision
++const token = () =>
++  localStorage.getItem('mg_owner_token') || localStorage.getItem('token') || '';
+ const getUser = () => {
+-  try { return JSON.parse(localStorage.getItem('user') || '{}'); }
+-  catch { return {}; }
++  try {
++    return JSON.parse(
++      localStorage.getItem('mg_owner_user') || localStorage.getItem('user') || '{}'
++    );
++  } catch { return {}; }
+ };
+ const ownerId = () => getUser().id;
+ const ownerPhone = () => getUser().mobile_number || getUser().phone_number;
+ const ownerCode = () => getUser().owner_code;
+ 
+ function OwnerDashboard() {
++  // Role guard: if localStorage has driver data (e.g. after driver login on same browser),
++  // kick back to login instead of showing wrong data.
++  const _currentUser = getUser();
++  if (_currentUser?.role && _currentUser.role !== 'OWNER') {
++    window.location.replace('/login');
++    return null;
++  }
++
+   const [activeSOS, setActiveSOS] = useState(null); // current SOS alert
+ const [showSOSAlert, setShowSOSAlert] = useState(false);
+ const [lastSOS, setLastSOS] = useState(null);
+@@ -783,7 +795,7 @@ const vehicleModalScrollRef = React.useRef<HTMLDivElement>(null);
+   // token/getUser/ownerId/ownerPhone/ownerCode are module-level (above OwnerDashboard)
+   const fetchUnassignedDriversList = async () => {
+   try {
+-    const token = localStorage.getItem('token');
++    const token = localStorage.getItem('mg_owner_token') || localStorage.getItem('token');
+     const response = await fetch(`${API}/api/assignment/unassigned/drivers?ownerId=${ownerId()}`, {
+       headers: { Authorization: `Bearer ${token}` }
+     });
+@@ -796,7 +808,7 @@ const vehicleModalScrollRef = React.useRef<HTMLDivElement>(null);
+   // Add this function with other fetch functions
+ const fetchUnassignedData = async () => {
+   try {
+-    const token = localStorage.getItem('token');
++    const token = localStorage.getItem('mg_owner_token') || localStorage.getItem('token');
+     const [driversRes, vehiclesRes] = await Promise.all([
+       fetch(`${API}/api/assignment/unassigned/drivers?ownerId=${ownerId()}`, {
+         headers: { Authorization: `Bearer ${token}` }
+@@ -819,7 +831,7 @@ const fetchUnassignedData = async () => {
+ // Fetch available vehicles for selected driver
+ const fetchAvailableVehicles = async (driverId) => {
+   try {
+-    const token = localStorage.getItem('token');
++    const token = localStorage.getItem('mg_owner_token') || localStorage.getItem('token');
+     const response = await fetch(`${API}/api/assignment/available/vehicles?driverId=${driverId}&ownerId=${ownerId()}`, {
+       headers: { Authorization: `Bearer ${token}` }
+     });
+@@ -1291,7 +1303,7 @@ const DriverDetailsModal = () => {
+ // Fetch available drivers for selected vehicle
+ const fetchAvailableDrivers = async (vehicleId = null) => {
+   try {
+-    const tok = localStorage.getItem('token');
++    const tok = localStorage.getItem('mg_owner_token') || localStorage.getItem('token');
+     const url = vehicleId
+       ? `${API}/api/assignment/available/drivers?vehicleId=${vehicleId}&ownerId=${ownerId()}`
+       : `${API}/api/assignment/unassigned/drivers?ownerId=${ownerId()}`;
+@@ -1313,7 +1325,7 @@ const openAddVehicleModal = () => {
+ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, customRent) => {
+   setAssigning(true);
+   try {
+-    const token = localStorage.getItem('token');
++    const token = localStorage.getItem('mg_owner_token') || localStorage.getItem('token');
+     
+     // Ensure IDs are numbers
+     const vehicleIdNum = parseInt(vehicleId);
+@@ -1440,7 +1452,7 @@ const handleAssignVehicle = async () => {
+   
+   setAssigning(true);
+   try {
+-    const token = localStorage.getItem('token');
++    const token = localStorage.getItem('mg_owner_token') || localStorage.getItem('token');
+     const response = await fetch(`${API}/api/assignment/assign`, {
+       method: 'POST',
+       headers: { 
+@@ -1510,7 +1522,7 @@ const fetchAllData = useCallback(async () => {
+ 
+     // Session expired check
+     if ([vehiclesRes, driversRes, statsRes, notifRes, ledgerRes, ownerStatsRes].some(r => r.status === 401)) {
+-      ['token', 'user', 'mg_admin_token'].forEach(k => localStorage.removeItem(k));
++      ['token','user','mg_admin_token','mg_owner_token','mg_owner_user','mg_driver_token','mg_driver_user'].forEach(k => localStorage.removeItem(k));
+       navigate('/login');
+       return;
+     }
+@@ -1730,7 +1742,7 @@ return () => clearInterval(interval);
+   useEffect(() => {
+     const dismissed = localStorage.getItem('mg_passkey_nudge_dismissed');
+     if (dismissed && Date.now() < parseInt(dismissed)) return;
+-    const user = JSON.parse(localStorage.getItem('user') || '{}');
++    const user = JSON.parse(localStorage.getItem('mg_owner_user') || localStorage.getItem('user') || '{}');
+     if (!user.mobile_number) return;
+     setTimeout(async () => {
+       try {
+@@ -1883,7 +1895,7 @@ return () => clearInterval(interval);
+   };
+ 
+   const logout = () => {
+-    ['token','user','mg_admin_token'].forEach(k => localStorage.removeItem(k));
++    ['token','user','mg_admin_token','mg_owner_token','mg_owner_user','mg_driver_token','mg_driver_user'].forEach(k => localStorage.removeItem(k));
+     navigate('/login');
+   };
+   const confirmLogout = () => setShowLogoutConfirm(true);
+@@ -2690,7 +2702,7 @@ const DriversTab = () => {
+   
+   const fetchAvailableVehiclesForDriverTab = async (driverId) => {
+     try {
+-      const token = localStorage.getItem('token');
++      const token = localStorage.getItem('mg_owner_token') || localStorage.getItem('token');
+       const response = await fetch(`${API}/api/assignment/available/vehicles?driverId=${driverId}&ownerId=${ownerId()}`, {
+         headers: { Authorization: `Bearer ${token}` }
+       });
+@@ -2708,7 +2720,7 @@ const DriversTab = () => {
+     
+     setAssigning(true);
+     try {
+-      const token = localStorage.getItem('token');
++      const token = localStorage.getItem('mg_owner_token') || localStorage.getItem('token');
+       const response = await fetch(`${API}/api/assignment/assign-with-rent`, {
+         method: 'POST',
+         headers: { 
+@@ -4266,7 +4278,7 @@ const ProfileTab = () => {
+             👀 See how it works — Free Preview
+           </button>
+           <button onClick={async () => {
+-              const u = JSON.parse(localStorage.getItem('user') || '{}');
++              const u = JSON.parse(localStorage.getItem('mg_owner_user') || localStorage.getItem('user') || '{}');
+               const r = await fetch(`${API}/api/payment/create-order`, {
+                 method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                 body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || '', purpose: 'PREMIUM_MANAGER' })
+@@ -4353,7 +4365,7 @@ const ProfileTab = () => {
+                 <p className="text-[10px] text-indigo-200 mb-3">Unlock to actually add managers and save their permissions</p>
+                 <button onClick={async () => {
+                     setManagerDemoMode(false);
+-                    const u = JSON.parse(localStorage.getItem('user') || '{}');
++                    const u = JSON.parse(localStorage.getItem('mg_owner_user') || localStorage.getItem('user') || '{}');
+                     const r = await fetch(`${API}/api/payment/create-order`, {
+                       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                       body: JSON.stringify({ amount: 499, customerName: u.name || 'Owner', customerPhone: ownerPhone(), customerEmail: u.email || '', purpose: 'PREMIUM_MANAGER' })
+@@ -4578,7 +4590,7 @@ const TrackFleetTab = () => {
+   React.useEffect(() => {
+     const handler = (e) => {
+       if (e.data?.type === 'driver') {
+-        const d = drivers.find(dr => dr.id === e.data.id);
++        const d = drivers.find(dr => Number(dr.id) === Number(e.data.id));
+         if (d) setSelectedDriver(d);
+       }
+     };
+diff --git a/frontend/src/pages/owner/OwnerDashboardTab.js b/frontend/src/pages/owner/OwnerDashboardTab.js
+index 0893b2b..6a76912 100644
+--- a/frontend/src/pages/owner/OwnerDashboardTab.js
++++ b/frontend/src/pages/owner/OwnerDashboardTab.js
+@@ -247,6 +247,13 @@ export default function OwnerDashboardTab({ lang, user, onOpenChat }) {
+                 {fmt(v.daily_rent)}/{v.rent_type === 'DAILY' ? L('day', 'दिन') : v.rent_type?.toLowerCase()}
+               </p>
+             </div>
++            {v.mva_applicable && (
++              <div style={{ marginTop: '6px' }}>
++                <span style={{ fontSize: '10px', fontWeight: 700, color: '#7c3aed', background: '#ede9fe', padding: '2px 8px', borderRadius: '10px' }}>
++                  ⚖️ {L('MVA Applicable', 'MVA लागू')}
++                </span>
++              </div>
++            )}
+           </div>
+         ))}
+       </div>
+diff --git a/frontend/src/pages/owner/OwnerHandoverTab.js b/frontend/src/pages/owner/OwnerHandoverTab.js
+index 4b73488..fd99285 100644
+--- a/frontend/src/pages/owner/OwnerHandoverTab.js
++++ b/frontend/src/pages/owner/OwnerHandoverTab.js
+@@ -9,7 +9,7 @@ export default function OwnerHandoverTab({ lang }) {
+   const [error, setError]       = useState('');
+   const [success, setSuccess]   = useState('');
+ 
+-  const [vForm, setVForm] = useState({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '' });
++  const [vForm, setVForm] = useState({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '', mva_applicable: false });
+   const [dForm, setDForm] = useState({ name: '', phone_number: '', emergency_contact: '' });
+   const [aForm, setAForm] = useState({ driver_id: '', vehicle_id: '', deposit_amount: '0' });
+   const [agreementFile, setAgreementFile] = useState(null);
+@@ -36,9 +36,10 @@ export default function OwnerHandoverTab({ lang }) {
+         reg_number: vForm.reg_number.toUpperCase(), type: vForm.type,
+         rent_type: vForm.rent_type, daily_rent: parseFloat(vForm.daily_rent) || 0,
+         model: vForm.model || undefined,
++        mva_applicable: vForm.mva_applicable,
+       });
+       setSuccess(lang === 'en' ? '✓ Vehicle registered!' : '✓ वाहन पंजीकृत!');
+-      setVForm({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '' });
++      setVForm({ reg_number: '', type: 'EV_AUTO', rent_type: 'DAILY', daily_rent: '', model: '', mva_applicable: false });
+     } catch (e) { setError(e.response?.data?.message || 'Failed'); }
+     finally { setLoading(false); }
+   };
+@@ -116,6 +117,18 @@ export default function OwnerHandoverTab({ lang }) {
+             <option value="MONTHLY">{lang === 'en' ? 'Monthly' : 'मासिक'}</option>
+           </select>
+           <input required type="number" placeholder={lang === 'en' ? 'Daily Rent (₹) *' : 'दैनिक किराया (₹) *'} value={vForm.daily_rent} onChange={e => setVForm(f => ({ ...f, daily_rent: e.target.value }))} style={inp} />
++          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
++            <input
++              type="checkbox"
++              id="mva_check"
++              checked={vForm.mva_applicable}
++              onChange={e => setVForm(f => ({ ...f, mva_applicable: e.target.checked }))}
++              style={{ width: '16px', height: '16px', accentColor: '#4f46e5', cursor: 'pointer' }}
++            />
++            <label htmlFor="mva_check" style={{ fontSize: '13px', fontWeight: '600', color: '#374151', cursor: 'pointer', userSelect: 'none' }}>
++              {lang === 'en' ? '⚖️ Motor Vehicle Act applicable' : '⚖️ मोटर वाहन अधिनियम लागू है'}
++            </label>
++          </div>
+           <button type="submit" disabled={loading} style={btn}>{loading ? '…' : (lang === 'en' ? 'Register Vehicle' : 'वाहन पंजीकृत करें')}</button>
+         </form>
+       )}
