@@ -195,16 +195,6 @@ router.get('/vehicles', async (req, res) => {
 // mva_applicable is AUTO-COMPUTED from vehicle type
 router.post('/vehicles', validate(AddVehicleSchema), async (req, res) => {
   const { reg_number, type, rent_type = 'DAILY', daily_rent, model, mva_applicable = false } = req.body;
-  // Auto-detect MVA: almost all motor vehicles qualify except pure bicycles/e-cycles
-  const mva_applicable = (() => {
-    if (!type) return true;
-    const t = type.toLowerCase();
-    if ((t.includes('bicycle') || t.includes('e-cycle') || t.includes('ecycle')) &&
-        !t.includes('tricycle') && !t.includes('auto') && !t.includes('rickshaw')) {
-      return false;
-    }
-    return true;
-  })();
   if (!reg_number || !type)
     return res.status(400).json({ success: false, message: 'reg_number and type are required' });
 
