@@ -887,7 +887,7 @@ export default function DriverPWA() {
                   <div style={{background:'var(--color-surface)',borderRadius:10,height:5,width:`${pct}%`,transition:'width 1s ease'}}/>
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',marginTop:5,fontSize:9,color:'rgba(255,255,255,0.5)',fontWeight:700}}>
-                  <span>Day {cycleDay} of 30</span><span>{100-pct}% remaining</span>
+                 <span>Day {dues > 0 ? Math.round(dues / (telemetry.dailyRent || 1)) : cycleDay} of {attendance?.daysElapsed || 30}</span><span>{100-pct}% remaining</span>
                 </div>
               </div>
             );
@@ -1002,7 +1002,12 @@ export default function DriverPWA() {
                     && calDate.getFullYear() === today.getFullYear()
                     && day === today.getDate();
                   const future = new Date(attendanceMonth + '-' + String(day).padStart(2,'0')) > today;
-                  const beforeAssignment = day < assignedFromDay;
+                  const inAnyWindow = attendance.windows?.some(w => {
+  const from = new Date(w.from).getDate();
+  const to = new Date(w.to).getDate();
+  return day >= from && day <= to;
+}) ?? (day >= assignedFromDay);
+const beforeAssignment = !inAnyWindow;
                   const inactive = future || beforeAssignment;
                   return (
                     <div key={day} title={beforeAssignment ? 'Before vehicle assignment' : `Day ${day}`} style={{

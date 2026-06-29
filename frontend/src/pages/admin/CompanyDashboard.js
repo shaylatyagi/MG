@@ -8,8 +8,8 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-white bg-gray-900 ">
-          <div className="bg-white bg-gray-900  rounded-2xl shadow-xl p-8 max-w-md text-center">
+        <div className="min-h-screen flex items-center justify-center bg-white white ">
+          <div className="bg-white white  rounded-2xl shadow-xl p-8 max-w-md text-center">
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">⚠️</span>
             </div>
@@ -110,7 +110,7 @@ const Badge = ({ status }) => {
 const StatCard = ({ label, value, sub, color = 'indigo' }) => {
   const borders = { indigo:'border-indigo-400', green:'border-green-400', blue:'border-blue-400', orange:'border-orange-400', red:'border-red-400' };
   return (
-    <div className={`border-l-4 rounded-lg p-4 shadow-sm bg-white bg-gray-800 ${borders[color] || borders.indigo}`}>
+    <div className={`border-l-4 rounded-lg p-4 shadow-sm bg-white bg-gray-50 ${borders[color] || borders.indigo}`}>
       <p className="text-xs text-gray-500 text-gray-300 uppercase tracking-wide">{label}</p>
       <p className="text-2xl font-bold text-gray-800 text-white mt-1">{value}</p>
       {sub && <p className="text-xs text-gray-500 text-gray-300 mt-1">{sub}</p>}
@@ -124,7 +124,7 @@ const StatCard = ({ label, value, sub, color = 'indigo' }) => {
 // onClose = close entire modal chain (shows × button)
 const Modal = ({ title, onClose, onBack, breadcrumbs, children, wide }) => (
   <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 overflow-y-auto py-8 px-4">
-    <div className={`bg-white bg-gray-900   rounded-2xl shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-2xl'} relative`}>
+    <div className={`bg-white white   rounded-2xl shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-2xl'} relative`}>
       {/* Breadcrumb trail */}
       {breadcrumbs && breadcrumbs.length > 0 && (
         <div className="px-6 pt-4 pb-0 flex items-center gap-1 text-xs text-gray-400  flex-wrap">
@@ -232,12 +232,12 @@ function DocumentsSection({ userType, userId }) {
         <p className="text-sm font-medium text-indigo-800 mb-3">Upload Document for this User</p>
         <div className="flex flex-wrap gap-2 items-end">
           <select value={docType} onChange={e => setDocType(e.target.value)}
-            className="px-3 py-2 border  rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white bg-gray-900   ">
+            className="px-3 py-2 border  rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white white   ">
             <option value="">Select type…</option>
             {types.map(t => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
           </select>
           <input ref={fileRef} type="file" accept="image/*,application/pdf"
-            className="text-sm text-gray-600 text-gray-400  file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-white bg-gray-900  file:text-indigo-700 file:cursor-pointer" />
+            className="text-sm text-gray-600 text-gray-400  file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-white white  file:text-indigo-700 file:cursor-pointer" />
           <button onClick={handleUpload} disabled={uploading}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
             {uploading ? 'Uploading…' : 'Upload'}
@@ -251,7 +251,7 @@ function DocumentsSection({ userType, userId }) {
         <p className="text-center text-gray-400  py-6 text-sm">No documents uploaded yet</p>
       ) : (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+          <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Type</th>
               <th className="px-3 py-2 text-left">File</th>
@@ -263,7 +263,7 @@ function DocumentsSection({ userType, userId }) {
           </thead>
           <tbody className="divide-y divide-gray-100 divide-gray-700 ">
             {docs.map(d => (
-              <tr key={d.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+              <tr key={d.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                 <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{d.doc_type?.replace(/_/g,' ')}</td>
                 <td className="px-3 py-2 text-gray-600 text-gray-400  max-w-xs truncate" title={d.original_name}>{d.original_name}</td>
                 <td className="px-3 py-2 text-gray-500 text-gray-400  ">{fileSize(d.file_size)}</td>
@@ -326,7 +326,7 @@ function LoginPage({ onLogin }) {
     finally { setLoading(false); }
   };
 
-  const inputCls = "w-full px-4 py-3 bg-white bg-gray-900  border border-gray-200 border-gray-700  rounded-xl text-gray-900 text-white  text-sm placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition";
+  const inputCls = "w-full px-4 py-3 bg-white white  border border-gray-200 border-gray-700  rounded-xl text-gray-900 text-white  text-sm placeholder-gray-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition";
 
   return (
     <div style={{
@@ -615,7 +615,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
             <StatCard label="Collected Month"   value={fmt(v.collected_month)}  color="indigo" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="bg-gray-50 bg-gray-800   rounded-lg p-4 space-y-2">
+            <div className="bg-gray-50 bg-gray-50   rounded-lg p-4 space-y-2">
               <p className="font-semibold text-gray-700 text-gray-300   mb-2">Vehicle Info</p>
               <Row label="Number"         value={v.vehicle_number} />
               <Row label="Model"          value={v.vehicle_model || '—'} />
@@ -625,7 +625,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
               <Row label="Insurance Exp"  value={fmtDate(v.insurance_expiry)} />
               <Row label="Fitness Exp"    value={fmtDate(v.fitness_expiry)} />
             </div>
-            <div className="bg-gray-50 bg-gray-800   rounded-lg p-4 space-y-2">
+            <div className="bg-gray-50 bg-gray-50   rounded-lg p-4 space-y-2">
               <p className="font-semibold text-gray-700 text-gray-300   mb-2">Current Assignment</p>
               {v.driver_id ? (
                 <>
@@ -646,7 +646,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
 
       {tab === 'history' && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+          <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Driver</th>
               <th className="px-3 py-2 text-left">Phone</th>
@@ -660,7 +660,7 @@ function VehicleDetailModal({ vehicleId, onClose, onBack, breadcrumbs }) {
             {history.length === 0
               ? <tr><td colSpan={6} className="py-8 text-center text-gray-400 ">No assignment history</td></tr>
               : history.map(h => (
-                <tr key={h.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                <tr key={h.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                   <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{h.driver_name}</td>
                   <td className="px-3 py-2 text-gray-500 text-gray-400  ">{h.driver_phone}</td>
                   <td className="px-3 py-2 text-gray-500 text-gray-400  ">{fmtDate(h.assigned_at)}</td>
@@ -720,7 +720,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
             <StatCard label="Transactions"    value={d.total_transactions || 0}  color="orange" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="bg-gray-50 bg-gray-800   rounded-lg p-4 space-y-2">
+            <div className="bg-gray-50 bg-gray-50   rounded-lg p-4 space-y-2">
               <p className="font-semibold text-gray-700 text-gray-300   mb-2">Personal</p>
               <Row label="Phone"      value={d.mobile_number} />
               <Row label="Status"     value={<Badge status={d.status} />} />
@@ -730,7 +730,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
               <Row label="DL Expiry"  value={fmtDate(d.driving_license_expiry)} />
               <Row label="Joined"     value={fmtDate(d.created_at)} />
             </div>
-            <div className="bg-gray-50 bg-gray-800   rounded-lg p-4 space-y-2">
+            <div className="bg-gray-50 bg-gray-50   rounded-lg p-4 space-y-2">
               <p className="font-semibold text-gray-700 text-gray-300   mb-2">Fleet & Finance</p>
               <Row label="Owner"       value={d.owner_name || '—'} />
               <Row label="Owner Phone" value={d.owner_phone || '—'} />
@@ -748,7 +748,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
       {tab === 'transactions' && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+            <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">Date</th>
                 <th className="px-3 py-2 text-right">Amount</th>
@@ -760,7 +760,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
               {transactions.length === 0
                 ? <tr><td colSpan={4} className="py-8 text-center text-gray-400 ">No transactions</td></tr>
                 : transactions.map((t, i) => (
-                  <tr key={i} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                  <tr key={i} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                     <td className="px-3 py-2 text-gray-500 text-gray-400  ">{fmtDate(t.order_initiation_date)}</td>
                     <td className="px-3 py-2 text-right font-medium text-gray-800 text-white  ">{fmt(t.order_amount)}</td>
                     <td className="px-3 py-2"><Badge status={t.transaction_status} /></td>
@@ -775,7 +775,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
       {tab === 'vehicles' && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+            <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">Vehicle</th>
                 <th className="px-3 py-2 text-left">Assigned</th>
@@ -788,7 +788,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
               {vehicle_history.length === 0
                 ? <tr><td colSpan={5} className="py-8 text-center text-gray-400 ">No vehicle history</td></tr>
                 : vehicle_history.map(h => (
-                  <tr key={h.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                  <tr key={h.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                     <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{h.vehicle_number} {h.vehicle_model ? `· ${h.vehicle_model}` : ''}</td>
                     <td className="px-3 py-2 text-gray-500 text-gray-400  ">{fmtDate(h.assigned_at)}</td>
                     <td className="px-3 py-2 text-gray-500 text-gray-400  ">{h.unassigned_at ? fmtDate(h.unassigned_at) : <span className="text-green-600 font-medium">Active</span>}</td>
@@ -804,7 +804,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
       {tab === 'logs' && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+            <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">Date</th>
                 <th className="px-3 py-2 text-right">Active Minutes</th>
@@ -815,7 +815,7 @@ function DriverDetailModal({ driverId, onClose, onBack, breadcrumbs }) {
               {daily_logs.length === 0
                 ? <tr><td colSpan={3} className="py-8 text-center text-gray-400 ">No daily logs</td></tr>
                 : daily_logs.map((l, i) => (
-                  <tr key={i} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                  <tr key={i} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                     <td className="px-3 py-2 text-gray-500 text-gray-400  ">{fmtDate(l.log_date)}</td>
                     <td className="px-3 py-2 text-right text-gray-700 text-gray-300  ">{l.active_minutes ?? '—'}</td>
                     <td className="px-3 py-2 text-right text-gray-700 text-gray-300  ">{l.trip_count ?? '—'}</td>
@@ -876,7 +876,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
             <StatCard label="Total Collection" value={fmt(o.collection_total)} color="green" />
             <StatCard label="This Month"     value={fmt(o.collection_month)}  color="indigo" />
           </div>
-          <div className="bg-gray-50 bg-gray-800   rounded-lg p-4 text-sm space-y-2">
+          <div className="bg-gray-50 bg-gray-50   rounded-lg p-4 text-sm space-y-2">
             <Row label="Phone"         value={o.mobile_number} />
             <Row label="Business"      value={o.business_name || '—'} />
             <Row label="Email"         value={o.email || '—'} />
@@ -890,7 +890,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
 
       {tab === 'drivers' && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+          <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Driver</th>
               <th className="px-3 py-2 text-left">Phone</th>
@@ -904,7 +904,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
             {drivers.length === 0
               ? <tr><td colSpan={6} className="py-8 text-center text-gray-400 ">No drivers</td></tr>
               : drivers.map(d => (
-                <tr key={d.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                <tr key={d.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                   <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{d.full_name}</td>
                   <td className="px-3 py-2 text-gray-500 text-gray-400  ">{d.mobile_number}</td>
                   <td className="px-3 py-2 text-gray-500 text-gray-400  ">{d.vehicle_number || '—'}</td>
@@ -922,7 +922,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
 
       {tab === 'vehicles' && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+          <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Vehicle</th>
               <th className="px-3 py-2 text-left">Model</th>
@@ -936,7 +936,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
             {vehicles.length === 0
               ? <tr><td colSpan={6} className="py-8 text-center text-gray-400 ">No vehicles</td></tr>
               : vehicles.map(v => (
-                <tr key={v.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                <tr key={v.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                   <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{v.vehicle_number}</td>
                   <td className="px-3 py-2 text-gray-500 text-gray-400  ">{v.vehicle_model || '—'}</td>
                   <td className="px-3 py-2"><Badge status={v.status || v.operational_status} /></td>
@@ -954,7 +954,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
 
       {tab === 'payments' && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+          <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Date</th>
               <th className="px-3 py-2 text-left">Driver</th>
@@ -965,7 +965,7 @@ function OwnerDetailModal({ ownerId, onClose, onBack, breadcrumbs, onSelectDrive
             {payments.length === 0
               ? <tr><td colSpan={3} className="py-8 text-center text-gray-400 ">No payments</td></tr>
               : payments.map((p, i) => (
-                <tr key={i} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                <tr key={i} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                   <td className="px-3 py-2 text-gray-500 text-gray-400  ">{fmtDate(p.order_completion_date)}</td>
                   <td className="px-3 py-2 text-gray-700 text-gray-300  ">{p.driver_name}</td>
                   <td className="px-3 py-2 text-right font-medium text-gray-800 text-white  ">{fmt(p.order_amount)}</td>
@@ -1025,7 +1025,7 @@ function CompanyDocsSection({ companyId }) {
         <p className="text-sm font-medium text-indigo-800 mb-3">Upload Company Document</p>
         <div className="flex gap-2 flex-wrap">
           <select value={docType} onChange={e => setDocType(e.target.value)}
-            className="border  rounded px-2 py-1.5 text-sm bg-white bg-gray-900    flex-shrink-0">
+            className="border  rounded px-2 py-1.5 text-sm bg-white white    flex-shrink-0">
             <option value="AGREEMENT">Agreement</option>
             <option value="GST">GST Certificate</option>
             <option value="PAN">PAN Card</option>
@@ -1033,7 +1033,7 @@ function CompanyDocsSection({ companyId }) {
             <option value="OTHER">Other</option>
           </select>
           <input type="file" onChange={e => setFile(e.target.files[0])}
-            className="text-xs flex-1 min-w-0 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white bg-gray-900  file:text-indigo-700" />
+            className="text-xs flex-1 min-w-0 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white white  file:text-indigo-700" />
           <button onClick={handleUpload} disabled={uploading}
             className="bg-indigo-600 text-white px-3 py-1.5 rounded text-sm font-medium disabled:opacity-50 flex-shrink-0">
             {uploading ? 'Uploading…' : 'Upload'}
@@ -1047,7 +1047,7 @@ function CompanyDocsSection({ companyId }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+            <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
               <tr>
                 <th className="px-3 py-2 text-left">User</th>
                 <th className="px-3 py-2 text-left">Type</th>
@@ -1060,7 +1060,7 @@ function CompanyDocsSection({ companyId }) {
             </thead>
             <tbody className="divide-y divide-gray-100 divide-gray-700 ">
               {docs.map(d => (
-                <tr key={d.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                <tr key={d.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                   <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{d.user_name || d.user_id}</td>
                   <td className="px-3 py-2 text-xs text-gray-500 text-gray-400 ">{d.user_type}</td>
                   <td className="px-3 py-2">{d.doc_type?.replace(/_/g,' ')}</td>
@@ -1273,7 +1273,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
           </div>
           {loading ? <Spinner /> : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+              <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
                 <tr>
                   <th className="px-3 py-2 text-left">Owner</th>
                   <th className="px-3 py-2 text-left">Phone</th>
@@ -1289,7 +1289,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                 {owners.length === 0
                   ? <tr><td colSpan={8} className="py-8 text-center text-gray-400 ">No owners found</td></tr>
                   : owners.map(o => (
-                    <tr key={o.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                    <tr key={o.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                       <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{o.full_name}</td>
                       <td className="px-3 py-2 text-gray-500 text-gray-400  ">{o.mobile_number}</td>
                       <td className="px-3 py-2">
@@ -1339,7 +1339,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                       <p className="text-sm text-gray-400  py-3">No drivers assigned to this branch</p>
                     ) : (
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+                        <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
                           <tr>
                             <th className="px-3 py-2 text-left">Name</th>
                             <th className="px-3 py-2 text-left">Phone</th>
@@ -1349,7 +1349,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                         </thead>
                         <tbody className="divide-y divide-gray-100 divide-gray-700 ">
                           {branchDrivers.map(d => (
-                            <tr key={d.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700  cursor-pointer"
+                            <tr key={d.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700  cursor-pointer"
                               onClick={() => onSelectOwner && null /* extend if needed */}>
                               <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{d.full_name}</td>
                               <td className="px-3 py-2 text-gray-500 text-gray-400 ">{d.mobile_number}</td>
@@ -1367,7 +1367,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                       <p className="text-sm text-gray-400  py-3">No vehicles assigned to this branch</p>
                     ) : (
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+                        <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
                           <tr>
                             <th className="px-3 py-2 text-left">Reg Number</th>
                             <th className="px-3 py-2 text-left">Type</th>
@@ -1377,7 +1377,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                         </thead>
                         <tbody className="divide-y divide-gray-100 divide-gray-700 ">
                           {branchVehicles.map(v => (
-                            <tr key={v.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                            <tr key={v.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                               <td className="px-3 py-2 font-medium text-gray-800 text-white  ">{v.reg_number}</td>
                               <td className="px-3 py-2 text-gray-500 text-gray-400 ">{vehicleTypeLabel(v.vehicle_type)}</td>
                               <td className="px-3 py-2 text-gray-500 text-gray-400 ">{v.driver_name || '—'}</td>
@@ -1424,7 +1424,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                       {branchSaving ? 'Saving…' : 'Create Branch'}
                     </button>
                     <button type="button" onClick={() => setAddingBranch(false)}
-                      className="px-4 py-1.5 border  text-gray-600 text-gray-400   rounded-lg text-sm hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                      className="px-4 py-1.5 border  text-gray-600 text-gray-400   rounded-lg text-sm hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                       Cancel
                     </button>
                   </div>
@@ -1489,7 +1489,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
             obStatus === 'APPROVED'  ? 'bg-emerald-50 border border-emerald-200' :
             obStatus === 'REJECTED'  ? 'bg-red-50 border border-red-200' :
             obStatus === 'SUBMITTED' ? 'bg-amber-50 border border-amber-200' :
-            'bg-gray-50 bg-gray-800  border border-gray-200 border-gray-700 '
+            'bg-gray-50 bg-gray-50  border border-gray-200 border-gray-700 '
           }`}>
             <div>
               <p className="text-xs font-semibold text-gray-700 text-gray-300 ">Merchant Onboarding Status</p>
@@ -1513,7 +1513,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
           {obMsg && <p className={`text-xs ${obMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{obMsg}</p>}
 
           {/* Merchant profile fields */}
-          <div className="bg-white bg-gray-900   rounded-xl border border-gray-100 border-gray-700   divide-y divide-gray-100 divide-gray-700  ">
+          <div className="bg-white white   rounded-xl border border-gray-100 border-gray-700   divide-y divide-gray-100 divide-gray-700  ">
             {[
               { label: 'Business Category',  value: company.business_category },
               { label: 'Legal Entity Type',  value: company.legal_entity_type },
@@ -1551,7 +1551,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
                 🔔 Payment Mode Change Request{pmRequests.length > 1 ? 's' : ''}
               </p>
               {pmRequests.map(req => (
-                <div key={req.id} className="bg-white bg-gray-900  rounded-lg p-3 border border-amber-100 space-y-2">
+                <div key={req.id} className="bg-white white  rounded-lg p-3 border border-amber-100 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-gray-700 text-gray-300 ">{req.owner_name}</p>
                     <span className="text-[10px] text-gray-400">{new Date(req.created_at).toLocaleDateString('en-IN')}</span>
@@ -1584,7 +1584,7 @@ function CompanyDetailModal({ company, onClose, onBack, breadcrumbs, onSelectOwn
             <select
               value={payMode}
               onChange={e => { setPayMode(e.target.value); setPayModeMsg(''); }}
-              className="w-full border border-gray-300  rounded-lg px-3 py-2 text-sm bg-white bg-gray-900    focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-full border border-gray-300  rounded-lg px-3 py-2 text-sm bg-white white    focus:outline-none focus:ring-2 focus:ring-indigo-400"
             >
               <option value="BOTH">Both (Cash + Online)</option>
               <option value="CASH_ONLY">Cash Only</option>
@@ -1693,9 +1693,9 @@ function Companies() {
         className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
       {loading ? <Spinner /> : (
-        <div className="bg-white bg-gray-900    rounded-xl shadow-sm border overflow-hidden">
+        <div className="bg-white white    rounded-xl shadow-sm border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+            <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Company</th>
                 <th className="px-4 py-3 text-left">City</th>
@@ -1750,7 +1750,7 @@ function Companies() {
       {/* Deactivate Confirm */}
       {confirmCo && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white bg-gray-900   rounded-xl p-6 w-full max-w-sm shadow-xl text-center">
+          <div className="bg-white white   rounded-xl p-6 w-full max-w-sm shadow-xl text-center">
             <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
               <span className="text-red-600 text-xl">⚠</span>
             </div>
@@ -1759,7 +1759,7 @@ function Companies() {
             <p className="text-xs text-gray-500 text-gray-400  mb-5">All owners and drivers in this company will lose access until reactivated.</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmCo(null)}
-                className="flex-1 border  text-gray-600 text-gray-400   py-2 rounded-lg text-sm hover:bg-gray-50 bg-gray-800 ">
+                className="flex-1 border  text-gray-600 text-gray-400   py-2 rounded-lg text-sm hover:bg-gray-50 bg-gray-50 ">
                 Cancel
               </button>
               <button onClick={() => { setConfirmCo(null); toggleStatus(confirmCo.id, confirmCo.status); }}
@@ -1774,7 +1774,7 @@ function Companies() {
       {/* Rename Company */}
       {renaming && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white bg-gray-900   rounded-xl p-6 w-full max-w-sm shadow-xl">
+          <div className="bg-white white   rounded-xl p-6 w-full max-w-sm shadow-xl">
             <h3 className="font-bold text-gray-800 text-white   mb-4">Rename Company</h3>
             <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') setRenaming(null); }}
@@ -1785,7 +1785,7 @@ function Companies() {
                 {renameSaving ? 'Saving…' : 'Save'}
               </button>
               <button onClick={() => setRenaming(null)}
-                className="flex-1 border  text-gray-600 text-gray-400   py-2 rounded-lg text-sm hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                className="flex-1 border  text-gray-600 text-gray-400   py-2 rounded-lg text-sm hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                 Cancel
               </button>
             </div>
@@ -1796,7 +1796,7 @@ function Companies() {
       {/* Add Company */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white bg-gray-900   rounded-xl p-6 w-full max-w-md shadow-xl">
+          <div className="bg-white white   rounded-xl p-6 w-full max-w-md shadow-xl">
             <h3 className="font-bold text-gray-800 text-white   mb-4">Onboard New Company</h3>
             {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
             <form onSubmit={addCompany} className="space-y-3">
@@ -1815,7 +1815,7 @@ function Companies() {
                   {saving ? 'Saving…' : 'Create'}
                 </button>
                 <button type="button" onClick={() => setShowAdd(false)}
-                  className="flex-1 border  text-gray-600 text-gray-400   py-2 rounded-lg text-sm hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                  className="flex-1 border  text-gray-600 text-gray-400   py-2 rounded-lg text-sm hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                   Cancel
                 </button>
               </div>
@@ -1915,9 +1915,9 @@ function KycReview() {
       </div>
 
       {loading ? <Spinner /> : (
-        <div className="bg-white bg-gray-900    rounded-xl shadow-sm border overflow-hidden">
+        <div className="bg-white white    rounded-xl shadow-sm border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+            <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Driver</th>
                 <th className="px-4 py-3 text-left">Phone</th>
@@ -1929,7 +1929,7 @@ function KycReview() {
             </thead>
             <tbody className="divide-y divide-gray-100 divide-gray-700 ">
               {drivers.map(d => (
-                <tr key={d.id} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                <tr key={d.id} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                   <td className="px-4 py-3">
                     <button onClick={() => push({ type: 'driver', id: d.id, label: d.full_name || d.driver_name })}
                       className="font-medium text-indigo-700 hover:underline text-left">
@@ -1964,7 +1964,7 @@ function KycReview() {
 
       {rejectTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white bg-gray-900   rounded-xl p-6 w-full max-w-md shadow-xl">
+          <div className="bg-white white   rounded-xl p-6 w-full max-w-md shadow-xl">
             <h3 className="font-bold text-gray-800 text-white   mb-3">Rejection Reason</h3>
             <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)}
               placeholder="Reason…"
@@ -1975,7 +1975,7 @@ function KycReview() {
                 {saving ? 'Rejecting…' : 'Confirm Reject'}
               </button>
               <button onClick={() => setRejectTarget(null)}
-                className="flex-1 border  text-gray-600 text-gray-400   py-2 rounded-lg text-sm hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                className="flex-1 border  text-gray-600 text-gray-400   py-2 rounded-lg text-sm hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                 Cancel
               </button>
             </div>
@@ -2300,7 +2300,7 @@ function AllOwners() {
 
       {editPhone && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setEditPhone(null)}>
-          <div className="bg-white bg-gray-900   rounded-2xl shadow-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-white white   rounded-2xl shadow-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h3 className="font-bold text-gray-800 text-white   mb-1">Change Phone Number</h3>
             <p className="text-sm text-gray-500 text-gray-400  mb-4">{editPhone.name}</p>
             <input type="tel" autoFocus maxLength={10}
@@ -2405,9 +2405,9 @@ function Transactions() {
         </div>
       )}
       {loading ? <Spinner /> : (
-        <div className="bg-white bg-gray-900    rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
+        <div className="bg-white white    rounded-xl shadow-sm border overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 bg-gray-800   text-gray-500 text-gray-400   text-xs uppercase">
+            <thead className="bg-gray-50 bg-gray-50   text-gray-500 text-gray-400   text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Date</th>
                 <th className="px-4 py-3 text-left">Driver</th>
@@ -2419,7 +2419,7 @@ function Transactions() {
             </thead>
             <tbody className="divide-y divide-gray-100 divide-gray-700 ">
               {rows.map((r, i) => (
-                <tr key={i} className="hover:bg-gray-50 bg-gray-800  :bg-gray-100 bg-gray-700 ">
+                <tr key={i} className="hover:bg-gray-50 bg-gray-50  :bg-gray-100 bg-gray-700 ">
                   <td className="px-4 py-3 text-gray-500 text-gray-400  ">{fmtDate(r.order_initiation_date)}</td>
                   <td className="px-4 py-3 text-gray-700 text-gray-300  ">{r.driver_name || r.payer_mobile || '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-gray-400  ">{r.owner_name || '—'}</td>
@@ -2668,7 +2668,7 @@ function AuditLog() {
             <div key={key} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
               {/* Owner header */}
               <div style={{ padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#111827' }}>
                   {(group.name || 'O')[0].toUpperCase()}
                 </div>
                 <div>
@@ -2795,14 +2795,14 @@ function ChatViewer() {
                 onMouseLeave={e => { if (selected?.driver_id !== t.driver_id) e.currentTarget.style.background = 'transparent'; }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#111827', flexShrink: 0 }}>
                     {(t.driver_name || '?')[0].toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.driver_name}</p>
                     <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>Owner: {t.owner_name || '—'}</p>
                   </div>
-                  {t.unread_count > 0 && <span style={{ background: '#6366f1', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 6px' }}>{t.unread_count}</span>}
+                  {t.unread_count > 0 && <span style={{ background: '#6366f1', color: '#111827', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 6px' }}>{t.unread_count}</span>}
                 </div>
                 {t.last_message
                   ? <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -2904,14 +2904,14 @@ function DocApprovals() {
       {/* Reject reason modal */}
       {rejectId && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white bg-gray-900   rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+          <div className="bg-white white   rounded-2xl w-full max-w-sm p-6 shadow-2xl">
             <h3 className="font-bold text-gray-900 text-white   mb-1">Reject Document</h3>
             <p className="text-sm text-gray-500 text-gray-400   mb-4">Optional: provide reason for rejection.</p>
             <textarea
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
               placeholder="e.g. Image blurry, wrong document type…"
-              className="w-full border  rounded-xl p-3 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-red-400 bg-white bg-gray-900   "
+              className="w-full border  rounded-xl p-3 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-red-400 bg-white white   "
             />
             <div className="flex gap-3 mt-4">
               <button onClick={() => { setRejectId(null); setRejectReason(''); }}
@@ -2950,10 +2950,10 @@ function DocApprovals() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {docs.map(d => (
-            <div key={d.id} className="bg-white bg-gray-900   rounded-2xl border border-gray-200 border-gray-700   overflow-hidden shadow-sm hover:shadow-md transition">
+            <div key={d.id} className="bg-white white   rounded-2xl border border-gray-200 border-gray-700   overflow-hidden shadow-sm hover:shadow-md transition">
               {/* Document preview */}
               <div
-                className="h-40 bg-gray-50 bg-gray-800   flex items-center justify-center cursor-pointer hover:bg-gray-100 bg-gray-700  :bg-gray-100 bg-gray-700  transition relative group"
+                className="h-40 bg-gray-50 bg-gray-50   flex items-center justify-center cursor-pointer hover:bg-gray-100 bg-gray-700  :bg-gray-100 bg-gray-700  transition relative group"
                 onClick={() => d.view_url && window.open(d.view_url, '_blank')}
               >
                 {d.mime_type?.startsWith('image/') && d.view_url ? (
@@ -3138,7 +3138,7 @@ function DbExplorer() {
             )}
             <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
               placeholder="Search value..." style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 12, outline: 'none', width: 180, background: '#fff', color: '#1e293b' }} />
-            <button type="submit" style={{ padding: '6px 14px', borderRadius: 6, background: '#6366f1', color: '#fff', border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Go</button>
+            <button type="submit" style={{ padding: '6px 14px', borderRadius: 6, background: '#6366f1', color: '#111827', border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>Go</button>
             {search && <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }}
               style={{ padding: '6px 10px', borderRadius: 6, background: '#f1f5f9', color: '#374151', border: 'none', fontSize: 12, cursor: 'pointer' }}>✕</button>}
 
@@ -3326,7 +3326,7 @@ function LeadsSection() {
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Landing Page Leads</h2>
           <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0' }}>{leads.length} total submissions · timestamps in UTC</p>
         </div>
-        <button onClick={downloadCSV} style={{ padding: '8px 16px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+        <button onClick={downloadCSV} style={{ padding: '8px 16px', background: '#4f46e5', color: '#111827', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
           Download CSV
         </button>
       </div>
@@ -3465,7 +3465,7 @@ function PinManagementSection() {
         </div>
       )}
 
-      <div className="bg-white bg-gray-900  border border-slate-200 rounded-2xl p-5 space-y-4">
+      <div className="bg-white white  border border-slate-200 rounded-2xl p-5 space-y-4">
         <div>
           <h3 className="font-black text-slate-800 text-white ">Generate Initial PINs</h3>
           <p className="text-xs text-slate-500 text-gray-400  mt-1">Pick a scope, generate, download CSV, share ONLY with that owner. Leave blank for platform-wide.</p>
@@ -3510,7 +3510,7 @@ function PinManagementSection() {
             </button>
             <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50 bg-gray-800  sticky top-0">
+                <thead className="bg-slate-50 bg-gray-50  sticky top-0">
                   <tr>{['Role','Name','Phone','Code','PIN'].map(function(h){return <th key={h} className="px-3 py-2 text-left font-black text-slate-600 text-gray-300 ">{h}</th>;})}</tr>
                 </thead>
                 <tbody>
@@ -3533,7 +3533,7 @@ function PinManagementSection() {
         )}
       </div>
 
-      <div className="bg-white bg-gray-900  border border-slate-200 rounded-2xl p-5 space-y-4">
+      <div className="bg-white white  border border-slate-200 rounded-2xl p-5 space-y-4">
         <div>
           <h3 className="font-black text-slate-800 text-white ">Reset a User's PIN</h3>
           <p className="text-xs text-slate-500 text-gray-400  mt-1">Enter phone number — no need to look up IDs. User will be forced to change PIN on next login.</p>
@@ -3631,7 +3631,7 @@ function AdminPanelInner() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 4px 12px rgba(99,102,241,0.35)', flexShrink: 0
             }}>
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>M</span>
+              <span style={{ color: '#111827', fontWeight: 800, fontSize: 16 }}>M</span>
             </div>
             <div>
               <p style={{ color: '#111827', fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', margin: 0 }}>MobilityGrid</p>
@@ -3738,7 +3738,7 @@ function AdminPanelInner() {
                   <span style={{
                     position: 'absolute', top: -4, right: -4,
                     minWidth: 16, height: 16, background: '#ef4444',
-                    color: '#fff', fontSize: 9, fontWeight: 700,
+                    color: '#111827', fontSize: 9, fontWeight: 700,
                     borderRadius: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px'
                   }}>
                     {unread > 99 ? '99+' : unread}
@@ -3836,7 +3836,7 @@ function AdminPanelInner() {
                             setTab(selectedNotif.metadata.role === 'OWNER' ? 'owners' : 'drivers');
                             setSelectedNotif(null);
                           }}
-                          style={{ width: '100%', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                          style={{ width: '100%', background: '#6366f1', color: '#111827', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                           View {selectedNotif.metadata.role === 'OWNER' ? 'Owner' : 'Driver'} Profile →
                         </button>
                       </div>
@@ -3858,7 +3858,7 @@ function AdminPanelInner() {
                 background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SA</span>
+                <span style={{ color: '#111827', fontSize: 11, fontWeight: 700 }}>SA</span>
               </div>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
                 {(() => { try { const p = JSON.parse(atob((localStorage.getItem('mg_admin_token')||'..').split('.')[1])); return p.phone ? `+91 ••••${String(p.phone).slice(-4)}` : 'Super Admin'; } catch { return 'Super Admin'; } })()}
@@ -3902,7 +3902,7 @@ function AdminPanelInner() {
                 Cancel
               </button>
               <button onClick={() => { localStorage.removeItem('mg_admin_token'); window.location.href = '/login'; }}
-                style={{ flex: 1, padding: '10px 0', background: '#ef4444', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '10px 0', background: '#ef4444', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#111827', cursor: 'pointer' }}>
                 Sign Out
               </button>
             </div>

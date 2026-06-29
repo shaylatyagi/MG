@@ -1390,6 +1390,7 @@ const addVehicle = async () => {
         daily_rent: newVehicle.dailyRent,
         rent_type: rentType,
         owner_id: ownerId(),
+        mva_applicable: newVehicle.mva
       })
     });
 
@@ -5277,7 +5278,19 @@ ${fit}
           </select>
         </div>
       </div>
-
+      {/* MVA */}
+        <div style={{display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'#f8fafc', borderRadius:10, border:'1px solid #e2e8f0'}}>
+          <input
+            type="checkbox"
+            id="mva_chk"
+            checked={newVehicle.mva || false}
+            onChange={e => setNewVehicle({...newVehicle, mva: e.target.checked})}
+            style={{width:16, height:16, cursor:'pointer', accentColor:'#7c3aed'}}
+          />
+          <label htmlFor="mva_chk" style={{fontSize:13, fontWeight:600, color:'#374151', cursor:'pointer'}}>
+            ⚖️ Motor Vehicle Act (MVA) applicable hai
+          </label>
+        </div>
       {/* Footer buttons */}
       <div className="px-5 py-4 border-t border-slate-100 flex gap-3">
         <button onClick={() => setShowAddVehicle(false)} className="flex-1 py-2.5 bg-slate-100 rounded-xl text-sm font-semibold text-slate-600">Cancel</button>
