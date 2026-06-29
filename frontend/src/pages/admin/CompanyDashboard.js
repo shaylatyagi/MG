@@ -2563,7 +2563,15 @@ function LoginActivity() {
         </select>
       </div>
       <div style={{ border:'1px solid #e2e8f0', borderRadius:12, overflow:'hidden', marginBottom:20 }}>
-        <div ref={mapRef} style={{ height:320, background:'#e5e7eb' }} />
+        <div ref={mapRef} style={{ height:320, background:'#e5e7eb' }}>
+  {logs.filter(l=>l.latitude).length === 0 && (
+    <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:8}}>
+      <span style={{fontSize:32}}>📍</span>
+      <p style={{fontSize:12,color:'#64748b',margin:0}}>GPS data will appear here after new logins</p>
+      <p style={{fontSize:11,color:'#94a3b8',margin:0}}>Location is captured when users login</p>
+    </div>
+  )}
+</div>
       </div>
       {loading ? <div style={{ textAlign:'center', padding:40, color:'#94a3b8' }}>Loading…</div> : (
         <div style={{ overflowX:'auto' }}>
@@ -3565,7 +3573,10 @@ function PinManagementSection() {
 
 
 function AdminPanelInner() {
-  useEffect(() => { document.documentElement.classList.remove('dark'); }, []);
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    try { localStorage.removeItem('mg_theme'); } catch {}
+  }, []);
   const [isLoggedIn, setIsLoggedIn] = useState(!!getToken());
   const [tab, setTab]               = useState('dashboard');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);

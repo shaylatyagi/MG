@@ -963,7 +963,7 @@ export default function DriverPWA() {
               max={new Date().toISOString().slice(0,7)}
               onChange={e => { setAttendanceMonth(e.target.value); fetchAttendance(e.target.value); }}
               className="text-[10px] text-slate-400 border-none bg-transparent outline-none font-mono"
-              style={{width:90}}
+              style={{width:120}}
             />
           </div>
           <div className="px-4 py-3">
@@ -1008,8 +1008,8 @@ export default function DriverPWA() {
                     <div key={day} title={beforeAssignment ? 'Before vehicle assignment' : `Day ${day}`} style={{
                       width: 22, height: 22, borderRadius: 6, fontSize: 9, fontWeight: 700,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: inactive ? 'var(--color-gray-100)' : present ? 'var(--color-primary)' : 'var(--color-danger-50)',
-                      color: inactive ? 'var(--color-text-muted)' : present ? 'white' : 'var(--color-danger-dark)',
+                      background: inactive ? '#f8fafc' : present ? '#16a34a' : '#fef2f2',
+color: inactive ? '#e2e8f0' : present ? 'white' : '#ef4444',
                       border: isToday ? '2px solid var(--color-primary)' : '2px solid transparent',
                       opacity: beforeAssignment ? 0.4 : 1,
                     }}>{day}</div>

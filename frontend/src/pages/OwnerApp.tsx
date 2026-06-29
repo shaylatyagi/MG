@@ -755,7 +755,7 @@ const vehicleModalScrollRef = React.useRef<HTMLDivElement>(null);
   // Form states
   const [newVehicle, setNewVehicle] = useState({
   vehicleNumber: '', vehicleModel: '', vehicleType: '', dailyRent: '',
-  insuranceExpiry: '', fitnessExpiry: '', chassisNumber: ''
+  insuranceExpiry: '', fitnessExpiry: '', chassisNumber: '',mva: 'false'
 });
   const [vehiclePhotos, setVehiclePhotos] = React.useState<Record<string,File|null>>({ front: null, back: null, left: null, right: null });
   const [vehiclePhotoPreviews, setVehiclePhotoPreviews] = React.useState<Record<string,string>>({});
@@ -3154,6 +3154,18 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
                     {new Date(vehicle.fitness_expiry).getTime() < new Date().getTime()&&' ⚠️ EXPIRED'}
                   </span>
                 ) : <span className="text-sm text-slate-600">Not added</span>}
+                <div style={{display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'#f8fafc', borderRadius:10, border:'1px solid #e2e8f0', marginBottom:8}}>
+  <input
+    type="checkbox"
+    id="mva_box"
+    checked={newVehicle.mva || false}
+    onChange={e => setNewVehicle({...newVehicle, mva: e.target.checked})}
+    style={{width:16, height:16, cursor:'pointer', accentColor:'#7c3aed'}}
+  />
+  <label htmlFor="mva_box" style={{fontSize:13, fontWeight:600, color:'#374151', cursor:'pointer'}}>
+    ⚖️ Motor Vehicle Act (MVA) applicable hai
+  </label>
+</div>
               </div>
             </div>
           </div>
@@ -6176,10 +6188,7 @@ ${fit}
                               }} className={`w-28 border rounded px-1.5 py-1 text-xs focus:outline-none ${v._errors.some(e=>e.includes('Model'))?'border-red-400':'border-slate-200'}`}/>
                             </td>
                             <td className="px-1 py-1">
-                              <select value={v.vehicle_type||'EV'} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],vehicle_type:e.target.value};return u;})}}
-                                className="border border-slate-200 rounded px-1.5 py-1 text-xs bg-white focus:outline-none">
-                                {VEHICLE_TYPE_GROUPS.map(g => g.types.map(t => <option key={t.code} value={t.code}>{t.icon} {t.label}</option>))}
-                              </select>
+                        
                             </td>
                             <td className="px-1 py-1">
                               <input type="number" value={v.daily_rent||''} onChange={e=>{setBulkVehicles(prev=>{const u=[...prev];u[i]={...u[i],daily_rent:e.target.value};return u;})}}

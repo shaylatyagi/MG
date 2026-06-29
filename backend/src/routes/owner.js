@@ -120,13 +120,18 @@ router.get('/stats', async (req, res) => {
 
     // Outstanding = actual unpaid dues from driver_ledger (RENT_CHARGE - PAYMENT)
     const outstandingRes = await pool.query(
-      `SELECT COALESCE(SUM(
-         CASE WHEN entry_type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT','DAMAGE_CHARGE','DEPOSIT_CHARGE') THEN amount
-              WHEN entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') THEN -amount
-              ELSE 0 END
-       ), 0) AS total
-       FROM public.driver_ledger
-       WHERE driver_id IN (
+      `SELECT
+         COALESCE(SUM(
+           CASE WHEN dl.entry_type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT','DAMAGE_CHARGE','DEPOSIT_CHARGE') THEN dl.amount
+                WHEN dl.entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND') THEN -dl.amount
+                ELSE 0 END
+         ), 0) - COALESCE((
+           SELECT SUM(d2.advance_balance)
+           FROM public.drivers d2
+           WHERE d2.owner_id = $1 AND d2.deleted_at IS NULL
+         ), 0) AS total
+       FROM public.driver_ledger dl
+       WHERE dl.driver_id IN (
          SELECT id FROM public.drivers WHERE owner_id=$1 AND deleted_at IS NULL
        )`,
       [oid]
@@ -189,7 +194,7 @@ router.get('/vehicles', async (req, res) => {
 // Body: { reg_number, type, rent_type, daily_rent, model? }// Body: { reg_number, type, rent_type, daily_rent, model? }
 // mva_applicable is AUTO-COMPUTED from vehicle type
 router.post('/vehicles', validate(AddVehicleSchema), async (req, res) => {
-  const { reg_number, type, rent_type = 'DAILY', daily_rent, model } = req.body;
+  const { reg_number, type, rent_type = 'DAILY', daily_rent, model, mva_applicable = false } = req.body;
   // Auto-detect MVA: almost all motor vehicles qualify except pure bicycles/e-cycles
   const mva_applicable = (() => {
     if (!type) return true;
