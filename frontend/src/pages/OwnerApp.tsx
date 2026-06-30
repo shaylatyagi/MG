@@ -1363,6 +1363,10 @@ const assignDriverToVehicleWithRent = async (vehicleId, driverId, rentType, cust
 };
 // Updated addVehicle function with driver assignment
 const addVehicle = async () => {
+  if (newVehicle.mva) {
+  const ok = window.confirm('⚖️ Is vehicle ko MVA applicable mark karna chahte ho? Driver ko unki vehicle info mein dikhega.');
+  if (!ok) return;
+}
   if (!newVehicle.vehicleNumber || !newVehicle.vehicleModel) {
     toast.warn('Vehicle number aur model required hai');
     return;
@@ -1375,12 +1379,6 @@ const addVehicle = async () => {
     toast.warn('Vehicle type select karo');
     return;
   }
-  if (newVehicle.mva) {
-  const confirmed = window.confirm(
-    '⚖️ MVA Applicable mark karna chahte ho?\n\nDriver ko unke vehicle info mein dikhega ki yeh vehicle Motor Vehicle Act ke under aata hai.'
-  );
-  if (!confirmed) return;
-}
 
   try {
     const response = await fetch(`${API}/api/payment/owner/vehicles`, {

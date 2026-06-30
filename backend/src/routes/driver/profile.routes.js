@@ -35,7 +35,7 @@ router.get('/profile', async (req, res) => {
       effectiveDailyCharge = dailyRent + dailyDepositRecovery;
 
       // Use driver_ledger as single source of truth (same as owner stats)
-      const [ledgerRes, todayPaidRes] = await Promise.all([
+      const [ledgerRes, todayPaidRes, allOnlinePaidRes] = await Promise.all([
         pool.query(`
           SELECT
             COALESCE(SUM(CASE WHEN entry_type IN ('RENT_CHARGE','PENALTY','SECURITY_DEPOSIT','DAMAGE_CHARGE','DEPOSIT_CHARGE') THEN amount ELSE 0 END), 0) AS total_charged,
@@ -47,13 +47,18 @@ router.get('/profile', async (req, res) => {
           FROM public.ms_orders
           WHERE payer_mobile = $1 AND transaction_status = 'SUCCESS'
             AND DATE(order_completion_date AT TIME ZONE 'Asia/Kolkata') = (NOW() AT TIME ZONE 'Asia/Kolkata')::date`,
+          [phone]),pool.query(`
+          SELECT COALESCE(SUM(order_amount), 0) AS total
+          FROM public.ms_orders
+          WHERE payer_mobile = $1 AND transaction_status = 'SUCCESS'`,
           [phone])
       ]);
 
       const totalCharged = parseFloat(ledgerRes.rows[0].total_charged);
 const totalPaid    = parseFloat(ledgerRes.rows[0].total_paid);
 const advanceBal   = parseFloat(p.advance_balance || 0);
-total_outstanding  = Math.max(0, totalCharged - totalPaid - advanceBal);
+const totalOnlinePaid = parseFloat(allOnlinePaidRes.rows[0].total);
+total_outstanding = Math.max(0, totalCharged - totalPaid - advanceBal - totalOnlinePaid);
       amount_paid_today  = parseFloat(todayPaidRes.rows[0].total);
     }
 

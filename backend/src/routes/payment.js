@@ -3246,9 +3246,9 @@ router.get('/driver/my-attendance', verifyToken, async (req, res) => {
         ? Math.round((daysPresent / daysElapsed) * 100) : 0,
       todayPresent: isToday,
       windows: windows.map(w => ({
-        from: String(w.win_start).slice(0,10),
-        to:   String(w.win_end).slice(0,10),
-      })),
+  from: new Date(w.win_start).toISOString().slice(0,10),
+  to:   new Date(w.win_end).toISOString().slice(0,10),
+})),
       logs: presentDays.map(day => ({ day, minutes: 0 })),
     });
 
