@@ -1238,7 +1238,7 @@ router.get('/document-approvals', async (req, res) => {
         ud.*,
         COALESCE(d.full_name, o.full_name)             AS user_name,
         COALESCE(d.mobile_number, o.mobile_number)    AS user_phone,
-        c.company_name
+       c.name as company_name
       FROM public.user_documents ud
       LEFT JOIN public.drivers d  ON d.id  = ud.user_id AND ud.user_type = 'DRIVER'
       LEFT JOIN public.owners  o  ON o.id  = ud.user_id AND ud.user_type = 'OWNER'
