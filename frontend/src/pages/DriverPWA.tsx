@@ -919,8 +919,12 @@ export default function DriverPWA() {
               <p className="text-sm font-black text-slate-800">{assignedVehicle.number}</p>
               <p className="text-[9px] text-slate-400">{assignedVehicle.type}{assignedVehicle.model ? ` · ${assignedVehicle.model}` : ''}</p>
               {assignedVehicle.mva && (
-                <span className="text-[8px] font-black text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">⚖️ MVA</span>
-              )}
+  <span style={{
+    fontSize: 9, fontWeight: 700, color: '#7c3aed',
+    background: '#f3e8ff', padding: '2px 8px',
+    borderRadius: 10, display: 'inline-block', marginTop: 2
+  }}>⚖️ MVA Applicable</span>
+)}
             </div>
           </div>
           <div className="text-right">
@@ -1007,13 +1011,15 @@ export default function DriverPWA() {
   const to = new Date(w.to).getDate();
   return day >= from && day <= to;
 }) ?? (day >= assignedFromDay);
-const inWindow = attendance.windows?.some(w => {
-  const wFrom = new Date(w.from + 'T00:00:00').getDate();
-  const wTo   = new Date(w.to   + 'T00:00:00').getDate();
-  return day >= wFrom && day <= wTo;
-}) ?? (day >= assignedFromDay);
+const inWindow = (attendance.windows && attendance.windows.length > 0)
+  ? attendance.windows.some(w => {
+      const wFrom = new Date(w.from + 'T00:00:00').getDate();
+      const wTo   = new Date(w.to   + 'T00:00:00').getDate();
+      return day >= wFrom && day <= wTo;
+    })
+  : (day >= assignedFromDay && !future);
 const inactive = future || !inWindow;
-const beforeAssignment = !inWindow && !future; 
+const beforeAssignment = !inWindow && !future;
                   return (
                     <div key={day} title={beforeAssignment ? 'Before vehicle assignment' : `Day ${day}`} style={{
                       width: 22, height: 22, borderRadius: 6, fontSize: 9, fontWeight: 700,

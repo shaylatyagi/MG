@@ -51,11 +51,9 @@ router.get('/profile', async (req, res) => {
       ]);
 
       const totalCharged = parseFloat(ledgerRes.rows[0].total_charged);
-      const totalPaid    = parseFloat(ledgerRes.rows[0].total_paid);
-      // ADVANCE_CREDIT is already included in totalPaid from driver_ledger
-      // Do NOT subtract advance_balance separately — owner stats use the same ledger formula
-      const advanceBal = parseFloat(p.advance_balance || 0);
-total_outstanding = Math.max(0, charged - paid - advanceBal);
+const totalPaid    = parseFloat(ledgerRes.rows[0].total_paid);
+const advanceBal   = parseFloat(p.advance_balance || 0);
+total_outstanding  = Math.max(0, totalCharged - totalPaid - advanceBal);
       amount_paid_today  = parseFloat(todayPaidRes.rows[0].total);
     }
 

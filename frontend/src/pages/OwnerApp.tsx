@@ -1375,6 +1375,12 @@ const addVehicle = async () => {
     toast.warn('Vehicle type select karo');
     return;
   }
+  if (newVehicle.mva) {
+  const confirmed = window.confirm(
+    '⚖️ MVA Applicable mark karna chahte ho?\n\nDriver ko unke vehicle info mein dikhega ki yeh vehicle Motor Vehicle Act ke under aata hai.'
+  );
+  if (!confirmed) return;
+}
 
   try {
     const response = await fetch(`${API}/api/payment/owner/vehicles`, {
