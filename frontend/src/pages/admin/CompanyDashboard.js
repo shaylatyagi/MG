@@ -2506,7 +2506,7 @@ function LoginActivity() {
     if (!mapRef.current) return;
     if (leafletMap.current) return;
     initMap();
-}, [mapRef.current]);
+}, []);
 
   const initMap = () => {
     if (!window.L || !mapRef.current || leafletMap.current) return;

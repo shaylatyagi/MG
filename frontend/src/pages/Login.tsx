@@ -263,7 +263,11 @@ const loginWithPin = async function() {
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
         if (!navigator.geolocation) { reject(); return; }
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+        navigator.geolocation.getCurrentPosition(resolve, reject, { 
+  timeout: 10000,
+  maximumAge: 60000,
+  enableHighAccuracy: false
+});
       });
       gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
     } catch {}
