@@ -2504,23 +2504,9 @@ function LoginActivity() {
   // Build Leaflet map once div is ready
   useEffect(() => {
     if (!mapRef.current) return;
-    if (leafletMap.current) return; // already built
-
-    // Dynamically load Leaflet CSS + JS (already available from package.json in pwa/web)
-    if (!window.L) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.onload = () => initMap();
-      document.head.appendChild(script);
-    } else {
-      initMap();
-    }
-  }, [mapRef.current]);
+    if (leafletMap.current) return;
+    initMap();
+}, [mapRef.current]);
 
   const initMap = () => {
     if (!window.L || !mapRef.current || leafletMap.current) return;
