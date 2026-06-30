@@ -277,17 +277,7 @@ router.post('/verify-otp', validate(VerifyOtpSchema), async (req, res) => {
 
     await pool.query(`UPDATE public.${table} SET session_token=$1 WHERE id=$2`, [sessionToken, user.id]);
     const token = generateToken({ id: user.id, phone_number: user.mobile_number, role: user.role, owner_id: user.owner_id || null, owner_code: user.owner_code || null, driver_code: user.driver_code || null, session_token: sessionToken });
-
-    // Notify admin on every owner/driver login — include device/IP
-    pool.query(
-      `INSERT INTO public.notifications (user_type, title, message, metadata, created_at)
-       VALUES ('ADMIN', $1, $2, $3, NOW())`,
-      [
-        `${user.role === 'OWNER' ? '🏢 Owner' : '🚗 Driver'} Login`,
-        `${user.full_name || 'Unknown'} (${user.mobile_number}) logged in`,
-        JSON.stringify({ ...loginMeta, type: 'login' }),
-      ]
-    ).catch(() => {});
+    
 
     // Audit log — owner/driver login with device & IP
     if (user.role === 'OWNER' || user.role === 'DRIVER') {
