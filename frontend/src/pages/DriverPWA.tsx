@@ -1007,8 +1007,12 @@ export default function DriverPWA() {
   const to = new Date(w.to).getDate();
   return day >= from && day <= to;
 }) ?? (day >= assignedFromDay);
-const beforeAssignment = !inAnyWindow;
-                  const inactive = future || beforeAssignment;
+const inWindow = attendance.windows?.some(w => {
+  const wFrom = new Date(w.from + 'T00:00:00').getDate();
+  const wTo   = new Date(w.to   + 'T00:00:00').getDate();
+  return day >= wFrom && day <= wTo;
+}) ?? (day >= assignedFromDay);
+const inactive = future || !inWindow;
                   return (
                     <div key={day} title={beforeAssignment ? 'Before vehicle assignment' : `Day ${day}`} style={{
                       width: 22, height: 22, borderRadius: 6, fontSize: 9, fontWeight: 700,
