@@ -1013,6 +1013,7 @@ const inWindow = attendance.windows?.some(w => {
   return day >= wFrom && day <= wTo;
 }) ?? (day >= assignedFromDay);
 const inactive = future || !inWindow;
+const beforeAssignment = !inWindow && !future; 
                   return (
                     <div key={day} title={beforeAssignment ? 'Before vehicle assignment' : `Day ${day}`} style={{
                       width: 22, height: 22, borderRadius: 6, fontSize: 9, fontWeight: 700,
