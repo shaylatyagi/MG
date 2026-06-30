@@ -3164,7 +3164,13 @@ const [vehicleHistory, setVehicleHistory] = useState([]);
     type="checkbox"
     id="mva_box"
     checked={newVehicle.mva || false}
-    onChange={e => setNewVehicle({...newVehicle, mva: e.target.checked})}
+    onChange={e => {
+  if (e.target.checked) {
+    const ok = window.confirm('⚖️ Is vehicle ko MVA applicable mark karna chahte ho?\nDriver ko unki vehicle info mein dikhega.');
+    if (!ok) return;
+  }
+  setNewVehicle({...newVehicle, mva: e.target.checked});
+}}
     style={{width:16, height:16, cursor:'pointer', accentColor:'#7c3aed'}}
   />
   <label htmlFor="mva_box" style={{fontSize:13, fontWeight:600, color:'#374151', cursor:'pointer'}}>
@@ -5288,7 +5294,13 @@ ${fit}
             type="checkbox"
             id="mva_chk"
             checked={newVehicle.mva || false}
-            onChange={e => setNewVehicle({...newVehicle, mva: e.target.checked})}
+            onChange={e => {
+  if (e.target.checked) {
+    const ok = window.confirm('⚖️ Is vehicle ko MVA applicable mark karna chahte ho?\nDriver ko unki vehicle info mein dikhega.');
+    if (!ok) return;
+  }
+  setNewVehicle({...newVehicle, mva: e.target.checked});
+}}
             style={{width:16, height:16, cursor:'pointer', accentColor:'#7c3aed'}}
           />
           <label htmlFor="mva_chk" style={{fontSize:13, fontWeight:600, color:'#374151', cursor:'pointer'}}>

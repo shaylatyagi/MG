@@ -58,6 +58,7 @@ router.get('/profile', async (req, res) => {
 const totalPaid    = parseFloat(ledgerRes.rows[0].total_paid);
 const advanceBal   = parseFloat(p.advance_balance || 0);
 const totalOnlinePaid = parseFloat(allOnlinePaidRes.rows[0].total);
+console.log('DEBUG outstanding:', { totalCharged, totalPaid, advanceBal, totalOnlinePaid });
 total_outstanding = Math.max(0, totalCharged - totalPaid - advanceBal - totalOnlinePaid);
       amount_paid_today  = parseFloat(todayPaidRes.rows[0].total);
     }

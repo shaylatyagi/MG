@@ -967,6 +967,7 @@ router.get('/owner/overdue-drivers', verifyToken, async (req, res) => {
         (SELECT COALESCE(SUM(amount), 0) FROM public.driver_ledger
          WHERE driver_id = d.id
            AND entry_type IN ('PAYMENT','CASH_PAYMENT','UPI_PAYMENT','ADVANCE_CREDIT','REPAIR_CREDIT','REFUND'))
+        - COALESCE(d.advance_balance, 0)
       ) AS balance
       FROM public.drivers d
       LEFT JOIN public.vehicles v ON v.driver_id = d.id
@@ -2337,8 +2338,9 @@ if (p.vehicle_number && p.vehicle_daily_rent) {
     [p.id]
   );
   const charged = parseFloat(ledgerBal.rows[0]?.total_charged || 0);
-  const paid = parseFloat(ledgerBal.rows[0]?.total_paid || 0);
-  total_outstanding = Math.max(0, charged - paid);
+  const paid    = parseFloat(ledgerBal.rows[0]?.total_paid    || 0);
+  const advanceBal = parseFloat(p.advance_balance || 0);
+  total_outstanding = Math.max(0, charged - paid - advanceBal);
 }
 res.json({
   ...p,
