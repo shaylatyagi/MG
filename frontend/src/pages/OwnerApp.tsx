@@ -4571,7 +4571,23 @@ const TrackFleetTab = () => {
   const [loading, setLoading] = React.useState(true);
   const [apiError, setApiError] = React.useState(null);
   const [selectedDriver, setSelectedDriver] = React.useState(null);
-
+  const leafletMap = React.useRef(null);
+  React.useEffect(() => {
+  if (leafletMap.current) return;
+  const initMap = () => {
+    const L = window.L;
+    if (!L) { setTimeout(initMap, 200); return; }
+    if (!mapDivRef.current) return;
+    const map = L.map(mapDivRef.current, { zoomControl: false }).setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    }).addTo(map);
+    leafletMap.current = map;
+  };
+  initMap();
+  return () => { if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; } };
+}, []);
+const mapDivRef = React.useRef(null);
   const timeAgo = (ts) => {
     if (!ts) return 'Unknown';
     const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
@@ -4597,50 +4613,33 @@ const TrackFleetTab = () => {
     const id = setInterval(fetchLocations, 60000);
     return () => clearInterval(id);
   }, [fetchLocations]);
-
-  // Listen for marker clicks from the iframe
   React.useEffect(() => {
-    const handler = (e) => {
-      if (e.data?.type === 'driver') {
-        const d = drivers.find(dr => Number(dr.id) === Number(e.data.id));
-        if (d) setSelectedDriver(d);
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [drivers]);
+  const L = window.L;
+  const map = leafletMap.current;
+  if (!L || !map || !drivers.length) return;
 
-  // Build self-contained Leaflet HTML for the iframe
-  const mapHtml = React.useMemo(() => {
-    const markers = drivers.map(d => {
-      const initial = (d.full_name || 'D')[0].toUpperCase();
-      return `L.marker([${parseFloat(d.last_lat)},${parseFloat(d.last_lng)}],{
-        icon:L.divIcon({
-          html:'<div style="width:38px;height:38px;border-radius:50%;background:#4f46e5;border:3px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;font-family:Arial;box-shadow:0 2px 8px rgba(0,0,0,0.3)">${initial}</div>',
-          className:'',iconSize:[38,38],iconAnchor:[19,19]
-        })
-      }).addTo(map).on('click',function(){parent.postMessage({type:'driver',id:${d.id}},'*');});`;
-    }).join('\n');
+  // Clear old markers
+  map.eachLayer(layer => {
+    if (layer instanceof L.Marker) map.removeLayer(layer);
+  });
 
-    const fit = drivers.length > 1
-      ? `map.fitBounds([${drivers.map(d=>`[${parseFloat(d.last_lat)},${parseFloat(d.last_lng)}]`).join(',')}],{padding:[70,40]});`
-      : drivers.length === 1
-      ? `map.setView([${parseFloat(drivers[0].last_lat)},${parseFloat(drivers[0].last_lng)}],15);`
-      : '';
+  const bounds = [];
+  drivers.forEach(d => {
+    if (!d.last_lat || !d.last_lng) return;
+    const initial = (d.full_name || 'D')[0].toUpperCase();
+    const icon = L.divIcon({
+      html: `<div style="width:38px;height:38px;border-radius:50%;background:#4f46e5;border:3px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">${initial}</div>`,
+      className: '', iconSize: [38, 38], iconAnchor: [19, 19]
+    });
+    const marker = L.marker([parseFloat(d.last_lat), parseFloat(d.last_lng)], { icon })
+      .addTo(map)
+      .on('click', () => setSelectedDriver(d));
+    bounds.push([parseFloat(d.last_lat), parseFloat(d.last_lng)]);
+  });
 
-    return `<!DOCTYPE html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>*{margin:0;padding:0}html,body{width:100%;height:100%}#map{width:100%;height:100%}</style>
-</head><body><div id="map"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script>
-var map=L.map('map',{zoomControl:false}).setView([28.6139,77.2090],13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-${markers}
-${fit}
-</script></body></html>`;
-  }, [drivers]);
-
+  if (bounds.length > 1) map.fitBounds(bounds, { padding: [70, 40] });
+  else if (bounds.length === 1) map.setView(bounds[0], 15);
+}, [drivers]);
   // ─── RENDER ──────────────────────────────────────────────────────────
   return (
   <div className="fixed inset-0 z-[9999] bg-slate-900" style={{ height: '100dvh', width: '100vw' }}>
@@ -4671,13 +4670,11 @@ ${fit}
         </div>
       </div>
     ) : (
-      <iframe
-        srcDoc={mapHtml}
-        sandbox="allow-scripts allow-same-origin"
-        className="absolute inset-0"
-        style={{ width: '100%', height: '100%', border: 'none' }}
-        title="Fleet Map"
-      />
+      <div
+  ref={mapDivRef}
+  className="absolute inset-0"
+  style={{ width: '100%', height: '100%' }}
+/>
     )}
 
     {/* Bottom sheet */}

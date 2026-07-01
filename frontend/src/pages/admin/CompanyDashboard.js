@@ -2483,9 +2483,6 @@ function LoginActivity() {
   const [role, setRole]       = useState('');
   const [search, setSearch]   = useState('');
   const [selected, setSelected] = useState(null);
-  const mapRef = useRef(null);
-  const leafletMap = useRef(null);
-  const markersLayer = useRef(null);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -2508,43 +2505,6 @@ function LoginActivity() {
     initMap();
 }, []);
 
-  const initMap = () => {
-    if (!window.L || !mapRef.current || leafletMap.current) return;
-    const map = window.L.map(mapRef.current, { zoomControl: true }).setView([20.5937, 78.9629], 5);
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-    markersLayer.current = window.L.layerGroup().addTo(map);
-    leafletMap.current = map;
-    // Trigger marker render with current logs
-    renderMarkers(logs);
-  };
-
-  const roleColor = (r) => r === 'DRIVER' ? '#16a34a' : r === 'OWNER' ? '#4f46e5' : '#dc2626';
-
-  const renderMarkers = (logList) => {
-    if (!window.L || !markersLayer.current) return;
-    markersLayer.current.clearLayers();
-    logList.forEach(log => {
-      if (!log.latitude || !log.longitude) return;
-      const color = roleColor(log.user_role);
-      const icon = window.L.divIcon({
-        className: '',
-        html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
-        iconSize: [12, 12], iconAnchor: [6, 6],
-      });
-      const marker = window.L.marker([log.latitude, log.longitude], { icon })
-        .bindPopup(`
-          <strong>${log.full_name || '—'}</strong><br/>
-          ${log.phone_number || ''}<br/>
-          <span style="font-size:11px;background:${color};color:#fff;padding:1px 6px;border-radius:8px">${log.user_role}</span><br/>
-          <span style="font-size:11px;color:#6b7280">${new Date(log.logged_in_at).toLocaleString('en-IN')}</span><br/>
-          <span style="font-size:11px;color:#374151">IP: ${log.ip_address || '—'}</span>
-        `);
-      markersLayer.current.addLayer(marker);
-    });
-  };
-
   // Re-render markers when logs change
   useEffect(() => {
     renderMarkers(logs);
@@ -2556,9 +2516,6 @@ function LoginActivity() {
       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
     });
   };
-
-  const logsWithGps = logs.filter(l => l.latitude && l.longitude).length;
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -2592,26 +2549,6 @@ function LoginActivity() {
           <option value="ADMIN">Admin</option>
         </select>
       </div>
-
-      {/* Leaflet Map */}
-      <div style={{
-        border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden',
-        marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-      }}>
-        <div style={{ padding: '8px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 16 }}>
-          {[['DRIVER','#16a34a'],['OWNER','#4f46e5'],['ADMIN','#dc2626']].map(([r, c]) => (
-            <span key={r} style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }}></span>
-              {r}
-            </span>
-          ))}
-          <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 'auto' }}>
-            {logsWithGps === 0 ? '⚠️ No GPS data yet — GPS only captured for new logins after this update' : `${logsWithGps} pins on map`}
-          </span>
-        </div>
-        <div ref={mapRef} style={{ height: 340, background: '#e5e7eb' }} />
-      </div>
-
       {/* Log Table */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Loading…</div>
