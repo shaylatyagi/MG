@@ -1620,25 +1620,26 @@ useEffect(() => {
         })
       ]);
       const d = await ledgerRes2.json();
-      
-      // Today's outstanding — owner/stats primary (matches "Calculated for Today")
-      if (statsRes2.ok) {
-        const s = await statsRes2.json();
-        if (s.success && s.data?.outstanding >= 0) {
-          d.outstanding = s.data.outstanding;
-        }
-      }
-      if (!d.outstanding) {
-        try {
-          const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${ownerId()}`, {
-            headers: { Authorization: `Bearer ${token()}` }
-          });
-          if (overdueRes.ok) {
-            const overdueData = await overdueRes.json();
-            d.outstanding = overdueData.reduce((sum, item) => sum + parseFloat(item.balance || 0), 0);
+      // Only override outstanding for 'today' — other periods use ledger API data
+      if (horizon === 'today') {
+        if (statsRes2.ok) {
+          const s = await statsRes2.json();
+          if (s.success && s.data?.outstanding >= 0) {
+            d.outstanding = s.data.outstanding;
           }
-        } catch (e) {
-          console.error('Overdue fetch for ledger failed:', e);
+        }
+        if (!d.outstanding) {
+          try {
+            const overdueRes = await fetch(`${API}/api/payment/owner/overdue-drivers?ownerId=${ownerId()}`, {
+              headers: { Authorization: `Bearer ${token()}` }
+            });
+            if (overdueRes.ok) {
+              const overdueData = await overdueRes.json();
+              d.outstanding = overdueData.reduce((sum, item) => sum + parseFloat(item.balance || 0), 0);
+            }
+          } catch (e) {
+            console.error('Overdue fetch for ledger failed:', e);
+          }
         }
       }
       
@@ -4629,7 +4630,6 @@ const TrackFleetTab = () => {
 
     return `<!DOCTYPE html><html><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>*{margin:0;padding:0}html,body{width:100%;height:100%}#map{width:100%;height:100%}</style>
 </head><body><div id="map"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -4673,7 +4673,7 @@ ${fit}
     ) : (
       <iframe
         srcDoc={mapHtml}
-        sandbox="allow-scripts"
+        sandbox="allow-scripts allow-same-origin"
         className="absolute inset-0"
         style={{ width: '100%', height: '100%', border: 'none' }}
         title="Fleet Map"

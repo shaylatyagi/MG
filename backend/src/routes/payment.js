@@ -1133,11 +1133,21 @@ router.get('/owner/ledger', async (req, res) => {
       default:           dateFilter = ` AND DATE(order_completion_date) = CURRENT_DATE`;
     }
     const received = await pool.query(
-      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='SUCCESS' AND driver_id = ANY($1::int[])${dateFilter}`,
+      `SELECT COALESCE(SUM(mo.order_amount),0) as total
+       FROM public.ms_orders mo
+       JOIN public.drivers d ON RIGHT(d.mobile_number,10) = RIGHT(mo.payer_mobile,10)
+       WHERE mo.transaction_status='SUCCESS'
+         AND d.id = ANY($1::int[])
+         ${dateFilter.replace(/order_completion_date/g,'mo.order_completion_date')}`,
       [driverIds]
     );
     const pending = await pool.query(
-      `SELECT COALESCE(SUM(order_amount),0) as total FROM ms_orders WHERE transaction_status='PENDING' AND driver_id = ANY($1::int[]) AND DATE(order_initiation_date)=CURRENT_DATE`,
+      `SELECT COALESCE(SUM(mo.order_amount),0) as total
+       FROM public.ms_orders mo
+       JOIN public.drivers d ON RIGHT(d.mobile_number,10) = RIGHT(mo.payer_mobile,10)
+       WHERE mo.transaction_status='PENDING'
+         AND d.id = ANY($1::int[])
+         AND DATE(mo.order_initiation_date)=CURRENT_DATE`,
       [driverIds]
     );
     res.json({
@@ -2282,7 +2292,7 @@ router.get('/driver/profile', verifyToken, async (req, res) => {
      d.driver_code, d.wallet_balance, d.status, d.advance_balance,
      d.security_deposit, d.owner_code,
      v.id as vehicle_id, v.vehicle_number, v.vehicle_model, v.vehicle_type,
-     v.daily_rent as vehicle_daily_rent, v.status as vehicle_status,
+     v.daily_rent as vehicle_daily_rent, v.status as vehicle_status, v.mva_applicable,
      COALESCE(
        (SELECT assigned_at FROM public.driver_vehicle_history dvh
         WHERE dvh.driver_id = d.id AND dvh.unassigned_at IS NULL

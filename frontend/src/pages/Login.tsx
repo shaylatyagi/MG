@@ -87,6 +87,15 @@ export default function Login() {
   const [signupEmail, setSignupEmail]         = useState('');
   const [signupCompany, setSignupCompany]     = useState('');
   const [signupOtp, setSignupOtp]             = useState('');
+  const [gpsCoords, setGpsCoords] = useState({ latitude: null, longitude: null });
+  useEffect(() => {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => setGpsCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+    () => {},
+    { timeout: 15000, maximumAge: 300000, enableHighAccuracy: false }
+  );
+}, []);
   const isAdminSubdomain = window.location.hostname === 'admin.mobilitygrid.in';
   const allRoles = [
     { type: 'driver', name: 'Driver',         icon: <Truck size={20} />,    redirect: '/driver/dashboard' },
@@ -259,18 +268,7 @@ useEffect(() => {
 const loginWithPin = async function() {
     setLoading(true); setError('');
     var role = selectedRole.type === 'driver' ? 'DRIVER' : 'OWNER';
-    let gpsCoords = { latitude: null, longitude: null };
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!navigator.geolocation) { reject(); return; }
-        navigator.geolocation.getCurrentPosition(resolve, reject, { 
-  timeout: 10000,
-  maximumAge: 60000,
-  enableHighAccuracy: false
-});
-      });
-      gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-    } catch {}
+
     try {
       
       var res = await fetch(API + '/api/auth/login-pin', {
